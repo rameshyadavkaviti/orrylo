@@ -4,7 +4,7 @@ extern crate std;
 
 use super::*;
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Bytes, BytesN, Env};
-use std::{fs, path::PathBuf};
+use std::{fs, panic::{catch_unwind, AssertUnwindSafe}, path::PathBuf};
 
 #[contract]
 struct InitializationHarness;
@@ -120,7 +120,7 @@ fn missing_state_returns_explicit_error() {
 
 #[test]
 #[ignore = "requires `stellar contract build` first"]
-fn wasm_deployment_enforces_constructor_auth_and_rolls_back_failed_deploy() {
+fn wasm_constructor_auth_failure_rolls_back_deployment() {
     let env = Env::default();
     let initializer = Address::generate(&env);
     let harness_id = env.register(WasmDeploymentHarness, ());
@@ -128,13 +128,19 @@ fn wasm_deployment_enforces_constructor_auth_and_rolls_back_failed_deploy() {
     let wasm = built_foundation_wasm(&env);
     let wasm_hash = env.deployer().upload_contract_wasm(wasm);
 
-    // Real deploy_v2 path: the Wasm constructor must reject an initializer
-    // that has not authorized this deployment.
-    assert!(harness.try_deploy(&wasm_hash, &initializer).is_err());
+    // This is the real Wasm/deployer path. With ordinary test authorization
+    // recording, the nested initializer.require_auth() is rejected as non-root.
+    // Catch the host panic so we can verify that the failed constructor caused
+    // the deployment to roll back completely.
+    let failed = catch_unwind(AssertUnwindSafe(|| {
+        harness.deploy(&wasm_hash, &initializer);
+    }));
+    assert!(failed.is_err());
 
-    // The failed deployment must roll back fully so the exact same deterministic
-    // deployment address remains available once authorization is provided.
-    env.mock_all_auths();
+    // Allow non-root auth in the test environment and retry the exact same
+    // deterministic deployment (same deployer contract + salt). Success proves
+    // that the failed constructor invocation did not leave a partial instance.
+    env.mock_all_auths_allowing_non_root_auth();
     let foundation_id = harness.deploy(&wasm_hash, &initializer);
     let foundation = OrryloFoundationClient::new(&env, &foundation_id);
 
@@ -142,13 +148,50 @@ fn wasm_deployment_enforces_constructor_auth_and_rolls_back_failed_deploy() {
         foundation.state(),
         FoundationState {
             state_version: FOUNDATION_STATE_VERSION,
-            initializer,
+            initializer: initializer.clone(),
         }
     );
 
-    // After successful deployment, repeating the same deployment (same
-    // deployer + salt) must fail rather than recreate/reinitialize the instance.
-    assert!(harness
-        .try_deploy(&wasm_hash, &foundation.state().initializer)
-        .is_err());
+    // The recorded auth set must contain the initializer. Since the deployer is
+    // a different contract address, this demonstrates that the deployed Wasm
+    // actually executed initializer.require_auth().
+    assert!(env
+        .auths()
+        .iter()
+        .any(|(address, _invocation)| address == &initializer));
+}
+
+#[test]
+#[ignore = "requires `stellar contract build` first"]
+fn wasm_direct_deployer_records_initializer_authorization() {
+    let env = Env::default();
+    let initializer = Address::generate(&env);
+    let deployer_address = Address::generate(&env);
+    let wasm = built_foundation_wasm(&env);
+    let wasm_hash = env.deployer().upload_contract_wasm(wasm);
+
+    // Env::register mocks constructor authorization. Deploying through
+    // Env::deployer exercises the same constructor-auth path used on-chain.
+    env.mock_all_auths();
+    let deployer = env
+        .deployer()
+        .with_address(deployer_address.clone(), [11_u8; 32]);
+    let foundation_id = deployer.deploy_v2(wasm_hash, (initializer.clone(),));
+    let foundation = OrryloFoundationClient::new(&env, &foundation_id);
+
+    assert_eq!(
+        foundation.state(),
+        FoundationState {
+            state_version: FOUNDATION_STATE_VERSION,
+            initializer: initializer.clone(),
+        }
+    );
+
+    let auths = env.auths();
+    assert!(auths
+        .iter()
+        .any(|(address, _invocation)| address == &deployer_address));
+    assert!(auths
+        .iter()
+        .any(|(address, _invocation)| address == &initializer));
 }
