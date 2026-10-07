@@ -10,7 +10,7 @@ import { normalizeWalletPublicKey } from "./wallet";
 
 const CHAIN_ID = "application";
 const SENSITIVE_KEY =
-  /(secret|seed|session.?token|signature|signed.?message|private.?key|credential|password)/i;
+  /(secret|seed|session(?:.?token)?|authorization|signature|signed.?message|private.?key|credential|password)/i;
 
 interface AuditRow {
   event_id: string;
@@ -24,6 +24,11 @@ interface AuditRow {
   metadata: JsonObject;
   previous_event_hash: string | null;
   event_hash: string;
+}
+
+interface AuditHeadRow {
+  last_sequence: string;
+  last_event_hash: string | null;
 }
 
 export class PostgresAuditRepository {
@@ -146,35 +151,81 @@ export class PostgresAuditRepository {
   }
 
   async verifyChain(): Promise<boolean> {
-    const events = await this.list();
-    let previousEventHash: string | null = null;
+    return this.sql.begin(async (transaction) => {
+      const [head] = await transaction<AuditHeadRow[]>`
+        SELECT
+          last_sequence::text AS last_sequence,
+          CASE
+            WHEN last_event_hash IS NULL THEN NULL
+            ELSE btrim(last_event_hash)
+          END AS last_event_hash
+        FROM audit_chain_heads
+        WHERE chain_id = ${CHAIN_ID}
+        FOR SHARE
+      `;
 
-    for (const event of events) {
-      if (event.previousEventHash !== previousEventHash) {
+      if (!head) {
         return false;
       }
 
-      const expected = hashAuditEvent({
-        eventId: event.eventId,
-        sequence: event.sequence,
-        requestId: event.requestId,
-        eventType: event.eventType,
-        source: event.source,
-        targetPublicKey: event.targetPublicKey,
-        occurredAt: event.occurredAt,
-        policyVersion: event.policyVersion,
-        metadata: event.metadata,
-        previousEventHash,
-      });
+      const rows = await transaction<AuditRow[]>`
+        SELECT
+          event_id,
+          sequence::text AS sequence,
+          request_id,
+          event_type,
+          source,
+          target_public_key,
+          occurred_at,
+          policy_version,
+          metadata,
+          previous_event_hash,
+          event_hash
+        FROM audit_events
+        WHERE chain_id = ${CHAIN_ID}
+        ORDER BY sequence ASC
+      `;
+      const events = rows.map(mapAuditRow);
+      let previousEventHash: string | null = null;
+      let expectedSequence = 1n;
 
-      if (expected !== event.eventHash) {
-        return false;
+      for (const event of events) {
+        if (event.sequence !== expectedSequence.toString()) {
+          return false;
+        }
+
+        if (event.previousEventHash !== previousEventHash) {
+          return false;
+        }
+
+        const expectedHash = hashAuditEvent({
+          eventId: event.eventId,
+          sequence: event.sequence,
+          requestId: event.requestId,
+          eventType: event.eventType,
+          source: event.source,
+          targetPublicKey: event.targetPublicKey,
+          occurredAt: event.occurredAt,
+          policyVersion: event.policyVersion,
+          metadata: event.metadata,
+          previousEventHash,
+        });
+
+        if (expectedHash !== event.eventHash) {
+          return false;
+        }
+
+        previousEventHash = event.eventHash;
+        expectedSequence += 1n;
       }
 
-      previousEventHash = event.eventHash;
-    }
+      const finalSequence = (expectedSequence - 1n).toString();
 
-    return true;
+      return (
+        head.last_sequence === finalSequence &&
+        head.last_event_hash === previousEventHash
+      );
+    });
   }
 }
 
