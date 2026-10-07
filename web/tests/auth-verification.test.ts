@@ -188,3 +188,169 @@ test("logout invalidates the session and missing session stays unauthenticated",
 
   assert.equal(service.getSession("logout-session", NOW + 3), null);
 });
+
+test("rejects unknown challenge IDs", () => {
+  const service = createService();
+  const payload = "Orrylo wallet authentication\\nunknown=true";
+
+  assert.deepEqual(
+    service.verifyWallet(
+      {
+        challengeId: "z".repeat(43),
+        payload,
+        proof: proofFor(payload),
+      },
+      NOW + 1,
+    ),
+    { ok: false, code: "challenge_missing_or_used" },
+  );
+});
+
+test("rejects challenge ID substitution", () => {
+  const service = createService();
+  const first = service.createChallenge(NOW, "h".repeat(43));
+  const second = service.createChallenge(NOW, "i".repeat(43));
+
+  assert.deepEqual(
+    service.verifyWallet(
+      {
+        challengeId: second.id,
+        payload: first.payload,
+        proof: proofFor(first.payload),
+      },
+      NOW + 1,
+    ),
+    { ok: false, code: "challenge_mismatch" },
+  );
+
+  const firstResult = service.verifyWallet(
+    {
+      challengeId: first.id,
+      payload: first.payload,
+      proof: proofFor(first.payload),
+    },
+    NOW + 2,
+    "first-session",
+  );
+  assert.equal(firstResult.ok, true);
+
+  assert.deepEqual(
+    service.verifyWallet(
+      {
+        challengeId: second.id,
+        payload: second.payload,
+        proof: proofFor(second.payload),
+      },
+      NOW + 3,
+    ),
+    { ok: false, code: "challenge_missing_or_used" },
+  );
+});
+
+test("burns challenge after failed proof", () => {
+  const service = createService();
+  const challenge = service.createChallenge(NOW, "j".repeat(43));
+  const proof = proofFor(challenge.payload);
+
+  assert.deepEqual(
+    service.verifyWallet(
+      {
+        challengeId: challenge.id,
+        payload: challenge.payload,
+        proof: { ...proof, signature: "00".repeat(64) },
+      },
+      NOW + 1,
+    ),
+    { ok: false, code: "invalid_signature" },
+  );
+
+  assert.deepEqual(
+    service.verifyWallet(
+      {
+        challengeId: challenge.id,
+        payload: challenge.payload,
+        proof,
+      },
+      NOW + 2,
+    ),
+    { ok: false, code: "challenge_missing_or_used" },
+  );
+});
+
+test("rejects cross-context challenge reuse", () => {
+  const contexts = [
+    { domain: "evil.example", network: "testnet" as const },
+    { domain: "app.orrylo.com", network: "public" as const },
+  ];
+
+  for (const context of contexts) {
+    const challenges = new MemoryChallengeStore();
+    const sessions = new MemorySessionStore();
+    const issuer = new WalletAuthService(
+      { domain: "app.orrylo.com", network: "testnet" },
+      challenges,
+      sessions,
+    );
+    const verifier = new WalletAuthService(context, challenges, sessions);
+    const nonce = randomNonce(context.domain + context.network);
+    const challenge = issuer.createChallenge(NOW, nonce);
+
+    assert.deepEqual(
+      verifier.verifyWallet(
+        {
+          challengeId: challenge.id,
+          payload: challenge.payload,
+          proof: proofFor(challenge.payload),
+        },
+        NOW + 1,
+      ),
+      { ok: false, code: "challenge_mismatch" },
+    );
+  }
+});
+
+test("rejects signed-message substitution", () => {
+  const service = createService();
+  const challenge = service.createChallenge(NOW, "k".repeat(43));
+  const proof = proofFor(challenge.payload, keypair(10));
+
+  assert.deepEqual(
+    service.verifyWallet(
+      {
+        challengeId: challenge.id,
+        payload: challenge.payload,
+        proof: {
+          ...proof,
+          signed_message: proof.signed_message + "x",
+        },
+      },
+      NOW + 1,
+    ),
+    { ok: false, code: "signed_message_mismatch" },
+  );
+});
+
+test("rejects public-key substitution", () => {
+  const service = createService();
+  const challenge = service.createChallenge(NOW, "l".repeat(43));
+  const proof = proofFor(challenge.payload, keypair(10));
+
+  assert.deepEqual(
+    service.verifyWallet(
+      {
+        challengeId: challenge.id,
+        payload: challenge.payload,
+        proof: {
+          ...proof,
+          pubkey: keypair(11).publicKey(),
+        },
+      },
+      NOW + 1,
+    ),
+    { ok: false, code: "signed_message_mismatch" },
+  );
+});
+
+function randomNonce(seed: string): string {
+  return Buffer.from(seed.padEnd(32, "_")).toString("base64url").slice(0, 43);
+}
