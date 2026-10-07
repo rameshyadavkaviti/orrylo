@@ -162,6 +162,13 @@ fn wasm_constructor_auth_failure_rolls_back_deployment() {
             initializer: initializer.clone(),
         }
     );
+
+    // Once the deterministic address has been successfully created, attempting
+    // the exact same deployment again must fail rather than rerun initialization.
+    let duplicate = catch_unwind(AssertUnwindSafe(|| {
+        harness.deploy(&wasm_hash, &initializer);
+    }));
+    assert!(duplicate.is_err());
 }
 
 #[test]
