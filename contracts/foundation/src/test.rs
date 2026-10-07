@@ -146,8 +146,15 @@ fn wasm_constructor_auth_failure_rolls_back_deployment() {
     // that the failed constructor invocation did not leave a partial instance.
     env.mock_all_auths_allowing_non_root_auth();
     let foundation_id = harness.deploy(&wasm_hash, &initializer);
-    let foundation = OrryloFoundationClient::new(&env, &foundation_id);
 
+    // Capture the deployment authorization before a later contract call replaces
+    // Env::auths()'s "last invocation" snapshot.
+    let deployment_auths = env.auths();
+    assert!(deployment_auths
+        .iter()
+        .any(|(address, _invocation)| address == &initializer));
+
+    let foundation = OrryloFoundationClient::new(&env, &foundation_id);
     assert_eq!(
         foundation.state(),
         FoundationState {
@@ -155,14 +162,6 @@ fn wasm_constructor_auth_failure_rolls_back_deployment() {
             initializer: initializer.clone(),
         }
     );
-
-    // The recorded auth set must contain the initializer. Since the deployer is
-    // a different contract address, this demonstrates that the deployed Wasm
-    // actually executed initializer.require_auth().
-    assert!(env
-        .auths()
-        .iter()
-        .any(|(address, _invocation)| address == &initializer));
 }
 
 #[test]
@@ -176,13 +175,21 @@ fn wasm_direct_deployer_records_initializer_authorization() {
 
     // Env::register mocks constructor authorization. Deploying through
     // Env::deployer exercises the same constructor-auth path used on-chain.
-    env.mock_all_auths();
+    env.mock_all_auths_allowing_non_root_auth();
     let deployer = env
         .deployer()
         .with_address(deployer_address.clone(), [11_u8; 32]);
     let foundation_id = deployer.deploy_v2(wasm_hash, (initializer.clone(),));
-    let foundation = OrryloFoundationClient::new(&env, &foundation_id);
 
+    let deployment_auths = env.auths();
+    assert!(deployment_auths
+        .iter()
+        .any(|(address, _invocation)| address == &deployer_address));
+    assert!(deployment_auths
+        .iter()
+        .any(|(address, _invocation)| address == &initializer));
+
+    let foundation = OrryloFoundationClient::new(&env, &foundation_id);
     assert_eq!(
         foundation.state(),
         FoundationState {
@@ -190,12 +197,4 @@ fn wasm_direct_deployer_records_initializer_authorization() {
             initializer: initializer.clone(),
         }
     );
-
-    let auths = env.auths();
-    assert!(auths
-        .iter()
-        .any(|(address, _invocation)| address == &deployer_address));
-    assert!(auths
-        .iter()
-        .any(|(address, _invocation)| address == &initializer));
 }
