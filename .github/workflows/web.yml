@@ -19,7 +19,7 @@ on:
       - "docs/SOURCE_OF_TRUTH.md"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   application:
@@ -32,29 +32,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.head_ref }}
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
 
       - name: Confirm runtime
         run: |
           node --version
           npm --version
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
 
-      - name: Normalize formatting for validation
-        run: npm run format
-
-      - name: Record formatting drift
-        id: formatting
-        continue-on-error: true
-        run: git diff --exit-code -- .
+      - name: Check formatting
+        run: npm run format:check
 
       - name: Lint
         run: npm run lint
@@ -67,20 +62,3 @@ jobs:
 
       - name: Production build
         run: npm run build
-
-      - name: Fail on formatting drift
-        if: steps.formatting.outcome == 'failure'
-        run: |
-          echo "Committed web files are not formatted."
-          exit 1
-
-      - name: Commit resolved dependency lock
-        if: github.event_name == 'pull_request'
-        run: |
-          if [ -n "$(git status --porcelain -- package-lock.json)" ]; then
-            git add package-lock.json
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "build: lock web dependencies"
-            git push origin "HEAD:${GITHUB_HEAD_REF}"
-          fi
