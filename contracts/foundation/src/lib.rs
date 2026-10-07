@@ -4,6 +4,13 @@ use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, panic_with_error, Address, Env,
 };
 
+/// Application-facing ABI compatibility level.
+///
+/// Increment this only when an application integrating with the currently
+/// stable public contract surface can no longer remain compatible unchanged.
+pub const CONTRACT_INTERFACE_VERSION: u32 = 1;
+
+/// Schema version of the foundation state stored by this contract.
 pub const FOUNDATION_STATE_VERSION: u32 = 1;
 
 #[contracttype]
@@ -42,6 +49,11 @@ impl OrryloFoundation {
         if let Err(error) = initialize(&env, initializer) {
             panic_with_error!(&env, error);
         }
+    }
+
+    /// Returns the application-facing ABI compatibility level.
+    pub fn interface_version() -> u32 {
+        CONTRACT_INTERFACE_VERSION
     }
 
     /// Returns the schema version of the foundation state.

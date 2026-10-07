@@ -1,0 +1,69 @@
+{
+  "functions": [
+    {
+      "name": "__constructor",
+      "inputs": [
+        {
+          "name": "initializer",
+          "type": "address"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "interface_version",
+      "inputs": [],
+      "outputs": [
+        "u32"
+      ]
+    },
+    {
+      "name": "state",
+      "inputs": [],
+      "outputs": [
+        {
+          "result": {
+            "ok_type": {
+              "udt": {
+                "name": "FoundationState"
+              }
+            },
+            "error_type": "error"
+          }
+        }
+      ]
+    },
+    {
+      "name": "version",
+      "inputs": [],
+      "outputs": [
+        "u32"
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "name": "AlreadyInitialized",
+      "value": 1
+    },
+    {
+      "name": "StateUnavailable",
+      "value": 2
+    }
+  ],
+  "types": [
+    {
+      "name": "FoundationState",
+      "fields": [
+        {
+          "name": "initializer",
+          "type": "address"
+        },
+        {
+          "name": "state_version",
+          "type": "u32"
+        }
+      ]
+    }
+  ]
+}

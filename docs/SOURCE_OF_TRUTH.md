@@ -1,6 +1,6 @@
 # Orrylo Source of Truth — v1
 
-Status: **Canonical architecture definition / contract implementation started**
+Status: **Canonical architecture definition / contract interface implementation**
 
 This document records the decisions currently considered authoritative for Orrylo. Anything not marked as decided here, or explicitly delegated to another canonical document, must be treated as unresolved.
 
@@ -223,13 +223,25 @@ Important status:
 
 ## 14. Implementation status
 
-Current phase: **Contract Foundation implementation**.
+Current phase: **Contract Interface Lock implementation**.
 
-The repository contains a minimal Soroban workspace and a policy-neutral foundation contract that establishes atomic deploy-time initialization, explicit initializer authorization, versioned foundation state, deterministic inspection, and typed missing-state handling.
+The repository contains a minimal Soroban workspace and a policy-neutral foundation contract with:
+
+- atomic deploy-time initialization;
+- explicit initializer authorization;
+- versioned foundation state;
+- an explicit application-facing interface compatibility version;
+- deterministic read-only inspection;
+- typed errors;
+- generated-spec regression verification;
+- real-Wasm constructor authorization/rollback/duplicate-deployment tests.
+
+The stable application-facing contract surface is documented in
+[`CONTRACT_INTERFACE.md`](CONTRACT_INTERFACE.md).
 
 This foundation does **not** define or implement:
 
-- RYLO supply, mint, burn, or service-spend economics;
+- RYLO supply, mint, burn, reward, pricing, or service-spend economics;
 - final RYLO trustline authorization/revocation mechanics;
 - Shared Issuer account configuration;
 - Dedicated Issuer token templates;
@@ -244,6 +256,7 @@ No production issuer configuration, RYLO supply rule, testnet deployment, or mai
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system architecture and boundaries
 - [RYLO_POLICY.md](RYLO_POLICY.md) — RYLO-specific rules
 - [OPEN_DECISIONS.md](OPEN_DECISIONS.md) — decisions intentionally left unresolved
+- [CONTRACT_INTERFACE.md](CONTRACT_INTERFACE.md) — stable application-facing contract interface
 - [../AGENTS.md](../AGENTS.md) — rules for humans and AI agents working in the repository
 
 When these documents conflict, this file is the highest-level product source of truth, while the more specific file governs implementation detail within its declared scope.

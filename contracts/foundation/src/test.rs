@@ -3,7 +3,10 @@
 extern crate std;
 
 use super::*;
-use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Bytes, BytesN, Env};
+use soroban_sdk::{
+    contract, contractimpl, testutils::Address as _, Address, Bytes, BytesN, ContractExecutable,
+    Env,
+};
 use std::{
     fs,
     panic::{catch_unwind, AssertUnwindSafe},
@@ -28,7 +31,7 @@ impl WasmDeploymentHarness {
     pub fn deploy(env: Env, wasm_hash: BytesN<32>, initializer: Address) -> Address {
         env.deployer()
             .with_current_contract([7_u8; 32])
-            .deploy_v2(wasm_hash, (initializer,))
+            .deploy_contract(ContractExecutable::Wasm(wasm_hash), (initializer,))
     }
 }
 
@@ -48,6 +51,7 @@ fn constructor_sets_versioned_state() {
     let contract_id = env.register(OrryloFoundation, (initializer.clone(),));
     let client = OrryloFoundationClient::new(&env, &contract_id);
 
+    assert_eq!(client.interface_version(), CONTRACT_INTERFACE_VERSION);
     assert_eq!(client.version(), FOUNDATION_STATE_VERSION);
     assert_eq!(
         client.state(),
@@ -56,6 +60,18 @@ fn constructor_sets_versioned_state() {
             initializer,
         }
     );
+}
+
+#[test]
+fn interface_version_is_stable_and_deterministic() {
+    let env = Env::default();
+    let initializer = Address::generate(&env);
+    let contract_id = env.register(OrryloFoundation, (initializer,));
+    let client = OrryloFoundationClient::new(&env, &contract_id);
+
+    assert_eq!(CONTRACT_INTERFACE_VERSION, 1);
+    assert_eq!(client.interface_version(), 1);
+    assert_eq!(client.interface_version(), client.interface_version());
 }
 
 #[test]
@@ -106,6 +122,7 @@ fn state_reads_are_deterministic() {
 
     assert_eq!(first, second);
     assert_eq!(client.version(), client.version());
+    assert_eq!(client.interface_version(), client.interface_version());
 }
 
 #[test]
@@ -155,6 +172,7 @@ fn wasm_constructor_auth_failure_rolls_back_deployment() {
         .any(|(address, _invocation)| address == &initializer));
 
     let foundation = OrryloFoundationClient::new(&env, &foundation_id);
+    assert_eq!(foundation.interface_version(), CONTRACT_INTERFACE_VERSION);
     assert_eq!(
         foundation.state(),
         FoundationState {
@@ -180,13 +198,14 @@ fn wasm_direct_deployer_records_initializer_authorization() {
     let wasm = built_foundation_wasm(&env);
     let wasm_hash = env.deployer().upload_contract_wasm(wasm);
 
-    // Env::register mocks constructor authorization. Deploying through
-    // Env::deployer exercises the same constructor-auth path used on-chain.
+    // Deploying through Env::deployer exercises the constructor-auth path used
+    // on-chain without Env::register's constructor authorization shortcut.
     env.mock_all_auths_allowing_non_root_auth();
     let deployer = env
         .deployer()
         .with_address(deployer_address.clone(), [11_u8; 32]);
-    let foundation_id = deployer.deploy_v2(wasm_hash, (initializer.clone(),));
+    let foundation_id =
+        deployer.deploy_contract(ContractExecutable::Wasm(wasm_hash), (initializer.clone(),));
 
     let deployment_auths = env.auths();
     assert!(deployment_auths
@@ -197,6 +216,7 @@ fn wasm_direct_deployer_records_initializer_authorization() {
         .any(|(address, _invocation)| address == &initializer));
 
     let foundation = OrryloFoundationClient::new(&env, &foundation_id);
+    assert_eq!(foundation.interface_version(), CONTRACT_INTERFACE_VERSION);
     assert_eq!(
         foundation.state(),
         FoundationState {
