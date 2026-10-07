@@ -47,3 +47,29 @@ test("reads version and state only after compatibility passes", async () => {
     state: { initializer: "GDEMO", stateVersion: 1 },
   });
 });
+
+test("does not read state or schema after an incompatible interface", async () => {
+  let versionReads = 0;
+  let stateReads = 0;
+
+  await assert.rejects(
+    () =>
+      readCompatibleFoundationSnapshot({
+        async interfaceVersion() {
+          return 2;
+        },
+        async version() {
+          versionReads += 1;
+          return 1;
+        },
+        async state() {
+          stateReads += 1;
+          return { initializer: "GDEMO", stateVersion: 1 };
+        },
+      }),
+    UnsupportedFoundationInterfaceError,
+  );
+
+  assert.equal(versionReads, 0);
+  assert.equal(stateReads, 0);
+});
