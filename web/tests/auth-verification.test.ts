@@ -206,7 +206,7 @@ test("unknown challenge id cannot authenticate", () => {
   );
 });
 
-test("challenge-id substitution cannot authenticate and consumes only the selected challenge", () => {
+test(\n  "challenge-id substitution cannot authenticate and consumes only the selected challenge",\n  () => {
   const service = createService();
   const first = service.createChallenge(NOW, "h".repeat(43));
   const second = service.createChallenge(NOW, "i".repeat(43));
@@ -292,7 +292,7 @@ test("stored challenge cannot cross domain or network context", () => {
       sessions,
     );
     const verifier = new WalletAuthService(config, challenges, sessions);
-    const challenge = issuer.createChallenge(NOW, randomNonce(config.domain + config.network));
+    const challenge = issuer.createChallenge(\n      NOW,\n      randomNonce(config.domain + config.network),\n    );
 
     assert.deepEqual(
       verifier.verifyWallet(
