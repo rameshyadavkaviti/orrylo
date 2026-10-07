@@ -7,6 +7,7 @@ import {
 } from "../lib/config/public-env";
 import { NAV_ITEMS } from "../lib/navigation";
 import { StatusPill } from "./status-pill";
+import { WalletAuthControl } from "./wallet-auth-control";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const config = readPublicRuntimeConfig();
@@ -34,8 +35,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="sidebar-note">
           <span className="eyebrow">Phase</span>
-          <strong>Application Foundation</strong>
-          <p>No live wallet or issuer mutations.</p>
+          <strong>Wallet authentication</strong>
+          <p>Albedo authentication only. No chain mutations.</p>
         </div>
       </aside>
 
@@ -49,11 +50,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <div className="topbar-actions">
             <StatusPill tone="warning">
-              {networkLabel(config.network)} · demo only
+              {networkLabel(config.network)} · product data demo
             </StatusPill>
-            <button type="button" className="button button-secondary" disabled>
-              Wallet not connected
-            </button>
+            <WalletAuthControl />
           </div>
         </header>
         <main className="main-content">{children}</main>
@@ -62,8 +61,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="status-column" aria-label="System status">
         <div className="status-card">
           <span className="eyebrow">Runtime status</span>
-          <StatusRow label="Data" value="Demo" />
-          <StatusRow label="Wallet" value="Not connected" />
+          <StatusRow label="Product data" value="Demo" />
+          <StatusRow label="Wallet auth" value="Server-verified" />
           <StatusRow
             label="Contract"
             value={
