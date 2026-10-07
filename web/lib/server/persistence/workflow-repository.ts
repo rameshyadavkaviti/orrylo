@@ -147,6 +147,7 @@ export class PostgresWorkflowRepository {
         )
       WHERE request_id = ${input.requestId}
         AND state = ${input.expectedState}
+        AND state NOT IN ('confirmed', 'failed', 'cancelled')
       RETURNING *
     `;
 
