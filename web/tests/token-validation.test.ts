@@ -26,3 +26,49 @@ test("rejects invalid asset code and display name", () => {
   assert.ok(result.errors.code);
   assert.ok(result.errors.displayName);
 });
+
+test("rejects empty and whitespace-only draft fields", () => {
+  for (const code of ["", "   "]) {
+    const result = validateSharedAssetDraft({
+      code,
+      displayName: "   ",
+    });
+
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.code);
+    assert.ok(result.errors.displayName);
+  }
+});
+
+test("accepts the 12-character code boundary and rejects 13 characters", () => {
+  assert.equal(
+    validateSharedAssetDraft({
+      code: "ABCDEFGHIJKL",
+      displayName: "Boundary Asset",
+    }).valid,
+    true,
+  );
+
+  const tooLong = validateSharedAssetDraft({
+    code: "ABCDEFGHIJKLM",
+    displayName: "Boundary Asset",
+  });
+  assert.equal(tooLong.valid, false);
+  assert.ok(tooLong.errors.code);
+});
+
+test("rejects punctuation and normalizes lowercase before validation", () => {
+  const punctuation = validateSharedAssetDraft({
+    code: "BAD-CODE",
+    displayName: "Demo Asset",
+  });
+  assert.equal(punctuation.valid, false);
+  assert.ok(punctuation.errors.code);
+
+  const lowercase = validateSharedAssetDraft({
+    code: "abc123",
+    displayName: "Demo Asset",
+  });
+  assert.equal(lowercase.valid, true);
+  assert.equal(lowercase.normalized.code, "ABC123");
+});
