@@ -15,19 +15,22 @@ The repository's current source of truth is:
 
 ## Current status
 
-**Contract Interface Lock implementation.**
+**Application Phase 1 — Full-stack Foundation.**
 
-The repository contains a minimal Soroban workspace and a policy-neutral,
-versioned foundation interface that future backend/application code can inspect
-without depending on unresolved RYLO economics or governance.
+The repository contains the security-reviewed Soroban foundation interface plus
+a Next.js application shell under `web/`. The application is explicit demo
+state only: it provides the approved dashboard/screens, typed adapter boundaries,
+Contract Interface v1 compatibility logic, form validation, tests, and web CI
+without performing live wallet, issuer, contract, testnet, or mainnet mutations.
 
 It does not yet implement RYLO economics, issuer configuration, trustline
-authorization, final contract governance, Dedicated Issuer templates, or any
-testnet/mainnet deployment.
+authorization, final contract governance, Dedicated Issuer templates, real
+wallet connection, real token issuance, or any testnet/mainnet deployment.
 
 See [docs/CONTRACT_INTERFACE.md](docs/CONTRACT_INTERFACE.md) for the exact stable
-surface and [contracts/README.md](contracts/README.md) for reproducible
-build/test/spec-verification commands.
+contract surface, [contracts/README.md](contracts/README.md) for reproducible
+contract verification, and [web/README.md](web/README.md) for application setup
+and current mock/live boundaries.
 
 No production contract, issuer, testnet/mainnet deployment, or token economics
 parameter should be inferred as implemented unless the repository contains
