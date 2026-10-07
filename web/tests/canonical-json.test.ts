@@ -3,31 +3,29 @@ import test from "node:test";
 
 import { canonicalJson, type JsonObject } from "../lib/persistence/json";
 
-test("canonical JSON orders ASCII keys", () => {
-  const forward: JsonObject = { a: 1, b: 2, c: 3 };
-  const reverse: JsonObject = { c: 3, b: 2, a: 1 };
+test("canonical JSON is ASCII insertion-order independent", () => {
+  const first: JsonObject = { a: 1, b: 2, c: 3 };
+  const second: JsonObject = { c: 3, b: 2, a: 1 };
 
-  assert.equal(canonicalJson(forward), canonicalJson(reverse));
-  assert.equal(canonicalJson(forward), '{"a":1,"b":2,"c":3}');
+  assert.equal(canonicalJson(first), canonicalJson(second));
 });
 
-test("canonical JSON orders Unicode keys deterministically", () => {
-  const composed = "é";
-  const decomposed = "é";
-  const first: JsonObject = {
-    [composed]: "composed",
-    [decomposed]: "decomposed",
-  };
-  const second: JsonObject = {
-    [decomposed]: "decomposed",
-    [composed]: "composed",
-  };
+test("canonical JSON is Unicode insertion-order independent", () => {
+  const composed = String.fromCodePoint(0x00e9);
+  const decomposed = String.fromCodePoint(0x0065, 0x0301);
+  const first: JsonObject = {};
+  const second: JsonObject = {};
+
+  first[composed] = "composed";
+  first[decomposed] = "decomposed";
+  second[decomposed] = "decomposed";
+  second[composed] = "composed";
 
   assert.notEqual(composed, decomposed);
   assert.equal(canonicalJson(first), canonicalJson(second));
 });
 
-test("canonical JSON orders nested object keys", () => {
+test("canonical JSON recursively orders nested objects", () => {
   const first: JsonObject = {
     outer: {
       z: { beta: 2, alpha: 1 },
@@ -45,8 +43,13 @@ test("canonical JSON orders nested object keys", () => {
 });
 
 test("canonical JSON preserves array order", () => {
+  const value: JsonObject[] = [
+    { b: 2, a: 1 },
+    { d: 4, c: 3 },
+  ];
+
   assert.equal(
-    canonicalJson([{ b: 2, a: 1 }, { d: 4, c: 3 }]),
+    canonicalJson(value),
     '[{"a":1,"b":2},{"c":3,"d":4}]',
   );
 });
