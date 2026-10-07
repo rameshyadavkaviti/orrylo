@@ -48,8 +48,5 @@ test("canonical JSON preserves array order", () => {
     { d: 4, c: 3 },
   ];
 
-  assert.equal(
-    canonicalJson(value),
-    '[{"a":1,"b":2},{"c":3,"d":4}]',
-  );
+  assert.equal(canonicalJson(value), '[{"a":1,"b":2},{"c":3,"d":4}]');
 });
