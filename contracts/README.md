@@ -1,12 +1,12 @@
 # Orrylo Soroban contracts
 
-This directory is the technical foundation for Orrylo's Soroban layer.
+This directory contains Orrylo's current Soroban contract layer.
 
 ## Current scope
 
-Phase 1 intentionally implements only a policy-neutral foundation contract.
+Phase 2 locks a minimal, policy-neutral application-facing foundation interface.
 
-It does **not** implement:
+The contract still does **not** implement:
 
 - RYLO mint, burn, maximum-supply, or service-spend behavior;
 - RYLO trustline authorization or revocation;
@@ -21,25 +21,31 @@ It does **not** implement:
 Those items remain governed by the canonical documents under `docs/`, including
 `docs/OPEN_DECISIONS.md`.
 
+The stable application integration reference is
+[`docs/CONTRACT_INTERFACE.md`](../docs/CONTRACT_INTERFACE.md).
+
 ## Workspace
 
 ```text
 contracts/
   foundation/
     Cargo.toml
+    interface.expected.json
+    check-interface.sh
     src/
       lib.rs
       test.rs
 ```
 
-The workspace pins `soroban-sdk = 28.0.0`.
+The workspace pins `soroban-sdk = 28.0.0`. The repository also pins the Rust
+toolchain and commits `Cargo.lock` for reproducible dependency resolution.
 
 ### Commands
 
 Run unit tests:
 
 ```sh
-cargo test --workspace
+cargo test --workspace --locked
 ```
 
 Check formatting:
@@ -48,39 +54,58 @@ Check formatting:
 cargo fmt --all -- --check
 ```
 
-Build deployable Wasm with Stellar CLI 28:
+Build deployable Wasm:
 
 ```sh
-rustup target add wasm32v1-none
-stellar contract build
+stellar contract build --locked
 ```
 
-## Foundation interface
+Run the real-Wasm deployment authorization tests after building:
 
-| Entrypoint | Purpose | Authorization | Reads | Writes | Errors | Invariant |
+```sh
+cargo test --workspace --locked wasm_ -- --ignored
+```
+
+Verify the generated application-facing interface:
+
+```sh
+contracts/foundation/check-interface.sh
+```
+
+Inspect the complete generated interface:
+
+```sh
+stellar contract info interface \
+  --wasm target/wasm32v1-none/release/orrylo_foundation.wasm \
+  --output json-formatted
+```
+
+## Stable foundation interface
+
+| Entrypoint | Purpose | Authorization | Reads | Writes | Error class | Integration status |
 | --- | --- | --- | --- | --- | --- | --- |
-| `__constructor(initializer)` | Atomically create versioned foundation state at deploy time | `initializer.require_auth()` | Existing state guard | Foundation state | `AlreadyInitialized` internally | No uninitialized takeover window; initializer substitution requires authorization |
-| `version()` | Inspect foundation schema version | None | Constant | None | None | Deterministic, side-effect-free |
-| `state()` | Inspect foundation state/provenance | None | Foundation state | None | `StateUnavailable` | Deterministic, side-effect-free |
-
-The constructor is a Soroban host-only deployment hook, not a normal callable
-entrypoint. This prevents a later transaction from re-running initialization.
+| `__constructor(initializer)` | Atomically create versioned foundation state | `initializer.require_auth()` | Initialization guard | Foundation state | Host auth / defensive `AlreadyInitialized` | Stable deployment ABI |
+| `interface_version()` | Application ABI compatibility level | None | None | None | None | Stable |
+| `version()` | Foundation state schema version | None | None | None | None | Stable |
+| `state()` | Foundation state/provenance inspection | None | Foundation state | None | `StateUnavailable` | Stable |
 
 The recorded `initializer` is **deployment provenance only**. It grants no
 post-deployment administrative, issuer, mint, burn, upgrade, emergency, or
 trustline-authorization capability.
 
-## Security baseline established
+## Security baseline
 
 - initialization is atomic with deployment;
-- initialization logic requires explicit address authorization;
-- initialization is single-use;
-- state is explicitly versioned for future migration awareness;
+- initialization requires explicit address authorization;
+- failed real-Wasm construction rolls back completely;
+- duplicate deterministic deployment is rejected;
+- state is explicitly versioned;
+- application ABI compatibility is explicitly versioned;
 - reads are deterministic and non-mutating;
-- missing foundation state returns a typed contract error;
-- there is no hidden administrator or alternate authority path;
-- no RYLO economics or unresolved issuer policy is encoded.
+- typed errors are locked by generated-spec regression checks;
+- no hidden administrator or alternate authority path exists;
+- no unresolved RYLO economics or issuer policy is encoded.
 
-The test-only initialization harness exists solely to exercise the constructor's
-shared authorization and duplicate-initialization logic. It is excluded from
-deployable contract code.
+The test-only initialization/deployment harnesses exist solely to exercise
+authorization and deployment invariants. They are excluded from deployable
+contract code.

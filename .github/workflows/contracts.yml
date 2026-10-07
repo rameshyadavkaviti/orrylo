@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
       - "contracts/**"
       - ".github/workflows/contracts.yml"
   push:
@@ -11,6 +13,8 @@ on:
       - main
     paths:
       - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
       - "contracts/**"
       - ".github/workflows/contracts.yml"
 
@@ -23,25 +27,42 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install Stellar CLI
-        uses: stellar/stellar-cli@v28.0.0
+        uses: stellar/stellar-cli@300aaf69ab100536678bdb641428b06f06b318ea # v28.0.0
+
+      - name: Confirm pinned Rust toolchain
+        run: |
+          rustc --version
+          cargo --version
 
       - name: Add Soroban Wasm target
         run: rustup target add wasm32v1-none
+
+      - name: Generate dependency lockfile
+        run: cargo generate-lockfile
+
+      - name: Emit generated lockfile for Phase 2 bootstrap
+        run: |
+          echo "::group::Cargo.lock"
+          cat Cargo.lock
+          echo "::endgroup::"
 
       - name: Check formatting
         run: cargo fmt --all -- --check
 
       - name: Run contract tests
-        run: cargo test --workspace
+        run: cargo test --workspace --locked
 
       - name: Build contract Wasm
-        run: stellar contract build
+        run: stellar contract build --locked
 
-      - name: Run real Wasm constructor authorization test
-        run: cargo test --workspace wasm_ -- --ignored
+      - name: Run real Wasm constructor authorization tests
+        run: cargo test --workspace --locked wasm_ -- --ignored
+
+      - name: Verify locked contract interface
+        run: contracts/foundation/check-interface.sh
 
       - name: Inspect contract interface
         run: stellar contract info interface --wasm target/wasm32v1-none/release/orrylo_foundation.wasm --output json-formatted

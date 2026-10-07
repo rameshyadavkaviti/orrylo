@@ -10,21 +10,28 @@ The repository's current source of truth is:
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system boundaries and intended architecture
 - [docs/RYLO_POLICY.md](docs/RYLO_POLICY.md) — RYLO ecosystem-token rules
 - [docs/OPEN_DECISIONS.md](docs/OPEN_DECISIONS.md) — unresolved decisions that must not be treated as final
+- [docs/CONTRACT_INTERFACE.md](docs/CONTRACT_INTERFACE.md) — stable application-facing Soroban interface
 - [AGENTS.md](AGENTS.md) — rules for developers and AI agents working in this repository
 
 ## Current status
 
-**Contract Foundation implementation.**
+**Contract Interface Lock implementation.**
 
-The repository contains a minimal Soroban workspace and policy-neutral foundation
-contract. It does not yet implement RYLO economics, issuer configuration,
-trustline authorization, final contract governance, Dedicated Issuer templates,
-or any testnet/mainnet deployment.
+The repository contains a minimal Soroban workspace and a policy-neutral,
+versioned foundation interface that future backend/application code can inspect
+without depending on unresolved RYLO economics or governance.
 
-See [contracts/README.md](contracts/README.md) for the implemented contract
-surface and reproducible build/test commands.
+It does not yet implement RYLO economics, issuer configuration, trustline
+authorization, final contract governance, Dedicated Issuer templates, or any
+testnet/mainnet deployment.
 
-No production contract, issuer, mainnet deployment, or token economics parameter should be inferred as implemented unless the repository contains explicit implementation evidence and the source-of-truth documents say so.
+See [docs/CONTRACT_INTERFACE.md](docs/CONTRACT_INTERFACE.md) for the exact stable
+surface and [contracts/README.md](contracts/README.md) for reproducible
+build/test/spec-verification commands.
+
+No production contract, issuer, testnet/mainnet deployment, or token economics
+parameter should be inferred as implemented unless the repository contains
+explicit implementation evidence and the source-of-truth documents say so.
 
 ## Brand
 
