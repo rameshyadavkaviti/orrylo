@@ -1,5 +1,8 @@
 import { DemoBanner } from "../../components/demo-banner";
-import { networkLabel, readPublicRuntimeConfig } from "../../lib/config/public-env";
+import {
+  networkLabel,
+  readPublicRuntimeConfig,
+} from "../../lib/config/public-env";
 
 export function SettingsPage() {
   const config = readPublicRuntimeConfig();

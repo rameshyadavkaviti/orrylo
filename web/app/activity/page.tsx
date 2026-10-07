@@ -9,7 +9,8 @@ export function ActivityPage() {
         <h1>Transaction history will begin with evidence.</h1>
         <p>
           Future records can track pending, submitted, confirmed, failed, retry,
-          and user-action states. This phase creates no fake transaction history.
+          and user-action states. This phase creates no fake transaction
+          history.
         </p>
       </div>
 

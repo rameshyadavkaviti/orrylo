@@ -1,6 +1,10 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { networkLabel, readPublicRuntimeConfig } from "../lib/config/public-env";
+import {
+  networkLabel,
+  readPublicRuntimeConfig,
+} from "../lib/config/public-env";
 import { NAV_ITEMS } from "../lib/navigation";
 import { StatusPill } from "./status-pill";
 
@@ -10,7 +14,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="Primary">
-        <a className="brand" href="/" aria-label="Orrylo home">
+        <Link className="brand" href="/" aria-label="Orrylo home">
           <span className="brand-mark" aria-hidden="true">
             O
           </span>
@@ -18,13 +22,13 @@ export function AppShell({ children }: { children: ReactNode }) {
             <strong>Orrylo</strong>
             <small>Stellar builder</small>
           </span>
-        </a>
+        </Link>
 
         <nav className="nav-list" aria-label="Application">
           {NAV_ITEMS.map((item) => (
-            <a key={item.href} href={item.href} className="nav-link">
+            <Link key={item.href} href={item.href} className="nav-link">
               {item.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
@@ -62,7 +66,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <StatusRow label="Wallet" value="Not connected" />
           <StatusRow
             label="Contract"
-            value={config.foundationContractId ? "Configured" : "Not configured"}
+            value={
+              config.foundationContractId ? "Configured" : "Not configured"
+            }
           />
           <StatusRow label="Transactions" value="Disabled" />
         </div>
@@ -70,8 +76,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="status-card">
           <span className="eyebrow">Contract Interface v1</span>
           <p className="muted">
-            Application compatibility is limited to interface_version(), version(),
-            and state() reads.
+            Application compatibility is limited to interface_version(),
+            version(), and state() reads.
           </p>
           <StatusPill tone="positive">Expected interface: 1</StatusPill>
         </div>

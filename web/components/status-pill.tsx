@@ -5,9 +5,6 @@ interface StatusPillProps {
   tone?: "neutral" | "positive" | "warning";
 }
 
-export function StatusPill({
-  children,
-  tone = "neutral",
-}: StatusPillProps) {
+export function StatusPill({ children, tone = "neutral" }: StatusPillProps) {
   return <span className={"status-pill status-" + tone}>{children}</span>;
 }

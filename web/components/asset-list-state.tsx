@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export type AssetListState =
   | { status: "loading" }
   | { status: "empty" }
@@ -28,9 +30,9 @@ export function AssetListStateView({ state }: { state: AssetListState }) {
           Real asset records will appear only after a supported creation flow is
           implemented and confirmed.
         </p>
-        <a className="button button-primary" href="/create-token">
+        <Link className="button button-primary" href="/create-token">
           Prepare a token draft
-        </a>
+        </Link>
       </div>
     );
   }

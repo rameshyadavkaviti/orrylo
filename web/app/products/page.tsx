@@ -27,8 +27,8 @@ export function ProductsPage() {
         <span className="eyebrow">Products & Services</span>
         <h1>Product surfaces without pretending they are live.</h1>
         <p>
-          Pricing and transaction actions remain unavailable until their approved
-          implementation and policy dependencies exist.
+          Pricing and transaction actions remain unavailable until their
+          approved implementation and policy dependencies exist.
         </p>
       </div>
 

@@ -15,8 +15,8 @@ export function CreateTokenPage() {
         <h1>Choose the infrastructure before the asset.</h1>
         <p>
           Orrylo separates the low-cost shared path from dedicated
-          contract-controlled infrastructure. Neither path performs real issuance
-          in this phase.
+          contract-controlled infrastructure. Neither path performs real
+          issuance in this phase.
         </p>
       </div>
 

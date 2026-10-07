@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { DemoBanner } from "../components/demo-banner";
 import { DASHBOARD_DEMO_STATE } from "../lib/demo/dashboard";
 
@@ -16,15 +18,16 @@ export function DashboardPage() {
           <h1>Welcome to Orrylo.</h1>
           <p>
             Start with a transparent asset draft, understand who controls the
-            infrastructure, and move on-chain only when approved interfaces exist.
+            infrastructure, and move on-chain only when approved interfaces
+            exist.
           </p>
           <div className="hero-actions">
-            <a className="button button-inverted" href="/create-token">
+            <Link className="button button-inverted" href="/create-token">
               Create token draft
-            </a>
-            <a className="button button-ghost" href="/products">
+            </Link>
+            <Link className="button button-ghost" href="/products">
               Explore services
-            </a>
+            </Link>
           </div>
         </div>
         <div className="hero-orbit" aria-hidden="true">
@@ -63,9 +66,9 @@ export function DashboardPage() {
             Activity will be stored only when supported application operations
             exist. No mock transaction is shown as real history.
           </p>
-          <a href="/activity" className="text-link">
+          <Link href="/activity" className="text-link">
             Open activity structure
-          </a>
+          </Link>
         </article>
 
         <article className="surface-card">

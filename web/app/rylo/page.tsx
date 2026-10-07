@@ -9,13 +9,17 @@ export function RyloPage() {
         <span className="eyebrow">RYLO</span>
         <h1>Utility and membership, presented as policy—not value promises.</h1>
         <p>
-          No live RYLO balance, direct sale price, market price, reward amount, or
-          authorization state is available in Application Phase 1.
+          No live RYLO balance, direct sale price, market price, reward amount,
+          or authorization state is available in Application Phase 1.
         </p>
       </div>
 
       <section className="metric-grid">
-        <RyloMetric label="RYLO amount" value="—" note="No live balance read." />
+        <RyloMetric
+          label="RYLO amount"
+          value="—"
+          note="No live balance read."
+        />
         <RyloMetric
           label="Eligibility"
           value="Not verified"
@@ -41,8 +45,8 @@ export function RyloPage() {
           <span className="eyebrow">Reserved issuer candidate</span>
           <code className="code-block">{RYLO_ISSUER_CANDIDATE}</code>
           <p className="muted">
-            Reserved candidate only. This screen does not claim testnet or mainnet
-            deployment.
+            Reserved candidate only. This screen does not claim testnet or
+            mainnet deployment.
           </p>
         </article>
       </section>
@@ -52,8 +56,8 @@ export function RyloPage() {
         <h2>Direct sale price and market price are different facts.</h2>
         <p className="muted">
           No direct sale price is currently fixed. Orrylo will not present a
-          future platform sale price as intrinsic value, guaranteed market value,
-          or guaranteed future value.
+          future platform sale price as intrinsic value, guaranteed market
+          value, or guaranteed future value.
         </p>
       </article>
     </div>
