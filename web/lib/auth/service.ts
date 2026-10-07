@@ -5,10 +5,10 @@ import {
   type PublicAuthChallenge,
 } from "./challenge";
 import { AUTH_PURPOSE } from "./constants";
-import {
-  MemoryChallengeStore,
-  MemorySessionStore,
-  type AuthSession,
+import type {
+  AuthSession,
+  ChallengeStore,
+  SessionStore,
 } from "./stores";
 import {
   verifyAlbedoPublicKeyProof,
@@ -47,27 +47,29 @@ export type VerifyWalletResult =
 export class WalletAuthService {
   constructor(
     private readonly config: AuthServiceConfig,
-    private readonly challenges: MemoryChallengeStore,
-    private readonly sessions: MemorySessionStore,
+    private readonly challenges: ChallengeStore,
+    private readonly sessions: SessionStore,
   ) {}
 
-  createChallenge(now = Date.now(), nonce?: string): PublicAuthChallenge {
+  async createChallenge(
+    now = Date.now(),
+    nonce?: string,
+  ): Promise<PublicAuthChallenge> {
     const challenge = createAuthChallenge({
       ...this.config,
       now,
       nonce,
     });
 
-    this.challenges.put(challenge);
+    await this.challenges.put(challenge);
     return toPublicAuthChallenge(challenge);
   }
 
-  verifyWallet(
+  async verifyWallet(
     request: VerifyWalletRequest,
     now = Date.now(),
-    sessionToken?: string,
-  ): VerifyWalletResult {
-    const consumed = this.challenges.consume(request.challengeId, now);
+  ): Promise<VerifyWalletResult> {
+    const consumed = await this.challenges.consume(request.challengeId, now);
 
     if (!consumed.ok) {
       return {
@@ -96,7 +98,7 @@ export class WalletAuthService {
       return { ok: false, code: proof.reason };
     }
 
-    const created = this.sessions.create(proof.publicKey, now, sessionToken);
+    const created = await this.sessions.create(proof.publicKey, now);
 
     return {
       ok: true,
@@ -105,13 +107,16 @@ export class WalletAuthService {
     };
   }
 
-  getSession(token: string | undefined, now = Date.now()): AuthSession | null {
+  async getSession(
+    token: string | undefined,
+    now = Date.now(),
+  ): Promise<AuthSession | null> {
     return token ? this.sessions.get(token, now) : null;
   }
 
-  logout(token: string | undefined): void {
+  async logout(token: string | undefined, now = Date.now()): Promise<void> {
     if (token) {
-      this.sessions.destroy(token);
+      await this.sessions.destroy(token, now);
     }
   }
 }

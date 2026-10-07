@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { createAuthChallenge } from "../lib/auth/challenge";
 import { AUTH_PURPOSE, CHALLENGE_TTL_MS } from "../lib/auth/constants";
-import { MemoryChallengeStore } from "../lib/auth/stores";
+import { MemoryChallengeStore } from "./helpers/memory-auth-stores";
 
 test("creates a purpose/domain/network-bound short-lived challenge", () => {
   const now = Date.parse("2026-10-07T12:00:00.000Z");
@@ -24,7 +24,7 @@ test("creates a purpose/domain/network-bound short-lived challenge", () => {
   assert.match(challenge.payload, new RegExp(`nonce=${nonce}`));
 });
 
-test("expired challenges are rejected and consumed", () => {
+test("expired challenges are rejected and consumed", async () => {
   const now = 1_000_000;
   const store = new MemoryChallengeStore();
   const challenge = createAuthChallenge({
@@ -34,13 +34,13 @@ test("expired challenges are rejected and consumed", () => {
     nonce: "x".repeat(43),
   });
 
-  store.put(challenge);
+  await store.put(challenge);
 
-  assert.deepEqual(store.consume(challenge.id, challenge.expiresAt), {
+  assert.deepEqual(await store.consume(challenge.id, challenge.expiresAt), {
     ok: false,
     reason: "expired",
   });
-  assert.deepEqual(store.consume(challenge.id, challenge.expiresAt), {
+  assert.deepEqual(await store.consume(challenge.id, challenge.expiresAt), {
     ok: false,
     reason: "missing",
   });

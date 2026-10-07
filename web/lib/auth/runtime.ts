@@ -1,26 +1,10 @@
 import type { StellarNetwork } from "../config/public-env";
-import { MemoryChallengeStore, MemorySessionStore } from "./stores";
+import {
+  PostgresChallengeStore,
+  PostgresSessionStore,
+} from "../server/persistence/auth-repositories";
+import { getDatabaseClient } from "../server/persistence/database";
 import { WalletAuthService } from "./service";
-
-interface AuthMemoryState {
-  challenges: MemoryChallengeStore;
-  sessions: MemorySessionStore;
-}
-
-declare global {
-  var __orryloAuthMemoryState: AuthMemoryState | undefined;
-}
-
-function getMemoryState(): AuthMemoryState {
-  if (!globalThis.__orryloAuthMemoryState) {
-    globalThis.__orryloAuthMemoryState = {
-      challenges: new MemoryChallengeStore(),
-      sessions: new MemorySessionStore(),
-    };
-  }
-
-  return globalThis.__orryloAuthMemoryState;
-}
 
 export function readServerAuthConfig(env: NodeJS.ProcessEnv = process.env): {
   domain: string;
@@ -37,11 +21,11 @@ export function readServerAuthConfig(env: NodeJS.ProcessEnv = process.env): {
 }
 
 export function getWalletAuthService(): WalletAuthService {
-  const memory = getMemoryState();
+  const sql = getDatabaseClient();
 
   return new WalletAuthService(
     readServerAuthConfig(),
-    memory.challenges,
-    memory.sessions,
+    new PostgresChallengeStore(sql),
+    new PostgresSessionStore(sql),
   );
 }

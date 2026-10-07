@@ -6,7 +6,10 @@ import { Keypair } from "@stellar/stellar-sdk/base";
 
 import { CHALLENGE_TTL_MS } from "../lib/auth/constants";
 import { WalletAuthService } from "../lib/auth/service";
-import { MemoryChallengeStore, MemorySessionStore } from "../lib/auth/stores";
+import {
+  MemoryChallengeStore,
+  MemorySessionStore,
+} from "./helpers/memory-auth-stores";
 
 const NOW = Date.parse("2026-10-07T12:00:00.000Z");
 
@@ -33,17 +36,16 @@ function proofFor(payload: string, signer = keypair(7)) {
   };
 }
 
-test("successful proof creates an authenticated session", () => {
+test("successful proof creates an authenticated session", async () => {
   const service = createService();
-  const challenge = service.createChallenge(NOW, "a".repeat(43));
-  const result = service.verifyWallet(
+  const challenge = await service.createChallenge(NOW, "a".repeat(43));
+  const result = await service.verifyWallet(
     {
       challengeId: challenge.id,
       payload: challenge.payload,
       proof: proofFor(challenge.payload),
     },
     NOW + 1,
-    "session-token",
   );
 
   assert.equal(result.ok, true);
@@ -52,36 +54,35 @@ test("successful proof creates an authenticated session", () => {
     return;
   }
 
-  assert.equal(result.sessionToken, "session-token");
   assert.equal(
-    service.getSession("session-token", NOW + 2)?.publicKey,
+    (await service.getSession(result.sessionToken, NOW + 2))?.publicKey,
     proofFor(challenge.payload).pubkey,
   );
 });
 
-test("replayed challenge is rejected", () => {
+test("replayed challenge is rejected", async () => {
   const service = createService();
-  const challenge = service.createChallenge(NOW, "b".repeat(43));
+  const challenge = await service.createChallenge(NOW, "b".repeat(43));
   const request = {
     challengeId: challenge.id,
     payload: challenge.payload,
     proof: proofFor(challenge.payload),
   };
 
-  assert.equal(service.verifyWallet(request, NOW + 1, "one").ok, true);
-  assert.deepEqual(service.verifyWallet(request, NOW + 2, "two"), {
+  assert.equal((await service.verifyWallet(request, NOW + 1)).ok, true);
+  assert.deepEqual(await service.verifyWallet(request, NOW + 2), {
     ok: false,
     code: "challenge_missing_or_used",
   });
 });
 
-test("modified challenge payload is rejected and burns the nonce", () => {
+test("modified challenge payload is rejected and burns the nonce", async () => {
   const service = createService();
-  const challenge = service.createChallenge(NOW, "c".repeat(43));
+  const challenge = await service.createChallenge(NOW, "c".repeat(43));
   const modified = challenge.payload + "\nmodified=true";
 
   assert.deepEqual(
-    service.verifyWallet(
+    await service.verifyWallet(
       {
         challengeId: challenge.id,
         payload: modified,
@@ -93,7 +94,7 @@ test("modified challenge payload is rejected and burns the nonce", () => {
   );
 
   assert.deepEqual(
-    service.verifyWallet(
+    await service.verifyWallet(
       {
         challengeId: challenge.id,
         payload: challenge.payload,
@@ -105,12 +106,12 @@ test("modified challenge payload is rejected and burns the nonce", () => {
   );
 });
 
-test("expired challenge is rejected", () => {
+test("expired challenge is rejected", async () => {
   const service = createService();
-  const challenge = service.createChallenge(NOW, "d".repeat(43));
+  const challenge = await service.createChallenge(NOW, "d".repeat(43));
 
   assert.deepEqual(
-    service.verifyWallet(
+    await service.verifyWallet(
       {
         challengeId: challenge.id,
         payload: challenge.payload,
@@ -122,15 +123,15 @@ test("expired challenge is rejected", () => {
   );
 });
 
-test("wrong signer and public-key mismatch are rejected", () => {
+test("wrong signer and public-key mismatch are rejected", async () => {
   const service = createService();
-  const challenge = service.createChallenge(NOW, "e".repeat(43));
+  const challenge = await service.createChallenge(NOW, "e".repeat(43));
   const signer = keypair(8);
   const claimed = keypair(9);
   const signedMessage = `${claimed.publicKey()}:${challenge.payload}`;
   const digest = createHash("sha256").update(signedMessage, "utf8").digest();
 
-  const result = service.verifyWallet(
+  const result = await service.verifyWallet(
     {
       challengeId: challenge.id,
       payload: challenge.payload,
@@ -146,13 +147,13 @@ test("wrong signer and public-key mismatch are rejected", () => {
   assert.deepEqual(result, { ok: false, code: "invalid_signature" });
 });
 
-test("invalid signature is rejected", () => {
+test("invalid signature is rejected", async () => {
   const service = createService();
-  const challenge = service.createChallenge(NOW, "f".repeat(43));
+  const challenge = await service.createChallenge(NOW, "f".repeat(43));
   const proof = proofFor(challenge.payload);
 
   assert.deepEqual(
-    service.verifyWallet(
+    await service.verifyWallet(
       {
         challengeId: challenge.id,
         payload: challenge.payload,
@@ -164,37 +165,39 @@ test("invalid signature is rejected", () => {
   );
 });
 
-test("logout invalidates the session and missing session stays unauthenticated", () => {
+test("logout invalidates the session and missing session stays unauthenticated", async () => {
   const service = createService();
 
-  assert.equal(service.getSession(undefined, NOW), null);
-  assert.equal(service.getSession("missing", NOW), null);
+  assert.equal(await service.getSession(undefined, NOW), null);
+  assert.equal(await service.getSession("missing", NOW), null);
 
-  const challenge = service.createChallenge(NOW, "g".repeat(43));
-  const result = service.verifyWallet(
+  const challenge = await service.createChallenge(NOW, "g".repeat(43));
+  const result = await service.verifyWallet(
     {
       challengeId: challenge.id,
       payload: challenge.payload,
       proof: proofFor(challenge.payload),
     },
     NOW + 1,
-    "logout-session",
   );
 
   assert.equal(result.ok, true);
-  assert.ok(service.getSession("logout-session", NOW + 2));
 
-  service.logout("logout-session");
+  if (!result.ok) {
+    return;
+  }
 
-  assert.equal(service.getSession("logout-session", NOW + 3), null);
+  assert.ok(await service.getSession(result.sessionToken, NOW + 2));
+  await service.logout(result.sessionToken, NOW + 3);
+  assert.equal(await service.getSession(result.sessionToken, NOW + 4), null);
 });
 
-test("rejects unknown challenge IDs", () => {
+test("rejects unknown challenge IDs", async () => {
   const service = createService();
   const payload = "Orrylo wallet authentication\\nunknown=true";
 
   assert.deepEqual(
-    service.verifyWallet(
+    await service.verifyWallet(
       {
         challengeId: "z".repeat(43),
         payload,
@@ -206,13 +209,13 @@ test("rejects unknown challenge IDs", () => {
   );
 });
 
-test("rejects challenge ID substitution", () => {
+test("rejects challenge ID substitution", async () => {
   const service = createService();
-  const first = service.createChallenge(NOW, "h".repeat(43));
-  const second = service.createChallenge(NOW, "i".repeat(43));
+  const first = await service.createChallenge(NOW, "h".repeat(43));
+  const second = await service.createChallenge(NOW, "i".repeat(43));
 
   assert.deepEqual(
-    service.verifyWallet(
+    await service.verifyWallet(
       {
         challengeId: second.id,
         payload: first.payload,
@@ -223,19 +226,22 @@ test("rejects challenge ID substitution", () => {
     { ok: false, code: "challenge_mismatch" },
   );
 
-  const firstResult = service.verifyWallet(
-    {
-      challengeId: first.id,
-      payload: first.payload,
-      proof: proofFor(first.payload),
-    },
-    NOW + 2,
-    "first-session",
+  assert.equal(
+    (
+      await service.verifyWallet(
+        {
+          challengeId: first.id,
+          payload: first.payload,
+          proof: proofFor(first.payload),
+        },
+        NOW + 2,
+      )
+    ).ok,
+    true,
   );
-  assert.equal(firstResult.ok, true);
 
   assert.deepEqual(
-    service.verifyWallet(
+    await service.verifyWallet(
       {
         challengeId: second.id,
         payload: second.payload,
@@ -247,13 +253,13 @@ test("rejects challenge ID substitution", () => {
   );
 });
 
-test("burns challenge after failed proof", () => {
+test("burns challenge after failed proof", async () => {
   const service = createService();
-  const challenge = service.createChallenge(NOW, "j".repeat(43));
+  const challenge = await service.createChallenge(NOW, "j".repeat(43));
   const proof = proofFor(challenge.payload);
 
   assert.deepEqual(
-    service.verifyWallet(
+    await service.verifyWallet(
       {
         challengeId: challenge.id,
         payload: challenge.payload,
@@ -265,7 +271,7 @@ test("burns challenge after failed proof", () => {
   );
 
   assert.deepEqual(
-    service.verifyWallet(
+    await service.verifyWallet(
       {
         challengeId: challenge.id,
         payload: challenge.payload,
@@ -277,7 +283,7 @@ test("burns challenge after failed proof", () => {
   );
 });
 
-test("rejects cross-context challenge reuse", () => {
+test("rejects cross-context challenge reuse", async () => {
   const contexts = [
     { domain: "evil.example", network: "testnet" as const },
     { domain: "app.orrylo.com", network: "public" as const },
@@ -293,10 +299,10 @@ test("rejects cross-context challenge reuse", () => {
     );
     const verifier = new WalletAuthService(context, challenges, sessions);
     const nonce = randomNonce(context.domain + context.network);
-    const challenge = issuer.createChallenge(NOW, nonce);
+    const challenge = await issuer.createChallenge(NOW, nonce);
 
     assert.deepEqual(
-      verifier.verifyWallet(
+      await verifier.verifyWallet(
         {
           challengeId: challenge.id,
           payload: challenge.payload,
@@ -309,13 +315,13 @@ test("rejects cross-context challenge reuse", () => {
   }
 });
 
-test("rejects signed-message substitution", () => {
+test("rejects signed-message substitution", async () => {
   const service = createService();
-  const challenge = service.createChallenge(NOW, "k".repeat(43));
+  const challenge = await service.createChallenge(NOW, "k".repeat(43));
   const proof = proofFor(challenge.payload, keypair(10));
 
   assert.deepEqual(
-    service.verifyWallet(
+    await service.verifyWallet(
       {
         challengeId: challenge.id,
         payload: challenge.payload,
@@ -330,13 +336,13 @@ test("rejects signed-message substitution", () => {
   );
 });
 
-test("rejects public-key substitution", () => {
+test("rejects public-key substitution", async () => {
   const service = createService();
-  const challenge = service.createChallenge(NOW, "l".repeat(43));
+  const challenge = await service.createChallenge(NOW, "l".repeat(43));
   const proof = proofFor(challenge.payload, keypair(10));
 
   assert.deepEqual(
-    service.verifyWallet(
+    await service.verifyWallet(
       {
         challengeId: challenge.id,
         payload: challenge.payload,
