@@ -14,9 +14,17 @@ The repository's current source of truth is:
 
 ## Current status
 
-Architecture definition / pre-implementation.
+**Contract Foundation implementation.**
 
-No production contract, issuer, mainnet deployment, or token economics parameter should be inferred as implemented unless the repository later contains explicit implementation evidence and the source-of-truth documents are updated.
+The repository contains a minimal Soroban workspace and policy-neutral foundation
+contract. It does not yet implement RYLO economics, issuer configuration,
+trustline authorization, final contract governance, Dedicated Issuer templates,
+or any testnet/mainnet deployment.
+
+See [contracts/README.md](contracts/README.md) for the implemented contract
+surface and reproducible build/test commands.
+
+No production contract, issuer, mainnet deployment, or token economics parameter should be inferred as implemented unless the repository contains explicit implementation evidence and the source-of-truth documents say so.
 
 ## Brand
 

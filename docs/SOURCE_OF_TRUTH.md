@@ -1,6 +1,6 @@
 # Orrylo Source of Truth — v1
 
-Status: **Canonical architecture definition / pre-implementation**
+Status: **Canonical architecture definition / contract implementation started**
 
 This document records the decisions currently considered authoritative for Orrylo. Anything not marked as decided here, or explicitly delegated to another canonical document, must be treated as unresolved.
 
@@ -223,9 +223,21 @@ Important status:
 
 ## 14. Implementation status
 
-Current phase: **architecture definition / pre-implementation**.
+Current phase: **Contract Foundation implementation**.
 
-No production contract, issuer configuration, RYLO supply rule, mainnet deployment, or completed token economics should be inferred merely from these documents.
+The repository contains a minimal Soroban workspace and a policy-neutral foundation contract that establishes atomic deploy-time initialization, explicit initializer authorization, versioned foundation state, deterministic inspection, and typed missing-state handling.
+
+This foundation does **not** define or implement:
+
+- RYLO supply, mint, burn, or service-spend economics;
+- final RYLO trustline authorization/revocation mechanics;
+- Shared Issuer account configuration;
+- Dedicated Issuer token templates;
+- final contract admin/governance or admin-transfer policy;
+- upgradeability or emergency controls;
+- testnet or mainnet deployment.
+
+No production issuer configuration, RYLO supply rule, testnet deployment, or mainnet deployment should be inferred merely from the presence of the contract workspace.
 
 ## 15. Canonical companion documents
 
