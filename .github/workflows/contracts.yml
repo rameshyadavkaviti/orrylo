@@ -41,7 +41,7 @@ jobs:
         run: stellar contract build
 
       - name: Run real Wasm constructor authorization test
-        run: cargo test --workspace wasm_deployment_enforces_constructor_auth_and_rolls_back_failed_deploy -- --ignored
+        run: cargo test --workspace wasm_ -- --ignored
 
       - name: Inspect contract interface
         run: stellar contract info interface --wasm target/wasm32v1-none/release/orrylo_foundation.wasm --output json-formatted
