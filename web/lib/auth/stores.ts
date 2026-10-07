@@ -11,6 +11,7 @@ export class MemoryChallengeStore {
   private readonly challenges = new Map<string, StoredAuthChallenge>();
 
   put(challenge: StoredAuthChallenge): void {
+    this.pruneExpired(challenge.issuedAt);
     this.challenges.set(challenge.id, challenge);
   }
 
@@ -35,6 +36,14 @@ export class MemoryChallengeStore {
   size(): number {
     return this.challenges.size;
   }
+
+  private pruneExpired(now: number): void {
+    for (const [id, challenge] of this.challenges) {
+      if (now >= challenge.expiresAt) {
+        this.challenges.delete(id);
+      }
+    }
+  }
 }
 
 export interface AuthSession {
@@ -56,6 +65,8 @@ export class MemorySessionStore {
     now: number,
     token = randomBytes(32).toString("base64url"),
   ): CreatedAuthSession {
+    this.pruneExpired(now);
+
     const session = {
       publicKey,
       createdAt: now,
@@ -88,5 +99,13 @@ export class MemorySessionStore {
 
   size(): number {
     return this.sessions.size;
+  }
+
+  private pruneExpired(now: number): void {
+    for (const [token, session] of this.sessions) {
+      if (now >= session.expiresAt) {
+        this.sessions.delete(token);
+      }
+    }
   }
 }

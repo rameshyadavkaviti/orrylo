@@ -4,12 +4,22 @@ import {
   createSessionCookiePolicy,
 } from "../../../../lib/auth/cookies";
 import { parseVerifyWalletRequest } from "../../../../lib/auth/http";
-import { getWalletAuthService } from "../../../../lib/auth/runtime";
+import { isTrustedAuthOrigin } from "../../../../lib/auth/origin";
+import {
+  getWalletAuthService,
+  readServerAuthConfig,
+} from "../../../../lib/auth/runtime";
 import { SESSION_COOKIE_NAME } from "../../../../lib/auth/constants";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
+  const config = readServerAuthConfig();
+
+  if (!isTrustedAuthOrigin(request.headers.get("origin"), config.domain)) {
+    return errorResponse("untrusted_origin", 403);
+  }
+
   let body: unknown;
 
   try {

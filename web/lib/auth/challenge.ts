@@ -34,8 +34,8 @@ export function createAuthChallenge(
   const expiresAt = issuedAt + CHALLENGE_TTL_MS;
   const nonce = options.nonce ?? randomBytes(32).toString("base64url");
 
-  if (!/^[A-Za-z0-9._:-]+$/.test(options.domain)) {
-    throw new Error("ORRYLO_AUTH_DOMAIN must be a host-style domain value.");
+  if (!/^[A-Za-z0-9.-]+$/.test(options.domain)) {
+    throw new Error("ORRYLO_AUTH_DOMAIN must contain a hostname only.");
   }
 
   const base = {
