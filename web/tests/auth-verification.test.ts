@@ -29,7 +29,7 @@ function proofFor(payload: string, signer = keypair(7)) {
   return {
     pubkey: signer.publicKey(),
     signed_message: signedMessage,
-    signature: signer.sign(digest).toString("hex"),
+    signature: Buffer.from(signer.sign(digest)).toString("hex"),
   };
 }
 
