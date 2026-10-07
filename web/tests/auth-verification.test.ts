@@ -137,7 +137,7 @@ test("wrong signer and public-key mismatch are rejected", () => {
       proof: {
         pubkey: claimed.publicKey(),
         signed_message: signedMessage,
-        signature: signer.sign(digest).toString("hex"),
+        signature: Buffer.from(signer.sign(digest)).toString("hex"),
       },
     },
     NOW + 1,
