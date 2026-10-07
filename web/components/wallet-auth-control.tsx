@@ -31,28 +31,38 @@ export function WalletAuthControl() {
   const [state, setState] = useState<WalletAuthState>({ status: "checking" });
 
   useEffect(() => {
-    void loadSession();
-  }, []);
+    let active = true;
 
-  async function loadSession() {
-    try {
-      const response = await fetch("/api/auth/session", {
-        method: "GET",
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      const session = (await response.json()) as SessionResponse;
+    void (async () => {
+      try {
+        const response = await fetch("/api/auth/session", {
+          method: "GET",
+          cache: "no-store",
+          credentials: "same-origin",
+        });
+        const session = (await response.json()) as SessionResponse;
 
-      if (response.ok && session.authenticated && session.publicKey) {
-        setState({ status: "authenticated", publicKey: session.publicKey });
-        return;
+        if (!active) {
+          return;
+        }
+
+        if (response.ok && session.authenticated && session.publicKey) {
+          setState({ status: "authenticated", publicKey: session.publicKey });
+          return;
+        }
+
+        setState({ status: "disconnected" });
+      } catch {
+        if (active) {
+          setState({ status: "failure" });
+        }
       }
+    })();
 
-      setState({ status: "disconnected" });
-    } catch {
-      setState({ status: "failure" });
-    }
-  }
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function connect() {
     setState({ status: "requesting_challenge" });
