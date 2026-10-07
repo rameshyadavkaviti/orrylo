@@ -179,7 +179,9 @@ Approved economics:
 - direct sales use Treasury inventory first and mint only an approved shortfall;
 - the Treasury has no separate balance cap beyond the global RYLO supply rules;
 - eligible/authorized members may transfer and trade RYLO with one another;
-- a **100,000 RYLO Bootstrap Liquidity Reserve** is approved to seed meaningful secondary-market liquidity;
+- a **1,000,000 RYLO Bootstrap Liquidity Reserve** is approved as the lifetime policy cap for Orrylo-managed bootstrap liquidity capacity;
+- initial liquidity deployment is **1,000 RYLO + 100 XLM**;
+- the remaining **999,000 RYLO** is undeployed reserve capacity and does not need to be minted in advance;
 - the previously considered idea that users could acquire additional RYLO only from Orrylo is rejected and is not policy.
 
 Approved v1 mint sources are limited to:
