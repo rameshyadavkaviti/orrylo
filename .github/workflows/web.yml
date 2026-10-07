@@ -49,10 +49,7 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Check formatting
-        run: |
-          npm run format
-          git diff -- tests/auth-verification.test.ts
-          exit 1
+        run: npm run format:check
 
       - name: Lint
         run: npm run lint
