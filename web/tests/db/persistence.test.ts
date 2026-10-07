@@ -71,7 +71,10 @@ if (!TEST_DATABASE_URL) {
     const result = await migrateDatabase(sql, migrationsDirectory);
 
     assert.equal(result.applied.length, 0);
-    assert.deepEqual(result.verified, ["001_application_persistence.sql"]);
+    assert.deepEqual(result.verified, [
+      "001_application_persistence.sql",
+      "002_reward_wallet_type_uniqueness.sql",
+    ]);
 
     const [{ count }] = await sql<{ count: string }[]>`
       SELECT count(*)::text AS count
@@ -230,6 +233,49 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
+  test("terminal workflow states cannot transition through repository CAS", async () => {
+    const repository = new PostgresWorkflowRepository(sql);
+    const terminalStates = ["confirmed", "failed", "cancelled"] as const;
+
+    for (const terminalState of terminalStates) {
+      const idempotencyKey = `terminal-${terminalState}`;
+      const created = await repository.createIdempotent(
+        {
+          workflowScope: "test:terminal",
+          workflowType: "future_operation",
+          idempotencyKey,
+          payload: { terminalState },
+          policyVersion: "test-policy",
+        },
+        NOW,
+      );
+      const terminal = await repository.compareAndSetState({
+        requestId: created.requestId,
+        expectedState: "created",
+        nextState: terminalState,
+        now: NOW + 1,
+      });
+
+      assert.ok(terminal);
+      assert.equal(terminal.state, terminalState);
+      assert.ok(terminal.terminalAt);
+
+      const reopened = await repository.compareAndSetState({
+        requestId: created.requestId,
+        expectedState: terminalState,
+        nextState: "created",
+        now: NOW + 2,
+      });
+
+      assert.equal(reopened, null);
+      const persisted = await repository.getByIdempotency(
+        "test:terminal",
+        idempotencyKey,
+      );
+      assert.equal(persisted?.state, terminalState);
+      assert.equal(persisted?.terminalAt, terminal.terminalAt);
+    }
+  });
   test("audit events append in a deterministic verifiable hash chain", async () => {
     const repository = new PostgresAuditRepository(sql);
     const first = await repository.append({
@@ -279,7 +325,74 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
-  test("eligibility and reward uniqueness constraints prevent duplicates", async () => {
+  test("audit verification rejects stored head hash and sequence mismatches", async () => {
+    const repository = new PostgresAuditRepository(sql);
+    const event = await repository.append({
+      eventType: "test.head",
+      source: "system",
+      occurredAt: NOW,
+      policyVersion: "test-policy",
+      metadata: { safe: true },
+    });
+
+    await sql`
+      UPDATE audit_chain_heads
+      SET last_event_hash = ${"0".repeat(64)}
+      WHERE chain_id = 'application'
+    `;
+    assert.equal(await repository.verifyChain(), false);
+
+    await sql`
+      UPDATE audit_chain_heads
+      SET last_sequence = 2, last_event_hash = ${event.eventHash}
+      WHERE chain_id = 'application'
+    `;
+    assert.equal(await repository.verifyChain(), false);
+  });
+
+  test("audit verification rejects missing tail history", async () => {
+    const repository = new PostgresAuditRepository(sql);
+    await repository.append({
+      eventType: "test.first",
+      source: "system",
+      occurredAt: NOW,
+      policyVersion: "test-policy",
+      metadata: { safe: true },
+    });
+    const tail = await repository.append({
+      eventType: "test.tail",
+      source: "system",
+      occurredAt: NOW + 1,
+      policyVersion: "test-policy",
+      metadata: { safe: true },
+    });
+
+    await sql.unsafe(
+      "ALTER TABLE audit_events DISABLE TRIGGER audit_events_append_only",
+    );
+    try {
+      await sql`DELETE FROM audit_events WHERE event_id = ${tail.eventId}`;
+    } finally {
+      await sql.unsafe(
+        "ALTER TABLE audit_events ENABLE TRIGGER audit_events_append_only",
+      );
+    }
+
+    assert.equal(await repository.verifyChain(), false);
+  });
+
+  test("audit verification rejects empty history with a non-empty head", async () => {
+    const repository = new PostgresAuditRepository(sql);
+
+    await sql`
+      UPDATE audit_chain_heads
+      SET last_sequence = 1, last_event_hash = ${"f".repeat(64)}
+      WHERE chain_id = 'application'
+    `;
+
+    assert.equal(await repository.verifyChain(), false);
+  });
+  test("eligibility and wallet/type reward uniqueness constraints prevent duplicates", async () => {
     const repository = new PostgresFutureDomainRepository(sql);
 
     const eligibility = {
@@ -323,11 +436,19 @@ if (!TEST_DATABASE_URL) {
         await repository.createReward({
           ...rewardBase,
           idempotencyKey: "reward-2",
-          rewardUniquenessKey: "first-token:" + PUBLIC_KEY,
+          rewardUniquenessKey: "caller-bypass-attempt:" + PUBLIC_KEY,
         })
       ).created,
       false,
     );
+
+    const [{ count }] = await sql<{ count: string }[]>\`
+      SELECT count(*)::text AS count
+      FROM reward_records
+      WHERE wallet_public_key = ${PUBLIC_KEY}
+        AND reward_type = ${rewardBase.rewardType}
+    \`;
+    assert.equal(count, "1");
   });
 }
 
