@@ -46,8 +46,13 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Check formatting
-        run: npm run format:check
+      - name: Normalize formatting for validation
+        run: npm run format
+
+      - name: Record formatting drift
+        id: formatting
+        continue-on-error: true
+        run: git diff --exit-code -- .
 
       - name: Lint
         run: npm run lint
@@ -60,6 +65,12 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+      - name: Fail on formatting drift
+        if: steps.formatting.outcome == 'failure'
+        run: |
+          echo "Committed web files are not formatted."
+          exit 1
 
       - name: Capture resolved dependency lock
         if: always()
