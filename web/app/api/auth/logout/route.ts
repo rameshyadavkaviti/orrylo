@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import {
-  createExpiredSessionCookiePolicy,
-} from "../../../../lib/auth/cookies";
+import { createExpiredSessionCookiePolicy } from "../../../../lib/auth/cookies";
 import { SESSION_COOKIE_NAME } from "../../../../lib/auth/constants";
 import { isTrustedAuthOrigin } from "../../../../lib/auth/origin";
 import {

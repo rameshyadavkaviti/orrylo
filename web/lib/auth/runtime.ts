@@ -23,9 +23,10 @@ function getMemoryState(): AuthMemoryState {
   return globalThis.__orryloAuthMemoryState;
 }
 
-export function readServerAuthConfig(
-  env: NodeJS.ProcessEnv = process.env,
-): { domain: string; network: StellarNetwork } {
+export function readServerAuthConfig(env: NodeJS.ProcessEnv = process.env): {
+  domain: string;
+  network: StellarNetwork;
+} {
   const domain = env.ORRYLO_AUTH_DOMAIN?.trim() || "localhost";
   const network = env.NEXT_PUBLIC_STELLAR_NETWORK ?? "testnet";
 

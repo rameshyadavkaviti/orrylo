@@ -6,10 +6,7 @@ import { Keypair } from "@stellar/stellar-sdk/base";
 
 import { CHALLENGE_TTL_MS } from "../lib/auth/constants";
 import { WalletAuthService } from "../lib/auth/service";
-import {
-  MemoryChallengeStore,
-  MemorySessionStore,
-} from "../lib/auth/stores";
+import { MemoryChallengeStore, MemorySessionStore } from "../lib/auth/stores";
 
 const NOW = Date.parse("2026-10-07T12:00:00.000Z");
 

@@ -51,10 +51,7 @@ export class WalletAuthService {
     private readonly sessions: MemorySessionStore,
   ) {}
 
-  createChallenge(
-    now = Date.now(),
-    nonce?: string,
-  ): PublicAuthChallenge {
+  createChallenge(now = Date.now(), nonce?: string): PublicAuthChallenge {
     const challenge = createAuthChallenge({
       ...this.config,
       now,

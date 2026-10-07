@@ -89,6 +89,7 @@ wallet signing key is stored by Orrylo.
 ## Intentionally unavailable
 
 This phase does not implement:
+
 - Stellar transaction submission;
 - Shared Issuer mutations or token issuance;
 - Dedicated Issuer provisioning;

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import {
-  createSessionCookiePolicy,
-} from "../../../../lib/auth/cookies";
+import { createSessionCookiePolicy } from "../../../../lib/auth/cookies";
 import { parseVerifyWalletRequest } from "../../../../lib/auth/http";
 import { isTrustedAuthOrigin } from "../../../../lib/auth/origin";
 import {

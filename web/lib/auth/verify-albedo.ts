@@ -15,8 +15,7 @@ export type AlbedoProofFailure =
   | "invalid_signature";
 
 export type AlbedoProofVerification =
-  | { ok: true; publicKey: string }
-  | { ok: false; reason: AlbedoProofFailure };
+  { ok: true; publicKey: string } | { ok: false; reason: AlbedoProofFailure };
 
 export function verifyAlbedoPublicKeyProof(
   challengePayload: string,

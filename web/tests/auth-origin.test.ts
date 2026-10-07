@@ -24,7 +24,10 @@ test("authentication origin is bound to the configured Orrylo domain", () => {
     ),
     false,
   );
-  assert.equal(isTrustedAuthOrigin(null, "app.orrylo.com", "production"), false);
+  assert.equal(
+    isTrustedAuthOrigin(null, "app.orrylo.com", "production"),
+    false,
+  );
 });
 
 test("localhost HTTP is permitted outside production", () => {
