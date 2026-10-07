@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import type { JsonObject } from "../lib/persistence/json";
+
 import {
   assertAuditMetadataSafe,
   hashAuditEvent,
@@ -24,7 +26,7 @@ test("audit hashing is deterministic", () => {
 });
 
 test("audit metadata rejects credential-like fields", () => {
-  for (const metadata of [
+  const cases: JsonObject[] = [
     { secret: "x" },
     { nested: { seedPhrase: "x" } },
     { session_token: "x" },
@@ -32,7 +34,9 @@ test("audit metadata rejects credential-like fields", () => {
     { privateKey: "x" },
     { credential: "x" },
     { password: "x" },
-  ]) {
+  ];
+
+  for (const metadata of cases) {
     assert.throws(() => assertAuditMetadataSafe(metadata), /sensitive/i);
   }
 });
