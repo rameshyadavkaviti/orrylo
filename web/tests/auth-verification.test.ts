@@ -191,7 +191,7 @@ test("logout invalidates the session and missing session stays unauthenticated",
 
 test("unknown challenge id cannot authenticate", () => {
   const service = createService();
-  const payload = "Orrylo wallet authentication\nunknown=true";
+  const payload = "Orrylo wallet authentication\\nunknown=true";
 
   assert.deepEqual(
     service.verifyWallet(
@@ -209,77 +209,81 @@ test("unknown challenge id cannot authenticate", () => {
 test(
   "challenge-id substitution cannot authenticate and consumes only the selected challenge",
   () => {
-  const service = createService();
-  const first = service.createChallenge(NOW, "h".repeat(43));
-  const second = service.createChallenge(NOW, "i".repeat(43));
+    const service = createService();
+    const first = service.createChallenge(NOW, "h".repeat(43));
+    const second = service.createChallenge(NOW, "i".repeat(43));
 
-  assert.deepEqual(
-    service.verifyWallet(
-      {
-        challengeId: second.id,
-        payload: first.payload,
-        proof: proofFor(first.payload),
-      },
-      NOW + 1,
-    ),
-    { ok: false, code: "challenge_mismatch" },
-  );
+    assert.deepEqual(
+      service.verifyWallet(
+        {
+          challengeId: second.id,
+          payload: first.payload,
+          proof: proofFor(first.payload),
+        },
+        NOW + 1,
+      ),
+      { ok: false, code: "challenge_mismatch" },
+    );
 
-  assert.equal(
-    service.verifyWallet(
-      {
-        challengeId: first.id,
-        payload: first.payload,
-        proof: proofFor(first.payload),
-      },
-      NOW + 2,
-      "first-session",
-    ).ok,
-    true,
-  );
+    assert.equal(
+      service.verifyWallet(
+        {
+          challengeId: first.id,
+          payload: first.payload,
+          proof: proofFor(first.payload),
+        },
+        NOW + 2,
+        "first-session",
+      ).ok,
+      true,
+    );
 
-  assert.deepEqual(
-    service.verifyWallet(
-      {
-        challengeId: second.id,
-        payload: second.payload,
-        proof: proofFor(second.payload),
-      },
-      NOW + 3,
-    ),
-    { ok: false, code: "challenge_missing_or_used" },
-  );
-});
+    assert.deepEqual(
+      service.verifyWallet(
+        {
+          challengeId: second.id,
+          payload: second.payload,
+          proof: proofFor(second.payload),
+        },
+        NOW + 3,
+      ),
+      { ok: false, code: "challenge_missing_or_used" },
+    );
+  },
+);
 
-test("invalid proof burns the challenge and cannot be replayed with a later valid proof", () => {
-  const service = createService();
-  const challenge = service.createChallenge(NOW, "j".repeat(43));
-  const proof = proofFor(challenge.payload);
+test(
+  "invalid proof burns the challenge and cannot be replayed with a later valid proof",
+  () => {
+    const service = createService();
+    const challenge = service.createChallenge(NOW, "j".repeat(43));
+    const proof = proofFor(challenge.payload);
 
-  assert.deepEqual(
-    service.verifyWallet(
-      {
-        challengeId: challenge.id,
-        payload: challenge.payload,
-        proof: { ...proof, signature: "00".repeat(64) },
-      },
-      NOW + 1,
-    ),
-    { ok: false, code: "invalid_signature" },
-  );
+    assert.deepEqual(
+      service.verifyWallet(
+        {
+          challengeId: challenge.id,
+          payload: challenge.payload,
+          proof: { ...proof, signature: "00".repeat(64) },
+        },
+        NOW + 1,
+      ),
+      { ok: false, code: "invalid_signature" },
+    );
 
-  assert.deepEqual(
-    service.verifyWallet(
-      {
-        challengeId: challenge.id,
-        payload: challenge.payload,
-        proof,
-      },
-      NOW + 2,
-    ),
-    { ok: false, code: "challenge_missing_or_used" },
-  );
-});
+    assert.deepEqual(
+      service.verifyWallet(
+        {
+          challengeId: challenge.id,
+          payload: challenge.payload,
+          proof,
+        },
+        NOW + 2,
+      ),
+      { ok: false, code: "challenge_missing_or_used" },
+    );
+  },
+);
 
 test("stored challenge cannot cross domain or network context", () => {
   for (const config of [
