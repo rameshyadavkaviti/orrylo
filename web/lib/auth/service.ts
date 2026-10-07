@@ -5,11 +5,7 @@ import {
   type PublicAuthChallenge,
 } from "./challenge";
 import { AUTH_PURPOSE } from "./constants";
-import type {
-  AuthSession,
-  ChallengeStore,
-  SessionStore,
-} from "./stores";
+import type { AuthSession, ChallengeStore, SessionStore } from "./stores";
 import {
   verifyAlbedoPublicKeyProof,
   type AlbedoPublicKeyProof,

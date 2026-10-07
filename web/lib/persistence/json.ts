@@ -2,9 +2,7 @@ import { createHash } from "node:crypto";
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue =
-  | JsonPrimitive
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+  JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 export type JsonObject = { [key: string]: JsonValue };
 
 export function canonicalJson(value: JsonValue): string {
@@ -12,7 +10,9 @@ export function canonicalJson(value: JsonValue): string {
 }
 
 export function hashJson(value: JsonValue): string {
-  return createHash("sha256").update(canonicalJson(value), "utf8").digest("hex");
+  return createHash("sha256")
+    .update(canonicalJson(value), "utf8")
+    .digest("hex");
 }
 
 function sortJson(value: JsonValue): JsonValue {

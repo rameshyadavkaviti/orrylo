@@ -24,7 +24,9 @@ export function getDatabaseClient(
   const connectionString = env.DATABASE_URL?.trim();
 
   if (!connectionString) {
-    throw new Error("DATABASE_URL is required for persistent application state.");
+    throw new Error(
+      "DATABASE_URL is required for persistent application state.",
+    );
   }
 
   if (!globalThis.__orryloDatabaseClient) {

@@ -33,7 +33,9 @@ if (!TEST_DATABASE_URL) {
   const sql = createDatabaseClient(databaseUrl);
   const migrationsDirectory = resolve(process.cwd(), "db/migrations");
   const NOW = Date.parse("2026-10-07T13:00:00.000Z");
-  const PUBLIC_KEY = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 17)).publicKey();
+  const PUBLIC_KEY = Keypair.fromRawEd25519Seed(
+    Buffer.alloc(32, 17),
+  ).publicKey();
 
   before(async () => {
     assertDedicatedTestDatabase(databaseUrl);
@@ -128,9 +130,8 @@ if (!TEST_DATABASE_URL) {
 
     assert.equal(results.filter((result) => result.ok).length, 1);
     assert.equal(
-      results.filter(
-        (result) => !result.ok && result.reason === "missing",
-      ).length,
+      results.filter((result) => !result.ok && result.reason === "missing")
+        .length,
       1,
     );
   });
@@ -156,7 +157,10 @@ if (!TEST_DATABASE_URL) {
     const second = new PostgresSessionStore(sql);
     const created = await first.create(PUBLIC_KEY, NOW);
 
-    assert.equal((await second.get(created.token, NOW + 1))?.publicKey, PUBLIC_KEY);
+    assert.equal(
+      (await second.get(created.token, NOW + 1))?.publicKey,
+      PUBLIC_KEY,
+    );
 
     const [stored] = await sql<{ token_hash: string }[]>`
       SELECT token_hash
@@ -203,12 +207,8 @@ if (!TEST_DATABASE_URL) {
     assert.equal(count, "1");
 
     assert.equal(
-      (
-        await first.getByIdempotency(
-          input.workflowScope,
-          input.idempotencyKey,
-        )
-      )?.requestId,
+      (await first.getByIdempotency(input.workflowScope, input.idempotencyKey))
+        ?.requestId,
       results[0]?.requestId,
     );
   });
@@ -222,16 +222,10 @@ if (!TEST_DATABASE_URL) {
       policyVersion: "test-policy",
     };
 
-    await repository.createIdempotent(
-      { ...base, payload: { value: 1 } },
-      NOW,
-    );
+    await repository.createIdempotent({ ...base, payload: { value: 1 } }, NOW);
 
     await assert.rejects(
-      repository.createIdempotent(
-        { ...base, payload: { value: 2 } },
-        NOW + 1,
-      ),
+      repository.createIdempotent({ ...base, payload: { value: 2 } }, NOW + 1),
       IdempotencyPayloadMismatchError,
     );
   });
@@ -296,8 +290,14 @@ if (!TEST_DATABASE_URL) {
       policyVersion: "test-policy",
     };
 
-    assert.equal((await repository.createEligibility(eligibility)).created, true);
-    assert.equal((await repository.createEligibility(eligibility)).created, false);
+    assert.equal(
+      (await repository.createEligibility(eligibility)).created,
+      true,
+    );
+    assert.equal(
+      (await repository.createEligibility(eligibility)).created,
+      false,
+    );
 
     const rewardBase = {
       walletPublicKey: PUBLIC_KEY,

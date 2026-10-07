@@ -28,7 +28,10 @@ export async function migrateDatabase(
   const result: MigrationResult = { applied: [], verified: [] };
 
   for (const name of names) {
-    const migrationSql = await readFile(join(migrationsDirectory, name), "utf8");
+    const migrationSql = await readFile(
+      join(migrationsDirectory, name),
+      "utf8",
+    );
     const checksum = createHash("sha256")
       .update(migrationSql, "utf8")
       .digest("hex");

@@ -85,9 +85,11 @@ export class PostgresFutureDomainRepository {
         ${input.idempotencyKey},
         ${input.rewardUniquenessKey},
         ${input.qualifyingEventReference ?? null},
-        ${input.launchWindowEvidence
-          ? this.sql.json(input.launchWindowEvidence)
-          : null},
+        ${
+          input.launchWindowEvidence
+            ? this.sql.json(input.launchWindowEvidence)
+            : null
+        },
         ${input.policyVersion},
         ${new Date(now)},
         ${new Date(now)}

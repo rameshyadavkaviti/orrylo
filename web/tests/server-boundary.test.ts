@@ -5,12 +5,18 @@ import test from "node:test";
 
 test("client modules do not import server persistence or database credentials", async () => {
   const root = resolve(process.cwd());
-  const files = await collectTypeScriptFiles(join(root, "app"), join(root, "components"));
+  const files = await collectTypeScriptFiles(
+    join(root, "app"),
+    join(root, "components"),
+  );
 
   for (const file of files) {
     const source = await readFile(file, "utf8");
 
-    if (!source.startsWith('"use client"') && !source.startsWith("'use client'")) {
+    if (
+      !source.startsWith('"use client"') &&
+      !source.startsWith("'use client'")
+    ) {
       continue;
     }
 

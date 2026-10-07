@@ -1,8 +1,6 @@
 import { resolve } from "node:path";
 
-import {
-  createDatabaseClient,
-} from "../lib/server/persistence/database";
+import { createDatabaseClient } from "../lib/server/persistence/database";
 import { migrateDatabase } from "../lib/server/persistence/migrations";
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
