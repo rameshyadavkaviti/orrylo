@@ -8,7 +8,6 @@ interface AuthMemoryState {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __orryloAuthMemoryState: AuthMemoryState | undefined;
 }
 
