@@ -1,0 +1,41 @@
+name: contracts
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "contracts/**"
+      - ".github/workflows/contracts.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "Cargo.toml"
+      - "contracts/**"
+      - ".github/workflows/contracts.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Stellar CLI
+        uses: stellar/stellar-cli@v28.0.0
+
+      - name: Add Soroban Wasm target
+        run: rustup target add wasm32v1-none
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run contract tests
+        run: cargo test --workspace
+
+      - name: Build contract Wasm
+        run: stellar contract build
