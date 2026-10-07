@@ -442,12 +442,12 @@ if (!TEST_DATABASE_URL) {
       false,
     );
 
-    const [{ count }] = await sql<{ count: string }[]>\`
+    const [{ count }] = await sql<{ count: string }[]>`
       SELECT count(*)::text AS count
       FROM reward_records
       WHERE wallet_public_key = ${PUBLIC_KEY}
         AND reward_type = ${rewardBase.rewardType}
-    \`;
+    `;
     assert.equal(count, "1");
   });
 }
