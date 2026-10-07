@@ -45,11 +45,13 @@ jobs:
       - name: Generate dependency lockfile
         run: cargo generate-lockfile
 
-      - name: Emit generated lockfile for Phase 2 bootstrap
-        run: |
-          echo "::group::Cargo.lock"
-          cat Cargo.lock
-          echo "::endgroup::"
+      - name: Upload generated lockfile for Phase 2 bootstrap
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: phase2-cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Check formatting
         run: cargo fmt --all -- --check

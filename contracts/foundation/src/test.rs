@@ -4,7 +4,8 @@ extern crate std;
 
 use super::*;
 use soroban_sdk::{
-    contract, contractimpl, testutils::Address as _, Address, Bytes, BytesN, ContractExecutable, Env,
+    contract, contractimpl, testutils::Address as _, Address, Bytes, BytesN, ContractExecutable,
+    Env,
 };
 use std::{
     fs,
@@ -203,10 +204,8 @@ fn wasm_direct_deployer_records_initializer_authorization() {
     let deployer = env
         .deployer()
         .with_address(deployer_address.clone(), [11_u8; 32]);
-    let foundation_id = deployer.deploy_contract(
-        ContractExecutable::Wasm(wasm_hash),
-        (initializer.clone(),),
-    );
+    let foundation_id =
+        deployer.deploy_contract(ContractExecutable::Wasm(wasm_hash), (initializer.clone(),));
 
     let deployment_auths = env.auths();
     assert!(deployment_auths
