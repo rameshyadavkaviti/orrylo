@@ -39,9 +39,7 @@ contain `test` because the integration suite resets its schema:
 
 ```sh
 export DATABASE_URL='postgres://postgres:orrylo-dev@localhost:5432/orrylo'
-createdb_url='postgres://postgres:orrylo-dev@localhost:5432/postgres'
-# Create once using your preferred PostgreSQL client:
-# CREATE DATABASE orrylo_test;
+docker exec orrylo-postgres createdb -U postgres orrylo_test
 export TEST_DATABASE_URL='postgres://postgres:orrylo-dev@localhost:5432/orrylo_test'
 ```
 
