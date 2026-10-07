@@ -18,14 +18,15 @@ Decided:
 - 150 RYLO first-successful-token launch reward;
 - 50 RYLO-equivalent non-tradable Free Build Credit;
 - 60-day reward window from a fixed official launch timestamp;
-- 100,000 RYLO Bootstrap Liquidity Reserve;
+- 1,000,000 RYLO Bootstrap Liquidity Reserve;
+- initial liquidity deployment: 1,000 RYLO + 100 XLM;
+- 999,000 RYLO remains undeployed reserve capacity after the initial deployment;
 - authorized eligible users may trade with one another.
 
 Still open:
 
 - exact official launch timestamp;
-- exact staging schedule for the 100,000 RYLO liquidity reserve;
-- exact amount of XLM paired with bootstrap liquidity;
+- staging rules for any liquidity additions after the approved initial 1,000 RYLO + 100 XLM deployment;
 - exact pool/market deployment mechanism;
 - exact service prices denominated in RYLO;
 - whether additional non-launch reward programs are introduced later.
