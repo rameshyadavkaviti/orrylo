@@ -2,45 +2,93 @@
 
 Status: **Unresolved by design**
 
-This file prevents future developers or AI agents from treating undecided questions as settled architecture.
+This file lists questions that remain intentionally open. Items already approved in the canonical source of truth or RYLO policy must not be reintroduced here as unresolved.
 
-## RYLO economics and control
+## RYLO economics and market operations
 
-The following are not yet final:
+Decided:
 
-- initial RYLO supply;
-- maximum supply;
-- whether supply is fixed, capped, or continuously mintable;
-- mint authority;
-- burn behavior;
-- treatment of RYLO spent on Orrylo services;
-- direct-sale price and pricing formula;
-- exact launch reward amount for the first 100 users;
-- exact free-build-credit amount.
-
-## RYLO authorization implementation
-
-The policy goal is decided: only eligible Orrylo ecosystem members should hold/trade RYLO.
-
-Still open:
-
-- exact `AUTH_REQUIRED` / issuer-authorization configuration;
-- whether authorization is driven directly by the issuer, a Soroban contract, or both;
-- exceptional revocation rules;
-- shutdown/recovery behavior.
-
-## RYLO contract governance
+- hybrid minting with a hard cap;
+- maximum supply: 100,000,000 RYLO;
+- initial mint: 0 RYLO;
+- approved mint sources: Direct Purchase shortfall, Reward, Bootstrap Liquidity;
+- direct sale price: 1 RYLO = 0.1 XLM;
+- service-spent RYLO returns to Treasury and is not burned;
+- Treasury-first direct-sale distribution;
+- 150 RYLO first-successful-token launch reward;
+- 50 RYLO-equivalent non-tradable Free Build Credit;
+- 60-day reward window from a fixed official launch timestamp;
+- 100,000 RYLO Bootstrap Liquidity Reserve;
+- authorized eligible users may trade with one another.
 
 Still open:
 
-- contract admin model;
-- upgradeability;
-- emergency powers;
-- admin transfer process;
-- multisig/governance requirements;
-- immutable vs upgradeable policy boundaries.
+- exact official launch timestamp;
+- exact staging schedule for the 100,000 RYLO liquidity reserve;
+- exact amount of XLM paired with bootstrap liquidity;
+- exact pool/market deployment mechanism;
+- exact service prices denominated in RYLO;
+- whether additional non-launch reward programs are introduced later.
 
-No hidden backdoor is allowed regardless of the final model.
+## RYLO eligibility and authorization
+
+Decided:
+
+- first successful token creation is the approved v1 token-creation eligibility path;
+- eligibility is wallet/public-key bound and permanent by default;
+- eligibility and trustline authorization are separate;
+- routine admin revocation is not allowed;
+- exceptional security/legal revocation is the only intended revocation category;
+- AUTH_REQUIRED is on;
+- AUTH_REVOCABLE is on;
+- AUTH_CLAWBACK is off;
+- authorized eligible wallets may transfer/trade RYLO;
+- issuer authorization is executed through a protected issuer-signing path rather than browser-side authority.
+
+Still open:
+
+- exact exceptional revocation criteria and governance/process;
+- whether product purchase becomes an additional eligibility path in v1;
+- exact shutdown behavior if the authorization service is unavailable.
+
+## RYLO issuer security and governance
+
+Decided:
+
+- 2-of-3 multisig;
+- Operational signer, Owner/policy co-signer, and offline Recovery signer;
+- master key excluded from routine app/backend operation;
+- routine authorization remains two-signature;
+- Signer B independently validates canonical transactions against policy;
+- issuer workflows use idempotent request IDs and append-only audit records;
+- security/financial audit retention target is 2 years;
+- operational debug-log retention target is 90 days.
+
+Still open:
+
+- concrete key-management technology/provider for each signer;
+- exact recovery ceremony;
+- exact signer rotation procedure;
+- exact master-key storage mechanism;
+- exact infrastructure for the independent Signer B service;
+- upgrade/emergency governance not already constrained by the no-hidden-backdoor rule.
+
+## RYLO mint/reward implementation
+
+Decided:
+
+- no arbitrary admin/manual/marketing/developer/emergency mint in v1;
+- Direct Purchase mint is shortfall-only after Treasury inventory;
+- first-token reward is 150 RYLO;
+- each wallet may receive that reward at most once;
+- reward/mint retries must be idempotent;
+- supply-cap verification is mandatory.
+
+Still open:
+
+- exact definition/evidence event for “successful token creation” before the reward is released;
+- exact persistent database schema and atomicity mechanism;
+- exact on-chain transaction construction and submission implementation.
 
 ## Shared Issuer
 
@@ -48,35 +96,53 @@ Decided:
 
 - customer Shared Issuer must be separate from the RYLO issuer.
 
+Reserved candidate:
+
+`GBR7SEZD4ITXQPAWEVBX2BULS76ERDRTRMIS3LUYKZ7DNLGZZ6ASSETS`
+
+This remains a reserved candidate only, not deployment evidence.
+
 Still open:
 
-- final Shared Issuer public key;
-- whether it uses a vanity suffix or a normal random Stellar address;
+- whether the reserved candidate becomes the final Shared Issuer public key;
 - final account authorization flags;
 - detailed lifecycle rules;
 - exact metadata schema.
 
-A vanity address is optional and must not delay the product if a random account is otherwise correct and secure.
-
 ## Dedicated Issuer templates
 
-The contract-controlled model is selected.
+The Contract-Controlled Issuer model is selected.
 
 Still open:
 
 - exact first set of templates;
-- implementation details for Fixed Supply;
-- implementation details for Capped Supply;
-- implementation details for Mintable;
-- implementation details for Governed;
+- Fixed Supply implementation;
+- Capped Supply implementation;
+- Mintable implementation;
+- Governed implementation;
 - ownership-transfer mechanics;
 - contract upgrade model.
 
+## Application persistence and auth production-readiness
+
+Albedo server-verified wallet authentication is implemented in the application foundation.
+
+Still open before public/multi-instance production:
+
+- shared atomic persistence for challenges/sessions;
+- rate limiting and request-abuse controls;
+- body/request limits at infrastructure level;
+- final production origin/cookie hardening;
+- durable application database workflows for eligibility, rewards, idempotency, and audit.
+
 ## Pricing
 
-A broad early service-price concept of roughly 50–100 XLM has been discussed, but no exact production price is locked.
+The RYLO direct sale price is decided separately from Orrylo service pricing.
 
-Pricing for all services remains open until unit economics and first-version scope are defined.
+Still open:
+
+- exact production prices for token creation and other Orrylo services;
+- RYLO-denominated service price schedule.
 
 ## Domains and hosting
 
@@ -91,7 +157,7 @@ Still open:
 
 ## Wallet support
 
-Albedo is the initial target wallet.
+Albedo is the initial wallet and the authentication slice is implemented.
 
 Still open:
 
@@ -102,18 +168,10 @@ Still open:
 
 Dedicated anti-Sybil protections are intentionally deferred.
 
-This does not mean abuse is impossible or accepted permanently. It means no extra anti-Sybil architecture should be invented for v1 without evidence or an explicit product decision.
+This does not mean abuse is permanently accepted. It means no extra anti-Sybil architecture should be invented without evidence or an explicit product decision.
 
 ## Legal / compliance
 
-Jurisdiction-specific legal treatment of:
-
-- direct RYLO sales;
-- controlled holder eligibility;
-- rewards;
-- secondary trading;
-- service-credit characterization;
-
-has not been finalized.
+Jurisdiction-specific legal treatment of direct RYLO sales, controlled eligibility, rewards, secondary trading, service-credit characterization, and exceptional authorization revocation has not been finalized.
 
 Do not make legal/compliance claims from architecture assumptions.
