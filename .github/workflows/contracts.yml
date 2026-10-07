@@ -39,19 +39,8 @@ jobs:
           rustc --version
           cargo --version
 
-      - name: Add Soroban Wasm target
-        run: rustup target add wasm32v1-none
-
-      - name: Generate dependency lockfile
-        run: cargo generate-lockfile
-
-      - name: Upload generated lockfile for Phase 2 bootstrap
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: phase2-cargo-lock
-          path: Cargo.lock
-          if-no-files-found: error
-          retention-days: 1
+      - name: Confirm committed dependency lock
+        run: cargo metadata --locked --no-deps --format-version 1 > /dev/null
 
       - name: Check formatting
         run: cargo fmt --all -- --check

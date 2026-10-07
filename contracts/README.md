@@ -37,8 +37,16 @@ contracts/
       test.rs
 ```
 
-The workspace pins `soroban-sdk = 28.0.0`. The repository also pins the Rust
-toolchain and commits `Cargo.lock` for reproducible dependency resolution.
+Build reproducibility is bounded by:
+
+- `soroban-sdk = 28.0.0`;
+- committed `Cargo.lock`;
+- repository Rust toolchain `1.99.0`;
+- Stellar CLI `28.0.0`;
+- SHA-pinned GitHub Actions used by contract CI.
+
+The GitHub-hosted `ubuntu-latest` runner itself remains a mutable hosted
+environment, so bit-for-bit runner-image reproducibility is not claimed.
 
 ### Commands
 
