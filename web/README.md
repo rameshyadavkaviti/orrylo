@@ -7,7 +7,7 @@ integration boundaries.
 ## Runtime
 
 - Node.js: 22.x
-- npm: 10.x
+- npm: 10.9.9
 - Next.js: 16.4.0
 - React: 19.3.0
 - TypeScript: strict mode
@@ -17,7 +17,7 @@ integration boundaries.
 ```sh
 cd web
 cp .env.example .env.local
-npm install
+npm ci
 npm run dev
 ```
 
