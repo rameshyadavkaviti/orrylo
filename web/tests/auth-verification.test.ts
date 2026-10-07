@@ -291,11 +291,7 @@ test("rejects cross-context challenge reuse", () => {
       challenges,
       sessions,
     );
-    const verifier = new WalletAuthService(
-      context,
-      challenges,
-      sessions,
-    );
+    const verifier = new WalletAuthService(context, challenges, sessions);
     const nonce = randomNonce(context.domain + context.network);
     const challenge = issuer.createChallenge(NOW, nonce);
 
@@ -356,7 +352,5 @@ test("rejects public-key substitution", () => {
 });
 
 function randomNonce(seed: string): string {
-  return Buffer.from(seed.padEnd(32, "_"))
-    .toString("base64url")
-    .slice(0, 43);
+  return Buffer.from(seed.padEnd(32, "_")).toString("base64url").slice(0, 43);
 }
