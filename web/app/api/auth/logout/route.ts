@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
 
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
 
-  getWalletAuthService().logout(token);
+  await getWalletAuthService().logout(token);
 
   const response = NextResponse.json(
     { authenticated: false },

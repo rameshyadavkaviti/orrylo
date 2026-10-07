@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const challenge = getWalletAuthService().createChallenge();
+  const challenge = await getWalletAuthService().createChallenge();
 
   return NextResponse.json(challenge, {
     headers: {

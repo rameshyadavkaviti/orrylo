@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  const session = getWalletAuthService().getSession(token);
+  const session = await getWalletAuthService().getSession(token);
 
   const response = NextResponse.json(
     session

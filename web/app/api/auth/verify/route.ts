@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createSessionCookiePolicy } from "../../../../lib/auth/cookies";
+import { SESSION_COOKIE_NAME } from "../../../../lib/auth/constants";
 import { parseVerifyWalletRequest } from "../../../../lib/auth/http";
 import { isTrustedAuthOrigin } from "../../../../lib/auth/origin";
 import {
   getWalletAuthService,
   readServerAuthConfig,
 } from "../../../../lib/auth/runtime";
-import { SESSION_COOKIE_NAME } from "../../../../lib/auth/constants";
 
 export const runtime = "nodejs";
 
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     return errorResponse("invalid_request", 400);
   }
 
-  const result = getWalletAuthService().verifyWallet(verificationRequest);
+  const result = await getWalletAuthService().verifyWallet(verificationRequest);
 
   if (!result.ok) {
     if (result.code === "challenge_expired") {
