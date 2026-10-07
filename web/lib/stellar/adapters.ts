@@ -1,14 +1,14 @@
 import type { StellarNetwork } from "../config/public-env";
 
-export interface WalletConnection {
-  walletId: string;
+export interface WalletAuthenticationProof {
   publicKey: string;
+  signedMessage: string;
+  signature: string;
 }
 
-export interface WalletAdapter {
+export interface WalletAuthenticationAdapter {
   readonly id: string;
-  connect(): Promise<WalletConnection>;
-  disconnect(): Promise<void>;
+  authenticate(challenge: string): Promise<WalletAuthenticationProof>;
 }
 
 export interface ContractReadRequest {
@@ -34,7 +34,7 @@ export interface TransactionSubmissionAdapter {
 }
 
 export type StellarAdapters = {
-  wallet: WalletAdapter | null;
+  walletAuthentication: WalletAuthenticationAdapter | null;
   contractReads: ContractReadAdapter | null;
   transactions: TransactionSubmissionAdapter | null;
 };

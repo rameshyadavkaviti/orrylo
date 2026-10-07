@@ -223,7 +223,7 @@ Important status:
 
 ## 14. Implementation status
 
-Current phase: **Application Phase 1 — Full-stack Foundation**.
+Current phase: **Application authentication — Albedo wallet/session slice**.
 
 The repository contains a minimal Soroban workspace and a policy-neutral foundation contract with:
 
@@ -246,12 +246,17 @@ The repository also contains an initial Next.js application foundation under
 - explicit demo-only account, eligibility, RYLO, asset, and activity states;
 - Shared Issuer draft UX with no issuance mutation;
 - visibly unavailable Dedicated Issuer and unresolved product capabilities;
-- modular wallet/contract-read/transaction adapter interfaces with no live adapters;
+- modular contract-read/transaction adapter interfaces plus a narrow Albedo authentication adapter;
 - Contract Interface v1 compatibility checks and typed error mapping;
 - application formatting, lint, typecheck, test, build, and CI gates.
 
-The web foundation performs no live wallet connection, Stellar transaction,
-issuer mutation, contract mutation, testnet deployment, or mainnet deployment.
+The web application now implements authentication-only Albedo wallet proof and
+server-side application sessions. Product data remains demo-only. The wallet
+slice performs no Stellar transaction, issuer mutation, contract mutation,
+testnet issuance/deployment, or mainnet activity.
+
+Authentication challenge/session state is temporarily process-local and must not
+be represented as horizontally scalable production persistence.
 
 This foundation does **not** define or implement:
 

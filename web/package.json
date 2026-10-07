@@ -20,7 +20,9 @@
   "dependencies": {
     "next": "16.4.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "@albedo-link/intent": "0.13.0",
+    "@stellar/stellar-sdk": "17.2.1"
   },
   "devDependencies": {
     "@types/node": "^22.18.0",

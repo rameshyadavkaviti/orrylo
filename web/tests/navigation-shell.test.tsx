@@ -17,6 +17,6 @@ test("application shell renders every approved navigation destination", () => {
     assert.ok(html.includes('href="' + item.href + '"'));
   }
 
-  assert.match(html, /demo only/i);
+  assert.match(html, /product data demo/i);
   assert.match(html, /Contract Interface v1/i);
 });
