@@ -30,6 +30,8 @@ test("audit metadata rejects credential-like fields", () => {
     { secret: "x" },
     { nested: { seedPhrase: "x" } },
     { session_token: "x" },
+    { session: "x" },
+    { authorization: "x" },
     { signature: "x" },
     { privateKey: "x" },
     { credential: "x" },
