@@ -4,7 +4,11 @@ extern crate std;
 
 use super::*;
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Bytes, BytesN, Env};
-use std::{fs, panic::{catch_unwind, AssertUnwindSafe}, path::PathBuf};
+use std::{
+    fs,
+    panic::{catch_unwind, AssertUnwindSafe},
+    path::PathBuf,
+};
 
 #[contract]
 struct InitializationHarness;
