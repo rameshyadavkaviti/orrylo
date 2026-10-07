@@ -128,56 +128,69 @@ Detailed rules are canonical in [RYLO_POLICY.md](RYLO_POLICY.md).
 
 ## 8. Eligible-member model
 
-A wallet becomes eligible for RYLO after successfully completing at least one qualifying Orrylo action:
-
-- create a token; or
-- create / purchase a product.
-
-Creating only a token is sufficient. A later product purchase is not required.
+For the approved v1 token-creation path, a wallet becomes RYLO-eligible after the user's **first successful token creation** through Orrylo.
 
 Current membership principle:
 
 **One-time builder → ecosystem member.**
 
-Authorization should not be casually revoked after qualification unless future policy explicitly changes.
+Eligibility rules:
 
-## 9. First 100 users
+- eligibility is bound to the Stellar wallet/public key;
+- eligibility is permanent by default;
+- zero RYLO balance, selling all RYLO, inactivity, or disconnecting the wallet do not remove eligibility;
+- eligibility and Stellar trustline authorization are separate states;
+- routine discretionary admin revocation is not part of v1;
+- revocation is reserved for an explicitly defined exceptional security/legal policy.
 
-The initial campaign model is:
+Any additional product-purchase path to eligibility must be specified separately before implementation.
+
+## 9. Launch build credit and reward window
+
+The approved launch flow is:
 
 ```
 User joins
-→ receives free build credit
+→ receives 50 RYLO-equivalent Free Build Credit
 → successfully creates first token
-→ becomes eligible member
+→ becomes eligible
 → RYLO trustline is authorized
-→ receives remaining RYLO reward
+→ receives 150 RYLO reward if the launch-reward window is still open
 ```
 
-The initial credit is not intended to be immediately tradable RYLO.
+Rules:
 
-Anti-Sybil controls are intentionally deferred for the first version unless real abuse requires them.
+- Free Build Credit is an internal Orrylo service credit, not minted RYLO;
+- it is not transferable or tradable;
+- the first-token reward is **150 RYLO**;
+- the reward window lasts **60 days** from a fixed official launch timestamp;
+- after that window, successful creation may still establish eligibility, but does not automatically earn the launch reward;
+- each wallet may receive the first-token-creation reward at most once;
+- anti-Sybil controls remain deferred for v1 unless evidence requires them.
 
-## 10. Price transparency
+## 10. RYLO supply, sale, treasury, and liquidity
 
-Orrylo may sell RYLO directly for XLM at a platform-set sale price.
+Approved economics:
 
-That direct sale price must not be described as:
+- maximum supply: **100,000,000 RYLO**;
+- initial mint: **0 RYLO**;
+- direct Orrylo sale price: **1 RYLO = 0.1 XLM**;
+- service-spent RYLO is returned to the Orrylo Treasury and is **not burned**;
+- direct sales use Treasury inventory first and mint only an approved shortfall;
+- the Treasury has no separate balance cap beyond the global RYLO supply rules;
+- eligible/authorized members may transfer and trade RYLO with one another;
+- a **100,000 RYLO Bootstrap Liquidity Reserve** is approved to seed meaningful secondary-market liquidity;
+- the previously considered idea that users could acquire additional RYLO only from Orrylo is rejected and is not policy.
 
-- intrinsic value;
-- guaranteed market value;
-- guaranteed future value.
+Approved v1 mint sources are limited to:
 
-For rewards, the UI may state the direct platform purchase price for the same amount, for example:
+1. Direct Purchase shortfall mint;
+2. Reward mint;
+3. Bootstrap Liquidity mint.
 
-```
-Gifted: 200 RYLO
-Paid: 0 XLM
-Direct Orrylo purchase price: 20 XLM
-Market value: market-dependent
-```
+No manual/admin/marketing/emergency/developer mint path is approved for v1.
 
-Do not say that the gift "is worth 20 XLM" solely because Orrylo sells the same amount for 20 XLM.
+The direct sale price must not be described as intrinsic value, guaranteed market value, guaranteed resale value, or guaranteed future value.
 
 ## 11. No investment section for v1
 
@@ -258,10 +271,13 @@ testnet issuance/deployment, or mainnet activity.
 Authentication challenge/session state is temporarily process-local and must not
 be represented as horizontally scalable production persistence.
 
-This foundation does **not** define or implement:
+Current canonical RYLO policy now defines supply, mint-source, reward, treasury, authorization, signer, retry, and audit intent in [RYLO_POLICY.md](RYLO_POLICY.md), but those policies are **not yet implemented on-chain or in production application workflows**.
 
-- RYLO supply, mint, burn, reward, pricing, or service-spend economics;
-- final RYLO trustline authorization/revocation mechanics;
+This foundation does **not** implement:
+
+- RYLO supply enforcement, mint execution, rewards, direct sales, service-spend recycling, or bootstrap liquidity;
+- RYLO trustline authorization/revocation execution;
+- RYLO issuer multisig/signing-service infrastructure;
 - Shared Issuer account configuration;
 - Dedicated Issuer token templates;
 - final contract admin/governance or admin-transfer policy;
