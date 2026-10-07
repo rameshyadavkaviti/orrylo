@@ -625,6 +625,53 @@ code {
   padding: 12px 20px;
 }
 
+.wallet-auth-control {
+  display: grid;
+  justify-items: end;
+  gap: 7px;
+}
+
+.wallet-authenticated {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 8px 10px 8px 12px;
+}
+
+.wallet-authenticated > div {
+  min-width: 0;
+}
+
+.wallet-auth-label {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--success);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.wallet-public-key {
+  display: block;
+  max-width: 360px;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wallet-auth-error {
+  max-width: 320px;
+  color: #b42338;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
 @media (max-width: 1180px) {
   .app-shell {
     grid-template-columns: 220px minmax(0, 1fr);
