@@ -15,14 +15,18 @@
     "test": "tsx --test tests/*.test.ts tests/*.test.tsx",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "verify": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build"
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:verify": "tsx scripts/verify-schema.ts",
+    "test:db": "tsx --test --test-concurrency=1 tests/db/*.test.ts"
   },
   "dependencies": {
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "@albedo-link/intent": "0.13.0",
-    "@stellar/stellar-sdk": "17.2.1"
+    "@stellar/stellar-sdk": "17.2.1",
+    "postgres": "3.4.9"
   },
   "devDependencies": {
     "@types/node": "^22.18.0",

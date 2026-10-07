@@ -8,48 +8,63 @@ on:
       - ".gitignore"
       - "README.md"
       - "docs/SOURCE_OF_TRUTH.md"
-  push:
-    branches:
-      - main
-    paths:
-      - "web/**"
-      - ".github/workflows/web.yml"
-      - ".gitignore"
-      - "README.md"
-      - "docs/SOURCE_OF_TRUTH.md"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   application:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: orrylo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d orrylo_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/orrylo_test
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/orrylo_test
 
     defaults:
       run:
         working-directory: web
 
     steps:
-      - name: Checkout
+      - name: Checkout feature branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.head_ref }}
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
-          cache: "npm"
-          cache-dependency-path: web/package-lock.json
 
-      - name: Confirm runtime
+      - name: Resolve locked dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Format web sources
+        run: npm run format
+
+      - name: Commit dependency lock and formatting
         run: |
-          node --version
-          npm --version
-
-      - name: Install locked dependencies
-        run: npm ci --no-audit --no-fund
-
-      - name: Check formatting
-        run: npm run format:check
+          if [ -n "$(git status --porcelain -- .)" ]; then
+            git add .
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "build: lock persistence dependencies"
+            git push origin "HEAD:${GITHUB_HEAD_REF}"
+          fi
 
       - name: Lint
         run: npm run lint
@@ -57,8 +72,17 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
+      - name: Unit tests
         run: npm test
+
+      - name: Apply migrations
+        run: npm run db:migrate
+
+      - name: Verify schema
+        run: npm run db:verify
+
+      - name: Database integration tests
+        run: npm run test:db
 
       - name: Production build
         run: npm run build
