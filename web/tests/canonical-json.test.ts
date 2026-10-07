@@ -12,8 +12,8 @@ test("canonical JSON orders ASCII keys", () => {
 });
 
 test("canonical JSON orders Unicode keys deterministically", () => {
-  const composed = "\u00e9";
-  const decomposed = "e\u0301";
+  const composed = "é";
+  const decomposed = "é";
   const first: JsonObject = {
     [composed]: "composed",
     [decomposed]: "decomposed",
