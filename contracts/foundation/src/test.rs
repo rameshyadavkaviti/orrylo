@@ -3,9 +3,7 @@
 extern crate std;
 
 use super::*;
-use soroban_sdk::{
-    contract, contractimpl, testutils::Address as _, Address, Bytes, BytesN, Env,
-};
+use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Bytes, BytesN, Env};
 use std::{fs, path::PathBuf};
 
 #[contract]
@@ -33,8 +31,9 @@ impl WasmDeploymentHarness {
 fn built_foundation_wasm(env: &Env) -> Bytes {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../target/wasm32v1-none/release/orrylo_foundation.wasm");
-    let wasm = fs::read(&path)
-        .unwrap_or_else(|error| panic!("failed to read built foundation Wasm at {path:?}: {error}"));
+    let wasm = fs::read(&path).unwrap_or_else(|error| {
+        panic!("failed to read built foundation Wasm at {path:?}: {error}")
+    });
     Bytes::from_slice(env, &wasm)
 }
 
@@ -149,5 +148,7 @@ fn wasm_deployment_enforces_constructor_auth_and_rolls_back_failed_deploy() {
 
     // After successful deployment, repeating the same deployment (same
     // deployer + salt) must fail rather than recreate/reinitialize the instance.
-    assert!(harness.try_deploy(&wasm_hash, &foundation.state().initializer).is_err());
+    assert!(harness
+        .try_deploy(&wasm_hash, &foundation.state().initializer)
+        .is_err());
 }
