@@ -46,6 +46,7 @@ interface StoredEventRow {
 
 interface EligibilityRow {
   eligibility_id: string;
+  qualifying_event_reference: string;
 }
 
 interface RewardRow {
@@ -177,13 +178,13 @@ export class EligibilityRewardService {
           ${validated.eventReference}
         )
         ON CONFLICT (wallet_public_key, eligibility_type) DO NOTHING
-        RETURNING eligibility_id
+        RETURNING eligibility_id, qualifying_event_reference
       `;
 
       const [eligibility] = createdEligibility
         ? [createdEligibility]
         : await transaction<EligibilityRow[]>`
-            SELECT eligibility_id
+            SELECT eligibility_id, qualifying_event_reference
             FROM eligibility_records
             WHERE wallet_public_key = ${validated.walletPublicKey}
               AND eligibility_type = ${FIRST_TOKEN_ELIGIBILITY_TYPE}
@@ -215,7 +216,9 @@ export class EligibilityRewardService {
       });
 
       await appendAudit(transaction, {
-        eventType: "reward.evaluated",
+        eventType: createdEligibility
+          ? "reward.evaluated"
+          : "reward.decision.reused",
         targetPublicKey: validated.walletPublicKey,
         policyVersion: validated.policyVersion,
         occurredAt: now,
@@ -228,7 +231,83 @@ export class EligibilityRewardService {
 
       let rewardResult: RewardResult;
 
-      if (!launchConfig.configured) {
+      if (!createdEligibility) {
+        const [firstEvent] = await transaction<StoredEventRow[]>`
+          SELECT event_fingerprint, result, processing_state
+          FROM token_creation_qualifying_events
+          WHERE event_reference = ${eligibility.qualifying_event_reference}
+            AND wallet_public_key = ${validated.walletPublicKey}
+        `;
+
+        if (
+          firstEvent?.processing_state !== "processed" ||
+          firstEvent.result?.outcome !== "processed" ||
+          firstEvent.result.eligibility.eligibilityId !==
+            eligibility.eligibility_id
+        ) {
+          throw new Error(
+            "Original first-token reward decision is unavailable.",
+          );
+        }
+
+        const firstReward = firstEvent.result.reward;
+
+        if (
+          firstReward.outcome === "reward_approved" ||
+          firstReward.outcome === "reward_already_exists"
+        ) {
+          const [originalReward] = await transaction<
+            { launch_window_evidence: JsonObject; policy_version: string }[]
+          >`
+            SELECT launch_window_evidence, policy_version
+            FROM reward_records
+            WHERE reward_id = ${firstReward.rewardId}
+              AND wallet_public_key = ${validated.walletPublicKey}
+              AND reward_type = ${FIRST_TOKEN_REWARD_TYPE}
+              AND qualifying_event_reference = ${eligibility.qualifying_event_reference}
+          `;
+          const launchAt = Date.parse(
+            String(originalReward?.launch_window_evidence?.launchAt),
+          );
+          const windowEnd = Date.parse(
+            String(originalReward?.launch_window_evidence?.windowEnd),
+          );
+
+          if (
+            !originalReward ||
+            !Number.isFinite(launchAt) ||
+            !Number.isFinite(windowEnd)
+          ) {
+            throw new Error(
+              "Original first-token reward evidence is unavailable.",
+            );
+          }
+
+          rewardResult = await ensureRewardPreparation(transaction, {
+            walletPublicKey: validated.walletPublicKey,
+            qualifyingEventReference: eligibility.qualifying_event_reference,
+            policyVersion: originalReward.policy_version,
+            now,
+            launchAt,
+            windowEnd,
+          });
+        } else {
+          rewardResult = firstReward;
+
+          await appendAudit(transaction, {
+            eventType: "reward.skipped.first_token_decision",
+            targetPublicKey: validated.walletPublicKey,
+            policyVersion: validated.policyVersion,
+            occurredAt: now,
+            metadata: {
+              qualifyingEventReference: eligibility.qualifying_event_reference,
+              observedEventReference: validated.eventReference,
+              rewardType: FIRST_TOKEN_REWARD_TYPE,
+              originalOutcome: firstReward.outcome,
+            },
+          });
+        }
+      } else if (!launchConfig.configured) {
         rewardResult = { outcome: "launch_not_configured" };
 
         await appendAudit(transaction, {
@@ -635,7 +714,10 @@ function validateEvent(event: TrustedTokenCreationSucceededEvent):
     throw error;
   }
 
-  if (!Number.isFinite(event.eventOccurredAt)) {
+  if (
+    !Number.isFinite(event.eventOccurredAt) ||
+    !Number.isFinite(new Date(event.eventOccurredAt).getTime())
+  ) {
     return { ok: false, code: "invalid_event_timestamp" };
   }
 

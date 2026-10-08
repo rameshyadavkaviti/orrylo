@@ -163,6 +163,12 @@ eligibility. Invalid launch configuration fails before database mutation. The
 official timestamp is intentionally unset and is not selected by this
 repository phase.
 
+The event that first establishes eligibility records the reward decision.
+Later token-creation events reuse that decision: they cannot turn a skipped
+first creation into a new launch reward. Already-approved rewards retain their
+original evidence and intents, including after the reward window closes;
+terminal workflow states are preserved.
+
 The persistence schema also retains inactive foundations for:
 
 - other eligibility and reward types;

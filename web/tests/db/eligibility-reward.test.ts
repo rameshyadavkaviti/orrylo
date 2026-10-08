@@ -398,6 +398,44 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
+  test("later token creation reuses an approved reward after the window without reopening its terminal workflow", async () => {
+    const firstEvent = qualifyingEvent(42, { walletSeed: 42 });
+    const laterEvent = qualifyingEvent(43, { walletSeed: 42 });
+    const first = await serviceAt(
+      sql,
+      LAUNCH_AT + 1,
+    ).processTrustedTokenCreationSucceeded(firstEvent);
+    assert.equal(first.outcome, "processed");
+    if (first.outcome !== "processed") return;
+    assert.equal(first.reward.outcome, "reward_approved");
+    if (first.reward.outcome !== "reward_approved") return;
+
+    await sql`
+      UPDATE workflow_intents
+      SET state = 'cancelled', terminal_at = ${new Date(LAUNCH_AT + 2)}
+      WHERE request_id = ${first.reward.workflowRequestId}
+    `;
+    const later = await serviceAt(
+      sql,
+      LAUNCH_AT + REWARD_WINDOW_MS,
+    ).processTrustedTokenCreationSucceeded(laterEvent);
+    assert.equal(later.outcome, "processed");
+    if (later.outcome !== "processed") return;
+    assert.deepEqual(later.reward, {
+      ...first.reward,
+      outcome: "reward_already_exists",
+    });
+
+    const [workflow] = await sql<{ state: string; terminal_at: Date }[]>`
+      SELECT state, terminal_at
+      FROM workflow_intents
+      WHERE request_id = ${first.reward.workflowRequestId}
+    `;
+    assert.equal(workflow.state, "cancelled");
+    assert.equal(workflow.terminal_at.getTime(), LAUNCH_AT + 2);
+    assert.equal(await new PostgresAuditRepository(sql).verifyChain(), true);
+  });
+
   test("protected-operation mismatch rejects reuse and rolls back the later event", async () => {
     const service = serviceAt(sql, LAUNCH_AT + 1);
     const firstEvent = qualifyingEvent(45, { walletSeed: 45 });
