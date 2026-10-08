@@ -239,6 +239,20 @@ Albedo wallet
 
 Testnet bootstrap/deployment should be reproducible because Testnet state may be reset.
 
+### RYLO Stellar Asset Contract visibility
+
+For RYLO, deployment acceptance includes the Stellar Asset Contract (SAC) representation of the Classic Stellar asset.
+
+Required evidence:
+
+- deploy the SAC corresponding to the RYLO Classic asset on the target network;
+- record and verify the resulting deterministic `C...` contract address;
+- verify that StellarExpert's RYLO asset Summary exposes the field `Soroban Contract: C...`.
+
+RYLO deployment must not be considered complete for the relevant network until this verification is recorded as deployment evidence.
+
+This requirement does not redefine RYLO as a separate custom Soroban token. RYLO remains the Classic Stellar asset; the SAC is its Soroban contract representation.
+
 ## 13. Repository authority and agent execution
 
 From this phase onward, **GitHub repository state is the operational source of truth for all Orrylo agents**.
