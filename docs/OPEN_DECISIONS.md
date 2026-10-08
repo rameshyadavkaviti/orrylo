@@ -26,7 +26,7 @@ Decided:
 Still open:
 
 - exact official launch timestamp;
-- staging rules for any liquidity additions after the approved initial 1,000 RYLO + 100 XLM deployment;
+- exact amount chosen for each future staged liquidity addition;
 - exact pool/market deployment mechanism;
 - exact service prices denominated in RYLO;
 - whether additional non-launch reward programs are introduced later.
@@ -68,8 +68,8 @@ Decided:
 Still open:
 
 - concrete key-management technology/provider for each signer;
-- exact recovery ceremony;
-- exact signer rotation procedure;
+- concrete recovery-ceremony implementation details;
+- concrete signer-rotation procedure;
 - exact master-key storage mechanism;
 - exact infrastructure for the independent Signer B service;
 - upgrade/emergency governance not already constrained by the no-hidden-backdoor rule.
@@ -149,9 +149,18 @@ Still open:
 
 Target domain architecture is decided conceptually.
 
+Approved first-prototype baseline:
+
+- Railway for app/backend hosting;
+- Neon Free for PostgreSQL;
+- Cloudflare Free for DNS/CDN;
+- Stellar Testnet for the first end-to-end prototype.
+
+These are prototype choices, not permanent production-provider commitments.
+
 Still open:
 
-- final deployment provider configuration;
+- final production deployment provider configuration;
 - exact DNS/wildcard setup;
 - custom-domain onboarding flow;
 - whether every dedicated asset receives a subdomain automatically in v1.
