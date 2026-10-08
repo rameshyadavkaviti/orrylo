@@ -12,6 +12,16 @@ const EXPECTED_TABLES = [
   "eligibility_records",
   "reward_records",
   "protected_operation_intents",
+  "token_creation_qualifying_events",
+] as const;
+
+const EXPECTED_ELIGIBILITY_REWARD_CONSTRAINTS = [
+  "eligibility_records_first_token_event_required",
+  "eligibility_records_qualifying_event_fk",
+  "reward_records_first_token_amount_check",
+  "reward_records_first_token_evidence_required",
+  "reward_records_qualifying_event_fk",
+  "token_creation_qualifying_events_processing_check",
 ] as const;
 
 async function main() {
@@ -37,6 +47,22 @@ async function main() {
 
     if (missing.length > 0) {
       throw new Error(`Missing database tables: ${missing.join(", ")}`);
+    }
+
+    const constraintRows = await sql<{ conname: string }[]>`
+      SELECT conname
+      FROM pg_constraint
+      WHERE conname = ANY(${EXPECTED_ELIGIBILITY_REWARD_CONSTRAINTS})
+    `;
+    const foundConstraints = new Set(constraintRows.map((row) => row.conname));
+    const missingConstraints = EXPECTED_ELIGIBILITY_REWARD_CONSTRAINTS.filter(
+      (name) => !foundConstraints.has(name),
+    );
+
+    if (missingConstraints.length > 0) {
+      throw new Error(
+        `Missing eligibility/reward constraints: ${missingConstraints.join(", ")}`,
+      );
     }
 
     process.stdout.write("Database schema verified.\n");

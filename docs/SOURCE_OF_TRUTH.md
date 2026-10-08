@@ -316,7 +316,7 @@ Important status:
 
 ## 17. Implementation status
 
-Current phase: **Application Persistence + Durable Workflow Foundation**.
+Current phase: **Eligibility + Reward Workflow Foundation**.
 
 The repository contains a minimal Soroban workspace and a policy-neutral foundation contract with:
 
@@ -346,8 +346,15 @@ The repository also contains an initial Next.js application foundation under
 The web application now implements authentication-only Albedo wallet proof with
 durable PostgreSQL-backed challenges and server-side sessions. It also contains
 an inactive persistent workflow/idempotency foundation, append-only
-hash-chained audit events, and schema foundations for future eligibility,
-reward, and protected-operation records. Product data remains demo-only.
+hash-chained audit events, and a server-only trusted qualifying-event boundary
+that can establish first-token eligibility and prepare the approved launch
+reward record plus inactive future workflow/protected-operation intents.
+
+The qualifying-event producer is not implemented or selected. The service does
+not decide whether a token creation succeeded; a future reviewed server-side
+integration must supply that trusted evidence. No public/browser mutation route
+exists for declaring token-creation success. Eligibility and reward UI data
+remain demo-only.
 
 The persistence layer is provider-neutral: the repository requires PostgreSQL
 through a server-only DATABASE_URL but does not select or claim any hosted
@@ -355,16 +362,23 @@ database provider. It supports multi-instance challenge/session state, atomic
 challenge consumption, database uniqueness constraints, deterministic
 migrations, and real database concurrency tests.
 
-No workflow, eligibility, reward, or protected-operation endpoint is activated.
-The application performs no Stellar transaction, issuer mutation, trustline
-mutation, RYLO mint/reward/payment/authorization, contract mutation, liquidity
-operation, testnet issuance/deployment, or mainnet activity.
+No public workflow, eligibility, reward, or protected-operation endpoint is
+activated. Reward preparation stops at database state `approved`; it does not
+create an envelope, invoke a signer, submit a transaction, or confirm an
+on-chain result. The application performs no Stellar transaction, issuer
+mutation, trustline mutation, RYLO mint/reward execution/payment/authorization,
+contract mutation, liquidity operation, testnet issuance/deployment, or mainnet
+activity.
 
-Current canonical RYLO policy now defines supply, mint-source, reward, treasury, authorization, signer, retry, and audit intent in [RYLO_POLICY.md](RYLO_POLICY.md), but those policies are **not yet implemented on-chain or in production application workflows**.
+Current canonical RYLO policy now defines supply, mint-source, reward, treasury,
+authorization, signer, retry, and audit intent in
+[RYLO_POLICY.md](RYLO_POLICY.md). This phase implements eligibility/reward
+preparation only; the policy is **not yet implemented on-chain or in an
+executing production issuer workflow**.
 
 This foundation does **not** implement:
 
-- RYLO supply enforcement, mint execution, rewards, direct sales, service-spend recycling, or bootstrap liquidity;
+- RYLO supply enforcement, mint/reward execution, direct sales, service-spend recycling, or bootstrap liquidity;
 - RYLO trustline authorization/revocation execution;
 - RYLO issuer multisig/signing-service infrastructure;
 - Shared Issuer account configuration;

@@ -137,24 +137,54 @@ signature, private key, credential, and password, and is size-bounded.
 This is tamper-evident application evidence; it is **not** described as
 tamper-proof storage against a database superuser.
 
-## Future-domain schema only
+## Trusted eligibility and reward preparation
 
-The migration prepares inactive tables for:
+The server-only `EligibilityRewardService` accepts a future trusted
+`TOKEN_CREATION_SUCCEEDED` event. It is not exposed through a public browser or
+API mutation route, and it does not decide whether token creation succeeded.
+That authoritative evidence boundary remains reserved for a reviewed
+server-side token-creation integration.
 
-- eligibility records;
-- reward records with a database-unique reward uniqueness key;
-- protected operation intents for future mint, authorization, treasury-transfer,
-  and liquidity workflows.
+Within one PostgreSQL transaction, the service:
 
-These tables are not wired to public mutation endpoints and do not activate any
-RYLO or Stellar behavior.
+- validates and canonicalizes the Stellar wallet StrKey;
+- stores and fingerprints the qualifying event for idempotent replay;
+- establishes first-token eligibility once per wallet;
+- evaluates the trusted qualifying event's `eventOccurredAt` against the
+  server-only `ORRYLO_OFFICIAL_LAUNCH_AT` configuration using a half-open
+  60-day interval;
+- approves exactly `150.0000000` RYLO when the event is in the launch window;
+- creates/reuses one reward workflow and one inactive future mint protected
+  operation;
+- appends qualifying-event, eligibility, reward, and intent evidence to the
+  audit chain.
+
+Missing launch configuration returns `launch_not_configured` without blocking
+eligibility. Invalid launch configuration fails before database mutation. The
+official timestamp is intentionally unset and is not selected by this
+repository phase.
+
+The event that first establishes eligibility records the reward decision.
+Later token-creation events reuse that decision: they cannot turn a skipped
+first creation into a new launch reward. Already-approved rewards retain their
+original evidence and intents, including after the reward window closes;
+terminal workflow states are preserved.
+
+The persistence schema also retains inactive foundations for:
+
+- other eligibility and reward types;
+- protected authorization, treasury-transfer, and liquidity workflows.
+
+No workflow signs, submits, mints, authorizes, confirms, or moves value.
 
 ## Current data boundary
 
 Wallet authentication and its database state are real application behavior.
-Balances, eligibility UI, RYLO holdings, assets, activity, rewards, protected
-operations, and on-chain transaction state remain demo/unavailable unless a
-future reviewed phase explicitly activates them.
+Trusted first-token eligibility/reward preparation is real server-only database
+behavior, but it has no event producer or public mutation route. Balances,
+eligibility UI, RYLO holdings, assets, activity, reward execution, protected
+operation execution, and on-chain transaction state remain demo/unavailable
+unless a future reviewed phase explicitly activates them.
 
 ## Contract boundary
 

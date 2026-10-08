@@ -83,12 +83,14 @@ Decided:
 - first-token reward is 150 RYLO;
 - each wallet may receive that reward at most once;
 - reward/mint retries must be idempotent;
+- first-token eligibility/reward preparation uses one PostgreSQL transaction,
+  database uniqueness, durable qualifying-event evidence, and inactive
+  workflow/protected-operation intents;
 - supply-cap verification is mandatory.
 
 Still open:
 
 - exact definition/evidence event for “successful token creation” before the reward is released;
-- exact persistent database schema and atomicity mechanism;
 - exact on-chain transaction construction and submission implementation.
 
 ## Shared Issuer
