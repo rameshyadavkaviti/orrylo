@@ -496,4 +496,122 @@ async function ensureRewardPreparation(
     outcome: createdReward ? "reward_approved" : "reward_already_exists",
     rewardId: reward.reward_id,
     workflowRequestId: workflow.request_id,
-    protect
+    protectedOperationId: protectedOperation.operation_id,
+    amount: FIRST_TOKEN_REWARD_AMOUNT,
+  };
+}
+
+async function appendAudit(
+  transaction: TransactionClient,
+  input: {
+    requestId?: string | null;
+    eventType: string;
+    targetPublicKey: string;
+    occurredAt: number;
+    policyVersion: string;
+    metadata: JsonObject;
+  },
+): Promise<void> {
+  assertAuditMetadataSafe(input.metadata);
+
+  const [head] = await transaction<
+    { last_sequence: string; last_event_hash: string | null }[]
+  >`
+    SELECT
+      last_sequence::text AS last_sequence,
+      CASE
+        WHEN last_event_hash IS NULL THEN NULL
+        ELSE btrim(last_event_hash)
+      END AS last_event_hash
+    FROM audit_chain_heads
+    WHERE chain_id = ${AUDIT_CHAIN_ID}
+    FOR UPDATE
+  `;
+
+  if (!head) {
+    throw new Error("Audit chain head is unavailable.");
+  }
+
+  const eventId = randomUUID();
+  const sequence = (BigInt(head.last_sequence) + 1n).toString();
+  const eventHash = hashAuditEvent({
+    eventId,
+    sequence,
+    requestId: input.requestId ?? null,
+    eventType: input.eventType,
+    source: "eligibility-reward-service",
+    targetPublicKey: input.targetPublicKey,
+    occurredAt: input.occurredAt,
+    policyVersion: input.policyVersion,
+    metadata: input.metadata,
+    previousEventHash: head.last_event_hash,
+  });
+
+  await transaction`
+    INSERT INTO audit_events (
+      event_id,
+      chain_id,
+      sequence,
+      request_id,
+      event_type,
+      source,
+      target_public_key,
+      occurred_at,
+      policy_version,
+      metadata,
+      previous_event_hash,
+      event_hash
+    )
+    VALUES (
+      ${eventId},
+      ${AUDIT_CHAIN_ID},
+      ${sequence},
+      ${input.requestId ?? null},
+      ${input.eventType},
+      ${"eligibility-reward-service"},
+      ${input.targetPublicKey},
+      ${new Date(input.occurredAt)},
+      ${input.policyVersion},
+      ${transaction.json(input.metadata)},
+      ${head.last_event_hash},
+      ${eventHash}
+    )
+  `;
+
+  await transaction`
+    UPDATE audit_chain_heads
+    SET last_sequence = ${sequence}, last_event_hash = ${eventHash}
+    WHERE chain_id = ${AUDIT_CHAIN_ID}
+  `;
+}
+
+function validateEvent(
+  event: TrustedTokenCreationSucceededEvent,
+):
+  | {
+      ok: true;
+      eventReference: string;
+      walletPublicKey: string;
+      eventOccurredAt: number;
+      associatedReference: string | null;
+      source: string;
+      policyVersion: string;
+    }
+  | { ok: false; code: InvalidQualifyingEventCode } {
+  if (event.eventType !== TOKEN_CREATION_SUCCEEDED_EVENT) {
+    return { ok: false, code: "invalid_event_type" };
+  }
+
+  const eventReference = event.eventReference.trim();
+
+  if (!eventReference || eventReference.length > 512) {
+    return { ok: false, code: "invalid_event_reference" };
+  }
+
+  let walletPublicKey: string;
+
+  try {
+    walletPublicKey = normalizeWalletPublicKey(event.walletPublicKey);
+  } catch (error) {
+    if (error instanceof InvalidStellarPublicKeyError) {
+      return { ok: false, code: "inv
