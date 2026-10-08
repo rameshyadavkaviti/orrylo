@@ -352,6 +352,27 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
+  test("audit listing and verification preserve numeric order beyond nine events", async () => {
+    const repository = new PostgresAuditRepository(sql);
+
+    for (let index = 0; index < 12; index += 1) {
+      await repository.append({
+        eventType: "test.numeric-order",
+        source: "system",
+        occurredAt: NOW + index,
+        policyVersion: "test-policy",
+        metadata: { index },
+      });
+    }
+
+    const events = await repository.list();
+    assert.deepEqual(
+      events.map((event) => event.sequence),
+      ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"],
+    );
+    assert.equal(await repository.verifyChain(), true);
+  });
+
   test("audit verification rejects stored head hash and sequence mismatches", async () => {
     const repository = new PostgresAuditRepository(sql);
     const event = await repository.append({

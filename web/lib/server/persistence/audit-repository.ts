@@ -144,7 +144,7 @@ export class PostgresAuditRepository {
         event_hash
       FROM audit_events
       WHERE chain_id = ${CHAIN_ID}
-      ORDER BY sequence ASC
+      ORDER BY audit_events.sequence ASC
     `;
 
     return rows.map(mapAuditRow);
@@ -183,7 +183,7 @@ export class PostgresAuditRepository {
           event_hash
         FROM audit_events
         WHERE chain_id = ${CHAIN_ID}
-        ORDER BY sequence ASC
+        ORDER BY audit_events.sequence ASC
       `;
       const events = rows.map(mapAuditRow);
       let previousEventHash: string | null = null;
