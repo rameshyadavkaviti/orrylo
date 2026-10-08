@@ -142,7 +142,7 @@ Still open before broad public production:
 - rate limiting and request-abuse controls;
 - body/request limits at infrastructure level;
 - final production origin/cookie hardening;
-- activation and production hardening of eligibility/reward/protected-operation workflows after their reviewed implementation is merged.
+- activation and production hardening of the merged eligibility/reward/protected-operation foundations, including the still-unresolved trusted successful-token event producer.
 
 ## Pricing
 
