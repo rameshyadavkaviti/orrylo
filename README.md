@@ -15,17 +15,18 @@ The repository's current source of truth is:
 
 ## Current status
 
-**Application Phase 1 — Full-stack Foundation.**
+**Public prototype application / pre-execution Stellar workflows.**
 
 The repository contains the security-reviewed Soroban foundation interface plus
-a Next.js application shell under `web/`. The application is explicit demo
-state only: it provides the approved dashboard/screens, typed adapter boundaries,
-Contract Interface v1 compatibility logic, form validation, tests, and web CI
-without performing live wallet, issuer, contract, testnet, or mainnet mutations.
+a customer-facing Next.js prototype under `web/`. Visitors can understand
+Orrylo, authenticate with Albedo, create and validate a local Shared Issuer token
+draft, preview it safely, and explore current RYLO policy and future products.
 
-It does not yet implement RYLO economics, issuer configuration, trustline
-authorization, final contract governance, Dedicated Issuer templates, real
-wallet connection, real token issuance, or any testnet/mainnet deployment.
+Token issuance remains unavailable: the application does not perform issuer,
+contract, trustline, RYLO execution, liquidity, testnet issuance, or mainnet
+mutations. The server-side eligibility/reward preparation foundation also remains
+inactive until a reviewed qualifying-event producer and later execution layers
+exist.
 
 See [docs/CONTRACT_INTERFACE.md](docs/CONTRACT_INTERFACE.md) for the exact stable
 contract surface, [contracts/README.md](contracts/README.md) for reproducible
