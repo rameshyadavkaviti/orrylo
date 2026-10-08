@@ -296,4 +296,102 @@ export class EligibilityRewardService {
 
 type TransactionClient = Parameters<Parameters<DatabaseClient["begin"]>[0]>[0];
 
-as
+async function ensureRewardPreparation(
+  transaction: TransactionClient,
+  input: {
+    walletPublicKey: string;
+    qualifyingEventReference: string;
+    policyVersion: string;
+    now: number;
+    launchAt: number;
+    windowEnd: number;
+  },
+): Promise<RewardResult> {
+  const rewardId = randomUUID();
+  const rewardIdempotencyKey = `${FIRST_TOKEN_REWARD_TYPE}:${input.walletPublicKey}`;
+  const rewardUniquenessKey = rewardIdempotencyKey;
+  const launchWindowEvidence: JsonObject = {
+    evaluatedAt: new Date(input.now).toISOString(),
+    launchAt: new Date(input.launchAt).toISOString(),
+    windowEnd: new Date(input.windowEnd).toISOString(),
+    interval: REWARD_WINDOW_INTERVAL,
+  };
+  const [createdReward] = await transaction<RewardRow[]>`
+    INSERT INTO reward_records (
+      reward_id,
+      wallet_public_key,
+      reward_type,
+      amount,
+      status,
+      idempotency_key,
+      reward_uniqueness_key,
+      qualifying_event_reference,
+      launch_window_evidence,
+      policy_version,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      ${rewardId},
+      ${input.walletPublicKey},
+      ${FIRST_TOKEN_REWARD_TYPE},
+      ${FIRST_TOKEN_REWARD_AMOUNT},
+      'approved',
+      ${rewardIdempotencyKey},
+      ${rewardUniquenessKey},
+      ${input.qualifyingEventReference},
+      ${transaction.json(launchWindowEvidence)},
+      ${input.policyVersion},
+      ${new Date(input.now)},
+      ${new Date(input.now)}
+    )
+    ON CONFLICT DO NOTHING
+    RETURNING reward_id
+  `;
+
+  const [reward] = createdReward
+    ? [createdReward]
+    : await transaction<RewardRow[]>`
+        SELECT reward_id
+        FROM reward_records
+        WHERE wallet_public_key = ${input.walletPublicKey}
+          AND reward_type = ${FIRST_TOKEN_REWARD_TYPE}
+      `;
+
+  if (!reward) {
+    throw new Error("Reward record could not be established.");
+  }
+
+  await appendAudit(transaction, {
+    eventType: createdReward ? "reward.approved" : "reward.already_exists",
+    targetPublicKey: input.walletPublicKey,
+    policyVersion: input.policyVersion,
+    occurredAt: input.now,
+    metadata: {
+      qualifyingEventReference: input.qualifyingEventReference,
+      rewardId: reward.reward_id,
+      rewardType: FIRST_TOKEN_REWARD_TYPE,
+      amount: FIRST_TOKEN_REWARD_AMOUNT,
+    },
+  });
+
+  const workflowPayload = {
+    rewardId: reward.reward_id,
+    rewardType: FIRST_TOKEN_REWARD_TYPE,
+    amount: FIRST_TOKEN_REWARD_AMOUNT,
+    walletPublicKey: input.walletPublicKey,
+    qualifyingEventReference: input.qualifyingEventReference,
+  } as const;
+  const workflowPayloadHash = hashJson({
+    workflowType: WORKFLOW_TYPE,
+    subjectPublicKey: input.walletPublicKey,
+    policyVersion: input.policyVersion,
+    payload: workflowPayload,
+  });
+  const workflowRequestId = randomUUID();
+  const workflowIdempotencyKey = `reward:${reward.reward_id}`;
+  const [createdWorkflow] = await transaction<WorkflowRow[]>`
+    INSERT INTO workflow_intents (
+      request_id,
+      workflow_scope,
+      w
