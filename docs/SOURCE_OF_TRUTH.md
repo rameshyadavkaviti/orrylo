@@ -239,7 +239,38 @@ Albedo wallet
 
 Testnet bootstrap/deployment should be reproducible because Testnet state may be reset.
 
-## 13. Domain architecture
+## 13. Repository authority and agent execution
+
+From this phase onward, **GitHub repository state is the operational source of truth for all Orrylo agents**.
+
+Rules:
+
+- every agent must fetch and reconcile current GitHub `main` before meaningful work;
+- agents must read the canonical repository documents before relying on prior chat, memory, handoff text, or another agent's summary;
+- chat context and handoff prompts are navigation aids only and must not override current repository state;
+- current code, tests, migrations, CI, deployment evidence, and canonical documents determine implementation status;
+- stale SHAs, copied policy text, or remembered project state must be revalidated against GitHub;
+- if repository reality conflicts with a chat instruction, the agent must stop and reconcile the conflict rather than silently proceeding;
+- completed decisions and implementation status should be written back to the repository so later agents can recover without depending on conversation history.
+
+This rule exists specifically to prevent repeated debugging loops, duplicate implementation, stale-state recovery, and contradictory agent handoffs.
+
+## 14. Prototype launch and UX objective
+
+The immediate execution goal is to reach a **simple public prototype on the Orrylo domain as quickly as practical without bypassing correctness or security gates**.
+
+The first public-facing experience should:
+
+- communicate Orrylo's core idea to a new visitor within approximately **30–60 seconds**;
+- present a small number of obvious actions rather than a dense or unfinished dashboard;
+- make the primary interactive paths easy to discover and test;
+- clearly distinguish working prototype capabilities from unavailable or future capabilities;
+- avoid exposing half-implemented flows as if they were complete;
+- be suitable for early promotion, user acquisition, and product feedback once the deployed prototype path is stable.
+
+Prototype speed should come from constrained scope and clear UX, not from weakening security, data integrity, deployment evidence, or canonical policy.
+
+## 15. Domain architecture
 
 Target public structure:
 
@@ -254,7 +285,7 @@ Shared assets use the shared issuer home domain.
 
 Dedicated issuers may use per-project subdomains and later custom domains.
 
-## 14. Current RYLO issuer candidate
+## 16. Current RYLO issuer candidate
 
 A vanity Stellar public key has been generated and is reserved as the current RYLO issuer candidate:
 
@@ -269,7 +300,7 @@ Important status:
 - The `ORRYLO` suffix is branding only and provides no additional cryptographic security.
 - The Shared Issuer for user assets must be a separate account.
 
-## 15. Implementation status
+## 17. Implementation status
 
 Current phase: **Application Persistence + Durable Workflow Foundation**.
 
@@ -330,7 +361,7 @@ This foundation does **not** implement:
 
 No production issuer configuration, RYLO supply rule, testnet deployment, or mainnet deployment should be inferred merely from the presence of the contract workspace.
 
-## 16. Canonical companion documents
+## 18. Canonical companion documents
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system architecture and boundaries
 - [RYLO_POLICY.md](RYLO_POLICY.md) — RYLO-specific rules
