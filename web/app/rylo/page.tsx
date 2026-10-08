@@ -1,14 +1,26 @@
+import Image from "next/image";
+
 export function RyloPage() {
   return (
     <div className="page-stack">
-      <div className="page-heading">
-        <span className="eyebrow">RYLO</span>
-        <h1>Membership and utility for people building with Orrylo.</h1>
-        <p>
-          RYLO is the Orrylo ecosystem utility token. The approved policy
-          connects membership to successful building—not investment-return
-          promises.
-        </p>
+      <div className="page-heading rylo-heading">
+        <Image
+          className="rylo-logo"
+          src="/brand/rylo-logo.webp"
+          alt="RYLO"
+          width={112}
+          height={112}
+          priority
+        />
+        <div>
+          <span className="eyebrow">RYLO</span>
+          <h1>Membership and utility for people building with Orrylo.</h1>
+          <p>
+            RYLO is the Orrylo ecosystem utility token. The approved policy
+            connects membership to successful building—not investment-return
+            promises.
+          </p>
+        </div>
       </div>
 
       <section className="value-grid" aria-label="RYLO membership path">
@@ -44,9 +56,7 @@ export function RyloPage() {
           <h2>Clear rules, separate states.</h2>
           <ul className="fact-list">
             <li>Eligibility is wallet-bound and permanent by default.</li>
-            <li>
-              Eligibility and Stellar trustline authorization are separate.
-            </li>
+            <li>Eligibility and Stellar trustline authorization are separate.</li>
             <li>Maximum supply policy: 100,000,000 RYLO; initial mint: 0.</li>
             <li>Eligible, authorized members may transfer and trade RYLO.</li>
           </ul>

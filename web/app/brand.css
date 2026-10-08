@@ -1,0 +1,37 @@
+.brand-logo {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.rylo-heading {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+}
+
+.rylo-logo {
+  width: 112px;
+  height: 112px;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 24px rgba(74, 45, 190, 0.18));
+}
+
+@media (max-width: 620px) {
+  .brand-logo {
+    width: 46px;
+    height: 46px;
+  }
+
+  .rylo-heading {
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .rylo-logo {
+    width: 76px;
+    height: 76px;
+  }
+}

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -9,9 +10,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="app-shell">
       <aside className="sidebar" aria-label="Primary">
         <Link className="brand" href="/" aria-label="Orrylo home">
-          <span className="brand-mark" aria-hidden="true">
-            O
-          </span>
+          <Image
+            className="brand-logo"
+            src="/brand/orrylo-logo.webp"
+            alt=""
+            width={52}
+            height={52}
+            priority
+          />
           <span>
             <strong>Orrylo</strong>
             <small>Build on Stellar</small>
