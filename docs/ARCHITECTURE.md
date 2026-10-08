@@ -157,7 +157,7 @@ User connects wallet
 → wallet may hold / receive / trade RYLO
 ```
 
-The exact implementation mechanism — issuer-side authorization, contract-mediated authorization, or a combination — remains an implementation decision until formally locked.
+The approved v1 enforcement mechanism is Stellar issuer-side trustline authorization through Orrylo's protected issuer-signing path. Eligibility is application policy; Stellar authorization is the final enforcement step. Contract-mediated authorization is not the approved v1 RYLO authorization mechanism unless canonical policy is explicitly changed later.
 
 ## 9. Metadata and domains
 

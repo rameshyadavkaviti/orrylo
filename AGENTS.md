@@ -2,16 +2,22 @@
 
 These rules apply to humans and AI agents working in this repository.
 
-## 1. Read before changing architecture
+## 1. GitHub is the operational source of truth
 
-Before architecture, contract, token-policy, issuer, membership, or pricing work, read:
+Before meaningful work, fetch and reconcile the current GitHub `main`.
+
+Then read the canonical repository documents:
 
 1. `docs/SOURCE_OF_TRUTH.md`
 2. `docs/ARCHITECTURE.md`
 3. `docs/RYLO_POLICY.md`
 4. `docs/OPEN_DECISIONS.md`
+5. `docs/CONTRACT_INTERFACE.md` when contract/application integration is relevant
+6. `web/README.md` when application/deployment behavior is relevant
 
-Do not infer product policy from code alone when a canonical policy document exists.
+Chat history, memory, copied SHAs, and previous-agent summaries are navigation aids only. They must not override current GitHub repository state.
+
+Do not infer product policy from code alone when a canonical policy document exists. Reconcile code, tests, migrations, CI, deployment evidence, and canonical docs before acting.
 
 ## 2. Distinguish status levels
 
@@ -30,14 +36,14 @@ Never promote one status to another without evidence.
 
 If a value or rule is listed in `OPEN_DECISIONS.md`, do not silently choose one during implementation.
 
-Examples include:
+Examples include currently unresolved items such as:
 
-- RYLO max supply;
-- mint authority;
-- burn policy;
-- service-spend behavior;
-- exact pricing;
-- admin/upgrade rules.
+- exact official launch timestamp;
+- exact evidence/producer for “successful token creation”;
+- exact service pricing;
+- exceptional revocation governance;
+- concrete signer key-management/recovery infrastructure;
+- Dedicated Issuer template details and upgrade/governance rules.
 
 Raise the unresolved decision explicitly instead.
 
@@ -88,12 +94,11 @@ Any Shared Issuer product must communicate that:
 
 ## 9. RYLO membership policy
 
-Current qualification rule:
+Current approved v1 token-creation qualification rule:
 
-- successful Orrylo token creation qualifies; or
-- successful Orrylo product creation/purchase qualifies.
+- the wallet becomes eligible after the user's first successful token creation through Orrylo.
 
-A user does not need to upgrade a token into a larger product to qualify.
+Product creation/purchase is not currently an approved additional eligibility path. If it is introduced later, it must first be explicitly specified in the canonical policy documents.
 
 Do not add KYC, anti-Sybil, device, IP, or identity requirements unless explicitly approved later.
 
