@@ -286,14 +286,18 @@ Prototype speed should come from constrained scope and clear UX, not from weaken
 
 ## 15. Domain architecture
 
-Target public structure:
+Approved prototype public structure:
 
 ```
-orrylo.com
-app.orrylo.com
-assets.orrylo.com
-*.orrylo.com
+orrylo.com                     public prototype application
+assets.orrylo.com              Shared Issuer metadata
+<project>.orrylo.com           Dedicated Issuer metadata
+<custom-domain>                optional future dedicated-domain support
 ```
+
+For the prototype, the interactive Orrylo application is deployed directly at `orrylo.com`; `app.orrylo.com` is not required.
+
+A separate marketing/application split may be introduced later if it becomes operationally useful, but it is not part of the current prototype baseline.
 
 Shared assets use the shared issuer home domain.
 
