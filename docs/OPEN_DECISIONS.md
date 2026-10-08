@@ -126,15 +126,21 @@ Still open:
 
 ## Application persistence and auth production-readiness
 
-Albedo server-verified wallet authentication is implemented in the application foundation.
+Decided / implemented on current `main`:
 
-Still open before public/multi-instance production:
+- Albedo server-verified wallet authentication;
+- shared PostgreSQL persistence for authentication challenges and sessions;
+- atomic challenge consumption;
+- durable server-side sessions;
+- generic durable workflow/idempotency foundation;
+- append-only tamper-evident audit foundation.
 
-- shared atomic persistence for challenges/sessions;
+Still open before broad public production:
+
 - rate limiting and request-abuse controls;
 - body/request limits at infrastructure level;
 - final production origin/cookie hardening;
-- durable application database workflows for eligibility, rewards, idempotency, and audit.
+- activation and production hardening of eligibility/reward/protected-operation workflows after their reviewed implementation is merged.
 
 ## Pricing
 
