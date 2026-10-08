@@ -48,6 +48,8 @@ interface EligibilityRow {
 
 interface RewardRow {
   reward_id: string;
+  qualifying_event_reference: string | null;
+  policy_version: string;
 }
 
 interface WorkflowRow {
@@ -346,13 +348,13 @@ async function ensureRewardPreparation(
       ${new Date(input.now)}
     )
     ON CONFLICT DO NOTHING
-    RETURNING reward_id
+    RETURNING reward_id, qualifying_event_reference, policy_version
   `;
 
   const [reward] = createdReward
     ? [createdReward]
     : await transaction<RewardRow[]>`
-        SELECT reward_id
+        SELECT reward_id, qualifying_event_reference, policy_version
         FROM reward_records
         WHERE wallet_public_key = ${input.walletPublicKey}
           AND reward_type = ${FIRST_TOKEN_REWARD_TYPE}
@@ -375,17 +377,20 @@ async function ensureRewardPreparation(
     },
   });
 
+  const workflowQualifyingEventReference =
+    reward.qualifying_event_reference ?? input.qualifyingEventReference;
+  const workflowPolicyVersion = reward.policy_version;
   const workflowPayload = {
     rewardId: reward.reward_id,
     rewardType: FIRST_TOKEN_REWARD_TYPE,
     amount: FIRST_TOKEN_REWARD_AMOUNT,
     walletPublicKey: input.walletPublicKey,
-    qualifyingEventReference: input.qualifyingEventReference,
+    qualifyingEventReference: workflowQualifyingEventReference,
   } as const;
   const workflowPayloadHash = hashJson({
     workflowType: WORKFLOW_TYPE,
     subjectPublicKey: input.walletPublicKey,
-    policyVersion: input.policyVersion,
+    policyVersion: workflowPolicyVersion,
     payload: workflowPayload,
   });
   const workflowRequestId = randomUUID();
@@ -415,7 +420,7 @@ async function ensureRewardPreparation(
       ${transaction.json(workflowPayload)},
       ${new Date(input.now)},
       ${new Date(input.now)},
-      ${input.policyVersion}
+      ${workflowPolicyVersion}
     )
     ON CONFLICT (workflow_scope, idempotency_key) DO NOTHING
     RETURNING request_id, payload_hash
@@ -439,7 +444,7 @@ async function ensureRewardPreparation(
     rewardId: reward.reward_id,
     rewardType: FIRST_TOKEN_REWARD_TYPE,
     amount: FIRST_TOKEN_REWARD_AMOUNT,
-    qualifyingEventReference: input.qualifyingEventReference,
+    qualifyingEventReference: workflowQualifyingEventReference,
     execution: "future_reward_mint",
   } as const;
   const [createdProtectedOperation] =
