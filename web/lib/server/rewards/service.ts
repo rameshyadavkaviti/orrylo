@@ -205,4 +205,95 @@ export class EligibilityRewardService {
           eligibilityId: eligibility.eligibility_id,
           eligibilityType: FIRST_TOKEN_ELIGIBILITY_TYPE,
         },
+      });id,
+          eligibilityType: FIRST_TOKEN_ELIGIBILITY_TYPE,
+        },
       });
+
+      await appendAudit(transaction, {
+        eventType: "reward.evaluated",
+        targetPublicKey: validated.walletPublicKey,
+        policyVersion: validated.policyVersion,
+        occurredAt: now,
+        metadata: {
+          qualifyingEventReference: validated.eventReference,
+          rewardType: FIRST_TOKEN_REWARD_TYPE,
+          launchConfigured: launchConfig.configured,
+        },
+      });
+
+      let rewardResult: RewardResult;
+
+      if (!launchConfig.configured) {
+        rewardResult = { outcome: "launch_not_configured" };
+
+        await appendAudit(transaction, {
+          eventType: "reward.skipped.launch_not_configured",
+          targetPublicKey: validated.walletPublicKey,
+          policyVersion: validated.policyVersion,
+          occurredAt: now,
+          metadata: {
+            qualifyingEventReference: validated.eventReference,
+            rewardType: FIRST_TOKEN_REWARD_TYPE,
+          },
+        });
+      } else {
+        const windowPosition = evaluateRewardWindow(now, launchConfig);
+
+        if (windowPosition !== "inside_window") {
+          rewardResult = {
+            outcome: "outside_reward_window",
+            position: windowPosition,
+          };
+
+          await appendAudit(transaction, {
+            eventType: "reward.skipped.outside_window",
+            targetPublicKey: validated.walletPublicKey,
+            policyVersion: validated.policyVersion,
+            occurredAt: now,
+            metadata: {
+              qualifyingEventReference: validated.eventReference,
+              rewardType: FIRST_TOKEN_REWARD_TYPE,
+              position: windowPosition,
+              launchAt: new Date(launchConfig.launchAt).toISOString(),
+              windowEnd: new Date(launchConfig.windowEnd).toISOString(),
+              interval: REWARD_WINDOW_INTERVAL,
+            },
+          });
+        } else {
+          rewardResult = await ensureRewardPreparation(transaction, {
+            walletPublicKey: validated.walletPublicKey,
+            qualifyingEventReference: validated.eventReference,
+            policyVersion: validated.policyVersion,
+            now,
+            launchAt: launchConfig.launchAt,
+            windowEnd: launchConfig.windowEnd,
+          });
+        }
+      }
+
+      const result: EligibilityRewardProcessingResult = {
+        outcome: "processed",
+        eventReference: validated.eventReference,
+        walletPublicKey: validated.walletPublicKey,
+        eligibility: eligibilityResult,
+        reward: rewardResult,
+      };
+
+      await transaction`
+        UPDATE token_creation_qualifying_events
+        SET
+          processing_state = 'processed',
+          result = ${transaction.json(result)},
+          processed_at = ${new Date(now)}
+        WHERE event_reference = ${validated.eventReference}
+      `;
+
+      return result;
+    });
+  }
+}
+
+type TransactionClient = Parameters<Parameters<DatabaseClient["begin"]>[0]>[0];
+
+as
