@@ -394,4 +394,106 @@ async function ensureRewardPreparation(
     INSERT INTO workflow_intents (
       request_id,
       workflow_scope,
-      w
+      workflow_type,
+      subject_public_key,
+      state,
+      idempotency_key,
+      payload_hash,
+      payload,
+      created_at,
+      updated_at,
+      policy_version
+    )
+    VALUES (
+      ${workflowRequestId},
+      ${WORKFLOW_SCOPE},
+      ${WORKFLOW_TYPE},
+      ${input.walletPublicKey},
+      'approved',
+      ${workflowIdempotencyKey},
+      ${workflowPayloadHash},
+      ${transaction.json(workflowPayload)},
+      ${new Date(input.now)},
+      ${new Date(input.now)},
+      ${input.policyVersion}
+    )
+    ON CONFLICT (workflow_scope, idempotency_key) DO NOTHING
+    RETURNING request_id, payload_hash
+  `;
+
+  const [workflow] = createdWorkflow
+    ? [createdWorkflow]
+    : await transaction<WorkflowRow[]>`
+        SELECT request_id, payload_hash
+        FROM workflow_intents
+        WHERE workflow_scope = ${WORKFLOW_SCOPE}
+          AND idempotency_key = ${workflowIdempotencyKey}
+      `;
+
+  if (!workflow || workflow.payload_hash.trim() !== workflowPayloadHash) {
+    throw new Error("Reward workflow idempotency conflict.");
+  }
+
+  const protectedOperationId = randomUUID();
+  const protectedParameters = {
+    rewardId: reward.reward_id,
+    rewardType: FIRST_TOKEN_REWARD_TYPE,
+    amount: FIRST_TOKEN_REWARD_AMOUNT,
+    qualifyingEventReference: input.qualifyingEventReference,
+    execution: "future_reward_mint",
+  } as const;
+  const [createdProtectedOperation] =
+    await transaction<ProtectedOperationRow[]>`
+      INSERT INTO protected_operation_intents (
+        operation_id,
+        workflow_request_id,
+        operation_type,
+        target_public_key,
+        parameters,
+        created_at
+      )
+      VALUES (
+        ${protectedOperationId},
+        ${workflow.request_id},
+        'mint',
+        ${input.walletPublicKey},
+        ${transaction.json(protectedParameters)},
+        ${new Date(input.now)}
+      )
+      ON CONFLICT (workflow_request_id) DO NOTHING
+      RETURNING operation_id
+    `;
+
+  const [protectedOperation] = createdProtectedOperation
+    ? [createdProtectedOperation]
+    : await transaction<ProtectedOperationRow[]>`
+        SELECT operation_id
+        FROM protected_operation_intents
+        WHERE workflow_request_id = ${workflow.request_id}
+      `;
+
+  if (!protectedOperation) {
+    throw new Error("Protected reward mint intent could not be established.");
+  }
+
+  if (createdWorkflow) {
+    await appendAudit(transaction, {
+      eventType: "reward.workflow_intent.created",
+      requestId: workflow.request_id,
+      targetPublicKey: input.walletPublicKey,
+      policyVersion: input.policyVersion,
+      occurredAt: input.now,
+      metadata: {
+        rewardId: reward.reward_id,
+        workflowRequestId: workflow.request_id,
+        protectedOperationId: protectedOperation.operation_id,
+        workflowType: WORKFLOW_TYPE,
+      },
+    });
+  }
+
+  return {
+    outcome: createdReward ? "reward_approved" : "reward_already_exists",
+    rewardId: reward.reward_id,
+    workflowRequestId: workflow.request_id,
+    protect
