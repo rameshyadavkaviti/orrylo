@@ -108,4 +108,101 @@ export class EligibilityRewardService {
           ${validated.eventReference},
           ${eventFingerprint},
           ${validated.walletPublicKey},
-          ${TOKEN_CREATIO
+          ${TOKEN_CREATION_SUCCEEDED_EVENT},
+          ${new Date(validated.eventOccurredAt)},
+          ${validated.associatedReference},
+          ${validated.source},
+          ${validated.policyVersion},
+          'received',
+          ${new Date(now)}
+        )
+        ON CONFLICT (event_reference) DO NOTHING
+        RETURNING event_reference
+      `;
+
+      const [storedEvent] = await transaction<StoredEventRow[]>`
+        SELECT event_fingerprint, result, processing_state
+        FROM token_creation_qualifying_events
+        WHERE event_reference = ${validated.eventReference}
+        FOR UPDATE
+      `;
+
+      if (
+        !storedEvent ||
+        storedEvent.event_fingerprint.trim() !== eventFingerprint
+      ) {
+        return {
+          outcome: "invalid_event",
+          code: "event_reference_conflict",
+        } satisfies EligibilityRewardProcessingResult;
+      }
+
+      if (
+        !insertedEvent &&
+        storedEvent.processing_state === "processed" &&
+        storedEvent.result
+      ) {
+        return storedEvent.result;
+      }
+
+      const eligibilityId = randomUUID();
+      const [createdEligibility] = await transaction<EligibilityRow[]>`
+        INSERT INTO eligibility_records (
+          eligibility_id,
+          wallet_public_key,
+          eligibility_type,
+          reason,
+          became_eligible_at,
+          status,
+          revocation_state,
+          policy_version,
+          qualifying_event_reference
+        )
+        VALUES (
+          ${eligibilityId},
+          ${validated.walletPublicKey},
+          ${FIRST_TOKEN_ELIGIBILITY_TYPE},
+          ${"first successful token creation through Orrylo"},
+          ${new Date(now)},
+          'eligible',
+          'not_revoked',
+          ${validated.policyVersion},
+          ${validated.eventReference}
+        )
+        ON CONFLICT (wallet_public_key, eligibility_type) DO NOTHING
+        RETURNING eligibility_id
+      `;
+
+      const [eligibility] = createdEligibility
+        ? [createdEligibility]
+        : await transaction<EligibilityRow[]>`
+            SELECT eligibility_id
+            FROM eligibility_records
+            WHERE wallet_public_key = ${validated.walletPublicKey}
+              AND eligibility_type = ${FIRST_TOKEN_ELIGIBILITY_TYPE}
+          `;
+
+      if (!eligibility) {
+        throw new Error("Eligibility record could not be established.");
+      }
+
+      const eligibilityResult: EligibilityResult = {
+        outcome: createdEligibility
+          ? "eligibility_established"
+          : "eligibility_already_existed",
+        eligibilityId: eligibility.eligibility_id,
+      };
+
+      await appendAudit(transaction, {
+        eventType: createdEligibility
+          ? "eligibility.established"
+          : "eligibility.reused",
+        targetPublicKey: validated.walletPublicKey,
+        policyVersion: validated.policyVersion,
+        occurredAt: now,
+        metadata: {
+          qualifyingEventReference: validated.eventReference,
+          eligibilityId: eligibility.eligibility_id,
+          eligibilityType: FIRST_TOKEN_ELIGIBILITY_TYPE,
+        },
+      });
