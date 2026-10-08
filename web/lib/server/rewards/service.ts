@@ -614,4 +614,41 @@ function validateEvent(
     walletPublicKey = normalizeWalletPublicKey(event.walletPublicKey);
   } catch (error) {
     if (error instanceof InvalidStellarPublicKeyError) {
-      return { ok: false, code: "inv
+      return { ok: false, code: "invalid_public_key" };
+    }
+
+    throw error;
+  }
+
+  if (!Number.isFinite(event.eventOccurredAt)) {
+    return { ok: false, code: "invalid_event_timestamp" };
+  }
+
+  const source = event.source.trim();
+
+  if (!source || source.length > 128) {
+    return { ok: false, code: "invalid_source" };
+  }
+
+  const policyVersion = event.policyVersion.trim();
+
+  if (!policyVersion || policyVersion.length > 128) {
+    return { ok: false, code: "invalid_policy_version" };
+  }
+
+  const associatedReference = event.associatedReference?.trim() || null;
+
+  if (associatedReference && associatedReference.length > 512) {
+    return { ok: false, code: "invalid_event_reference" };
+  }
+
+  return {
+    ok: true,
+    eventReference,
+    walletPublicKey,
+    eventOccurredAt: event.eventOccurredAt,
+    associatedReference,
+    source,
+    policyVersion,
+  };
+}
