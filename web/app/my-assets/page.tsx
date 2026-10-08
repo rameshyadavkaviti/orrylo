@@ -1,19 +1,28 @@
-import { AssetListStateView } from "../../components/asset-list-state";
-import { DemoBanner } from "../../components/demo-banner";
+import Link from "next/link";
 
 export function MyAssetsPage() {
   return (
     <div className="page-stack">
-      <DemoBanner />
       <div className="page-heading">
         <span className="eyebrow">My Assets</span>
-        <h1>Your asset workspace, ready for real data later.</h1>
+        <h1>Your Orrylo assets will live here.</h1>
         <p>
-          The UI supports loading, empty, and explicitly labeled demo records
-          without fabricating on-chain ownership.
+          There are no issued assets to show in the current prototype. You can
+          create and preview a token draft without fabricating on-chain
+          ownership.
         </p>
       </div>
-      <AssetListStateView state={{ status: "empty" }} />
+
+      <div className="empty-state">
+        <strong>No issued assets yet</strong>
+        <p>
+          Token issuance is not enabled. Start with a draft and preview the
+          identity and Shared Issuer model.
+        </p>
+        <Link className="button button-primary" href="/create-token">
+          Create Token
+        </Link>
+      </div>
     </div>
   );
 }

@@ -339,10 +339,13 @@ The stable application-facing contract surface is documented in
 The repository also contains an initial Next.js application foundation under
 `web/` with:
 
-- the approved dashboard/navigation shell and responsive visual direction;
-- explicit demo-only account, eligibility, RYLO, asset, and activity states;
-- Shared Issuer draft UX with no issuance mutation;
-- visibly unavailable Dedicated Issuer and unresolved product capabilities;
+- the approved public-prototype shell and responsive visual direction;
+- a customer-facing homepage centered on token creation, wallet authentication,
+  RYLO, and Products & Services;
+- a guided Shared Issuer token draft covering identity, metadata context, and
+  safe preview with no issuance mutation;
+- customer-facing RYLO policy presentation and visibly unavailable Dedicated
+  Issuer/unimplemented product capabilities;
 - modular contract-read/transaction adapter interfaces plus a narrow Albedo authentication adapter;
 - Contract Interface v1 compatibility checks and typed error mapping;
 - application formatting, lint, typecheck, test, build, and CI gates.

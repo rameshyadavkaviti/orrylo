@@ -177,6 +177,21 @@ The persistence schema also retains inactive foundations for:
 
 No workflow signs, submits, mints, authorizes, confirms, or moves value.
 
+## Public prototype presentation
+
+The primary application shell is customer-facing rather than an engineering
+status dashboard. The homepage leads with token creation and wallet connection,
+then provides direct paths to RYLO and Products & Services. Create Token supports
+a local Shared Issuer draft with Stellar-compatible asset-code validation,
+metadata-domain context, and an explicit preview. It stops before issuance and
+never presents the preview as an on-chain asset.
+
+RYLO presentation reflects the approved membership, 50 RYLO-equivalent Free
+Build Credit, 150 RYLO launch reward, 60-day reward-window, supply, and direct
+sale policies while clearly separating policy from live execution. Unimplemented
+Products & Services are labeled Coming soon. Activity and Settings remain
+secondary utility/diagnostic routes rather than primary customer navigation.
+
 ## Current data boundary
 
 Wallet authentication and its database state are real application behavior.

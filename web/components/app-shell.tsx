@@ -1,17 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import {
-  networkLabel,
-  readPublicRuntimeConfig,
-} from "../lib/config/public-env";
-import { NAV_ITEMS } from "../lib/navigation";
-import { StatusPill } from "./status-pill";
+import { NAV_ITEMS, UTILITY_NAV_ITEMS } from "../lib/navigation";
 import { WalletAuthControl } from "./wallet-auth-control";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const config = readPublicRuntimeConfig();
-
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="Primary">
@@ -21,11 +14,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           </span>
           <span>
             <strong>Orrylo</strong>
-            <small>Stellar builder</small>
+            <small>Build on Stellar</small>
           </span>
         </Link>
 
-        <nav className="nav-list" aria-label="Application">
+        <nav className="nav-list" aria-label="Primary navigation">
           {NAV_ITEMS.map((item) => (
             <Link key={item.href} href={item.href} className="nav-link">
               {item.label}
@@ -34,70 +27,41 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="sidebar-note">
-          <span className="eyebrow">Phase</span>
-          <strong>Wallet authentication</strong>
-          <p>Albedo authentication only. No chain mutations.</p>
+          <span className="eyebrow">Early prototype</span>
+          <strong>Explore before launch</strong>
+          <p>
+            Draft and preview a token today. On-chain token creation is not
+            enabled yet.
+          </p>
         </div>
       </aside>
 
       <div className="workspace">
         <header className="topbar">
           <div>
-            <span className="eyebrow">Orrylo workspace</span>
+            <span className="eyebrow">Stellar made approachable</span>
             <p className="topbar-copy">
-              Clear product state, explicit chain boundaries.
+              Create a clear token draft, then grow into more Orrylo services.
             </p>
           </div>
-          <div className="topbar-actions">
-            <StatusPill tone="warning">
-              {networkLabel(config.network)} · product data demo
-            </StatusPill>
+          <div id="wallet-connect" className="topbar-actions">
             <WalletAuthControl />
           </div>
         </header>
+
         <main className="main-content">{children}</main>
+
+        <footer className="site-footer">
+          <span>Orrylo public prototype</span>
+          <nav aria-label="Prototype utilities">
+            {UTILITY_NAV_ITEMS.map((item) => (
+              <Link key={item.href} href={item.href}>
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </footer>
       </div>
-
-      <aside className="status-column" aria-label="System status">
-        <div className="status-card">
-          <span className="eyebrow">Runtime status</span>
-          <StatusRow label="Product data" value="Demo" />
-          <StatusRow label="Wallet auth" value="Server-verified" />
-          <StatusRow
-            label="Contract"
-            value={
-              config.foundationContractId ? "Configured" : "Not configured"
-            }
-          />
-          <StatusRow label="Transactions" value="Disabled" />
-        </div>
-
-        <div className="status-card">
-          <span className="eyebrow">Contract Interface v1</span>
-          <p className="muted">
-            Application compatibility is limited to interface_version(),
-            version(), and state() reads.
-          </p>
-          <StatusPill tone="positive">Expected interface: 1</StatusPill>
-        </div>
-
-        <div className="status-card">
-          <span className="eyebrow">Safety boundary</span>
-          <p className="muted">
-            Issuance, RYLO mutations, authorization changes, payments, and admin
-            controls are unavailable in this phase.
-          </p>
-        </div>
-      </aside>
-    </div>
-  );
-}
-
-function StatusRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="status-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
     </div>
   );
 }

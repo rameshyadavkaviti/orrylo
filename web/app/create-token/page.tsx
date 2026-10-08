@@ -1,72 +1,43 @@
 import { CreateSharedTokenForm } from "../../components/create-shared-token-form";
-import { DemoBanner } from "../../components/demo-banner";
-import {
-  SHARED_ASSET_DOMAIN,
-  SHARED_ISSUER_CANDIDATE,
-} from "../../lib/product/constants";
+import { SHARED_ASSET_DOMAIN } from "../../lib/product/constants";
 
 export function CreateTokenPage() {
   return (
     <div className="page-stack">
-      <DemoBanner />
-
       <div className="page-heading">
         <span className="eyebrow">Create Token</span>
-        <h1>Choose the infrastructure before the asset.</h1>
+        <h1>Turn your token idea into a clear Stellar-ready draft.</h1>
         <p>
-          Orrylo separates the low-cost shared path from dedicated
-          contract-controlled infrastructure. Neither path performs real
-          issuance in this phase.
+          Configure the identity, understand where metadata will live, and
+          preview the result. This prototype stops before on-chain creation.
         </p>
       </div>
 
-      <section className="tier-grid" aria-label="Issuer tiers">
-        <article className="tier-card tier-featured">
-          <div className="card-title-row">
-            <span className="tier-icon" aria-hidden="true">
-              S
-            </span>
-            <span className="availability-badge">Draft available</span>
-          </div>
+      <section className="creation-path" aria-label="Creation path">
+        <article className="path-card path-card-active">
+          <span className="availability-badge">Prototype available</span>
           <h2>Shared Issuer</h2>
           <p>
-            Low-cost/free-oriented creation using shared Orrylo-controlled
-            infrastructure.
+            The simple Orrylo path uses shared infrastructure. Your asset
+            remains identified by its own code plus the shared issuer.
           </p>
-          <ul className="fact-list">
-            <li>Issuer is shared Orrylo infrastructure, not user-owned.</li>
-            <li>Asset codes must be unique under the shared issuer.</li>
-            <li>Shared metadata domain: {SHARED_ASSET_DOMAIN}.</li>
-            <li>RYLO issuer is not used for customer Shared Issuer assets.</li>
+          <ul className="fact-list compact-list">
+            <li>Shared Orrylo infrastructure, not a dedicated issuer.</li>
+            <li>Asset code must be unique under the Shared Issuer.</li>
+            <li>Metadata domain: {SHARED_ASSET_DOMAIN}.</li>
           </ul>
-          <div className="disclosure">
-            <span>Reserved issuer candidate</span>
-            <code>{SHARED_ISSUER_CANDIDATE}</code>
-            <small>Candidate only — not represented as live or deployed.</small>
-          </div>
         </article>
 
-        <article className="tier-card">
-          <div className="card-title-row">
-            <span className="tier-icon" aria-hidden="true">
-              D
-            </span>
-            <span className="availability-badge">Coming later</span>
-          </div>
+        <article className="path-card">
+          <span className="availability-badge">Coming soon</span>
           <h2>Dedicated Issuer</h2>
           <p>
-            Premium, separate infrastructure targeting the approved
-            Contract-Controlled Issuer architecture.
+            Separate contract-controlled infrastructure for projects that need
+            their own issuer and policy model.
           </p>
-          <ul className="fact-list">
-            <li>Dedicated to one customer/project infrastructure instance.</li>
-            <li>Contract-control target; no raw issuer-key promise.</li>
-            <li>Exact templates and authority rules remain unresolved.</li>
-            <li>No provisioning action exists in Contract Interface v1.</li>
-          </ul>
-          <button className="button button-secondary" type="button" disabled>
-            Not yet available
-          </button>
+          <p className="muted">
+            Templates and provisioning are not available in this prototype.
+          </p>
         </article>
       </section>
 
