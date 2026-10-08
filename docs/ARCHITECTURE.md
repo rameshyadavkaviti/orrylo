@@ -161,15 +161,16 @@ The approved v1 enforcement mechanism is Stellar issuer-side trustline authoriza
 
 ## 9. Metadata and domains
 
-Target routing:
+Approved prototype routing:
 
 ```
-orrylo.com                     company site
-app.orrylo.com                 application
+orrylo.com                     public prototype application
 assets.orrylo.com              Shared Issuer metadata
 <project>.orrylo.com           Dedicated Issuer metadata
 <custom-domain>                optional future dedicated-domain support
 ```
+
+The prototype application is intentionally served directly from `orrylo.com` to reduce launch friction and keep the first user journey simple. A future split to `app.orrylo.com` remains optional rather than required.
 
 A wildcard domain may be used so one application can serve project-specific subdomains dynamically.
 
