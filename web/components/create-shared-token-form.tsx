@@ -50,7 +50,10 @@ export function CreateSharedTokenForm() {
               <span className="step-number">1</span>
               <div>
                 <h3 id="identity-step">Token identity</h3>
-                <p>Choose the name people will recognize and the Stellar asset code.</p>
+                <p>
+                  Choose the name people will recognize and the Stellar asset
+                  code.
+                </p>
               </div>
             </div>
 
@@ -70,7 +73,8 @@ export function CreateSharedTokenForm() {
                 </small>
               ) : (
                 <small id="code-help">
-                  1–12 letters or numbers. Final uniqueness must be checked before issuance.
+                  1–12 letters or numbers. Final uniqueness must be checked
+                  before issuance.
                 </small>
               )}
             </label>
@@ -80,7 +84,9 @@ export function CreateSharedTokenForm() {
               <input
                 name="displayName"
                 value={draft.displayName}
-                onChange={(event) => updateField("displayName", event.target.value)}
+                onChange={(event) =>
+                  updateField("displayName", event.target.value)
+                }
                 placeholder="My Token"
                 autoComplete="off"
                 aria-describedby={errors.displayName ? "name-error" : undefined}
@@ -99,7 +105,8 @@ export function CreateSharedTokenForm() {
               <div>
                 <h3 id="metadata-step">Metadata</h3>
                 <p>
-                  Shared assets are planned to publish metadata through Orrylo's shared asset domain.
+                  Shared assets are planned to publish metadata through Orrylo's
+                  shared asset domain.
                 </p>
               </div>
             </div>
@@ -107,7 +114,8 @@ export function CreateSharedTokenForm() {
               <span>Metadata home</span>
               <strong>{SHARED_ASSET_DOMAIN}</strong>
               <small>
-                Additional metadata fields and publishing are coming soon; the final metadata schema remains undecided.
+                Additional metadata fields and publishing are coming soon; the
+                final metadata schema remains undecided.
               </small>
             </div>
           </section>

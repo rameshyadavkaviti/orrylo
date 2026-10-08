@@ -94,10 +94,15 @@ export function HomePage() {
         </article>
       </section>
 
-      <section className="prototype-boundary" aria-label="Prototype availability">
+      <section
+        className="prototype-boundary"
+        aria-label="Prototype availability"
+      >
         <div>
           <span className="eyebrow">Available in this prototype</span>
-          <strong>Token drafting, preview, and secure Albedo authentication</strong>
+          <strong>
+            Token drafting, preview, and secure Albedo authentication
+          </strong>
         </div>
         <p>
           Token issuance and other Stellar mutations are not enabled yet. Orrylo

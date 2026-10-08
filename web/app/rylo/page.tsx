@@ -43,7 +43,9 @@ export function RyloPage() {
           <h2>Clear rules, separate states.</h2>
           <ul className="fact-list">
             <li>Eligibility is wallet-bound and permanent by default.</li>
-            <li>Eligibility and Stellar trustline authorization are separate.</li>
+            <li>
+              Eligibility and Stellar trustline authorization are separate.
+            </li>
             <li>Maximum supply policy: 100,000,000 RYLO; initial mint: 0.</li>
             <li>Eligible, authorized members may transfer and trade RYLO.</li>
           </ul>
@@ -69,7 +71,8 @@ export function RyloPage() {
         <p>
           This is a direct Orrylo sale policy, not intrinsic value, guaranteed
           market value, guaranteed resale value, or a promise of future value.
-          Direct sale and on-chain RYLO execution are not active in this prototype.
+          Direct sale and on-chain RYLO execution are not active in this
+          prototype.
         </p>
       </article>
     </div>

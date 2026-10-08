@@ -53,7 +53,11 @@ export function ProductsPage() {
                 Open token draft
               </Link>
             ) : (
-              <button className="button button-secondary" type="button" disabled>
+              <button
+                className="button button-secondary"
+                type="button"
+                disabled
+              >
                 Coming soon
               </button>
             )}
@@ -68,7 +72,8 @@ export function ProductsPage() {
         </div>
         <p>
           Orrylo does not simulate provisioning, token issuance, contract
-          deployment, or payment success when those execution paths do not exist.
+          deployment, or payment success when those execution paths do not
+          exist.
         </p>
       </section>
     </div>

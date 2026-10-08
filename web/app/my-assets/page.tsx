@@ -8,7 +8,8 @@ export function MyAssetsPage() {
         <h1>Your Orrylo assets will live here.</h1>
         <p>
           There are no issued assets to show in the current prototype. You can
-          create and preview a token draft without fabricating on-chain ownership.
+          create and preview a token draft without fabricating on-chain
+          ownership.
         </p>
       </div>
 

@@ -18,8 +18,8 @@ export function CreateTokenPage() {
           <span className="availability-badge">Prototype available</span>
           <h2>Shared Issuer</h2>
           <p>
-            The simple Orrylo path uses shared infrastructure. Your asset remains
-            identified by its own code plus the shared issuer.
+            The simple Orrylo path uses shared infrastructure. Your asset
+            remains identified by its own code plus the shared issuer.
           </p>
           <ul className="fact-list compact-list">
             <li>Shared Orrylo infrastructure, not a dedicated issuer.</li>
