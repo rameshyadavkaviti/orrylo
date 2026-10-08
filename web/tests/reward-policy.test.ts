@@ -46,10 +46,7 @@ test("reward window is half-open from launch inclusive to end exclusive", () => 
     evaluateRewardWindow(config.launchAt + REWARD_WINDOW_MS / 2, config),
     "inside_window",
   );
-  assert.equal(
-    evaluateRewardWindow(config.windowEnd, config),
-    "after_window",
-  );
+  assert.equal(evaluateRewardWindow(config.windowEnd, config), "after_window");
   assert.equal(
     evaluateRewardWindow(config.windowEnd + 1, config),
     "after_window",

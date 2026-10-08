@@ -13,7 +13,18 @@ CREATE TABLE IF NOT EXISTS token_creation_qualifying_events (
     CHECK (processing_state IN ('received', 'processed')),
   result jsonb,
   received_at timestamptz NOT NULL,
-  processed_at timestamptz
+  processed_at timestamptz,
+  CONSTRAINT token_creation_qualifying_events_processing_check CHECK (
+    (
+      processing_state = 'received'
+      AND result IS NULL
+      AND processed_at IS NULL
+    ) OR (
+      processing_state = 'processed'
+      AND result IS NOT NULL
+      AND processed_at IS NOT NULL
+    )
+  )
 );
 
 ALTER TABLE eligibility_records
@@ -24,6 +35,13 @@ ADD CONSTRAINT eligibility_records_qualifying_event_fk
 FOREIGN KEY (qualifying_event_reference)
 REFERENCES token_creation_qualifying_events(event_reference);
 
+ALTER TABLE eligibility_records
+ADD CONSTRAINT eligibility_records_first_token_event_required
+CHECK (
+  eligibility_type <> 'FIRST_SUCCESSFUL_TOKEN_CREATION'
+  OR qualifying_event_reference IS NOT NULL
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS eligibility_records_qualifying_event_unique
   ON eligibility_records (qualifying_event_reference)
   WHERE qualifying_event_reference IS NOT NULL;
@@ -33,4 +51,19 @@ ADD CONSTRAINT reward_records_first_token_amount_check
 CHECK (
   reward_type <> 'FIRST_TOKEN_CREATION_REWARD'
   OR amount = 150.0000000
+);
+
+ALTER TABLE reward_records
+ADD CONSTRAINT reward_records_qualifying_event_fk
+FOREIGN KEY (qualifying_event_reference)
+REFERENCES token_creation_qualifying_events(event_reference);
+
+ALTER TABLE reward_records
+ADD CONSTRAINT reward_records_first_token_evidence_required
+CHECK (
+  reward_type <> 'FIRST_TOKEN_CREATION_REWARD'
+  OR (
+    qualifying_event_reference IS NOT NULL
+    AND launch_window_evidence IS NOT NULL
+  )
 );

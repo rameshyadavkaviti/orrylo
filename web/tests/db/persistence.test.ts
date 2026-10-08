@@ -16,10 +16,7 @@ import {
   PostgresSessionStore,
   hashSessionToken,
 } from "../../lib/server/persistence/auth-repositories";
-import {
-  createDatabaseClient,
-  type DatabaseClient,
-} from "../../lib/server/persistence/database";
+import { createDatabaseClient } from "../../lib/server/persistence/database";
 import { PostgresFutureDomainRepository } from "../../lib/server/persistence/future-domain-repository";
 import { migrateDatabase } from "../../lib/server/persistence/migrations";
 import { PostgresWorkflowRepository } from "../../lib/server/persistence/workflow-repository";
@@ -95,6 +92,33 @@ if (!TEST_DATABASE_URL) {
     `;
 
     assert.equal(count, "8");
+  });
+
+  test("eligibility reward migration installs evidence integrity constraints", async () => {
+    const constraints = await sql<{ conname: string }[]>`
+      SELECT conname
+      FROM pg_constraint
+      WHERE conname IN (
+        'eligibility_records_qualifying_event_fk',
+        'eligibility_records_first_token_event_required',
+        'reward_records_qualifying_event_fk',
+        'reward_records_first_token_evidence_required',
+        'reward_records_first_token_amount_check',
+        'token_creation_qualifying_events_processing_check'
+      )
+      ORDER BY conname
+    `;
+    assert.deepEqual(
+      constraints.map((constraint) => constraint.conname),
+      [
+        "eligibility_records_first_token_event_required",
+        "eligibility_records_qualifying_event_fk",
+        "reward_records_first_token_amount_check",
+        "reward_records_first_token_evidence_required",
+        "reward_records_qualifying_event_fk",
+        "token_creation_qualifying_events_processing_check",
+      ],
+    );
   });
 
   test("challenge persists across repository instances and consumes once", async () => {
@@ -453,7 +477,6 @@ if (!TEST_DATABASE_URL) {
     `;
     assert.equal(count, "1");
   });
-
 }
 
 function assertDedicatedTestDatabase(connectionString: string): void {

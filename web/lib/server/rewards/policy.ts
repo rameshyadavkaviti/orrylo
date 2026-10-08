@@ -1,5 +1,4 @@
-export const FIRST_TOKEN_ELIGIBILITY_TYPE =
-  "FIRST_SUCCESSFUL_TOKEN_CREATION";
+export const FIRST_TOKEN_ELIGIBILITY_TYPE = "FIRST_SUCCESSFUL_TOKEN_CREATION";
 export const FIRST_TOKEN_REWARD_TYPE = "FIRST_TOKEN_CREATION_REWARD";
 export const FIRST_TOKEN_REWARD_AMOUNT = "150.0000000";
 export const TOKEN_CREATION_SUCCEEDED_EVENT = "TOKEN_CREATION_SUCCEEDED";
@@ -81,9 +80,7 @@ export function parseOfficialLaunchAt(
 }
 
 export type RewardWindowEvaluation =
-  | "before_launch"
-  | "inside_window"
-  | "after_window";
+  "before_launch" | "inside_window" | "after_window";
 
 export function evaluateRewardWindow(
   now: number,

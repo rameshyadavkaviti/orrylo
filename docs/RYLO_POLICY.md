@@ -101,7 +101,19 @@ The initial deployment uses only 1,000 RYLO, leaving **999,000 RYLO** of undeplo
 
 Undeployed reserve capacity does **not** require advance minting. RYLO allocated from this reserve should be minted/deployed only when an approved liquidity operation actually requires it and remains subject to the global maximum supply cap.
 
-Further liquidity additions beyond the approved initial 1,000 RYLO + 100 XLM deployment require an explicit approved staging rule or later policy decision.
+Further liquidity additions beyond the approved initial 1,000 RYLO + 100 XLM deployment follow this approved staging model:
+
+- no automatic release schedule;
+- no mandatory monthly/periodic liquidity additions;
+- use only real XLM that Orrylo has actually available for liquidity;
+- prefer realized Orrylo revenue or separately approved capital rather than operational funds needed elsewhere;
+- each addition is a protected, explicitly approved operation;
+- each operation has a unique `request_id`, `policy_version`, and append-only audit evidence;
+- the ordinary public application backend cannot independently execute the liquidity operation;
+- undeployed reserve remains unminted until an approved liquidity operation actually requires it;
+- total bootstrap-liquidity allocation can never exceed 1,000,000 RYLO.
+
+The exact size of each future addition remains a case-by-case operational decision based on available XLM and then-current market conditions.
 
 ## 7. Eligibility
 
@@ -223,6 +235,16 @@ Roles:
 - retained only under an explicitly protected recovery arrangement.
 
 Daily trustline authorization remains subject to the two-signature control; it must not be downgraded to a single-signer path merely for convenience.
+
+Approved operational matrix:
+
+- routine financial/authorization operations use **Signer A + Signer B**;
+- this includes trustline authorization, Reward Mint, Direct Purchase shortfall mint, Bootstrap Liquidity mint, Treasury transfer, and Liquidity Add;
+- Signer B independently parses and validates the transaction/policy and is never a blind co-signer;
+- Signer C is not used for routine operations;
+- Signer C may participate only in recovery or signer replacement under an explicit recovery procedure;
+- the Master Key is not used for routine operations;
+- critical operations such as signer rotation, threshold changes, issuer-flag changes, recovery, or master-key configuration use a manual/local ceremony with explicit owner approval and audit evidence.
 
 ## 12. Signer B co-signing policy
 

@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import type postgres from "postgres";
+
 import { hashJson, type JsonObject } from "../../persistence/json";
 import {
   assertAuditMetadataSafe,
@@ -59,6 +61,9 @@ interface WorkflowRow {
 
 interface ProtectedOperationRow {
   operation_id: string;
+  operation_type: string;
+  target_public_key: string | null;
+  parameters: JsonObject;
 }
 
 export class EligibilityRewardService {
@@ -207,9 +212,6 @@ export class EligibilityRewardService {
           eligibilityId: eligibility.eligibility_id,
           eligibilityType: FIRST_TOKEN_ELIGIBILITY_TYPE,
         },
-      });id,
-          eligibilityType: FIRST_TOKEN_ELIGIBILITY_TYPE,
-        },
       });
 
       await appendAudit(transaction, {
@@ -274,13 +276,13 @@ export class EligibilityRewardService {
         }
       }
 
-      const result: EligibilityRewardProcessingResult = {
+      const result = {
         outcome: "processed",
         eventReference: validated.eventReference,
         walletPublicKey: validated.walletPublicKey,
         eligibility: eligibilityResult,
         reward: rewardResult,
-      };
+      } satisfies EligibilityRewardProcessingResult;
 
       await transaction`
         UPDATE token_creation_qualifying_events
@@ -296,7 +298,7 @@ export class EligibilityRewardService {
   }
 }
 
-type TransactionClient = Parameters<Parameters<DatabaseClient["begin"]>[0]>[0];
+type TransactionClient = postgres.TransactionSql;
 
 async function ensureRewardPreparation(
   transaction: TransactionClient,
@@ -364,33 +366,34 @@ async function ensureRewardPreparation(
     throw new Error("Reward record could not be established.");
   }
 
+  const rewardQualifyingEventReference =
+    reward.qualifying_event_reference ?? input.qualifyingEventReference;
+  const rewardPolicyVersion = reward.policy_version;
+
   await appendAudit(transaction, {
     eventType: createdReward ? "reward.approved" : "reward.already_exists",
     targetPublicKey: input.walletPublicKey,
-    policyVersion: input.policyVersion,
+    policyVersion: rewardPolicyVersion,
     occurredAt: input.now,
     metadata: {
-      qualifyingEventReference: input.qualifyingEventReference,
+      qualifyingEventReference: rewardQualifyingEventReference,
       rewardId: reward.reward_id,
       rewardType: FIRST_TOKEN_REWARD_TYPE,
       amount: FIRST_TOKEN_REWARD_AMOUNT,
     },
   });
 
-  const workflowQualifyingEventReference =
-    reward.qualifying_event_reference ?? input.qualifyingEventReference;
-  const workflowPolicyVersion = reward.policy_version;
   const workflowPayload = {
     rewardId: reward.reward_id,
     rewardType: FIRST_TOKEN_REWARD_TYPE,
     amount: FIRST_TOKEN_REWARD_AMOUNT,
     walletPublicKey: input.walletPublicKey,
-    qualifyingEventReference: workflowQualifyingEventReference,
+    qualifyingEventReference: rewardQualifyingEventReference,
   } as const;
   const workflowPayloadHash = hashJson({
     workflowType: WORKFLOW_TYPE,
     subjectPublicKey: input.walletPublicKey,
-    policyVersion: workflowPolicyVersion,
+    policyVersion: rewardPolicyVersion,
     payload: workflowPayload,
   });
   const workflowRequestId = randomUUID();
@@ -420,7 +423,7 @@ async function ensureRewardPreparation(
       ${transaction.json(workflowPayload)},
       ${new Date(input.now)},
       ${new Date(input.now)},
-      ${workflowPolicyVersion}
+      ${rewardPolicyVersion}
     )
     ON CONFLICT (workflow_scope, idempotency_key) DO NOTHING
     RETURNING request_id, payload_hash
@@ -444,11 +447,12 @@ async function ensureRewardPreparation(
     rewardId: reward.reward_id,
     rewardType: FIRST_TOKEN_REWARD_TYPE,
     amount: FIRST_TOKEN_REWARD_AMOUNT,
-    qualifyingEventReference: workflowQualifyingEventReference,
+    qualifyingEventReference: rewardQualifyingEventReference,
     execution: "future_reward_mint",
   } as const;
-  const [createdProtectedOperation] =
-    await transaction<ProtectedOperationRow[]>`
+  const [createdProtectedOperation] = await transaction<
+    ProtectedOperationRow[]
+  >`
       INSERT INTO protected_operation_intents (
         operation_id,
         workflow_request_id,
@@ -466,19 +470,27 @@ async function ensureRewardPreparation(
         ${new Date(input.now)}
       )
       ON CONFLICT (workflow_request_id) DO NOTHING
-      RETURNING operation_id
+      RETURNING operation_id, operation_type, target_public_key, parameters
     `;
 
   const [protectedOperation] = createdProtectedOperation
     ? [createdProtectedOperation]
     : await transaction<ProtectedOperationRow[]>`
-        SELECT operation_id
+        SELECT operation_id, operation_type, target_public_key, parameters
         FROM protected_operation_intents
         WHERE workflow_request_id = ${workflow.request_id}
       `;
 
   if (!protectedOperation) {
     throw new Error("Protected reward mint intent could not be established.");
+  }
+
+  if (
+    protectedOperation.operation_type !== "mint" ||
+    protectedOperation.target_public_key?.trim() !== input.walletPublicKey ||
+    hashJson(protectedOperation.parameters) !== hashJson(protectedParameters)
+  ) {
+    throw new Error("Protected reward mint intent idempotency conflict.");
   }
 
   if (createdWorkflow) {
@@ -590,9 +602,7 @@ async function appendAudit(
   `;
 }
 
-function validateEvent(
-  event: TrustedTokenCreationSucceededEvent,
-):
+function validateEvent(event: TrustedTokenCreationSucceededEvent):
   | {
       ok: true;
       eventReference: string;

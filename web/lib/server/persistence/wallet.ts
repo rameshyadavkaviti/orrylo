@@ -8,10 +8,10 @@ export class InvalidStellarPublicKeyError extends Error {
 }
 
 export function normalizeWalletPublicKey(publicKey: string): string {
-  const trimmed = publicKey.trim();
+  const normalized = publicKey.trim().toUpperCase();
 
   try {
-    return Keypair.fromPublicKey(trimmed).publicKey();
+    return Keypair.fromPublicKey(normalized).publicKey();
   } catch {
     throw new InvalidStellarPublicKeyError();
   }

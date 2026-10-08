@@ -202,3 +202,48 @@ The UI should distinguish clearly between:
 Until code and deployment evidence exist, architecture documents describe intent only.
 
 No agent should state that a contract, asset policy, domain route, issuer transition, or mainnet deployment is complete based solely on this document.
+
+
+## 12. Prototype deployment baseline
+
+For the first working prototype, Orrylo uses a low-cost provider-neutral deployment baseline:
+
+```
+Cloudflare DNS/CDN
+      │
+      ▼
+Railway app/backend
+      │
+      ▼
+Neon PostgreSQL
+      │
+      ├── durable auth/workflows/audit
+      │
+      ▼
+Stellar Testnet
+```
+
+The expected starting infrastructure cost is approximately **$5/month**, driven primarily by Railway. Neon and Cloudflare are expected to remain on their free tiers for the initial prototype.
+
+This is not a permanent production-provider commitment. Application/database boundaries should remain portable.
+
+The Testnet environment should be reproducibly bootstrappable because Testnet state is disposable/resettable.
+
+## 13. Protected issuer operations
+
+Routine protected RYLO operations use the approved two-signer path:
+
+```
+Application policy / durable intent
+→ protected operations boundary
+→ Signer A
+→ independent Signer B policy verification
+→ Stellar submission
+→ confirmation + audit
+```
+
+Routine examples include trustline authorization, approved mint execution, Treasury transfer, and liquidity additions.
+
+Critical operations such as signer rotation, threshold changes, issuer-flag changes, and recovery are intentionally excluded from the routine path and require a manual/local ceremony with recovery-capable participation and explicit audit evidence.
+
+Signer C and the Master Key are not routine operational signers.

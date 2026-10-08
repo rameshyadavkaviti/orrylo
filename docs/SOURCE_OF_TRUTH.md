@@ -182,6 +182,9 @@ Approved economics:
 - a **1,000,000 RYLO Bootstrap Liquidity Reserve** is approved as the lifetime policy cap for Orrylo-managed bootstrap liquidity capacity;
 - initial liquidity deployment is **1,000 RYLO + 100 XLM**;
 - the remaining **999,000 RYLO** is undeployed reserve capacity and does not need to be minted in advance;
+- additional liquidity is **manual, staged, and revenue/capital-backed** rather than automatic or time-scheduled;
+- each additional liquidity operation must use real available XLM, remain within the 1,000,000 RYLO reserve cap, use a protected operation with `request_id` and `policy_version`, and produce append-only audit evidence;
+- the ordinary public application backend must not independently execute liquidity additions;
 - the previously considered idea that users could acquire additional RYLO only from Orrylo is rejected and is not policy.
 
 Approved v1 mint sources are limited to:
@@ -206,7 +209,37 @@ The first version must not introduce an official investment program such as:
 
 Any future financial/investment feature requires a separate product and legal review.
 
-## 12. Domain architecture
+## 12. Prototype infrastructure baseline
+
+The approved first-prototype infrastructure baseline is intentionally low-cost and provider-neutral at the application boundary:
+
+- application/backend hosting: **Railway**, expected starting cost about **$5/month**;
+- PostgreSQL: **Neon Free** initially;
+- DNS/CDN: **Cloudflare Free**;
+- Stellar environment: **Testnet**;
+- existing Orrylo domain: reused with no new prototype-domain purchase.
+
+This is a **prototype deployment baseline**, not a permanent production-provider commitment.
+
+The application must remain portable enough to move away from Railway, Neon, or Cloudflare if pricing, availability, sanctions/access, scale, security, or operational requirements change.
+
+The first Testnet prototype is considered complete when the real end-to-end path demonstrates:
+
+```
+Albedo wallet
+→ application eligibility
+→ RYLO trustline
+→ issuer authorization
+→ 150 RYLO reward
+→ visible wallet balance
+→ RYLO/XLM liquidity pool
+→ successful market swap
+→ durable audit evidence
+```
+
+Testnet bootstrap/deployment should be reproducible because Testnet state may be reset.
+
+## 13. Domain architecture
 
 Target public structure:
 
@@ -221,7 +254,7 @@ Shared assets use the shared issuer home domain.
 
 Dedicated issuers may use per-project subdomains and later custom domains.
 
-## 13. Current RYLO issuer candidate
+## 14. Current RYLO issuer candidate
 
 A vanity Stellar public key has been generated and is reserved as the current RYLO issuer candidate:
 
@@ -236,9 +269,9 @@ Important status:
 - The `ORRYLO` suffix is branding only and provides no additional cryptographic security.
 - The Shared Issuer for user assets must be a separate account.
 
-## 14. Implementation status
+## 15. Implementation status
 
-Current phase: **Application Persistence + Durable Workflow Foundation**.
+Current phase: **Eligibility + Reward Workflow Foundation**.
 
 The repository contains a minimal Soroban workspace and a policy-neutral foundation contract with:
 
@@ -268,8 +301,15 @@ The repository also contains an initial Next.js application foundation under
 The web application now implements authentication-only Albedo wallet proof with
 durable PostgreSQL-backed challenges and server-side sessions. It also contains
 an inactive persistent workflow/idempotency foundation, append-only
-hash-chained audit events, and schema foundations for future eligibility,
-reward, and protected-operation records. Product data remains demo-only.
+hash-chained audit events, and a server-only trusted qualifying-event boundary
+that can establish first-token eligibility and prepare the approved launch
+reward record plus inactive future workflow/protected-operation intents.
+
+The qualifying-event producer is not implemented or selected. The service does
+not decide whether a token creation succeeded; a future reviewed server-side
+integration must supply that trusted evidence. No public/browser mutation route
+exists for declaring token-creation success. Eligibility and reward UI data
+remain demo-only.
 
 The persistence layer is provider-neutral: the repository requires PostgreSQL
 through a server-only DATABASE_URL but does not select or claim any hosted
@@ -277,16 +317,23 @@ database provider. It supports multi-instance challenge/session state, atomic
 challenge consumption, database uniqueness constraints, deterministic
 migrations, and real database concurrency tests.
 
-No workflow, eligibility, reward, or protected-operation endpoint is activated.
-The application performs no Stellar transaction, issuer mutation, trustline
-mutation, RYLO mint/reward/payment/authorization, contract mutation, liquidity
-operation, testnet issuance/deployment, or mainnet activity.
+No public workflow, eligibility, reward, or protected-operation endpoint is
+activated. Reward preparation stops at database state `approved`; it does not
+create an envelope, invoke a signer, submit a transaction, or confirm an
+on-chain result. The application performs no Stellar transaction, issuer
+mutation, trustline mutation, RYLO mint/reward execution/payment/authorization,
+contract mutation, liquidity operation, testnet issuance/deployment, or mainnet
+activity.
 
-Current canonical RYLO policy now defines supply, mint-source, reward, treasury, authorization, signer, retry, and audit intent in [RYLO_POLICY.md](RYLO_POLICY.md), but those policies are **not yet implemented on-chain or in production application workflows**.
+Current canonical RYLO policy now defines supply, mint-source, reward, treasury,
+authorization, signer, retry, and audit intent in
+[RYLO_POLICY.md](RYLO_POLICY.md). This phase implements eligibility/reward
+preparation only; the policy is **not yet implemented on-chain or in an
+executing production issuer workflow**.
 
 This foundation does **not** implement:
 
-- RYLO supply enforcement, mint execution, rewards, direct sales, service-spend recycling, or bootstrap liquidity;
+- RYLO supply enforcement, mint/reward execution, direct sales, service-spend recycling, or bootstrap liquidity;
 - RYLO trustline authorization/revocation execution;
 - RYLO issuer multisig/signing-service infrastructure;
 - Shared Issuer account configuration;
@@ -297,7 +344,7 @@ This foundation does **not** implement:
 
 No production issuer configuration, RYLO supply rule, testnet deployment, or mainnet deployment should be inferred merely from the presence of the contract workspace.
 
-## 15. Canonical companion documents
+## 16. Canonical companion documents
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system architecture and boundaries
 - [RYLO_POLICY.md](RYLO_POLICY.md) — RYLO-specific rules
