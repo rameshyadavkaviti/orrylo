@@ -105,7 +105,7 @@ export function CreateSharedTokenForm() {
               <div>
                 <h3 id="metadata-step">Metadata</h3>
                 <p>
-                  Shared assets are planned to publish metadata through Orrylo's
+                  Shared assets are planned to publish metadata through Orrylo&apos;s
                   shared asset domain.
                 </p>
               </div>
