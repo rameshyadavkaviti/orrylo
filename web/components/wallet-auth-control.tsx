@@ -28,7 +28,9 @@ interface SessionResponse {
 }
 
 export function WalletAuthControl() {
-  const [state, setState] = useState<WalletAuthState>({ status: "checking" });
+  const [state, setState] = useState<WalletAuthState>({
+    status: "disconnected",
+  });
 
   useEffect(() => {
     let active = true;
@@ -180,7 +182,7 @@ export function WalletAuthControl() {
         disabled={Boolean(progressLabel)}
         onClick={() => void connect()}
       >
-        {progressLabel ?? "Connect Albedo"}
+        {progressLabel ?? "Connect Wallet"}
       </button>
       {state.status === "rejected" ? (
         <span className="wallet-auth-error" role="alert">
