@@ -119,7 +119,10 @@ if (!TEST_DATABASE_URL) {
   });
 
   test("launch boundary approves exactly 150 RYLO and creates inactive future intents once", async () => {
-    const event = qualifyingEvent(2, { lowercaseWallet: true });
+    const event = qualifyingEvent(2, {
+      lowercaseWallet: true,
+      eventOccurredAt: LAUNCH_AT,
+    });
     const service = serviceAt(sql, LAUNCH_AT);
 
     const first = await service.processTrustedTokenCreationSucceeded(event);
@@ -218,28 +221,94 @@ if (!TEST_DATABASE_URL) {
     assert.equal("transactionEnvelope" in operation.parameters, false);
   });
 
-  test("reward window excludes before launch and the exact 60-day end", async () => {
-    const before = await serviceAt(
+  test("event at launch minus one millisecond does not earn the reward", async () => {
+    const result = await serviceAt(
       sql,
-      LAUNCH_AT - 1,
-    ).processTrustedTokenCreationSucceeded(qualifyingEvent(3));
-    const atEnd = await serviceAt(
-      sql,
-      LAUNCH_AT + REWARD_WINDOW_MS,
-    ).processTrustedTokenCreationSucceeded(qualifyingEvent(4));
+      LAUNCH_AT + 1,
+    ).processTrustedTokenCreationSucceeded(
+      qualifyingEvent(3, { eventOccurredAt: LAUNCH_AT - 1 }),
+    );
 
-    assert.equal(before.outcome, "processed");
-    assert.equal(atEnd.outcome, "processed");
-    if (before.outcome !== "processed" || atEnd.outcome !== "processed") {
-      return;
-    }
-    assert.deepEqual(before.reward, {
+    assert.equal(result.outcome, "processed");
+    if (result.outcome !== "processed") return;
+    assert.deepEqual(result.reward, {
       outcome: "outside_reward_window",
       position: "before_launch",
     });
-    assert.deepEqual(atEnd.reward, {
+  });
+
+  test("event at launch earns the reward", async () => {
+    const result = await serviceAt(
+      sql,
+      LAUNCH_AT + 1,
+    ).processTrustedTokenCreationSucceeded(
+      qualifyingEvent(4, { eventOccurredAt: LAUNCH_AT }),
+    );
+
+    assert.equal(result.outcome, "processed");
+    if (result.outcome !== "processed") return;
+    assert.equal(result.reward.outcome, "reward_approved");
+  });
+
+  test("event at window end minus one millisecond earns the reward", async () => {
+    const result = await serviceAt(
+      sql,
+      LAUNCH_AT + REWARD_WINDOW_MS + 1,
+    ).processTrustedTokenCreationSucceeded(
+      qualifyingEvent(5, {
+        eventOccurredAt: LAUNCH_AT + REWARD_WINDOW_MS - 1,
+      }),
+    );
+
+    assert.equal(result.outcome, "processed");
+    if (result.outcome !== "processed") return;
+    assert.equal(result.reward.outcome, "reward_approved");
+  });
+
+  test("event at the exact window end does not earn the reward", async () => {
+    const result = await serviceAt(
+      sql,
+      LAUNCH_AT + REWARD_WINDOW_MS - 1,
+    ).processTrustedTokenCreationSucceeded(
+      qualifyingEvent(6, {
+        eventOccurredAt: LAUNCH_AT + REWARD_WINDOW_MS,
+      }),
+    );
+
+    assert.equal(result.outcome, "processed");
+    if (result.outcome !== "processed") return;
+    assert.deepEqual(result.reward, {
       outcome: "outside_reward_window",
       position: "after_window",
+    });
+  });
+
+  test("in-window event processed after window end still earns the reward", async () => {
+    const result = await serviceAt(
+      sql,
+      LAUNCH_AT + REWARD_WINDOW_MS + 1,
+    ).processTrustedTokenCreationSucceeded(
+      qualifyingEvent(7, { eventOccurredAt: LAUNCH_AT + 1 }),
+    );
+
+    assert.equal(result.outcome, "processed");
+    if (result.outcome !== "processed") return;
+    assert.equal(result.reward.outcome, "reward_approved");
+  });
+
+  test("out-of-window event processed during the window does not earn the reward", async () => {
+    const result = await serviceAt(
+      sql,
+      LAUNCH_AT + 1,
+    ).processTrustedTokenCreationSucceeded(
+      qualifyingEvent(8, { eventOccurredAt: LAUNCH_AT - 1 }),
+    );
+
+    assert.equal(result.outcome, "processed");
+    if (result.outcome !== "processed") return;
+    assert.deepEqual(result.reward, {
+      outcome: "outside_reward_window",
+      position: "before_launch",
     });
 
     const [{ count }] = await sql<{ count: string }[]>`
@@ -249,8 +318,11 @@ if (!TEST_DATABASE_URL) {
   });
 
   test("later token creation cannot reward a first creation processed before launch", async () => {
-    const firstEvent = qualifyingEvent(5, { walletSeed: 5 });
-    const laterEvent = qualifyingEvent(6, { walletSeed: 5 });
+    const firstEvent = qualifyingEvent(9, {
+      walletSeed: 9,
+      eventOccurredAt: LAUNCH_AT - 1,
+    });
+    const laterEvent = qualifyingEvent(10, { walletSeed: 9 });
     const first = await serviceAt(
       sql,
       LAUNCH_AT - 1,
@@ -276,8 +348,8 @@ if (!TEST_DATABASE_URL) {
   });
 
   test("later token creation cannot retroactively reward an unconfigured first creation", async () => {
-    const firstEvent = qualifyingEvent(7, { walletSeed: 7 });
-    const laterEvent = qualifyingEvent(8, { walletSeed: 7 });
+    const firstEvent = qualifyingEvent(11, { walletSeed: 11 });
+    const laterEvent = qualifyingEvent(12, { walletSeed: 11 });
     const first = await new EligibilityRewardService(sql, {
       now: () => LAUNCH_AT + 1,
     }).processTrustedTokenCreationSucceeded(firstEvent);
@@ -547,7 +619,11 @@ async function assertNoRewardIntents(sql: DatabaseClient): Promise<void> {
 
 function qualifyingEvent(
   index: number,
-  options: { lowercaseWallet?: boolean; walletSeed?: number } = {},
+  options: {
+    eventOccurredAt?: number;
+    lowercaseWallet?: boolean;
+    walletSeed?: number;
+  } = {},
 ): TrustedTokenCreationSucceededEvent {
   const publicKey = Keypair.fromRawEd25519Seed(
     Buffer.alloc(32, options.walletSeed ?? index),
@@ -559,7 +635,7 @@ function qualifyingEvent(
       ? publicKey.toLowerCase()
       : publicKey,
     eventType: "TOKEN_CREATION_SUCCEEDED",
-    eventOccurredAt: LAUNCH_AT - 500,
+    eventOccurredAt: options.eventOccurredAt ?? LAUNCH_AT,
     associatedReference: `asset-${index}`,
     source: "trusted-token-creation-service",
     policyVersion: POLICY_VERSION,

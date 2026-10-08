@@ -14,7 +14,14 @@ test("invalid event timestamps return a typed error before database access", asy
   } as unknown as DatabaseClient;
   const service = new EligibilityRewardService(sql);
 
-  for (const eventOccurredAt of [NaN, Infinity, -Infinity, 1e20, -1e20]) {
+  for (const eventOccurredAt of [
+    NaN,
+    Infinity,
+    -Infinity,
+    1e20,
+    -1e20,
+    Date.parse("-010000-01-01T00:00:00.000Z"),
+  ]) {
     const result = await service.processTrustedTokenCreationSucceeded({
       eventReference: "invalid-timestamp-event",
       walletPublicKey: Keypair.fromRawEd25519Seed(
