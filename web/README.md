@@ -150,8 +150,9 @@ Within one PostgreSQL transaction, the service:
 - validates and canonicalizes the Stellar wallet StrKey;
 - stores and fingerprints the qualifying event for idempotent replay;
 - establishes first-token eligibility once per wallet;
-- evaluates the server-only `ORRYLO_OFFICIAL_LAUNCH_AT` configuration using a
-  half-open 60-day interval;
+- evaluates the trusted qualifying event's `eventOccurredAt` against the
+  server-only `ORRYLO_OFFICIAL_LAUNCH_AT` configuration using a half-open
+  60-day interval;
 - approves exactly `150.0000000` RYLO when the event is in the launch window;
 - creates/reuses one reward workflow and one inactive future mint protected
   operation;

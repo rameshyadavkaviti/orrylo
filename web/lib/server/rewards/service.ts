@@ -322,7 +322,10 @@ export class EligibilityRewardService {
           },
         });
       } else {
-        const windowPosition = evaluateRewardWindow(now, launchConfig);
+        const windowPosition = evaluateRewardWindow(
+          validated.eventOccurredAt,
+          launchConfig,
+        );
 
         if (windowPosition !== "inside_window") {
           rewardResult = {
