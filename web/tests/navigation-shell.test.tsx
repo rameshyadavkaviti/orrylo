@@ -3,9 +3,9 @@ import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { AppShell } from "../components/app-shell";
-import { NAV_ITEMS } from "../lib/navigation";
+import { NAV_ITEMS, UTILITY_NAV_ITEMS } from "../lib/navigation";
 
-test("application shell renders every approved navigation destination", () => {
+test("public shell renders primary product navigation and secondary utilities", () => {
   const html = renderToStaticMarkup(
     <AppShell>
       <div>content</div>
@@ -17,6 +17,13 @@ test("application shell renders every approved navigation destination", () => {
     assert.ok(html.includes('href="' + item.href + '"'));
   }
 
-  assert.match(html, /product data demo/i);
-  assert.match(html, /Contract Interface v1/i);
+  for (const item of UTILITY_NAV_ITEMS) {
+    assert.match(html, new RegExp(item.label));
+  }
+
+  assert.match(html, /Early prototype/i);
+  assert.match(html, /Connect Wallet/i);
+  assert.doesNotMatch(html, /Runtime status/i);
+  assert.doesNotMatch(html, /Contract Interface v1/i);
+  assert.doesNotMatch(html, /Safety boundary/i);
 });

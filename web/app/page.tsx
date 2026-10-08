@@ -1,33 +1,28 @@
 import Link from "next/link";
 
-import { DemoBanner } from "../components/demo-banner";
-import { DASHBOARD_DEMO_STATE } from "../lib/demo/dashboard";
-
-export function DashboardPage() {
-  const state = DASHBOARD_DEMO_STATE;
-
+export function HomePage() {
   return (
-    <div className="page-stack">
-      <DemoBanner />
-
-      <section className="hero">
+    <div className="page-stack public-home">
+      <section className="hero public-hero">
         <div className="hero-copy">
-          <span className="hero-kicker">
-            Build on Stellar without hidden assumptions
-          </span>
-          <h1>Welcome to Orrylo.</h1>
+          <span className="hero-kicker">Build your idea on Stellar</span>
+          <h1>Create your Stellar token in minutes.</h1>
           <p>
-            Start with a transparent asset draft, understand who controls the
-            infrastructure, and move on-chain only when approved interfaces
-            exist.
+            Orrylo gives you a simple place to shape your token, understand the
+            infrastructure behind it, and preview the result before anything
+            goes on-chain.
           </p>
           <div className="hero-actions">
             <Link className="button button-inverted" href="/create-token">
-              Create token draft
+              Create Token
             </Link>
-            <Link className="button button-ghost" href="/products">
-              Explore services
-            </Link>
+            <a className="button button-ghost" href="#wallet-connect">
+              Connect Wallet
+            </a>
+          </div>
+          <div className="hero-links" aria-label="Explore Orrylo">
+            <Link href="/rylo">Explore RYLO →</Link>
+            <Link href="/products">Products &amp; Services →</Link>
           </div>
         </div>
         <div className="hero-orbit" aria-hidden="true">
@@ -35,75 +30,82 @@ export function DashboardPage() {
         </div>
       </section>
 
-      <section className="metric-grid" aria-label="Account overview">
-        <MetricCard
-          label="Ecosystem member"
-          value="Not verified"
-          note="Qualification requires a confirmed qualifying action."
-        />
-        <MetricCard
-          label="RYLO balance"
-          value="—"
-          note="No live balance read is active."
-        />
-        <MetricCard
-          label="Free Build Credit"
-          value="Not issued"
-          note="This is not presented as tradable RYLO."
-        />
+      <section className="intro-section" aria-labelledby="what-is-orrylo">
+        <span className="eyebrow">What is Orrylo?</span>
+        <h2 id="what-is-orrylo">A simpler path from token idea to Stellar.</h2>
+        <p>
+          Start with a guided token draft. Orrylo is designed to grow with you
+          into metadata, dedicated issuer infrastructure, RYLO membership, and
+          other Stellar services—without hiding which capabilities are ready.
+        </p>
+      </section>
+
+      <section className="value-grid" aria-label="How the prototype works">
+        <article className="value-card">
+          <span className="step-number">01</span>
+          <h2>Configure</h2>
+          <p>
+            Choose your asset code and display name with Stellar-compatible
+            validation.
+          </p>
+        </article>
+        <article className="value-card">
+          <span className="step-number">02</span>
+          <h2>Understand</h2>
+          <p>
+            See the Shared Issuer and metadata model in plain language before
+            you continue.
+          </p>
+        </article>
+        <article className="value-card">
+          <span className="step-number">03</span>
+          <h2>Preview safely</h2>
+          <p>
+            Review the token draft without pretending an on-chain launch has
+            happened.
+          </p>
+        </article>
       </section>
 
       <section className="two-column">
-        <article className="surface-card">
-          <div className="section-heading">
-            <div>
-              <span className="eyebrow">Recent activity</span>
-              <h2>Nothing recorded</h2>
-            </div>
-            <span className="availability-badge">Demo</span>
-          </div>
+        <article className="surface-card feature-card">
+          <span className="eyebrow">RYLO membership</span>
+          <h2>Build once. Become part of the ecosystem.</h2>
           <p className="muted">
-            Activity will be stored only when supported application operations
-            exist. No mock transaction is shown as real history.
+            Approved policy connects your first successful Orrylo token creation
+            to membership eligibility, Free Build Credit, and a launch reward
+            path.
           </p>
-          <Link href="/activity" className="text-link">
-            Open activity structure
+          <Link className="text-link" href="/rylo">
+            Understand RYLO
           </Link>
         </article>
 
-        <article className="surface-card">
-          <span className="eyebrow">Wallet status</span>
-          <h2>Connection adapter pending</h2>
+        <article className="surface-card feature-card">
+          <span className="eyebrow">More than token creation</span>
+          <h2>Grow into the services your project needs.</h2>
           <p className="muted">
-            Albedo is the initial target. No wallet proof or
-            authorization-sensitive client state is trusted in this phase.
+            Explore metadata, domain, dedicated issuer, and custom Stellar
+            services. Unavailable capabilities are clearly marked.
           </p>
-          <div className="key-value">
-            <span>Source</span>
-            <strong>{state.source}</strong>
-          </div>
+          <Link className="text-link" href="/products">
+            Browse Products &amp; Services
+          </Link>
         </article>
+      </section>
+
+      <section className="prototype-boundary" aria-label="Prototype availability">
+        <div>
+          <span className="eyebrow">Available in this prototype</span>
+          <strong>Token drafting, preview, and secure Albedo authentication</strong>
+        </div>
+        <p>
+          Token issuance and other Stellar mutations are not enabled yet. Orrylo
+          will never show a draft as a successful on-chain launch.
+        </p>
       </section>
     </div>
   );
 }
 
-function MetricCard({
-  label,
-  value,
-  note,
-}: {
-  label: string;
-  value: string;
-  note: string;
-}) {
-  return (
-    <article className="metric-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{note}</small>
-    </article>
-  );
-}
-
-export default DashboardPage;
+export default HomePage;

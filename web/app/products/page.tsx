@@ -1,50 +1,75 @@
-import { DemoBanner } from "../../components/demo-banner";
+import Link from "next/link";
 
 const PRODUCTS = [
   {
-    title: "Domain Link",
-    description: "Connect approved project metadata to a domain workflow.",
+    title: "Token Draft",
+    description:
+      "Shape a Shared Issuer token identity and preview it before anything goes on-chain.",
+    status: "Prototype available",
+    href: "/create-token",
   },
   {
-    title: "Metadata Setup",
-    description: "Prepare transparent project and asset metadata.",
+    title: "Metadata & Domain",
+    description:
+      "Publish clear asset and project metadata through Orrylo-managed domain infrastructure.",
+    status: "Coming soon",
   },
   {
     title: "Dedicated Issuer",
-    description: "Premium contract-controlled issuer infrastructure target.",
+    description:
+      "Separate contract-controlled issuer infrastructure for projects that need their own policy model.",
+    status: "Coming soon",
   },
   {
-    title: "Custom Service",
-    description: "Future scoped Stellar product and infrastructure work.",
+    title: "Custom Stellar Services",
+    description:
+      "Scoped Stellar product, contract, and infrastructure work for needs beyond the standard paths.",
+    status: "Coming soon",
   },
 ] as const;
 
 export function ProductsPage() {
   return (
     <div className="page-stack">
-      <DemoBanner />
       <div className="page-heading">
-        <span className="eyebrow">Products & Services</span>
-        <h1>Product surfaces without pretending they are live.</h1>
+        <span className="eyebrow">Products &amp; Services</span>
+        <h1>Start simple, then add infrastructure when you need it.</h1>
         <p>
-          Pricing and transaction actions remain unavailable until their
-          approved implementation and policy dependencies exist.
+          Orrylo is growing beyond token creation. Every card below says clearly
+          whether you can use it in this prototype or whether it is still ahead.
         </p>
       </div>
 
-      <section className="card-grid">
+      <section className="card-grid product-grid">
         {PRODUCTS.map((product) => (
           <article className="surface-card product-card" key={product.title}>
             <div className="card-title-row">
               <h2>{product.title}</h2>
-              <span className="availability-badge">Coming later</span>
+              <span className="availability-badge">{product.status}</span>
             </div>
-            <p>{product.description}</p>
-            <button className="button button-secondary" type="button" disabled>
-              Unavailable
-            </button>
+            <p className="muted">{product.description}</p>
+            {"href" in product ? (
+              <Link className="button button-primary" href={product.href}>
+                Open token draft
+              </Link>
+            ) : (
+              <button className="button button-secondary" type="button" disabled>
+                Coming soon
+              </button>
+            )}
           </article>
         ))}
+      </section>
+
+      <section className="prototype-boundary">
+        <div>
+          <span className="eyebrow">Prototype promise</span>
+          <strong>Unavailable services stay visibly unavailable.</strong>
+        </div>
+        <p>
+          Orrylo does not simulate provisioning, token issuance, contract
+          deployment, or payment success when those execution paths do not exist.
+        </p>
       </section>
     </div>
   );
