@@ -82,7 +82,7 @@ export class EligibilityRewardService {
     options: { officialLaunchAt?: string; now?: () => number } = {},
   ): Promise<EligibilityRewardResult> {
     const wallet = validateEvent(event);
-    const launchAt = parseOfficialLaunchAt(options.officialLaunchAt);
+    const launchAt = parseOfficialLaunchAt(options.officialLaunchAt ?? process.env.ORRYLO_OFFICIAL_LAUNCH_AT);
     const now = (options.now ?? Date.now)();
     if (!Number.isSafeInteger(now)) throw new Error("Invalid server time.");
 
