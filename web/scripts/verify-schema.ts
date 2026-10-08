@@ -12,6 +12,7 @@ const EXPECTED_TABLES = [
   "eligibility_records",
   "reward_records",
   "protected_operation_intents",
+  "token_creation_qualifying_events",
 ] as const;
 
 async function main() {
