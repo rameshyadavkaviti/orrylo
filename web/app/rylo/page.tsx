@@ -5,7 +5,7 @@ export function RyloPage() {
         <span className="eyebrow">RYLO</span>
         <h1>Membership and utility for people building with Orrylo.</h1>
         <p>
-          RYLO is Orrylo's ecosystem utility token. The approved policy connects
+          RYLO is Orrylo&apos;s ecosystem utility token. The approved policy connects
           membership to successful building—not investment-return promises.
         </p>
       </div>
