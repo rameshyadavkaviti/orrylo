@@ -182,6 +182,9 @@ Approved economics:
 - a **1,000,000 RYLO Bootstrap Liquidity Reserve** is approved as the lifetime policy cap for Orrylo-managed bootstrap liquidity capacity;
 - initial liquidity deployment is **1,000 RYLO + 100 XLM**;
 - the remaining **999,000 RYLO** is undeployed reserve capacity and does not need to be minted in advance;
+- additional liquidity is **manual, staged, and revenue/capital-backed** rather than automatic or time-scheduled;
+- each additional liquidity operation must use real available XLM, remain within the 1,000,000 RYLO reserve cap, use a protected operation with `request_id` and `policy_version`, and produce append-only audit evidence;
+- the ordinary public application backend must not independently execute liquidity additions;
 - the previously considered idea that users could acquire additional RYLO only from Orrylo is rejected and is not policy.
 
 Approved v1 mint sources are limited to:
@@ -206,7 +209,37 @@ The first version must not introduce an official investment program such as:
 
 Any future financial/investment feature requires a separate product and legal review.
 
-## 12. Domain architecture
+## 12. Prototype infrastructure baseline
+
+The approved first-prototype infrastructure baseline is intentionally low-cost and provider-neutral at the application boundary:
+
+- application/backend hosting: **Railway**, expected starting cost about **$5/month**;
+- PostgreSQL: **Neon Free** initially;
+- DNS/CDN: **Cloudflare Free**;
+- Stellar environment: **Testnet**;
+- existing Orrylo domain: reused with no new prototype-domain purchase.
+
+This is a **prototype deployment baseline**, not a permanent production-provider commitment.
+
+The application must remain portable enough to move away from Railway, Neon, or Cloudflare if pricing, availability, sanctions/access, scale, security, or operational requirements change.
+
+The first Testnet prototype is considered complete when the real end-to-end path demonstrates:
+
+```
+Albedo wallet
+→ application eligibility
+→ RYLO trustline
+→ issuer authorization
+→ 150 RYLO reward
+→ visible wallet balance
+→ RYLO/XLM liquidity pool
+→ successful market swap
+→ durable audit evidence
+```
+
+Testnet bootstrap/deployment should be reproducible because Testnet state may be reset.
+
+## 13. Domain architecture
 
 Target public structure:
 
@@ -221,7 +254,7 @@ Shared assets use the shared issuer home domain.
 
 Dedicated issuers may use per-project subdomains and later custom domains.
 
-## 13. Current RYLO issuer candidate
+## 14. Current RYLO issuer candidate
 
 A vanity Stellar public key has been generated and is reserved as the current RYLO issuer candidate:
 
@@ -236,7 +269,7 @@ Important status:
 - The `ORRYLO` suffix is branding only and provides no additional cryptographic security.
 - The Shared Issuer for user assets must be a separate account.
 
-## 14. Implementation status
+## 15. Implementation status
 
 Current phase: **Application Persistence + Durable Workflow Foundation**.
 
@@ -297,7 +330,7 @@ This foundation does **not** implement:
 
 No production issuer configuration, RYLO supply rule, testnet deployment, or mainnet deployment should be inferred merely from the presence of the contract workspace.
 
-## 15. Canonical companion documents
+## 16. Canonical companion documents
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system architecture and boundaries
 - [RYLO_POLICY.md](RYLO_POLICY.md) — RYLO-specific rules
