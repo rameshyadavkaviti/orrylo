@@ -248,6 +248,55 @@ if (!TEST_DATABASE_URL) {
     assert.equal(count, "0");
   });
 
+  test("later token creation cannot reward a first creation processed before launch", async () => {
+    const firstEvent = qualifyingEvent(5, { walletSeed: 5 });
+    const laterEvent = qualifyingEvent(6, { walletSeed: 5 });
+    const first = await serviceAt(
+      sql,
+      LAUNCH_AT - 1,
+    ).processTrustedTokenCreationSucceeded(firstEvent);
+    const later = await serviceAt(
+      sql,
+      LAUNCH_AT + 1,
+    ).processTrustedTokenCreationSucceeded(laterEvent);
+
+    assert.equal(first.outcome, "processed");
+    assert.equal(later.outcome, "processed");
+    if (first.outcome !== "processed" || later.outcome !== "processed") return;
+    assert.equal(later.eligibility.outcome, "eligibility_already_existed");
+    assert.equal(
+      later.eligibility.eligibilityId,
+      first.eligibility.eligibilityId,
+    );
+    assert.deepEqual(later.reward, {
+      outcome: "outside_reward_window",
+      position: "before_launch",
+    });
+    await assertNoRewardIntents(sql);
+  });
+
+  test("later token creation cannot retroactively reward an unconfigured first creation", async () => {
+    const firstEvent = qualifyingEvent(7, { walletSeed: 7 });
+    const laterEvent = qualifyingEvent(8, { walletSeed: 7 });
+    const first = await new EligibilityRewardService(sql, {
+      now: () => LAUNCH_AT + 1,
+    }).processTrustedTokenCreationSucceeded(firstEvent);
+    const later = await serviceAt(
+      sql,
+      LAUNCH_AT + 2,
+    ).processTrustedTokenCreationSucceeded(laterEvent);
+
+    assert.equal(first.outcome, "processed");
+    assert.equal(later.outcome, "processed");
+    if (first.outcome !== "processed" || later.outcome !== "processed") return;
+    assert.equal(
+      later.eligibility.eligibilityId,
+      first.eligibility.eligibilityId,
+    );
+    assert.deepEqual(later.reward, { outcome: "launch_not_configured" });
+    await assertNoRewardIntents(sql);
+  });
+
   test("concurrent distinct trusted events create one eligibility, reward, workflow, and protected operation", async () => {
     const service = serviceAt(sql, LAUNCH_AT + 1);
     const results = await Promise.all(
@@ -443,6 +492,19 @@ function serviceAt(sql: DatabaseClient, now: number): EligibilityRewardService {
     officialLaunchAt: "2026-10-08T00:00:00.000Z",
     now: () => now,
   });
+}
+
+async function assertNoRewardIntents(sql: DatabaseClient): Promise<void> {
+  const [counts] = await sql<
+    { rewards: string; workflows: string; operations: string }[]
+  >`
+    SELECT
+      (SELECT count(*)::text FROM reward_records) AS rewards,
+      (SELECT count(*)::text FROM workflow_intents) AS workflows,
+      (SELECT count(*)::text FROM protected_operation_intents) AS operations
+  `;
+  assert.deepEqual(counts, { rewards: "0", workflows: "0", operations: "0" });
+  assert.equal(await new PostgresAuditRepository(sql).verifyChain(), true);
 }
 
 function qualifyingEvent(
