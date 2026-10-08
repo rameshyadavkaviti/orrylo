@@ -53,6 +53,7 @@ if (!TEST_DATABASE_URL) {
       TRUNCATE TABLE
         protected_operation_intents,
         reward_records,
+        token_creation_qualifying_events,
         eligibility_records,
         audit_events,
         workflow_intents,
@@ -74,6 +75,7 @@ if (!TEST_DATABASE_URL) {
     assert.deepEqual(result.verified, [
       "001_application_persistence.sql",
       "002_reward_wallet_type_uniqueness.sql",
+      "003_eligibility_reward_workflow.sql",
     ]);
 
     const [{ count }] = await sql<{ count: string }[]>`
@@ -87,11 +89,12 @@ if (!TEST_DATABASE_URL) {
           'audit_events',
           'eligibility_records',
           'reward_records',
-          'protected_operation_intents'
+          'protected_operation_intents',
+          'token_creation_qualifying_events'
         )
     `;
 
-    assert.equal(count, "7");
+    assert.equal(count, "8");
   });
 
   test("challenge persists across repository instances and consumes once", async () => {
