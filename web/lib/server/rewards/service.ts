@@ -32,6 +32,7 @@ import type {
 const AUDIT_CHAIN_ID = "application";
 const WORKFLOW_SCOPE = "rylo:first-token-reward";
 const WORKFLOW_TYPE = "reward_preparation";
+const POSTGRES_TIMESTAMPTZ_MIN_MS = Date.parse("-004713-11-24T00:00:00.000Z");
 
 interface ServiceOptions {
   officialLaunchAt?: string;
@@ -716,7 +717,8 @@ function validateEvent(event: TrustedTokenCreationSucceededEvent):
 
   if (
     !Number.isFinite(event.eventOccurredAt) ||
-    !Number.isFinite(new Date(event.eventOccurredAt).getTime())
+    !Number.isFinite(new Date(event.eventOccurredAt).getTime()) ||
+    event.eventOccurredAt < POSTGRES_TIMESTAMPTZ_MIN_MS
   ) {
     return { ok: false, code: "invalid_event_timestamp" };
   }
