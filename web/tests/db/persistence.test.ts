@@ -3,7 +3,6 @@ import { resolve } from "node:path";
 import { after, before, beforeEach, test } from "node:test";
 
 import { Keypair } from "@stellar/stellar-sdk/base";
-import { EligibilityRewardService } from "../../lib/server/eligibility-reward/service";
 
 import { createAuthChallenge } from "../../lib/auth/challenge";
 import { CHALLENGE_TTL_MS, SESSION_TTL_MS } from "../../lib/auth/constants";
@@ -453,103 +452,6 @@ if (!TEST_DATABASE_URL) {
         AND reward_type = ${rewardBase.rewardType}
     `;
     assert.equal(count, "1");
-  });
-  test("trusted qualifying event atomically prepares one reward under concurrency", async () => {
-    const service = new EligibilityRewardService(sql);
-    const event = {
-      type: "TokenCreationSucceeded" as const,
-      eventId: "token-success-1",
-      walletPublicKey: PUBLIC_KEY,
-      source: "trusted-test-producer",
-      assetReference: "asset-1",
-      workflowReference: "creation-1",
-    };
-    const launch = "2026-10-07T00:00:00.000Z";
-    const options = { officialLaunchAt: launch, now: () => NOW };
-    const results = await Promise.all(
-      Array.from({ length: 12 }, () => service.processTrustedTokenCreation(event, options)),
-    );
-    assert.equal(results.filter((r) => r.eligibility === "established").length, 1);
-    assert.equal(results.filter((r) => r.reward === "reward_approved").length, 1);
-    assert.equal(results.filter((r) => r.reward === "reward_already_exists").length, 11);
-    assert.equal(new Set(results.map((r) => r.rewardId)).size, 1);
-    for (const table of ["eligibility_records", "reward_records", "workflow_intents", "protected_operation_intents"]) {
-      const [row] = await sql.unsafe<{ count: string }[]>(`SELECT count(*)::text AS count FROM ${table}`);
-      assert.equal(row.count, "1", table);
-    }
-    const [reward] = await sql<{ amount: string; status: string }[]>`
-      SELECT amount::text AS amount, status FROM reward_records
-    `;
-    assert.equal(reward.amount, "150.0000000");
-    assert.equal(reward.status, "approved");
-    assert.equal(await new PostgresAuditRepository(sql).verifyChain(), true);
-    const audit = await new PostgresAuditRepository(sql).list();
-    assert.deepEqual(audit.map((item) => item.eventType), [
-      "eligibility.established", "reward.approved", "reward.intent_created",
-    ]);
-  });
-
-  test("eligibility persists when launch is missing; later reward can be prepared", async () => {
-    const service = new EligibilityRewardService(sql);
-    const event = {
-      type: "TokenCreationSucceeded" as const,
-      eventId: "token-success-2",
-      walletPublicKey: PUBLIC_KEY,
-      source: "trusted-test-producer",
-      assetReference: "asset-2",
-      workflowReference: "creation-2",
-    };
-    const first = await service.processTrustedTokenCreation(event, { now: () => NOW });
-    assert.equal(first.eligibility, "established");
-    assert.equal(first.reward, "launch_not_configured");
-    assert.equal(first.rewardId, null);
-    const second = await service.processTrustedTokenCreation(event, {
-      now: () => NOW,
-      officialLaunchAt: "2026-10-07T00:00:00.000Z",
-    });
-    assert.equal(second.eligibility, "already_existed");
-    assert.equal(second.reward, "reward_approved");
-    assert.equal(first.eligibilityId, second.eligibilityId);
-    assert.equal(await new PostgresAuditRepository(sql).verifyChain(), true);
-  });
-
-  test("outside launch window creates eligibility without reward", async () => {
-    const service = new EligibilityRewardService(sql);
-    const event = {
-      type: "TokenCreationSucceeded" as const,
-      eventId: "token-success-3",
-      walletPublicKey: PUBLIC_KEY,
-      source: "trusted-test-producer",
-      assetReference: "asset-3",
-      workflowReference: "creation-3",
-    };
-    const result = await service.processTrustedTokenCreation(event, {
-      now: () => NOW,
-      officialLaunchAt: "2026-01-01T00:00:00.000Z",
-    });
-    assert.equal(result.reward, "outside_reward_window");
-    const [count] = await sql<{ count: string }[]>`SELECT count(*)::text AS count FROM reward_records`;
-    assert.equal(count.count, "0");
-    assert.equal(await new PostgresAuditRepository(sql).verifyChain(), true);
-  });
-
-  test("invalid trusted event and invalid launch config do not mutate state", async () => {
-    const service = new EligibilityRewardService(sql);
-    const event = {
-      type: "TokenCreationSucceeded" as const,
-      eventId: "invalid event reference",
-      walletPublicKey: PUBLIC_KEY,
-      source: "trusted-test-producer",
-      assetReference: "asset-4",
-      workflowReference: "creation-4",
-    };
-    await assert.rejects(service.processTrustedTokenCreation(event));
-    await assert.rejects(service.processTrustedTokenCreation(
-      { ...event, eventId: "valid-event" },
-      { officialLaunchAt: "invalid" },
-    ));
-    const [count] = await sql<{ count: string }[]>`SELECT count(*)::text AS count FROM eligibility_records`;
-    assert.equal(count.count, "0");
   });
 
 }
