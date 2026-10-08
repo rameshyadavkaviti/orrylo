@@ -166,10 +166,15 @@ Approved first-prototype baseline:
 
 These are prototype choices, not permanent production-provider commitments.
 
+Decided for the first prototype:
+
+- the public prototype application is served directly from `orrylo.com`;
+- `app.orrylo.com` is not required for the prototype.
+
 Still open:
 
 - final production deployment provider configuration;
-- exact DNS/wildcard setup;
+- exact DNS/wildcard setup beyond the prototype root-domain deployment;
 - custom-domain onboarding flow;
 - whether every dedicated asset receives a subdomain automatically in v1.
 
