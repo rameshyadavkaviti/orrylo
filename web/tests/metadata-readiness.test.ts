@@ -44,7 +44,7 @@ test("readiness marks missing issuer while keeping generated/published/reachable
   assert.equal(readiness.toml.published, false);
   assert.equal(readiness.toml.reachable, false);
   assert.equal(byKey.issuer_linkage?.value, "Not linked");
-  assert.equal(byKey.toml_generated?.value, "Generated locally");
+  assert.equal(byKey.toml_generated?.value, "Yes");
   assert.equal(byKey.toml_published?.value, "No");
   assert.equal(byKey.toml_reachable?.value, "No");
   assert.equal(byKey.explorer_visibility?.state, "unverified");
