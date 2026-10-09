@@ -13,6 +13,7 @@ const EXPECTED_TABLES = [
   "reward_records",
   "protected_operation_intents",
   "token_creation_qualifying_events",
+  "project_profiles",
 ] as const;
 
 const EXPECTED_ELIGIBILITY_REWARD_CONSTRAINTS = [
