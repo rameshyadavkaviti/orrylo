@@ -21,7 +21,9 @@ export interface NormalizedProjectMetadata {
 }
 
 export type ProjectMetadataField = keyof EditableProjectMetadataInput;
-export type ProjectMetadataErrors = Partial<Record<ProjectMetadataField, string>>;
+export type ProjectMetadataErrors = Partial<
+  Record<ProjectMetadataField, string>
+>;
 
 export interface ProjectMetadataValidationResult {
   valid: boolean;
