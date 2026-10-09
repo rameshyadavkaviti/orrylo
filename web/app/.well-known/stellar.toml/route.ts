@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
 
+import {
+  renderSharedTestnetToml,
+  type MetadataPublicationState,
+} from "../../lib/projects/metadata-publication";
 import { SHARED_ASSET_DOMAIN } from "../../lib/product/constants";
 import { getDatabaseClient } from "../../lib/server/persistence/database";
 import { PostgresMetadataPublicationRepository } from "../../lib/server/persistence/metadata-publication-repository";
@@ -7,12 +11,25 @@ import { PostgresMetadataPublicationRepository } from "../../lib/server/persiste
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+export interface SharedTomlRouteDependencies {
+  listPublications(): Promise<MetadataPublicationState[]>;
+}
+
 export async function GET() {
   const repository = new PostgresMetadataPublicationRepository(
     getDatabaseClient(),
   );
-  const publications = await repository.listSharedTestnetPublications();
-  const content = publications.map((item) => item.currencyToml).join("\n");
+
+  return handleSharedTomlRequest({
+    listPublications: () => repository.listSharedTestnetPublications(),
+  });
+}
+
+export async function handleSharedTomlRequest(
+  dependencies: SharedTomlRouteDependencies,
+) {
+  const publications = await dependencies.listPublications();
+  const content = renderSharedTestnetToml(publications);
   const etag = createHash("sha256").update(content, "utf8").digest("hex");
 
   return new Response(content, {
