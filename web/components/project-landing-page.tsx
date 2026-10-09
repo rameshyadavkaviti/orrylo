@@ -95,7 +95,9 @@ export function ProjectLandingPage({
           <div>
             <span>Network</span>
             <strong>
-              {project.network === "public" ? "Stellar Public" : "Stellar Testnet"}
+              {project.network === "public"
+                ? "Stellar Public"
+                : "Stellar Testnet"}
             </strong>
           </div>
           <div>
@@ -112,7 +114,10 @@ export function ProjectLandingPage({
           </div>
         </section>
 
-        <section id="about" className="project-public-section project-public-about">
+        <section
+          id="about"
+          className="project-public-section project-public-about"
+        >
           <div>
             <span className="project-public-section-kicker">About</span>
             <h2>Built to be understood, shared, and developed further.</h2>
@@ -159,7 +164,10 @@ export function ProjectLandingPage({
           </div>
         </section>
 
-        <section id="project" className="project-public-section project-public-project-grid">
+        <section
+          id="project"
+          className="project-public-section project-public-project-grid"
+        >
           <article className="project-public-card">
             <span className="project-public-section-kicker">Project details</span>
             <h2>{project.displayName}</h2>
@@ -170,12 +178,20 @@ export function ProjectLandingPage({
             </p>
             <div className="project-public-links">
               {project.websiteUrl ? (
-                <a href={project.websiteUrl} target="_blank" rel="noreferrer">
+                <a
+                  href={project.websiteUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Website ↗
                 </a>
               ) : null}
               {project.communityUrl ? (
-                <a href={project.communityUrl} target="_blank" rel="noreferrer">
+                <a
+                  href={project.communityUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Community ↗
                 </a>
               ) : null}
