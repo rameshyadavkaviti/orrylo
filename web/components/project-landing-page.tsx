@@ -1,14 +1,35 @@
 import Link from "next/link";
 
+import type { MetadataPublicationState } from "../lib/projects/metadata-publication";
 import { safeHttpsUrl } from "../lib/projects/project-metadata";
 import type { ProjectProfile } from "../lib/projects/project-profile";
+import { generateProjectCurrencyToml } from "../lib/projects/stellar-toml";
 
-export function ProjectLandingPage({ project }: { project: ProjectProfile }) {
+export function ProjectLandingPage({
+  project,
+  metadataPublication = null,
+}: {
+  project: ProjectProfile;
+  metadataPublication?: MetadataPublicationState | null;
+}) {
   const initial = project.assetCode.slice(0, 1);
   const logoUrl = safeHttpsUrl(project.logoUrl);
   const websiteUrl = safeHttpsUrl(project.websiteUrl);
   const communityUrl = safeHttpsUrl(project.communityUrl);
   const explorerUrl = safeHttpsUrl(project.explorerUrl);
+  const generatedToml = generateProjectCurrencyToml(project);
+  const publishedMetadataCurrent = Boolean(
+    metadataPublication &&
+      generatedToml &&
+      metadataPublication.currencyToml === generatedToml.content,
+  );
+  const tomlStatus = !metadataPublication
+    ? "Not published"
+    : !publishedMetadataCurrent
+      ? "Published; update available"
+      : metadataPublication.reachable
+        ? "Published and reachable"
+        : "Published; reachability not verified";
 
   return (
     <div className="project-public-page">
@@ -226,7 +247,7 @@ export function ProjectLandingPage({ project }: { project: ProjectProfile }) {
               </div>
               <div>
                 <dt>TOML status</dt>
-                <dd>Not published by this prototype</dd>
+                <dd>{tomlStatus}</dd>
               </div>
             </dl>
           </article>
