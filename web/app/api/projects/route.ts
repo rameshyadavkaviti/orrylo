@@ -17,6 +17,10 @@ import {
 } from "../../../lib/projects/project-profile";
 import { getDatabaseClient } from "../../../lib/server/persistence/database";
 import {
+  InvalidStellarPublicKeyError,
+  normalizeWalletPublicKey,
+} from "../../../lib/server/persistence/wallet";
+import {
   ManagedProjectCreationError,
   ManagedProjectService,
 } from "../../../lib/server/projects/managed-project-service";
@@ -87,6 +91,26 @@ export async function handleCreateManagedProject(
 
   if (!input) {
     return failure("invalid_request", 400);
+  }
+
+  if (input.authenticatedWalletAssertion) {
+    let assertedWallet: string;
+
+    try {
+      assertedWallet = normalizeWalletPublicKey(
+        input.authenticatedWalletAssertion,
+      );
+    } catch (error) {
+      if (error instanceof InvalidStellarPublicKeyError) {
+        return failure("invalid_request", 400);
+      }
+
+      throw error;
+    }
+
+    if (assertedWallet !== session.publicKey) {
+      return failure("wallet_session_changed", 409);
+    }
   }
 
   try {

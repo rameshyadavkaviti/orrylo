@@ -15,6 +15,7 @@ import {
 
 const OWNER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 41)).publicKey();
 const OTHER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 42)).publicKey();
+const THIRD = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 43)).publicKey();
 const PROJECT_ID = "c4a9fbd2-31b1-4bbd-b0cb-e7f0a6a9b610";
 const SESSION = {
   publicKey: OWNER,
@@ -86,6 +87,7 @@ test("managed project creation derives owner from the authenticated session", as
       code: "NOVA",
       displayName: "Nova",
       description: "Demo",
+      authenticatedWalletAssertion: OWNER,
       ownerPublicKey: OTHER,
     }),
     dependencies,
@@ -97,6 +99,68 @@ test("managed project creation derives owner from the authenticated session", as
   assert.equal(payload.managePath, `/my-assets/${PROJECT_ID}`);
   assert.equal(payload.publicPath, "/p/nova");
   assert.equal(payload.publicStatus, "draft");
+});
+
+test("wallet continuity mismatch is rejected before managed project creation", async () => {
+  let called = false;
+  const sessionB = { ...SESSION, publicKey: OTHER };
+  const dependencies: CreateProjectRouteDependencies = {
+    authDomain: "app.orrylo.com",
+    getSession: async () => sessionB,
+    createProject: async () => {
+      called = true;
+      throw new Error("must not run");
+    },
+  };
+
+  const response = await handleCreateManagedProject(
+    createRequest({
+      idempotencyKey: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      code: "NOVA",
+      displayName: "Nova",
+      description: "Frozen under wallet A.",
+      authenticatedWalletAssertion: OWNER,
+    }),
+    dependencies,
+  );
+
+  assert.equal(response.status, 409);
+  assert.deepEqual(await response.json(), {
+    ok: false,
+    code: "wallet_session_changed",
+  });
+  assert.equal(called, false);
+});
+
+test("an arbitrary wallet continuity assertion cannot select project ownership", async () => {
+  let called = false;
+  const sessionB = { ...SESSION, publicKey: OTHER };
+  const dependencies: CreateProjectRouteDependencies = {
+    authDomain: "app.orrylo.com",
+    getSession: async () => sessionB,
+    createProject: async () => {
+      called = true;
+      throw new Error("must not run");
+    },
+  };
+
+  const response = await handleCreateManagedProject(
+    createRequest({
+      idempotencyKey: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      code: "NOVA",
+      displayName: "Nova",
+      description: "Cannot choose a different owner.",
+      authenticatedWalletAssertion: THIRD,
+    }),
+    dependencies,
+  );
+
+  assert.equal(response.status, 409);
+  assert.deepEqual(await response.json(), {
+    ok: false,
+    code: "wallet_session_changed",
+  });
+  assert.equal(called, false);
 });
 
 test("publish boundary also binds the operation to the authenticated owner", async () => {

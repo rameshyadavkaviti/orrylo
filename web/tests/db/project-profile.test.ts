@@ -5,6 +5,12 @@ import { after, before, beforeEach, test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { Keypair } from "@stellar/stellar-sdk/base";
+import { NextRequest } from "next/server";
+
+import {
+  handleCreateManagedProject,
+  type CreateProjectRouteDependencies,
+} from "../../app/api/projects/route";
 
 import { ProjectLandingPage } from "../../components/project-landing-page";
 import { createDatabaseClient } from "../../lib/server/persistence/database";
@@ -109,6 +115,118 @@ if (!TEST_DATABASE_URL) {
         ?.projectId,
       result.project.projectId,
     );
+  });
+
+  test("wallet-session mismatch has zero project side effects and restored wallet A reuses the logical save", async () => {
+    const service = new ManagedProjectService(sql, {
+      network: "testnet",
+      now: () => NOW,
+    });
+    const idempotencyKey = "abababab-abab-4bab-8bab-abababababab";
+    const body = {
+      idempotencyKey,
+      code: "NOVA",
+      displayName: "Nova Continuity",
+      description: "Frozen after wallet A authentication.",
+      authenticatedWalletAssertion: OWNER,
+    };
+
+    function request() {
+      return new NextRequest("https://app.orrylo.com/api/projects", {
+        method: "POST",
+        headers: {
+          Origin: "https://app.orrylo.com",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+    }
+
+    function dependencies(sessionPublicKey: string): CreateProjectRouteDependencies {
+      return {
+        authDomain: "app.orrylo.com",
+        getSession: async () => ({
+          publicKey: sessionPublicKey,
+          createdAt: NOW,
+          expiresAt: NOW + 60_000,
+        }),
+        createProject: (ownerPublicKey, input) =>
+          service.createManagedProject({ ownerPublicKey, ...input }),
+      };
+    }
+
+    const mismatched = await handleCreateManagedProject(
+      request(),
+      dependencies(OTHER),
+    );
+
+    assert.equal(mismatched.status, 409);
+    assert.deepEqual(await mismatched.json(), {
+      ok: false,
+      code: "wallet_session_changed",
+    });
+
+    const [{ projectsAfterMismatch }] = await sql<
+      { projectsAfterMismatch: string }[]
+    >`
+      SELECT count(*)::text AS "projectsAfterMismatch"
+      FROM project_profiles
+    `;
+    const [{ ownersAfterMismatch }] = await sql<
+      { ownersAfterMismatch: string }[]
+    >`
+      SELECT count(*)::text AS "ownersAfterMismatch"
+      FROM project_profile_owners
+    `;
+    const [{ workflowsAfterMismatch }] = await sql<
+      { workflowsAfterMismatch: string }[]
+    >`
+      SELECT count(*)::text AS "workflowsAfterMismatch"
+      FROM workflow_intents
+      WHERE workflow_scope = 'project:managed-create'
+    `;
+
+    assert.equal(projectsAfterMismatch, "0");
+    assert.equal(ownersAfterMismatch, "0");
+    assert.equal(workflowsAfterMismatch, "0");
+
+    const restored = await handleCreateManagedProject(
+      request(),
+      dependencies(OWNER),
+    );
+    const restoredPayload = await restored.json();
+
+    assert.equal(restored.status, 201);
+    assert.equal(restoredPayload.ok, true);
+
+    const retried = await handleCreateManagedProject(
+      request(),
+      dependencies(OWNER),
+    );
+    const retriedPayload = await retried.json();
+
+    assert.equal(retried.status, 200);
+    assert.equal(retriedPayload.projectId, restoredPayload.projectId);
+
+    const [{ projects }] = await sql<{ projects: string }[]>`
+      SELECT count(*)::text AS projects
+      FROM project_profiles
+    `;
+    const [{ owners }] = await sql<{ owners: string }[]>`
+      SELECT count(*)::text AS owners
+      FROM project_profile_owners
+      WHERE owner_public_key = ${OWNER}
+    `;
+    const [{ workflows }] = await sql<{ workflows: string }[]>`
+      SELECT count(*)::text AS workflows
+      FROM workflow_intents
+      WHERE workflow_scope = 'project:managed-create'
+        AND subject_public_key = ${OWNER}
+    `;
+
+    assert.equal(projects, "1");
+    assert.equal(owners, "1");
+    assert.equal(workflows, "1");
   });
 
   test("concurrent retry of one logical save creates exactly one project", async () => {

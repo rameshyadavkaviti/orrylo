@@ -50,3 +50,16 @@ export function prepareManagedProjectSave(
     },
   };
 }
+
+export function withWalletContinuityAssertion(
+  pending: PendingManagedProjectSave,
+  authenticatedWalletAssertion: string,
+): PendingManagedProjectSave {
+  return {
+    normalizedDraft: pending.normalizedDraft,
+    request: {
+      ...pending.request,
+      authenticatedWalletAssertion,
+    },
+  };
+}

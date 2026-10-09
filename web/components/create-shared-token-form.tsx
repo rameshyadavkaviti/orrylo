@@ -10,6 +10,7 @@ import type {
 import {
   prepareManagedProjectSave,
   type PendingManagedProjectSave,
+  withWalletContinuityAssertion,
 } from "../lib/projects/pending-managed-project";
 import { SHARED_ASSET_DOMAIN } from "../lib/product/constants";
 import {
@@ -33,6 +34,7 @@ type SaveState =
   | { status: "idle" }
   | { status: "saving" }
   | { status: "needs_wallet" }
+  | { status: "wallet_session_changed" }
   | { status: "failure"; message: string };
 
 export function CreateSharedTokenForm() {
@@ -164,6 +166,16 @@ export function CreateSharedTokenForm() {
         return;
       }
 
+      if (
+        response.status === 409 &&
+        result &&
+        !result.ok &&
+        result.code === "wallet_session_changed"
+      ) {
+        setSaveState({ status: "wallet_session_changed" });
+        return;
+      }
+
       if (!response.ok || !result || !result.ok) {
         setSaveState({
           status: "failure",
@@ -182,7 +194,7 @@ export function CreateSharedTokenForm() {
     }
   }
 
-  async function continueAfterAuthentication() {
+  async function continueAfterAuthentication(publicKey: string) {
     const pendingSave = pendingSaveRef.current;
 
     if (!pendingSave) {
@@ -193,7 +205,9 @@ export function CreateSharedTokenForm() {
       return;
     }
 
-    await persistProject(pendingSave);
+    await persistProject(
+      withWalletContinuityAssertion(pendingSave, publicKey),
+    );
   }
 
   const previewCode = draft.code.trim().toUpperCase() || "TOKEN";
@@ -478,16 +492,19 @@ export function CreateSharedTokenForm() {
                 : "Save & manage project"}
             </button>
 
-            {saveState.status === "needs_wallet" ? (
+            {saveState.status === "needs_wallet" ||
+            saveState.status === "wallet_session_changed" ? (
               <div className="builder-wallet-boundary">
                 <p>
-                  Connect with Albedo to claim this Project Profile. Your
-                  configured values stay on this page while authentication
-                  completes.
+                  {saveState.status === "wallet_session_changed"
+                    ? "Your wallet session changed before the project could be saved. Reconnect or confirm the wallet that completed this save flow, then retry."
+                    : "Connect with Albedo to claim this Project Profile. Your configured values stay on this page while authentication completes."}
                 </p>
                 <WalletAuthControl
                   connectLabel="Connect wallet & save"
-                  onAuthenticated={() => void continueAfterAuthentication()}
+                  onAuthenticated={(publicKey) =>
+                    void continueAfterAuthentication(publicKey)
+                  }
                 />
               </div>
             ) : null}
@@ -530,6 +547,8 @@ function describeProjectSaveFailure(
       return "Project saving is temporarily unavailable. Your configuration is still on this page.";
     case "unauthenticated":
       return "Connect your wallet to save and manage this project.";
+    case "wallet_session_changed":
+      return "Your wallet session changed before saving. Reconnect or confirm the wallet that completed this save flow, then retry.";
   }
 }
 
