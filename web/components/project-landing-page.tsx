@@ -2,11 +2,7 @@ import Link from "next/link";
 
 import type { ProjectProfile } from "../lib/projects/project-profile";
 
-export function ProjectLandingPage({
-  project,
-}: {
-  project: ProjectProfile;
-}) {
+export function ProjectLandingPage({ project }: { project: ProjectProfile }) {
   const initial = project.assetCode.slice(0, 1);
 
   return (
@@ -169,29 +165,23 @@ export function ProjectLandingPage({
           className="project-public-section project-public-project-grid"
         >
           <article className="project-public-card">
-            <span className="project-public-section-kicker">Project details</span>
+            <span className="project-public-section-kicker">
+              Project details
+            </span>
             <h2>{project.displayName}</h2>
             <p>
-              This public page is generated from the project&apos;s managed Orrylo
-              Project Profile rather than maintained as a separate source of
-              truth.
+              This public page is generated from the project&apos;s managed
+              Orrylo Project Profile rather than maintained as a separate source
+              of truth.
             </p>
             <div className="project-public-links">
               {project.websiteUrl ? (
-                <a
-                  href={project.websiteUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
+                <a href={project.websiteUrl} target="_blank" rel="noreferrer">
                   Website ↗
                 </a>
               ) : null}
               {project.communityUrl ? (
-                <a
-                  href={project.communityUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
+                <a href={project.communityUrl} target="_blank" rel="noreferrer">
                   Community ↗
                 </a>
               ) : null}
@@ -222,8 +212,12 @@ export function ProjectLandingPage({
         </section>
 
         <section className="project-public-stellar">
-          <span className="project-public-section-kicker">Built on Stellar</span>
-          <h2>Fast, open infrastructure for a project that can keep growing.</h2>
+          <span className="project-public-section-kicker">
+            Built on Stellar
+          </span>
+          <h2>
+            Fast, open infrastructure for a project that can keep growing.
+          </h2>
           <p>
             Orrylo manages the project presentation layer while preserving the
             underlying Stellar asset identity and verifiable network state.
