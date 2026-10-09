@@ -140,6 +140,15 @@ Current reserved issuer candidate:
 
 The address must not be considered active or mainnet-deployed until explicit deployment records exist.
 
+The verified RYLO **Testnet** issuer is separate:
+
+`GDNSIP2SKNJIKN6IG3XZBQMHIKKDET25J33F4R5V6DALKHIUDTVZOPKX`
+
+The prior Testnet candidate
+`GDPKHRFAGZHDJFKLBERV7IXF2XX4TGW6MYYUDGME3MIJ3HES5SGICG5H` is abandoned.
+All Testnet transaction construction and SAC derivation must use the verified
+Testnet issuer.
+
 RYLO-specific authorization and economics are defined in `RYLO_POLICY.md`.
 
 ## 8. Membership authorization
@@ -248,3 +257,20 @@ Routine examples include trustline authorization, approved mint execution, Treas
 Critical operations such as signer rotation, threshold changes, issuer-flag changes, and recovery are intentionally excluded from the routine path and require a manual/local ceremony with recovery-capable participation and explicit audit evidence.
 
 Signer C and the Master Key are not routine operational signers.
+
+For the current Testnet issuer, the final account-level target is:
+
+```text
+Master = 0
+A      = 1
+B      = 1
+C      = 1
+low    = 2
+medium = 2
+high   = 2
+```
+
+The currently verified pre-ceremony Testnet state has Master/A/B/C at weight
+`1`, thresholds `0/0/0`, and all three RYLO authorization/clawback flags off.
+The Master weight may move to `0` only after the multisig path has been tested
+successfully. Routine operation is A+B; A+C or B+C is recovery-only.

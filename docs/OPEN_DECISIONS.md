@@ -63,7 +63,16 @@ Decided:
 - Signer B independently validates canonical transactions against policy;
 - issuer workflows use idempotent request IDs and append-only audit records;
 - security/financial audit retention target is 2 years;
-- operational debug-log retention target is 90 days.
+- operational debug-log retention target is 90 days;
+- the Testnet issuer is
+  `GDNSIP2SKNJIKN6IG3XZBQMHIKKDET25J33F4R5V6DALKHIUDTVZOPKX`;
+- the Testnet signer identities A/B/C are fixed to the public keys recorded in
+  `RYLO_POLICY.md`;
+- the final Testnet account mapping is
+  `Master=0, A=1, B=1, C=1, low=2, medium=2, high=2`;
+- routine protected Testnet operations use A+B;
+- A+C or B+C is recovery-only;
+- Master is disabled only after the multisig path has been tested successfully.
 
 Still open:
 
