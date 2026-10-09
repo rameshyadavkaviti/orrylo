@@ -86,5 +86,8 @@ test("post-authentication retry carries the authenticated wallet only as a conti
     prepared.pending.request.authenticatedWalletAssertion,
     undefined,
   );
-  assert.equal(asserted.request.idempotencyKey, prepared.pending.request.idempotencyKey);
+  assert.equal(
+    asserted.request.idempotencyKey,
+    prepared.pending.request.idempotencyKey,
+  );
 });
