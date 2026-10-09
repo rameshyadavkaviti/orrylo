@@ -21,18 +21,15 @@ const PUBLICATION: Pick<
 test("shared metadata verifier uses only the fixed canonical HTTPS endpoint", async () => {
   let observedUrl = "";
   let observedRedirect: RequestRedirect | undefined;
-  const verifier = new FixedSharedMetadataVerifier(
-    async (input, init) => {
-      observedUrl = input.toString();
-      observedRedirect = init?.redirect;
+  const verifier = new FixedSharedMetadataVerifier(async (input, init) => {
+    observedUrl = input.toString();
+    observedRedirect = init?.redirect;
 
-      return new Response(PUBLICATION.currencyToml, {
-        status: 200,
-        headers: { "Content-Type": "text/plain; charset=utf-8" },
-      });
-    },
-    1_000,
-  );
+    return new Response(PUBLICATION.currencyToml, {
+      status: 200,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }, 1_000);
 
   assert.deepEqual(await verifier.verify(PUBLICATION), { ok: true });
   assert.match(observedUrl, new RegExp(`^${SHARED_METADATA_TOML_ENDPOINT}`));
