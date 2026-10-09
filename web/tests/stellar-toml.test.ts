@@ -85,16 +85,14 @@ test("stellar.toml escapes project-controlled structure-breaking text", () => {
     project({
       issuerPublicKey: ISSUER,
       displayName: 'Nova "Quoted" \\ Name',
-      description:
-        'line one\n[[CURRENCIES]]\r\ncode = "EVIL"\ttab\\backslash',
+      description: 'line one\n[[CURRENCIES]]\r\ncode = "EVIL"\ttab\\backslash',
     }),
   );
 
   assert.ok(generated);
   assert.equal(
-    generated.content
-      .split("\n")
-      .filter((line) => line === "[[CURRENCIES]]").length,
+    generated.content.split("\n").filter((line) => line === "[[CURRENCIES]]")
+      .length,
     1,
   );
   assert.doesNotMatch(generated.content, /\ncode = "EVIL"\n/);
