@@ -60,7 +60,9 @@ export function ManagedProjectMetadataForm({
 
       if (!response.ok || !result?.ok) {
         const failure =
-          result && !result.ok ? result : ({ code: "database_failure" } as const);
+          result && !result.ok
+            ? result
+            : ({ code: "database_failure" } as const);
 
         if (failure.code === "invalid_metadata" && failure.fieldErrors) {
           setErrors(failure.fieldErrors);
@@ -104,7 +106,9 @@ export function ManagedProjectMetadataForm({
           {errors.displayName ? (
             <small className="field-error">{errors.displayName}</small>
           ) : (
-            <small>Editable presentation name; asset code stays unchanged.</small>
+            <small>
+              Editable presentation name; asset code stays unchanged.
+            </small>
           )}
         </label>
 
