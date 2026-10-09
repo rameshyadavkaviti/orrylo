@@ -67,8 +67,11 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Check formatting
-        run: npm run format:check
+      - name: Diagnose formatting
+        run: |
+          npm run format
+          git diff -- app/prototype.css components/managed-project-metadata-form.tsx components/project-landing-page.tsx lib/projects/managed-project-metadata-api.ts lib/projects/metadata-readiness.ts lib/projects/project-metadata.ts lib/projects/stellar-toml.ts
+          exit 1
 
       - name: Lint
         run: npm run lint
