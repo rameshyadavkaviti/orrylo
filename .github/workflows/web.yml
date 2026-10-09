@@ -67,8 +67,11 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Check formatting
-        run: npm run format:check
+      - name: Diagnose formatting
+        run: |
+          npm run format
+          git diff -- app/api/projects/[projectId]/publish/route.ts app/api/projects/route.ts app/my-assets/page.tsx app/prototype.css components/create-shared-token-form.tsx components/publish-project-control.tsx tests/project-profile.test.tsx tests/project-slug.test.ts
+          exit 1
 
       - name: Lint
         run: npm run lint
