@@ -451,6 +451,6 @@ if (!TEST_DATABASE_URL) {
     assert.match(html, /Persisted public project data/);
     assert.match(html, /\/p\/nova/);
     assert.match(html, /TOML status/i);
-    assert.match(html, /Not published by this prototype/i);
+    assert.match(html, /Not published/i);
   });
 }
