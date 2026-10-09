@@ -24,7 +24,6 @@ export interface UpdateProjectMetadataFailure {
 }
 
 export type UpdateProjectMetadataResponse =
-  | UpdateProjectMetadataSuccess
-  | UpdateProjectMetadataFailure;
+  UpdateProjectMetadataSuccess | UpdateProjectMetadataFailure;
 
 export type UpdateProjectMetadataRequest = EditableProjectMetadataInput;
