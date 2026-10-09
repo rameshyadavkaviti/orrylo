@@ -102,7 +102,7 @@ export function mapMetadataPublication(
     issuerPublicKey: row.issuer_public_key.trim(),
     currencyToml: row.currency_toml,
     contentHash: row.content_hash.trim(),
-    revision: row.revision,
+    revision: Number(row.revision),
     publishedAt: row.published_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
     reachable: row.reachable,
