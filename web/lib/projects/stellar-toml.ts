@@ -53,9 +53,7 @@ export function hasValidStellarIssuer(
   return Boolean(normalizedIssuer(publicKey));
 }
 
-function normalizedIssuer(
-  publicKey: string | null | undefined,
-): string | null {
+function normalizedIssuer(publicKey: string | null | undefined): string | null {
   if (!publicKey) {
     return null;
   }
