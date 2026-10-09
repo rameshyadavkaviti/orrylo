@@ -318,6 +318,87 @@ Important status:
 - The `ORRYLO` suffix is branding only and provides no additional cryptographic security.
 - The Shared Issuer for user assets must be a separate account.
 
+### 16.1 RYLO Testnet issuer status
+
+The verified RYLO Testnet issuer is:
+
+```
+GDNSIP2SKNJIKN6IG3XZBQMHIKKDET25J33F4R5V6DALKHIUDTVZOPKX
+```
+
+The previously considered Testnet account
+`GDPKHRFAGZHDJFKLBERV7IXF2XX4TGW6MYYUDGME3MIJ3HES5SGICG5H` is
+**abandoned**. It must not be treated as the RYLO Testnet issuer and must not be
+used for RYLO SAC derivation or deployment evidence.
+
+Verified current Testnet issuer state:
+
+- Master signer: weight **1**;
+- Signer A — Operational:
+  `GB5V6M5EQGDWVDH66ZX6GF2NOJADUDU6ZWKEZJCZZNXUBSYLBHZIM2F3`, weight **1**;
+- Signer B — Owner / policy co-signer:
+  `GC52EXPMDMAQ3WDPGAW2MJJOS5FAUNLE2KHPAESJUWZ4NETVYSWTJZR5`, weight **1**;
+- Signer C — Recovery:
+  `GBWRVDTU4KTNTIPASSBPFGLGYUFOBI4TZPVKHGA3D23QIXLHY7XT2F3T`, weight **1**;
+- low / medium / high thresholds: **0 / 0 / 0**;
+- `AUTH_REQUIRED`: **OFF**;
+- `AUTH_REVOCABLE`: **OFF**;
+- `AUTH_CLAWBACK`: **OFF**;
+- no RYLO has intentionally been minted.
+
+The locked final **Testnet** signer/threshold target is:
+
+```text
+Master = 0
+A      = 1
+B      = 1
+C      = 1
+low    = 2
+medium = 2
+high   = 2
+```
+
+Operational interpretation:
+
+- routine protected operations require **A + B**;
+- recovery may use **A + C** or **B + C** only under the recovery procedure;
+- no individual signer may independently authorize issuer operations.
+
+Required Testnet safety sequence:
+
+1. Keep the Master signer at weight **1** during initial configuration.
+2. Configure A, B, C and the intended low/medium/high thresholds.
+3. Successfully test and prove the routine **A + B** authorization path.
+4. Only after the **A + B** test succeeds may the Master signer be reduced to
+   weight **0**.
+
+Testing **A + C** or **B + C** does not satisfy step 3 because those paths are
+recovery-only.
+
+The approved RYLO issuer flags remain:
+
+```text
+AUTH_REQUIRED  = ON
+AUTH_REVOCABLE = ON
+AUTH_CLAWBACK  = OFF
+```
+
+Initial RYLO supply remains **0**.
+
+For the Classic Stellar asset
+`RYLO:GDNSIP2SKNJIKN6IG3XZBQMHIKKDET25J33F4R5V6DALKHIUDTVZOPKX` on Testnet,
+the deterministic Stellar Asset Contract address is:
+
+```
+CAPB6JBF466Y6TY4UBAQDSN24KTILN2R2CLINBGJSIGS5BTTEEDW3GMI
+```
+
+This deterministic address is identity/provenance evidence only; it is not by
+itself evidence that the SAC has been deployed. The obsolete SAC
+`CARDQUIZNFA56T4SNDNLG6WNIZQU2JIGPNOGXOCIL4CKECFNE6VFNMB3`, derived from
+the abandoned `GDPKHR...` Testnet candidate, must not be used as RYLO Testnet
+deployment evidence.
+
 ## 17. Implementation status
 
 Current phase: **Eligibility + Reward Workflow Foundation**.
@@ -394,7 +475,17 @@ This foundation does **not** implement:
 - upgradeability or emergency controls;
 - testnet or mainnet deployment.
 
-No production issuer configuration, RYLO supply rule, testnet deployment, or mainnet deployment should be inferred merely from the presence of the contract workspace.
+The Testnet RYLO issuer account and the three named non-master signers now exist
+as verified public Testnet state. However, thresholds remain `0/0/0`, the
+Master signer still has weight `1`, the approved issuer flags are not yet set,
+no RYLO has intentionally been minted, and no RYLO SAC deployment has been
+recorded. This is **partial Testnet issuer preparation**, not a completed RYLO
+Testnet deployment.
+
+No mainnet issuer configuration, RYLO supply enforcement, completed Testnet
+issuer ceremony, SAC deployment, or mainnet deployment should be inferred
+merely from the presence of the contract/application workspace or the partial
+Testnet account setup.
 
 ## 18. Canonical companion documents
 

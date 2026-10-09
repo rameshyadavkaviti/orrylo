@@ -51,13 +51,22 @@ Raise the unresolved decision explicitly instead.
 
 The RYLO issuer and customer Shared Issuer are separate accounts.
 
-Current RYLO issuer candidate:
+Reserved non-Testnet RYLO issuer candidate:
 
 `GCKB453UWEFLJQY4TVW7I7NZV3ZNVUCZZS6KKIKJZVF75WM2VEORRYLO`
 
-Do not use it for customer Shared Issuer assets.
+Verified RYLO Testnet issuer:
 
-The address is a reserved candidate, not proof of mainnet deployment.
+`GDNSIP2SKNJIKN6IG3XZBQMHIKKDET25J33F4R5V6DALKHIUDTVZOPKX`
+
+The abandoned Testnet candidate
+`GDPKHRFAGZHDJFKLBERV7IXF2XX4TGW6MYYUDGME3MIJ3HES5SGICG5H` must not be
+used as the RYLO Testnet issuer and must not be used for SAC derivation.
+
+Do not use any RYLO issuer for customer Shared Issuer assets.
+
+The vanity `GCKB...ORRYLO` address remains a reserved candidate only, not proof
+of mainnet deployment.
 
 ## 5. No hidden authority
 

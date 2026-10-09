@@ -25,6 +25,26 @@ Reserved RYLO issuer candidate:
 
 This address is a reserved candidate only and must not be represented as a live/testnet/mainnet deployment without explicit deployment evidence.
 
+### Testnet issuer identity
+
+The verified RYLO Testnet issuer is:
+
+`GDNSIP2SKNJIKN6IG3XZBQMHIKKDET25J33F4R5V6DALKHIUDTVZOPKX`
+
+The previous Testnet candidate
+`GDPKHRFAGZHDJFKLBERV7IXF2XX4TGW6MYYUDGME3MIJ3HES5SGICG5H` is abandoned
+and must not be used for Testnet RYLO identity, transaction construction, or SAC
+derivation.
+
+The deterministic Testnet SAC for
+`RYLO:GDNSIP2SKNJIKN6IG3XZBQMHIKKDET25J33F4R5V6DALKHIUDTVZOPKX` is:
+
+`CAPB6JBF466Y6TY4UBAQDSN24KTILN2R2CLINBGJSIGS5BTTEEDW3GMI`
+
+This address does not prove that the SAC has been deployed. The obsolete
+`CARDQUIZNFA56T4SNDNLG6WNIZQU2JIGPNOGXOCIL4CKECFNE6VFNMB3` address belongs
+to the abandoned Testnet candidate and is not RYLO Testnet deployment evidence.
+
 ## 3. Supply model
 
 Approved model: **Hybrid minting with a hard maximum-supply cap**.
@@ -236,6 +256,55 @@ Roles:
 
 Daily trustline authorization remains subject to the two-signature control; it must not be downgraded to a single-signer path merely for convenience.
 
+### Locked Testnet signer mapping
+
+Verified signer identities currently present on the RYLO Testnet issuer:
+
+- Master / issuer key: current weight **1**;
+- Signer A:
+  `GB5V6M5EQGDWVDH66ZX6GF2NOJADUDU6ZWKEZJCZZNXUBSYLBHZIM2F3`, weight **1**;
+- Signer B:
+  `GC52EXPMDMAQ3WDPGAW2MJJOS5FAUNLE2KHPAESJUWZ4NETVYSWTJZR5`, weight **1**;
+- Signer C:
+  `GBWRVDTU4KTNTIPASSBPFGLGYUFOBI4TZPVKHGA3D23QIXLHY7XT2F3T`, weight **1**.
+
+Current Testnet thresholds are **low=0, medium=0, high=0**. These values are
+pre-ceremony state and are not the approved final configuration.
+
+The locked final Testnet account mapping is:
+
+```text
+Master = 0
+A      = 1
+B      = 1
+C      = 1
+low    = 2
+medium = 2
+high   = 2
+```
+
+Interpretation:
+
+- routine protected operations use **A + B**;
+- **A + C** or **B + C** is reserved for an explicit recovery procedure;
+- no individual signer may independently authorize issuer operations.
+
+Required Testnet safety sequence:
+
+1. Keep the Master signer at weight **1** during initial configuration.
+2. Configure A, B, C and the intended low/medium/high thresholds.
+3. Successfully test and prove the routine **A + B** authorization path.
+4. Only after the **A + B** test succeeds may the Master signer be reduced to
+   weight `0`.
+
+A successful **A + C** or **B + C** recovery-path test must not be treated as
+satisfying the prerequisite for Master weight `0`.
+
+This locks the account-level Testnet signer/threshold policy. It does not select
+the final production key-management provider, Signer B service infrastructure,
+master-key storage mechanism, signer-rotation procedure, or recovery ceremony
+implementation.
+
 Approved operational matrix:
 
 - routine financial/authorization operations use **Signer A + Signer B**;
@@ -364,12 +433,19 @@ Orrylo must not advertise or implement guaranteed return, guaranteed yield, prof
 
 ## 17. Not yet implementation evidence
 
-The policies above are approved intent. They do not by themselves prove that Orrylo has:
+The policies above are approved intent. Current verified Testnet evidence is
+limited to the selected issuer account and the presence of Signers A, B, and C
+at weight `1` alongside the Master signer at weight `1`. Testnet thresholds
+remain `0/0/0`, approved issuer flags remain unset, and no RYLO has
+intentionally been minted.
 
-- configured the RYLO issuer;
-- set issuer flags;
-- configured multisig;
+They do not by themselves prove that Orrylo has:
+
+- completed the RYLO issuer multisig/threshold ceremony;
+- set the approved issuer flags;
+- disabled the Master signer for routine operation;
 - deployed signer services;
+- deployed the RYLO SAC;
 - minted any RYLO;
 - created the liquidity pool;
 - funded liquidity with XLM;
