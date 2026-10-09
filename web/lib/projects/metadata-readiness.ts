@@ -103,8 +103,8 @@ export function buildMetadataReadiness(
     testnetSupported;
   const publishedContentCurrent = Boolean(
     publication &&
-      generatedToml &&
-      publication.currencyToml === generatedToml.content,
+    generatedToml &&
+    publication.currencyToml === generatedToml.content,
   );
   const blockers: MetadataReadinessKey[] = [];
 
@@ -282,8 +282,7 @@ export function buildMetadataReadiness(
       label: "Stellar asset",
       state: "not_applicable",
       value: "Not created",
-      detail:
-        "Metadata publication is separate from Stellar asset creation.",
+      detail: "Metadata publication is separate from Stellar asset creation.",
     },
   ];
 
