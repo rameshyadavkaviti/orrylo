@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { ManagedProjectView } from "../components/managed-project-view";
 import { ProjectLandingPage } from "../components/project-landing-page";
 import {
   isValidProjectSlug,
   projectPublicPath,
+  type ManagedProjectProfile,
   type ProjectProfile,
 } from "../lib/projects/project-profile";
 
@@ -47,5 +49,27 @@ test("free landing template renders from Project Profile data", () => {
   assert.match(html, /assets\.orrylo\.com/);
   assert.match(html, /\/p\/nova/);
   assert.match(html, /Built on Stellar/);
-  assert.match(html, /Metadata publication/);
+  assert.match(html, /Metadata context/);
+  assert.match(html, /TOML status/);
+  assert.match(html, /Not published by this prototype/);
+});
+
+test("managed project view keeps ownership, routing, metadata, and on-chain state separate", () => {
+  const managed: ManagedProjectProfile = {
+    ...PROJECT,
+    publicStatus: "draft",
+    ownerPublicKey:
+      "GA6HCMBLTZS5VQ3FPJ4SCA5PXI4D54ZZG6EXOWZOCN2H7P7PVOQC7F3Y",
+  };
+  const html = renderToStaticMarkup(<ManagedProjectView project={managed} />);
+
+  assert.match(html, /Managed Project/i);
+  assert.match(html, new RegExp(managed.projectId));
+  assert.match(html, new RegExp(managed.ownerPublicKey));
+  assert.match(html, /\/p\/nova/);
+  assert.match(html, /Private draft/i);
+  assert.match(html, /TOML publication.*Not published/is);
+  assert.match(html, /Stellar asset.*Not created/is);
+  assert.match(html, /Publish public landing page/i);
+  assert.doesNotMatch(html, /asset created successfully/i);
 });
