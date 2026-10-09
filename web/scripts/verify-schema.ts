@@ -14,9 +14,11 @@ const EXPECTED_TABLES = [
   "protected_operation_intents",
   "token_creation_qualifying_events",
   "project_profiles",
+  "project_profile_owners",
 ] as const;
 
-const EXPECTED_ELIGIBILITY_REWARD_CONSTRAINTS = [
+const EXPECTED_CONSTRAINTS = [
+  "project_profile_owners_wallet_check",
   "eligibility_records_first_token_event_required",
   "eligibility_records_qualifying_event_fk",
   "reward_records_first_token_amount_check",
@@ -53,16 +55,16 @@ async function main() {
     const constraintRows = await sql<{ conname: string }[]>`
       SELECT conname
       FROM pg_constraint
-      WHERE conname = ANY(${EXPECTED_ELIGIBILITY_REWARD_CONSTRAINTS})
+      WHERE conname = ANY(${EXPECTED_CONSTRAINTS})
     `;
     const foundConstraints = new Set(constraintRows.map((row) => row.conname));
-    const missingConstraints = EXPECTED_ELIGIBILITY_REWARD_CONSTRAINTS.filter(
+    const missingConstraints = EXPECTED_CONSTRAINTS.filter(
       (name) => !foundConstraints.has(name),
     );
 
     if (missingConstraints.length > 0) {
       throw new Error(
-        `Missing eligibility/reward constraints: ${missingConstraints.join(", ")}`,
+        `Missing required constraints: ${missingConstraints.join(", ")}`,
       );
     }
 

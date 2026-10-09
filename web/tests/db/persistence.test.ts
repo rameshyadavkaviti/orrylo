@@ -56,6 +56,7 @@ if (!TEST_DATABASE_URL) {
         workflow_intents,
         auth_sessions,
         auth_challenges,
+        project_profile_owners,
         project_profiles
       RESTART IDENTITY CASCADE
     `);
@@ -75,6 +76,7 @@ if (!TEST_DATABASE_URL) {
       "002_reward_wallet_type_uniqueness.sql",
       "003_eligibility_reward_workflow.sql",
       "004_project_profiles.sql",
+      "005_project_profile_ownership.sql",
     ]);
 
     const [{ count }] = await sql<{ count: string }[]>`
@@ -90,11 +92,12 @@ if (!TEST_DATABASE_URL) {
           'reward_records',
           'protected_operation_intents',
           'token_creation_qualifying_events',
-          'project_profiles'
+          'project_profiles',
+          'project_profile_owners'
         )
     `;
 
-    assert.equal(count, "9");
+    assert.equal(count, "10");
   });
 
   test("eligibility reward migration installs evidence integrity constraints", async () => {

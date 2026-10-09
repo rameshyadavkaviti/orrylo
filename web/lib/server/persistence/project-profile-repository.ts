@@ -1,6 +1,13 @@
-import type { ProjectProfile } from "../../projects/project-profile";
-import { isValidProjectSlug } from "../../projects/project-profile";
+import type {
+  ManagedProjectProfile,
+  ProjectProfile,
+} from "../../projects/project-profile";
+import {
+  isValidProjectId,
+  isValidProjectSlug,
+} from "../../projects/project-profile";
 import type { DatabaseClient } from "./database";
+import { normalizeWalletPublicKey } from "./wallet";
 
 interface ProjectProfileRow {
   project_id: string;
@@ -20,6 +27,10 @@ interface ProjectProfileRow {
   public_status: "draft" | "published";
   created_at: Date;
   updated_at: Date;
+}
+
+interface ManagedProjectProfileRow extends ProjectProfileRow {
+  owner_public_key: string;
 }
 
 export interface CreateProjectProfileInput {
@@ -113,6 +124,72 @@ export class PostgresProjectProfileRepository {
 
     return row ? mapProjectProfile(row) : null;
   }
+
+  async findOwnedById(
+    projectId: string,
+    ownerPublicKey: string,
+  ): Promise<ManagedProjectProfile | null> {
+    if (!isValidProjectId(projectId)) {
+      return null;
+    }
+
+    const owner = normalizeWalletPublicKey(ownerPublicKey);
+    const [row] = await this.sql<ManagedProjectProfileRow[]>`
+      SELECT p.*, o.owner_public_key
+      FROM project_profiles AS p
+      INNER JOIN project_profile_owners AS o
+        ON o.project_id = p.project_id
+      WHERE p.project_id = ${projectId}
+        AND o.owner_public_key = ${owner}
+      LIMIT 1
+    `;
+
+    return row ? mapManagedProjectProfile(row) : null;
+  }
+
+  async listOwnedByWallet(
+    ownerPublicKey: string,
+  ): Promise<ManagedProjectProfile[]> {
+    const owner = normalizeWalletPublicKey(ownerPublicKey);
+    const rows = await this.sql<ManagedProjectProfileRow[]>`
+      SELECT p.*, o.owner_public_key
+      FROM project_profiles AS p
+      INNER JOIN project_profile_owners AS o
+        ON o.project_id = p.project_id
+      WHERE o.owner_public_key = ${owner}
+      ORDER BY p.created_at DESC, p.project_id
+    `;
+
+    return rows.map(mapManagedProjectProfile);
+  }
+
+  async publishOwned(
+    projectId: string,
+    ownerPublicKey: string,
+    now = Date.now(),
+  ): Promise<ManagedProjectProfile | null> {
+    if (!isValidProjectId(projectId)) {
+      return null;
+    }
+
+    const owner = normalizeWalletPublicKey(ownerPublicKey);
+    const [row] = await this.sql<ManagedProjectProfileRow[]>`
+      UPDATE project_profiles AS p
+      SET
+        public_status = 'published',
+        updated_at = CASE
+          WHEN p.public_status = 'published' THEN p.updated_at
+          ELSE ${new Date(now)}
+        END
+      FROM project_profile_owners AS o
+      WHERE p.project_id = ${projectId}
+        AND o.project_id = p.project_id
+        AND o.owner_public_key = ${owner}
+      RETURNING p.*, o.owner_public_key
+    `;
+
+    return row ? mapManagedProjectProfile(row) : null;
+  }
 }
 
 function mapProjectProfile(row: ProjectProfileRow): ProjectProfile {
@@ -134,5 +211,14 @@ function mapProjectProfile(row: ProjectProfileRow): ProjectProfile {
     publicStatus: row.public_status,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
+  };
+}
+
+function mapManagedProjectProfile(
+  row: ManagedProjectProfileRow,
+): ManagedProjectProfile {
+  return {
+    ...mapProjectProfile(row),
+    ownerPublicKey: row.owner_public_key.trim(),
   };
 }

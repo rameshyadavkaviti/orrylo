@@ -34,8 +34,10 @@ test("create-token experience offers a meaningful anonymous live builder", () =>
   assert.match(html, /Shared Issuer/i);
   assert.match(html, /Dedicated Issuer/i);
   assert.match(html, /Coming soon/i);
-  assert.match(html, /On-chain boundary/i);
-  assert.match(html, /Continue to on-chain launch/i);
+  assert.match(html, /Ready to manage/i);
+  assert.match(html, /Save &amp; manage project/i);
+  assert.match(html, /does not create a Stellar asset/i);
+  assert.match(html, /On-chain issuance remains a separate later step/i);
   assert.doesNotMatch(html, /Draft only/i);
   assert.doesNotMatch(html, /No on-chain submission/i);
 });
