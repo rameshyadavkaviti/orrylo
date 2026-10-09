@@ -76,8 +76,7 @@ test("post-authentication retry carries the authenticated wallet only as a conti
     return;
   }
 
-  const walletA =
-    "GA6HCMBLTZS5VQ3FPJ4SCA5PXI4D54ZZG6EXOWZOCN2H7P7PVOQC7F3Y";
+  const walletA = "GA6HCMBLTZS5VQ3FPJ4SCA5PXI4D54ZZG6EXOWZOCN2H7P7PVOQC7F3Y";
   const asserted = withWalletContinuityAssertion(prepared.pending, walletA);
 
   assert.equal(asserted.request.authenticatedWalletAssertion, walletA);
