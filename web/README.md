@@ -107,6 +107,12 @@ and instances that share the same database.
 No Albedo implicit-flow token, callback URL, transaction intent, secret key,
 issuer key, or wallet signing key is stored.
 
+Production wallet authentication requires an explicit `ORRYLO_AUTH_DOMAIN`
+matching the hostname users actually visit. Production no longer silently falls
+back to `localhost`; a missing value is a deployment misconfiguration. The
+current public hostname must be updated when Orrylo moves from a temporary
+Railway hostname to the canonical custom domain.
+
 ## Workflow and idempotency foundation
 
 `workflow_intents` provides an inactive generic workflow record with:
@@ -181,10 +187,12 @@ No workflow signs, submits, mints, authorizes, confirms, or moves value.
 
 The primary application shell is customer-facing rather than an engineering
 status dashboard. The homepage leads with token creation and wallet connection,
-then provides direct paths to RYLO and Products & Services. Create Token supports
-a local Shared Issuer draft with Stellar-compatible asset-code validation,
-metadata-domain context, and an explicit preview. It stops before issuance and
-never presents the preview as an on-chain asset.
+then provides direct paths to Products & Services and RYLO. The anonymous token
+builder does not require wallet authentication: visitors can configure asset
+code, display name, description, a browser-local logo preview, Shared Issuer
+infrastructure context, and metadata-domain presentation. The live preview stops
+at one explicit execution boundary and never presents the configuration as an
+on-chain asset.
 
 RYLO presentation reflects the approved membership, 50 RYLO-equivalent Free
 Build Credit, 150 RYLO launch reward, 60-day reward-window, supply, and direct

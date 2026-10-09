@@ -6,7 +6,7 @@ const PRODUCTS = [
     description:
       "Shape a Shared Issuer token identity and preview it before anything goes on-chain.",
     status: "Prototype available",
-    href: "/create-token",
+    href: "/create",
   },
   {
     title: "Metadata & Domain",
@@ -50,7 +50,7 @@ export function ProductsPage() {
             <p className="muted">{product.description}</p>
             {"href" in product ? (
               <Link className="button button-primary" href={product.href}>
-                Open token draft
+                Open token builder
               </Link>
             ) : (
               <button

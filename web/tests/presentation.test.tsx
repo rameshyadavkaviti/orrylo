@@ -7,31 +7,37 @@ import { HomePage } from "../app/page";
 import { ProductsPage } from "../app/products/page";
 import { RyloPage } from "../app/rylo/page";
 
-test("homepage presents Orrylo as a public product prototype", () => {
+test("homepage makes anonymous token building the dominant product journey", () => {
   const html = renderToStaticMarkup(<HomePage />);
 
   assert.match(html, /Create your Stellar token in minutes/i);
   assert.match(html, />Create Token</i);
   assert.match(html, />Connect Wallet</i);
-  assert.match(html, /Explore RYLO/i);
+  assert.match(html, /no wallet connection required/i);
+  assert.match(html, /use the token builder anonymously/i);
   assert.match(html, /Products &amp; Services/i);
-  assert.match(html, /Token issuance.*not enabled/i);
-  assert.doesNotMatch(html, /Runtime status/i);
-  assert.doesNotMatch(html, /Contract Interface/i);
+  assert.match(html, /Explore RYLO/i);
+  assert.match(html, /On-chain token issuance is not enabled/i);
 });
 
-test("create-token experience guides identity, metadata, and safe preview", () => {
+test("create-token experience offers a meaningful anonymous live builder", () => {
   const html = renderToStaticMarkup(<CreateTokenPage />);
 
+  assert.match(html, /Build a Stellar token before you connect anything/i);
+  assert.match(html, /No wallet needed to explore/i);
   assert.match(html, /Token identity/i);
-  assert.match(html, /Metadata/i);
-  assert.match(html, /Preview/i);
+  assert.match(html, /Description/i);
+  assert.match(html, /Logo &amp; presentation/i);
+  assert.match(html, /Infrastructure/i);
+  assert.match(html, /Metadata preview/i);
+  assert.match(html, /Live token preview/i);
   assert.match(html, /Shared Issuer/i);
   assert.match(html, /Dedicated Issuer/i);
   assert.match(html, /Coming soon/i);
-  assert.match(html, /No on-chain submission/i);
-  assert.match(html, /Draft only/i);
-  assert.match(html, /Launch token.*Coming soon/i);
+  assert.match(html, /On-chain boundary/i);
+  assert.match(html, /Continue to on-chain launch/i);
+  assert.doesNotMatch(html, /Draft only/i);
+  assert.doesNotMatch(html, /No on-chain submission/i);
 });
 
 test("RYLO page presents approved membership, credit, and reward policy", () => {

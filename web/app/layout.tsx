@@ -9,7 +9,7 @@ import "./brand.css";
 export const metadata: Metadata = {
   title: "Orrylo — Build on Stellar",
   description:
-    "Create a Stellar token draft, explore RYLO membership, and discover Orrylo products and services.",
+    "Build and preview a Stellar token without connecting a wallet, then explore Orrylo products and RYLO membership.",
   icons: {
     icon: "/brand/orrylo-logo.webp",
     shortcut: "/brand/orrylo-logo.webp",

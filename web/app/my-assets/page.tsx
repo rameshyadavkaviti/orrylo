@@ -16,10 +16,10 @@ export function MyAssetsPage() {
       <div className="empty-state">
         <strong>No issued assets yet</strong>
         <p>
-          Token issuance is not enabled. Start with a draft and preview the
-          identity and Shared Issuer model.
+          Token issuance is not enabled. Start in the anonymous builder and
+          preview the identity and Shared Issuer model.
         </p>
-        <Link className="button button-primary" href="/create-token">
+        <Link className="button button-primary" href="/create">
           Create Token
         </Link>
       </div>

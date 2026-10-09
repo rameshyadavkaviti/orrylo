@@ -3,18 +3,17 @@
 import { useEffect, useState } from "react";
 
 import { albedoAuthAdapter } from "../lib/wallet/albedo-auth-adapter";
+import { describeAuthApiFailure } from "../lib/wallet/auth-messages";
 import { classifyWalletIntentError } from "../lib/wallet/errors";
 
 type WalletAuthState =
-  | { status: "checking" }
   | { status: "disconnected" }
   | { status: "requesting_challenge" }
   | { status: "awaiting_wallet" }
   | { status: "verifying" }
   | { status: "authenticated"; publicKey: string }
   | { status: "rejected" }
-  | { status: "expired" }
-  | { status: "failure" };
+  | { status: "failure"; message: string };
 
 interface ChallengeResponse {
   id: string;
@@ -25,6 +24,7 @@ interface ChallengeResponse {
 interface SessionResponse {
   authenticated: boolean;
   publicKey?: string;
+  code?: string;
 }
 
 export function WalletAuthControl() {
@@ -42,13 +42,13 @@ export function WalletAuthControl() {
           cache: "no-store",
           credentials: "same-origin",
         });
-        const session = (await response.json()) as SessionResponse;
+        const session = await readJson<SessionResponse>(response);
 
         if (!active) {
           return;
         }
 
-        if (response.ok && session.authenticated && session.publicKey) {
+        if (response.ok && session?.authenticated && session.publicKey) {
           setState({ status: "authenticated", publicKey: session.publicKey });
           return;
         }
@@ -56,7 +56,7 @@ export function WalletAuthControl() {
         setState({ status: "disconnected" });
       } catch {
         if (active) {
-          setState({ status: "failure" });
+          setState({ status: "disconnected" });
         }
       }
     })();
@@ -76,15 +76,28 @@ export function WalletAuthControl() {
         method: "POST",
         credentials: "same-origin",
       });
+      const result = await readJson<ChallengeResponse & { code?: string }>(
+        response,
+      );
 
-      if (!response.ok) {
-        setState({ status: "failure" });
+      if (!response.ok || !result?.id || !result.payload) {
+        setState({
+          status: "failure",
+          message: describeAuthApiFailure({
+            code: result?.code,
+            status: response.status,
+          }),
+        });
         return;
       }
 
-      challenge = (await response.json()) as ChallengeResponse;
+      challenge = result;
     } catch {
-      setState({ status: "failure" });
+      setState({
+        status: "failure",
+        message:
+          "Wallet authentication is temporarily unavailable. The token builder still works without a wallet.",
+      });
       return;
     }
 
@@ -95,12 +108,15 @@ export function WalletAuthControl() {
     try {
       proof = await albedoAuthAdapter.authenticate(challenge.payload);
     } catch (error) {
-      setState({
-        status:
-          classifyWalletIntentError(error) === "rejected"
-            ? "rejected"
-            : "failure",
-      });
+      if (classifyWalletIntentError(error) === "rejected") {
+        setState({ status: "rejected" });
+      } else {
+        setState({
+          status: "failure",
+          message:
+            "Albedo could not complete the wallet request. Please try again.",
+        });
+      }
       return;
     }
 
@@ -123,23 +139,26 @@ export function WalletAuthControl() {
           },
         }),
       });
-      const result = (await response.json()) as SessionResponse & {
-        code?: string;
-      };
+      const result = await readJson<SessionResponse>(response);
 
-      if (response.status === 410 || result.code === "challenge_expired") {
-        setState({ status: "expired" });
-        return;
-      }
-
-      if (!response.ok || !result.authenticated || !result.publicKey) {
-        setState({ status: "failure" });
+      if (!response.ok || !result?.authenticated || !result.publicKey) {
+        setState({
+          status: "failure",
+          message: describeAuthApiFailure({
+            code: result?.code,
+            status: response.status,
+          }),
+        });
         return;
       }
 
       setState({ status: "authenticated", publicKey: result.publicKey });
     } catch {
-      setState({ status: "failure" });
+      setState({
+        status: "failure",
+        message:
+          "Wallet verification is temporarily unavailable. Your token configuration is still available.",
+      });
     }
   }
 
@@ -189,14 +208,9 @@ export function WalletAuthControl() {
           Wallet request rejected or cancelled.
         </span>
       ) : null}
-      {state.status === "expired" ? (
-        <span className="wallet-auth-error" role="alert">
-          Authentication challenge expired. Try again.
-        </span>
-      ) : null}
       {state.status === "failure" ? (
         <span className="wallet-auth-error" role="alert">
-          Wallet authentication failed. Try again.
+          {state.message}
         </span>
       ) : null}
     </div>
@@ -205,8 +219,6 @@ export function WalletAuthControl() {
 
 function getProgressLabel(status: WalletAuthState["status"]): string | null {
   switch (status) {
-    case "checking":
-      return "Checking session…";
     case "requesting_challenge":
       return "Requesting challenge…";
     case "awaiting_wallet":
@@ -215,5 +227,13 @@ function getProgressLabel(status: WalletAuthState["status"]): string | null {
       return "Verifying proof…";
     default:
       return null;
+  }
+}
+
+async function readJson<T>(response: Response): Promise<T | null> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
   }
 }

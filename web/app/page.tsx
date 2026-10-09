@@ -8,9 +8,9 @@ export function HomePage() {
           <span className="hero-kicker">Build your idea on Stellar</span>
           <h1>Create your Stellar token in minutes.</h1>
           <p>
-            Orrylo gives you a simple place to shape your token, understand the
-            infrastructure behind it, and preview the result before anything
-            goes on-chain.
+            Start configuring immediately—no wallet connection required just to
+            explore. Build the identity, brand, and presentation, then see what
+            Orrylo would create before any on-chain step.
           </p>
           <div className="hero-actions">
             <Link className="button button-inverted" href="/create-token">
@@ -20,9 +20,13 @@ export function HomePage() {
               Connect Wallet
             </a>
           </div>
+          <p className="hero-reassurance">
+            You can use the token builder anonymously. Wallet authentication is
+            for later identity and execution steps.
+          </p>
           <div className="hero-links" aria-label="Explore Orrylo">
-            <Link href="/rylo">Explore RYLO →</Link>
             <Link href="/products">Products &amp; Services →</Link>
+            <Link href="/rylo">Explore RYLO →</Link>
           </div>
         </div>
         <div className="hero-orbit" aria-hidden="true">
@@ -34,62 +38,63 @@ export function HomePage() {
         <span className="eyebrow">What is Orrylo?</span>
         <h2 id="what-is-orrylo">A simpler path from token idea to Stellar.</h2>
         <p>
-          Start with a guided token draft. Orrylo is designed to grow with you
-          into metadata, dedicated issuer infrastructure, RYLO membership, and
-          other Stellar services—without hiding which capabilities are ready.
+          Orrylo helps you shape a token or product first, understand the
+          infrastructure behind it, and move toward real Stellar execution only
+          when the required product and security boundaries are available.
         </p>
       </section>
 
-      <section className="value-grid" aria-label="How the prototype works">
+      <section className="value-grid" aria-label="How the token builder works">
         <article className="value-card">
           <span className="step-number">01</span>
-          <h2>Configure</h2>
+          <h2>Build anonymously</h2>
           <p>
-            Choose your asset code and display name with Stellar-compatible
-            validation.
+            Choose an asset code, name, description, and logo without connecting
+            a wallet.
           </p>
         </article>
         <article className="value-card">
           <span className="step-number">02</span>
-          <h2>Understand</h2>
+          <h2>See it come together</h2>
           <p>
-            See the Shared Issuer and metadata model in plain language before
-            you continue.
+            Watch a live token profile update while Orrylo explains issuer and
+            metadata infrastructure.
           </p>
         </article>
         <article className="value-card">
           <span className="step-number">03</span>
-          <h2>Preview safely</h2>
+          <h2>Connect only when needed</h2>
           <p>
-            Review the token draft without pretending an on-chain launch has
-            happened.
+            Wallet identity and Stellar execution stay behind the later launch
+            boundary rather than blocking exploration.
           </p>
         </article>
       </section>
 
       <section className="two-column">
         <article className="surface-card feature-card">
-          <span className="eyebrow">RYLO membership</span>
-          <h2>Build once. Become part of the ecosystem.</h2>
+          <span className="eyebrow">Products &amp; Services</span>
+          <h2>Token creation is the starting point, not the finish line.</h2>
           <p className="muted">
-            Approved policy connects your first successful Orrylo token creation
-            to membership eligibility, Free Build Credit, and a launch reward
-            path.
+            Orrylo is designed to grow into metadata, domain, dedicated issuer,
+            and custom Stellar infrastructure as those product paths become
+            available.
           </p>
-          <Link className="text-link" href="/rylo">
-            Understand RYLO
+          <Link className="text-link" href="/products">
+            Browse Products &amp; Services
           </Link>
         </article>
 
         <article className="surface-card feature-card">
-          <span className="eyebrow">More than token creation</span>
-          <h2>Grow into the services your project needs.</h2>
+          <span className="eyebrow">RYLO ecosystem</span>
+          <h2>Membership is a benefit of building with Orrylo.</h2>
           <p className="muted">
-            Explore metadata, domain, dedicated issuer, and custom Stellar
-            services. Unavailable capabilities are clearly marked.
+            RYLO policy connects a first successful Orrylo token creation to
+            ecosystem eligibility and the approved launch-benefit path. It does
+            not need to interrupt anonymous product exploration.
           </p>
-          <Link className="text-link" href="/products">
-            Browse Products &amp; Services
+          <Link className="text-link" href="/rylo">
+            Understand RYLO
           </Link>
         </article>
       </section>
@@ -99,14 +104,13 @@ export function HomePage() {
         aria-label="Prototype availability"
       >
         <div>
-          <span className="eyebrow">Available in this prototype</span>
-          <strong>
-            Token drafting, preview, and secure Albedo authentication
-          </strong>
+          <span className="eyebrow">Try the core product now</span>
+          <strong>Anonymous token configuration and live preview</strong>
         </div>
         <p>
-          Token issuance and other Stellar mutations are not enabled yet. Orrylo
-          will never show a draft as a successful on-chain launch.
+          On-chain token issuance is not enabled yet. Orrylo keeps that
+          execution boundary explicit instead of presenting a preview as a
+          successful Stellar launch.
         </p>
       </section>
     </div>
