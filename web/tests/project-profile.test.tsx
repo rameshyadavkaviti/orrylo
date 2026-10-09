@@ -70,5 +70,11 @@ test("managed project view keeps ownership, routing, metadata, and on-chain stat
   assert.match(html, /TOML publication.*Not published/is);
   assert.match(html, /Stellar asset.*Not created/is);
   assert.match(html, /Publish public landing page/i);
+  assert.match(html, /Publication readiness/i);
+  assert.match(html, /stellar\.toml/i);
+  assert.match(html, /Explorer visibility/i);
+  assert.match(html, /Unverified/i);
+  assert.match(html, /Project image.*Not hosted/is);
+  assert.match(html, /Issuer linkage.*Not linked/is);
   assert.doesNotMatch(html, /asset created successfully/i);
 });
