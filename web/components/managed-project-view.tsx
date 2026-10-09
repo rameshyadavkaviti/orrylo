@@ -5,6 +5,7 @@ import {
   type ManagedProjectProfile,
   projectPublicPath,
 } from "../lib/projects/project-profile";
+import { ManagedProjectMetadataForm } from "./managed-project-metadata-form";
 import { PublishProjectControl } from "./publish-project-control";
 
 export function ManagedProjectView({
@@ -103,17 +104,32 @@ export function ManagedProjectView({
         </article>
       </section>
 
+      <ManagedProjectMetadataForm
+        projectId={project.projectId}
+        initial={{
+          displayName: project.displayName,
+          description: project.description ?? "",
+          logoUrl: project.logoUrl ?? "",
+          websiteUrl: project.websiteUrl ?? "",
+          communityUrl: project.communityUrl ?? "",
+        }}
+      />
+
       <section className="surface-card readiness-card">
         <div className="section-heading">
           <div>
             <span className="eyebrow">Publication readiness</span>
             <h2>What is ready, and what still needs infrastructure?</h2>
           </div>
-          <span className="availability-badge">Truthful status only</span>
+          <span className="availability-badge">
+            {readiness.publicationReady
+              ? "Ready for future publication"
+              : "Needs attention"}
+          </span>
         </div>
 
         <div className="readiness-grid">
-          {readiness.map((item) => (
+          {readiness.items.map((item) => (
             <article key={item.key} className="readiness-item">
               <div className="readiness-item-heading">
                 <span>{item.label}</span>
@@ -123,6 +139,27 @@ export function ManagedProjectView({
             </article>
           ))}
         </div>
+
+        {readiness.blockers.length > 0 ? (
+          <p className="readiness-note">
+            Publication blockers remain. Resolve the missing required fields
+            above before a future hosting step is enabled.
+          </p>
+        ) : null}
+
+        {readiness.toml.content ? (
+          <div className="toml-preview">
+            <div>
+              <span className="eyebrow">Generated stellar.toml preview</span>
+              <strong>Application-side only</strong>
+            </div>
+            <pre>{readiness.toml.content}</pre>
+            <small>
+              Generated: yes · Published: no · Reachable: no · Explorer
+              visibility: unverified
+            </small>
+          </div>
+        ) : null}
 
         <p className="readiness-note">
           Landing-page publication does not imply stellar.toml publication,

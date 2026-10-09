@@ -1217,3 +1217,72 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+.metadata-editor {
+  display: grid;
+  gap: 20px;
+  padding: 24px;
+}
+
+.metadata-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.metadata-editor-wide {
+  grid-column: 1 / -1;
+}
+
+.toml-preview {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #121329;
+  color: #f4f2ff;
+  padding: 18px;
+}
+
+.toml-preview > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.toml-preview .eyebrow {
+  color: #b8abff;
+}
+
+.toml-preview pre {
+  margin: 0;
+  overflow-x: auto;
+  border-radius: 12px;
+  background: #0b0c1b;
+  padding: 16px;
+  color: #e8e5ff;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.toml-preview small {
+  color: #b9bad0;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .metadata-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metadata-editor-wide {
+    grid-column: auto;
+  }
+
+  .toml-preview > div {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
