@@ -138,7 +138,11 @@ export function ProjectLandingPage({ project }: { project: ProjectProfile }) {
               <h2>Transparent Stellar identity</h2>
             </div>
             {explorerUrl ? (
-              <a href={explorerUrl ?? undefined} target="_blank" rel="noreferrer">
+              <a
+                href={explorerUrl ?? undefined}
+                target="_blank"
+                rel="noreferrer"
+              >
                 View on explorer ↗
               </a>
             ) : null}
@@ -181,12 +185,20 @@ export function ProjectLandingPage({ project }: { project: ProjectProfile }) {
             </p>
             <div className="project-public-links">
               {websiteUrl ? (
-                <a href={websiteUrl ?? undefined} target="_blank" rel="noreferrer">
+                <a
+                  href={websiteUrl ?? undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Website ↗
                 </a>
               ) : null}
               {communityUrl ? (
-                <a href={communityUrl ?? undefined} target="_blank" rel="noreferrer">
+                <a
+                  href={communityUrl ?? undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Community ↗
                 </a>
               ) : null}
