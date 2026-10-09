@@ -62,7 +62,7 @@ export function ManagedProjectMetadataForm({
         const failure =
           result && !result.ok
             ? result
-            : ({ code: "database_failure" } as const);
+            : ({ ok: false, code: "database_failure" } as const);
 
         if (failure.code === "invalid_metadata" && failure.fieldErrors) {
           setErrors(failure.fieldErrors);
