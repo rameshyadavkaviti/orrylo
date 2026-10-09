@@ -90,9 +90,7 @@ export function PublishMetadataControl({
   );
 }
 
-function describeFailure(
-  result: PublishMetadataResponse | null,
-): string {
+function describeFailure(result: PublishMetadataResponse | null): string {
   if (!result || result.ok) {
     return "Metadata publication could not be completed.";
   }
