@@ -12,9 +12,10 @@ function publication(
   },
 ): MetadataPublicationState {
   return {
+    ...overrides,
     projectId: overrides.projectId,
-    metadataHome: "assets.orrylo.com",
-    network: "testnet",
+    metadataHome: overrides.metadataHome ?? "assets.orrylo.com",
+    network: overrides.network ?? "testnet",
     assetCode: overrides.assetCode,
     issuerPublicKey:
       overrides.issuerPublicKey ??
@@ -28,7 +29,6 @@ function publication(
     verifiedAt: overrides.verifiedAt ?? null,
     lastVerificationAt: overrides.lastVerificationAt ?? null,
     verificationErrorCode: overrides.verificationErrorCode ?? null,
-    ...overrides,
   };
 }
 
