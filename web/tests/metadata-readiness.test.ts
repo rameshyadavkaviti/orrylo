@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { Keypair } from "@stellar/stellar-sdk/base";
+
 import { buildMetadataReadiness } from "../lib/projects/metadata-readiness";
 import type { ManagedProjectProfile } from "../lib/projects/project-profile";
+
+const ISSUER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 62)).publicKey();
 
 const BASE: ManagedProjectProfile = {
   projectId: "c4a9fbd2-31b1-4bbd-b0cb-e7f0a6a9b610",
@@ -25,30 +29,56 @@ const BASE: ManagedProjectProfile = {
   ownerPublicKey: "GA6HCMBLTZS5VQ3FPJ4SCA5PXI4D54ZZG6EXOWZOCN2H7P7PVOQC7F3Y",
 };
 
-test("metadata readiness is truthful for a newly managed project", () => {
-  const items = buildMetadataReadiness(BASE);
-  const byKey = Object.fromEntries(items.map((item) => [item.key, item]));
+test("readiness marks missing issuer while keeping generated/published/reachable separate", () => {
+  const readiness = buildMetadataReadiness(BASE);
+  const byKey = Object.fromEntries(
+    readiness.items.map((item) => [item.key, item]),
+  );
 
-  assert.equal(byKey.project_profile?.value, "Ready");
-  assert.equal(byKey.public_landing?.value, "Private draft");
-  assert.equal(byKey.metadata_host?.value, "assets.orrylo.com");
-  assert.equal(byKey.toml_publication?.value, "Not published");
-  assert.equal(byKey.project_image?.value, "Not hosted");
+  assert.equal(readiness.metadataConfigured, true);
+  assert.equal(readiness.publicationReady, false);
+  assert.deepEqual(readiness.blockers, ["issuer_linkage"]);
+  assert.equal(readiness.toml.generatable, true);
+  assert.equal(readiness.toml.generated, true);
+  assert.equal(readiness.toml.published, false);
+  assert.equal(readiness.toml.reachable, false);
   assert.equal(byKey.issuer_linkage?.value, "Not linked");
-  assert.equal(byKey.explorer_visibility?.value, "Unverified");
+  assert.equal(byKey.toml_generated?.value, "Generated locally");
+  assert.equal(byKey.toml_published?.value, "No");
+  assert.equal(byKey.toml_reachable?.value, "No");
+  assert.equal(byKey.explorer_visibility?.state, "unverified");
 });
 
-test("landing publication does not imply TOML or explorer verification", () => {
-  const items = buildMetadataReadiness({
+test("landing-page publication remains separate from TOML publication", () => {
+  const readiness = buildMetadataReadiness({
     ...BASE,
     publicStatus: "published",
-    issuerPublicKey: "GB5V6M5EQGDWVDH66ZX6GF2NOJADUDU6ZWKEZJCZZNXUBSYLBHZIM2F3",
-    explorerUrl: "https://stellar.expert/example",
+    issuerPublicKey: ISSUER,
+    logoUrl: "https://cdn.example.com/nova.png",
   });
-  const byKey = Object.fromEntries(items.map((item) => [item.key, item]));
+  const byKey = Object.fromEntries(
+    readiness.items.map((item) => [item.key, item]),
+  );
 
+  assert.equal(readiness.publicationReady, true);
+  assert.equal(readiness.publicLanding.published, true);
+  assert.equal(readiness.publicLanding.path, "/p/nova");
   assert.equal(byKey.public_landing?.value, "Published");
-  assert.equal(byKey.issuer_linkage?.value, "Issuer recorded");
-  assert.equal(byKey.toml_publication?.value, "Not published");
-  assert.equal(byKey.explorer_visibility?.value, "Unverified");
+  assert.equal(readiness.toml.generated, true);
+  assert.equal(readiness.toml.published, false);
+  assert.equal(readiness.toml.reachable, false);
+  assert.equal(readiness.explorerVisibility.verified, false);
+  assert.equal(readiness.sacVisibility.verified, false);
+});
+
+test("Shared Issuer readiness requires the canonical metadata host context", () => {
+  const readiness = buildMetadataReadiness({
+    ...BASE,
+    issuerPublicKey: ISSUER,
+    metadataHome: "wrong.example.com",
+  });
+
+  assert.equal(readiness.metadataConfigured, false);
+  assert.equal(readiness.publicationReady, false);
+  assert.ok(readiness.blockers.includes("metadata_home"));
 });
