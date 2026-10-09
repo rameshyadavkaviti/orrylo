@@ -1,11 +1,20 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { NAV_ITEMS, UTILITY_NAV_ITEMS } from "../lib/navigation";
 import { WalletAuthControl } from "./wallet-auth-control";
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+
+  if (pathname.startsWith("/p/")) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="Primary">
