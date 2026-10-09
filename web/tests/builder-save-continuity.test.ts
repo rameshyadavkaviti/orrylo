@@ -88,9 +88,9 @@ test(
       prepared.pending.request.authenticatedWalletAssertion,
       undefined,
     );
-      assert.equal(
-        asserted.request.idempotencyKey,
-        prepared.pending.request.idempotencyKey,
-      );
+    assert.equal(
+      asserted.request.idempotencyKey,
+      prepared.pending.request.idempotencyKey,
+    );
   },
 );
