@@ -26,9 +26,7 @@ const PROJECT_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export function isValidProjectSlug(slug: string): boolean {
   return (
-    slug.length > 0 &&
-    slug.length <= 63 &&
-    PROJECT_SLUG_PATTERN.test(slug)
+    slug.length > 0 && slug.length <= 63 && PROJECT_SLUG_PATTERN.test(slug)
   );
 }
 
