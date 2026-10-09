@@ -46,10 +46,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   );
 
   return (
-    <ProjectLandingPage
-      project={project}
-      metadataPublication={publication}
-    />
+    <ProjectLandingPage project={project} metadataPublication={publication} />
   );
 }
 
