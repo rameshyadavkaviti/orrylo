@@ -205,9 +205,7 @@ export function CreateSharedTokenForm() {
       return;
     }
 
-    await persistProject(
-      withWalletContinuityAssertion(pendingSave, publicKey),
-    );
+    await persistProject(withWalletContinuityAssertion(pendingSave, publicKey));
   }
 
   const previewCode = draft.code.trim().toUpperCase() || "TOKEN";
