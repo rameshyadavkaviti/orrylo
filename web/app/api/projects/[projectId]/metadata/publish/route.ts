@@ -84,8 +84,7 @@ export async function handlePublishMetadata(
           endpoint: SHARED_METADATA_TOML_ENDPOINT,
           contentHash: result.publication.contentHash,
           revision: result.publication.revision,
-          verificationErrorCode:
-            result.publication.verificationErrorCode,
+          verificationErrorCode: result.publication.verificationErrorCode,
         },
         {
           status: 502,
