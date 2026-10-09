@@ -134,7 +134,8 @@ test("managed and public project views surface verified metadata publication wit
   const managedHtml = renderToStaticMarkup(
     <ManagedProjectView project={managed} publication={publication} />,
   );
-  assert.match(managedHtml, /Metadata verified/i);
+  assert.match(managedHtml, /TOML reachability.*Verified/is);
+  assert.match(managedHtml, /Published · update available/i);
   assert.match(managedHtml, /TOML publication.*Published/is);
   assert.match(managedHtml, /TOML reachability.*Verified/is);
   assert.match(managedHtml, /Stellar asset.*Not created/is);
