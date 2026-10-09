@@ -142,7 +142,9 @@ if (!TEST_DATABASE_URL) {
       });
     }
 
-    function dependencies(sessionPublicKey: string): CreateProjectRouteDependencies {
+    function dependencies(
+      sessionPublicKey: string,
+    ): CreateProjectRouteDependencies {
       return {
         authDomain: "app.orrylo.com",
         getSession: async () => ({
