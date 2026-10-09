@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { buildMetadataReadiness } from "../lib/projects/metadata-readiness";
 import {
   type ManagedProjectProfile,
   projectPublicPath,
@@ -13,6 +14,7 @@ export function ManagedProjectView({
 }) {
   const publicPath = projectPublicPath(project.slug);
   const published = project.publicStatus === "published";
+  const readiness = buildMetadataReadiness(project);
 
   return (
     <div className="page-stack">
@@ -99,6 +101,33 @@ export function ManagedProjectView({
             <PublishProjectControl projectId={project.projectId} />
           )}
         </article>
+      </section>
+
+      <section className="surface-card readiness-card">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">Publication readiness</span>
+            <h2>What is ready, and what still needs infrastructure?</h2>
+          </div>
+          <span className="availability-badge">Truthful status only</span>
+        </div>
+
+        <div className="readiness-grid">
+          {readiness.map((item) => (
+            <article key={item.key} className="readiness-item">
+              <div className="readiness-item-heading">
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+              </div>
+              <p>{item.detail}</p>
+            </article>
+          ))}
+        </div>
+
+        <p className="readiness-note">
+          Landing-page publication does not imply stellar.toml publication,
+          issuer deployment, explorer verification, or Stellar asset creation.
+        </p>
       </section>
 
       <section className="prototype-boundary">
