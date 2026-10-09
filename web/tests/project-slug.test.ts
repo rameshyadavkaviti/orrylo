@@ -7,9 +7,15 @@ import {
 } from "../lib/projects/project-slug";
 
 test("project slug normalization is lowercase, URL-safe, and deterministic", () => {
-  assert.equal(normalizeProjectSlug(" Nóva Community! ", "NOVA"), "nova-community");
+  assert.equal(
+    normalizeProjectSlug(" Nóva Community! ", "NOVA"),
+    "nova-community",
+  );
   assert.equal(normalizeProjectSlug("***", "NOVA"), "nova");
-  assert.equal(normalizeProjectSlug("NOVA___Builders", "NOVA"), "nova-builders");
+  assert.equal(
+    normalizeProjectSlug("NOVA___Builders", "NOVA"),
+    "nova-builders",
+  );
 });
 
 test("project slug collision candidates use deterministic numeric suffixes", () => {

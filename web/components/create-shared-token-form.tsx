@@ -1,12 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import {
-  type ChangeEvent,
-  type FormEvent,
-  useRef,
-  useState,
-} from "react";
+import { type ChangeEvent, type FormEvent, useRef, useState } from "react";
 
 import type {
   CreateManagedProjectFailure,

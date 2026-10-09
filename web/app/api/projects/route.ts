@@ -63,10 +63,7 @@ export async function handleCreateManagedProject(
   dependencies: CreateProjectRouteDependencies,
 ) {
   if (
-    !isTrustedAuthOrigin(
-      request.headers.get("origin"),
-      dependencies.authDomain,
-    )
+    !isTrustedAuthOrigin(request.headers.get("origin"), dependencies.authDomain)
   ) {
     return failure("untrusted_origin", 403);
   }

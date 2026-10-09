@@ -58,8 +58,7 @@ test("managed project view keeps ownership, routing, metadata, and on-chain stat
   const managed: ManagedProjectProfile = {
     ...PROJECT,
     publicStatus: "draft",
-    ownerPublicKey:
-      "GA6HCMBLTZS5VQ3FPJ4SCA5PXI4D54ZZG6EXOWZOCN2H7P7PVOQC7F3Y",
+    ownerPublicKey: "GA6HCMBLTZS5VQ3FPJ4SCA5PXI4D54ZZG6EXOWZOCN2H7P7PVOQC7F3Y",
   };
   const html = renderToStaticMarkup(<ManagedProjectView project={managed} />);
 

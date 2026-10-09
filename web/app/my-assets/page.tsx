@@ -68,7 +68,10 @@ export async function MyAssetsPage() {
       ) : (
         <section className="card-grid">
           {projects.map((project) => (
-            <article className="surface-card managed-project-card" key={project.projectId}>
+            <article
+              className="surface-card managed-project-card"
+              key={project.projectId}
+            >
               <div className="card-title-row">
                 <div>
                   <span className="eyebrow">{project.assetCode}</span>

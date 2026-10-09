@@ -7,11 +7,7 @@ import type {
   PublishManagedProjectSuccess,
 } from "../lib/projects/managed-project-api";
 
-export function PublishProjectControl({
-  projectId,
-}: {
-  projectId: string;
-}) {
+export function PublishProjectControl({ projectId }: { projectId: string }) {
   const [state, setState] = useState<
     | { status: "idle" }
     | { status: "publishing" }
