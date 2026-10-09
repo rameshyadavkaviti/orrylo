@@ -148,6 +148,6 @@ test("managed and public project views surface verified metadata publication wit
       metadataPublication={publication}
     />,
   );
-  assert.match(publicHtml, /Published and reachable/i);
+  assert.match(publicHtml, /Published; update available/i);
   assert.doesNotMatch(publicHtml, /asset created successfully/i);
 });
