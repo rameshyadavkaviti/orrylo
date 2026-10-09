@@ -3,10 +3,10 @@ import { createHash } from "node:crypto";
 import {
   renderSharedTestnetToml,
   type MetadataPublicationState,
-} from "../../lib/projects/metadata-publication";
-import { SHARED_ASSET_DOMAIN } from "../../lib/product/constants";
-import { getDatabaseClient } from "../../lib/server/persistence/database";
-import { PostgresMetadataPublicationRepository } from "../../lib/server/persistence/metadata-publication-repository";
+} from "../../../lib/projects/metadata-publication";
+import { SHARED_ASSET_DOMAIN } from "../../../lib/product/constants";
+import { getDatabaseClient } from "../../../lib/server/persistence/database";
+import { PostgresMetadataPublicationRepository } from "../../../lib/server/persistence/metadata-publication-repository";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
