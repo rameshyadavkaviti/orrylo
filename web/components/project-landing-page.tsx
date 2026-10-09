@@ -20,8 +20,8 @@ export function ProjectLandingPage({
   const generatedToml = generateProjectCurrencyToml(project);
   const publishedMetadataCurrent = Boolean(
     metadataPublication &&
-      generatedToml &&
-      metadataPublication.currencyToml === generatedToml.content,
+    generatedToml &&
+    metadataPublication.currencyToml === generatedToml.content,
   );
   const tomlStatus = !metadataPublication
     ? "Not published"
