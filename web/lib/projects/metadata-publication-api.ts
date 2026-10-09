@@ -34,5 +34,4 @@ export interface PublishMetadataFailure {
 }
 
 export type PublishMetadataResponse =
-  | PublishMetadataSuccess
-  | PublishMetadataFailure;
+  PublishMetadataSuccess | PublishMetadataFailure;
