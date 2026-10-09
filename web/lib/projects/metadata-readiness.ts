@@ -80,16 +80,12 @@ export function buildMetadataReadiness(
   const issuerLinked = hasValidStellarIssuer(project.issuerPublicKey);
   const generatedToml = generateProjectCurrencyToml(project);
   const metadataConfigured =
-    displayNameConfigured &&
-    descriptionConfigured &&
-    metadataHomeConfigured &&
-    sharedHostCompatible;
+    displayNameConfigured && metadataHomeConfigured && sharedHostCompatible;
   const publicationReady = metadataConfigured && assetCodeValid && issuerLinked;
   const blockers: MetadataReadinessKey[] = [];
 
   if (!assetCodeValid) blockers.push("asset_code");
   if (!displayNameConfigured) blockers.push("display_name");
-  if (!descriptionConfigured) blockers.push("description");
   if (!metadataHomeConfigured || !sharedHostCompatible)
     blockers.push("metadata_home");
   if (!issuerLinked) blockers.push("issuer_linkage");
@@ -101,8 +97,8 @@ export function buildMetadataReadiness(
       state: metadataConfigured ? "ready" : "missing",
       value: metadataConfigured ? "Configured" : "Needs attention",
       detail: metadataConfigured
-        ? "The current Project Profile has the core presentation metadata needed for a publication-ready record."
-        : "Complete the missing Project Profile fields shown below before publication infrastructure is added.",
+        ? "The baseline Project Profile metadata context is configured; optional presentation fields may still be missing."
+        : "Complete the missing required Project Profile fields shown below before publication infrastructure is added.",
     },
     {
       key: "asset_code",
