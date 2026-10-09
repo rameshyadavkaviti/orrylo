@@ -68,12 +68,7 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Check formatting
-        run: |
-          npm run format:check || {
-            npx prettier --write app/prototype.css lib/projects/metadata-readiness.ts tests/metadata-readiness.test.ts
-            git diff -- app/prototype.css lib/projects/metadata-readiness.ts tests/metadata-readiness.test.ts
-            exit 1
-          }
+        run: npm run format:check
 
       - name: Lint
         run: npm run lint
