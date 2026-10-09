@@ -1,8 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { type ChangeEvent, type FormEvent, useState } from "react";
+import {
+  type ChangeEvent,
+  type FormEvent,
+  useRef,
+  useState,
+} from "react";
 
+import type {
+  CreateManagedProjectFailure,
+  CreateManagedProjectSuccess,
+} from "../lib/projects/managed-project-api";
 import { SHARED_ASSET_DOMAIN } from "../lib/product/constants";
 import {
   type SharedAssetDraft,
@@ -10,6 +19,7 @@ import {
   TOKEN_DESCRIPTION_MAX_LENGTH,
   validateSharedAssetDraft,
 } from "../lib/validation/token";
+import { WalletAuthControl } from "./wallet-auth-control";
 
 const INITIAL_DRAFT: SharedAssetDraft = {
   code: "",
@@ -20,6 +30,12 @@ const INITIAL_DRAFT: SharedAssetDraft = {
 const LOGO_MAX_BYTES = 2 * 1024 * 1024;
 const LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
+type SaveState =
+  | { status: "idle" }
+  | { status: "saving" }
+  | { status: "needs_wallet" }
+  | { status: "failure"; message: string };
+
 export function CreateSharedTokenForm() {
   const [draft, setDraft] = useState<SharedAssetDraft>(INITIAL_DRAFT);
   const [errors, setErrors] = useState<SharedAssetDraftErrors>({});
@@ -27,11 +43,17 @@ export function CreateSharedTokenForm() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoName, setLogoName] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
+  const idempotencyKeyRef = useRef<string | null>(null);
+  const pendingDraftRef = useRef<SharedAssetDraft | null>(null);
 
   function updateField(field: keyof SharedAssetDraft, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
     setConfigurationReady(false);
+    setSaveState({ status: "idle" });
+    idempotencyKeyRef.current = null;
+    pendingDraftRef.current = null;
   }
 
   function handleLogoChange(event: ChangeEvent<HTMLInputElement>) {
@@ -75,12 +97,100 @@ export function CreateSharedTokenForm() {
     reader.readAsDataURL(file);
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function validateCurrentDraft(): SharedAssetDraft | null {
     const result = validateSharedAssetDraft(draft);
     setDraft(result.normalized);
     setErrors(result.errors);
     setConfigurationReady(result.valid);
+
+    return result.valid ? result.normalized : null;
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    validateCurrentDraft();
+  }
+
+  async function handleSaveProject() {
+    const normalized = validateCurrentDraft();
+
+    if (!normalized) {
+      setSaveState({
+        status: "failure",
+        message: "Review the highlighted token details before saving.",
+      });
+      return;
+    }
+
+    pendingDraftRef.current = normalized;
+    await persistProject(normalized);
+  }
+
+  async function persistProject(normalized: SharedAssetDraft) {
+    setSaveState({ status: "saving" });
+
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = crypto.randomUUID();
+    }
+
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          idempotencyKey: idempotencyKeyRef.current,
+          code: normalized.code,
+          displayName: normalized.displayName,
+          description: normalized.description,
+        }),
+      });
+      const result = await readJson<
+        CreateManagedProjectSuccess | CreateManagedProjectFailure
+      >(response);
+
+      if (
+        response.status === 401 &&
+        result &&
+        !result.ok &&
+        result.code === "unauthenticated"
+      ) {
+        setSaveState({ status: "needs_wallet" });
+        return;
+      }
+
+      if (!response.ok || !result || !result.ok) {
+        setSaveState({
+          status: "failure",
+          message: describeProjectSaveFailure(result),
+        });
+        return;
+      }
+
+      window.location.assign(result.managePath);
+    } catch {
+      setSaveState({
+        status: "failure",
+        message:
+          "Orrylo could not save the project right now. Your configuration is still on this page.",
+      });
+    }
+  }
+
+  async function continueAfterAuthentication() {
+    const pendingDraft = pendingDraftRef.current;
+
+    if (!pendingDraft) {
+      setSaveState({
+        status: "failure",
+        message: "Review the project once more before saving.",
+      });
+      return;
+    }
+
+    await persistProject(pendingDraft);
   }
 
   const previewCode = draft.code.trim().toUpperCase() || "TOKEN";
@@ -290,14 +400,15 @@ export function CreateSharedTokenForm() {
           </section>
 
           <div className="form-actions">
-            <button type="submit" className="button button-primary">
+            <button type="submit" className="button button-secondary">
               Check configuration
             </button>
           </div>
 
           {configurationReady ? (
             <p className="form-message" role="status">
-              Configuration looks good. Review the live product preview.
+              Configuration looks good. You can save it as a managed Orrylo
+              project whenever you are ready.
             </p>
           ) : null}
         </div>
@@ -346,19 +457,83 @@ export function CreateSharedTokenForm() {
           </dl>
 
           <div className="execution-boundary">
-            <span className="eyebrow">On-chain boundary</span>
-            <strong>Ready for the next step when launch is supported.</strong>
+            <span className="eyebrow">Ready to manage</span>
+            <strong>Save this as your managed Orrylo project.</strong>
             <p>
-              This configuration has not created a Stellar asset. Wallet
-              authentication and Stellar execution belong at the launch
-              boundary, not in the anonymous builder.
+              Your wallet is used here only to prove who owns the Project
+              Profile. Saving does not create a Stellar asset, sign a
+              transaction, or publish TOML metadata.
             </p>
-            <button className="button button-secondary" type="button" disabled>
-              Continue to on-chain launch
+            <button
+              className="button button-primary"
+              type="button"
+              disabled={saveState.status === "saving"}
+              onClick={() => void handleSaveProject()}
+            >
+              {saveState.status === "saving"
+                ? "Saving project…"
+                : "Save & manage project"}
             </button>
+
+            {saveState.status === "needs_wallet" ? (
+              <div className="builder-wallet-boundary">
+                <p>
+                  Connect with Albedo to claim this Project Profile. Your
+                  configured values stay on this page while authentication
+                  completes.
+                </p>
+                <WalletAuthControl
+                  connectLabel="Connect wallet & save"
+                  onAuthenticated={() => void continueAfterAuthentication()}
+                />
+              </div>
+            ) : null}
+
+            {saveState.status === "failure" ? (
+              <p className="field-error" role="alert">
+                {saveState.message}
+              </p>
+            ) : null}
+
+            <small className="builder-boundary-note">
+              On-chain issuance remains a separate later step.
+            </small>
           </div>
         </aside>
       </div>
     </form>
   );
+}
+
+function describeProjectSaveFailure(
+  result: CreateManagedProjectSuccess | CreateManagedProjectFailure | null,
+): string {
+  if (!result || result.ok) {
+    return "Orrylo could not save the project. Your configuration is still on this page.";
+  }
+
+  switch (result.code) {
+    case "invalid_project":
+    case "invalid_request":
+      return "Review the token details and try saving again.";
+    case "invalid_idempotency_key":
+    case "idempotency_conflict":
+      return "This save attempt no longer matches the current project. Change a field or retry from the current configuration.";
+    case "slug_unavailable":
+      return "Orrylo could not reserve a public project path for this name. Try a more distinctive display name.";
+    case "untrusted_origin":
+      return "Project saving is not configured for this site address yet. Your anonymous builder state is unchanged.";
+    case "database_failure":
+      return "Project saving is temporarily unavailable. Your configuration is still on this page.";
+    case "unauthenticated":
+      return "Connect your wallet to save and manage this project.";
+  }
+}
+
+async function readJson<T>(response: Response): Promise<T | null> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
 }

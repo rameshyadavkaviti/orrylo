@@ -27,7 +27,15 @@ interface SessionResponse {
   code?: string;
 }
 
-export function WalletAuthControl() {
+export interface WalletAuthControlProps {
+  connectLabel?: string;
+  onAuthenticated?: (publicKey: string) => void;
+}
+
+export function WalletAuthControl({
+  connectLabel = "Connect Wallet",
+  onAuthenticated,
+}: WalletAuthControlProps = {}) {
   const [state, setState] = useState<WalletAuthState>({
     status: "disconnected",
   });
@@ -153,6 +161,7 @@ export function WalletAuthControl() {
       }
 
       setState({ status: "authenticated", publicKey: result.publicKey });
+      onAuthenticated?.(result.publicKey);
     } catch {
       setState({
         status: "failure",
@@ -201,7 +210,7 @@ export function WalletAuthControl() {
         disabled={Boolean(progressLabel)}
         onClick={() => void connect()}
       >
-        {progressLabel ?? "Connect Wallet"}
+        {progressLabel ?? connectLabel}
       </button>
       {state.status === "rejected" ? (
         <span className="wallet-auth-error" role="alert">

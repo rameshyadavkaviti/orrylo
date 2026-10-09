@@ -190,13 +190,13 @@ export function ProjectLandingPage({ project }: { project: ProjectProfile }) {
 
           <article className="project-public-card project-public-metadata-card">
             <span className="project-public-section-kicker">
-              Metadata publication
+              Metadata context
             </span>
             <h2>Separate from this landing page</h2>
             <p>
               Orrylo keeps public-page routing separate from Stellar metadata
-              hosting so the project can move domains without changing its
-              identity.
+              hosting. This public page does not prove that stellar.toml has
+              been published.
             </p>
             <dl>
               <div>
@@ -204,8 +204,12 @@ export function ProjectLandingPage({ project }: { project: ProjectProfile }) {
                 <dd>{`/p/${project.slug}`}</dd>
               </div>
               <div>
-                <dt>Metadata home</dt>
-                <dd>{project.metadataHome ?? "Not published yet"}</dd>
+                <dt>Expected metadata home</dt>
+                <dd>{project.metadataHome ?? "Not configured"}</dd>
+              </div>
+              <div>
+                <dt>TOML status</dt>
+                <dd>Not published by this prototype</dd>
               </div>
             </dl>
           </article>
