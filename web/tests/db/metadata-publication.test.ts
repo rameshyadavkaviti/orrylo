@@ -183,8 +183,7 @@ if (!TEST_DATABASE_URL) {
     ]);
 
     const repository = new PostgresMetadataPublicationRepository(sql);
-    const publications =
-      await repository.listSharedTestnetPublications();
+    const publications = await repository.listSharedTestnetPublications();
 
     assert.equal(publications.length, 2);
     assert.deepEqual(
@@ -238,8 +237,9 @@ if (!TEST_DATABASE_URL) {
       clock,
     );
 
-    const stillPublished =
-      await publicationRepository.getByProjectId(alpha.projectId);
+    const stillPublished = await publicationRepository.getByProjectId(
+      alpha.projectId,
+    );
     assert.equal(stillPublished?.currencyToml, before.currencyToml);
     assert.doesNotMatch(stillPublished?.currencyToml ?? "", /Alpha Updated/);
 
@@ -267,10 +267,9 @@ if (!TEST_DATABASE_URL) {
       ok: false,
       code: "request_failed",
     });
-    const failed = await publicationService(failureVerifier).publishOwnedProject(
-      project.projectId,
-      OWNER,
-    );
+    const failed = await publicationService(
+      failureVerifier,
+    ).publishOwnedProject(project.projectId, OWNER);
 
     assert.equal(failed.status, "published_not_reachable");
     assert.equal(failed.publication.reachable, false);
@@ -395,10 +394,12 @@ if (!TEST_DATABASE_URL) {
     result: MetadataVerificationResult,
   ): MetadataPublicationVerifier {
     return {
-      verify: async (_publication: Pick<
-        MetadataPublicationState,
-        "assetCode" | "issuerPublicKey" | "currencyToml" | "contentHash"
-      >) => result,
+      verify: async (
+        _publication: Pick<
+          MetadataPublicationState,
+          "assetCode" | "issuerPublicKey" | "currencyToml" | "contentHash"
+        >,
+      ) => result,
     };
   }
 
