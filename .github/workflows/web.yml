@@ -68,12 +68,7 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Check formatting
-        run: |
-          npm run format:check || {
-            npx prettier --write components/project-landing-page.tsx lib/projects/project-profile.ts
-            git diff -- components/project-landing-page.tsx lib/projects/project-profile.ts
-            exit 1
-          }
+        run: npm run format:check
 
       - name: Lint
         run: npm run lint
