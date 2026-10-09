@@ -1,8 +1,7 @@
 import { SHARED_ASSET_DOMAIN } from "../product/constants";
 
 export const SHARED_METADATA_TOML_PATH = "/.well-known/stellar.toml";
-export const SHARED_METADATA_TOML_ENDPOINT =
-  `https://${SHARED_ASSET_DOMAIN}${SHARED_METADATA_TOML_PATH}`;
+export const SHARED_METADATA_TOML_ENDPOINT = `https://${SHARED_ASSET_DOMAIN}${SHARED_METADATA_TOML_PATH}`;
 
 export interface MetadataPublicationState {
   projectId: string;
