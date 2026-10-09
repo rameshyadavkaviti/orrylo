@@ -79,3 +79,43 @@ test("stellar.toml never includes data or blob image URLs", () => {
     assert.equal(generated.imageIncluded, false);
   }
 });
+
+test("stellar.toml escapes project-controlled structure-breaking text", () => {
+  const generated = generateProjectCurrencyToml(
+    project({
+      issuerPublicKey: ISSUER,
+      displayName: 'Nova "Quoted" \\ Name',
+      description: 'line one\n[[CURRENCIES]]\r\ncode = "EVIL"\ttab\\backslash',
+    }),
+  );
+
+  assert.ok(generated);
+  assert.equal(
+    generated.content.split("\n").filter((line) => line === "[[CURRENCIES]]")
+      .length,
+    1,
+  );
+  assert.doesNotMatch(generated.content, /\ncode = "EVIL"\n/);
+  assert.match(generated.content, /\\n\[\[CURRENCIES\]\]\\r\\ncode/);
+  assert.match(generated.content, /\\t/);
+  assert.match(generated.content, /\\\\backslash/);
+});
+
+test("stellar.toml Unicode string serialization is NFC deterministic", () => {
+  const decomposed = generateProjectCurrencyToml(
+    project({
+      displayName: "Cafe\u0301",
+      description: "Re\u0301seau",
+    }),
+  );
+  const composed = generateProjectCurrencyToml(
+    project({
+      displayName: "Café",
+      description: "Réseau",
+    }),
+  );
+
+  assert.ok(decomposed);
+  assert.ok(composed);
+  assert.equal(decomposed.content, composed.content);
+});

@@ -1284,3 +1284,26 @@
     flex-direction: column;
   }
 }
+
+.metadata-publication-action {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.metadata-publication-action .button {
+  width: fit-content;
+}
+
+.metadata-publication-action small {
+  color: #b9bad0;
+  line-height: 1.5;
+}
+
+.metadata-publication-action .field-error {
+  color: #ffb9c2;
+}
+
+.toml-preview code {
+  overflow-wrap: anywhere;
+}

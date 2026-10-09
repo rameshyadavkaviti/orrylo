@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { ProjectLandingPage } from "../../../components/project-landing-page";
 import { getDatabaseClient } from "../../../lib/server/persistence/database";
+import { PostgresMetadataPublicationRepository } from "../../../lib/server/persistence/metadata-publication-repository";
 import { PostgresProjectProfileRepository } from "../../../lib/server/persistence/project-profile-repository";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +38,16 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     notFound();
   }
 
-  return <ProjectLandingPage project={project} />;
+  const publicationRepository = new PostgresMetadataPublicationRepository(
+    getDatabaseClient(),
+  );
+  const publication = await publicationRepository.getByProjectId(
+    project.projectId,
+  );
+
+  return (
+    <ProjectLandingPage project={project} metadataPublication={publication} />
+  );
 }
 
 async function findProject(slug: string) {

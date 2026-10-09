@@ -5,6 +5,7 @@ import { ManagedProjectView } from "../../../components/managed-project-view";
 import { SESSION_COOKIE_NAME } from "../../../lib/auth/constants";
 import { getWalletAuthService } from "../../../lib/auth/runtime";
 import { getDatabaseClient } from "../../../lib/server/persistence/database";
+import { PostgresMetadataPublicationRepository } from "../../../lib/server/persistence/metadata-publication-repository";
 import { PostgresProjectProfileRepository } from "../../../lib/server/persistence/project-profile-repository";
 
 export const dynamic = "force-dynamic";
@@ -25,12 +26,19 @@ export default async function ManagedProjectPage({
   }
 
   const { projectId } = await params;
-  const repository = new PostgresProjectProfileRepository(getDatabaseClient());
-  const project = await repository.findOwnedById(projectId, session.publicKey);
+  const sql = getDatabaseClient();
+  const projectRepository = new PostgresProjectProfileRepository(sql);
+  const project = await projectRepository.findOwnedById(
+    projectId,
+    session.publicKey,
+  );
 
   if (!project) {
     notFound();
   }
 
-  return <ManagedProjectView project={project} />;
+  const publicationRepository = new PostgresMetadataPublicationRepository(sql);
+  const publication = await publicationRepository.getByProjectId(projectId);
+
+  return <ManagedProjectView project={project} publication={publication} />;
 }

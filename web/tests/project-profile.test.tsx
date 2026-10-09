@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { ManagedProjectView } from "../components/managed-project-view";
 import { ProjectLandingPage } from "../components/project-landing-page";
+import type { MetadataPublicationState } from "../lib/projects/metadata-publication";
 import {
   isValidProjectSlug,
   projectPublicPath,
@@ -51,7 +52,7 @@ test("free landing template renders from Project Profile data", () => {
   assert.match(html, /Built on Stellar/);
   assert.match(html, /Metadata context/);
   assert.match(html, /TOML status/);
-  assert.match(html, /Not published by this prototype/);
+  assert.match(html, /Not published/);
 });
 
 test("managed project view keeps ownership, routing, metadata, and on-chain state separate", () => {
@@ -73,10 +74,10 @@ test("managed project view keeps ownership, routing, metadata, and on-chain stat
   assert.match(html, /Publication readiness/i);
   assert.match(html, /stellar\.toml/i);
   assert.match(html, /Explorer visibility/i);
-  assert.match(html, /Unverified/i);
+  assert.match(html, /Not verified/i);
   assert.match(html, /Project image.*Missing/is);
   assert.match(html, /Issuer linkage.*Not linked/is);
-  assert.match(html, /Generated stellar\.toml preview/i);
+  assert.match(html, /Generated stellar\.toml/i);
   assert.match(html, /Generated: yes.*Published: no.*Reachable: no/is);
   assert.match(html, /Save metadata/i);
   assert.doesNotMatch(html, /asset created successfully/i);
@@ -100,4 +101,53 @@ test("public landing page does not render unsafe persisted metadata URLs", () =>
   assert.doesNotMatch(html, /file:\/\/\//);
   assert.doesNotMatch(html, /blob:https/);
   assert.match(html, /project-public-logo-fallback/);
+});
+
+test("managed and public project views surface verified metadata publication without claiming asset creation", () => {
+  const issuer = "GA6HCMBLTZS5VQ3FPJ4SCA5PXI4D54ZZG6EXOWZOCN2H7P7PVOQC7F3Y";
+  const managed: ManagedProjectProfile = {
+    ...PROJECT,
+    issuerPublicKey: issuer,
+    publicStatus: "draft",
+    ownerPublicKey: issuer,
+  };
+  const publication: MetadataPublicationState = {
+    projectId: managed.projectId,
+    metadataHome: "assets.orrylo.com",
+    network: "testnet",
+    assetCode: managed.assetCode,
+    issuerPublicKey: issuer,
+    currencyToml:
+      '[[CURRENCIES]]\ncode = "NOVA"\nissuer = "' +
+      issuer +
+      '"\nname = "Nova"\ndesc = "A community token for players, builders, and creators."\n',
+    contentHash: "a".repeat(64),
+    revision: 1,
+    publishedAt: "2026-10-09T12:00:00.000Z",
+    updatedAt: "2026-10-09T12:00:01.000Z",
+    reachable: true,
+    verifiedAt: "2026-10-09T12:00:01.000Z",
+    lastVerificationAt: "2026-10-09T12:00:01.000Z",
+    verificationErrorCode: null,
+  };
+
+  const managedHtml = renderToStaticMarkup(
+    <ManagedProjectView project={managed} publication={publication} />,
+  );
+  assert.match(managedHtml, /TOML reachability.*Verified/is);
+  assert.match(managedHtml, /Published · update available/i);
+  assert.match(managedHtml, /TOML publication.*Published/is);
+  assert.match(managedHtml, /TOML reachability.*Verified/is);
+  assert.match(managedHtml, /Stellar asset.*Not created/is);
+  assert.match(managedHtml, /\/p\/nova/);
+  assert.match(managedHtml, /assets\.orrylo\.com\/\.well-known\/stellar\.toml/);
+
+  const publicHtml = renderToStaticMarkup(
+    <ProjectLandingPage
+      project={{ ...PROJECT, issuerPublicKey: issuer }}
+      metadataPublication={publication}
+    />,
+  );
+  assert.match(publicHtml, /Published; update available/i);
+  assert.doesNotMatch(publicHtml, /asset created successfully/i);
 });
