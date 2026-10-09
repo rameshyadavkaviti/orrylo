@@ -12,8 +12,7 @@ export type MetadataVerificationFailureCode =
   | "issuer_missing";
 
 export type MetadataVerificationResult =
-  | { ok: true }
-  | { ok: false; code: MetadataVerificationFailureCode };
+  { ok: true } | { ok: false; code: MetadataVerificationFailureCode };
 
 export interface MetadataPublicationVerifier {
   verify(
@@ -24,9 +23,7 @@ export interface MetadataPublicationVerifier {
   ): Promise<MetadataVerificationResult>;
 }
 
-export class FixedSharedMetadataVerifier
-  implements MetadataPublicationVerifier
-{
+export class FixedSharedMetadataVerifier implements MetadataPublicationVerifier {
   constructor(
     private readonly fetchImpl: typeof fetch = fetch,
     private readonly timeoutMs = 5_000,
@@ -61,7 +58,8 @@ export class FixedSharedMetadataVerifier
       return { ok: false, code: "unexpected_status" };
     }
 
-    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+    const contentType =
+      response.headers.get("content-type")?.toLowerCase() ?? "";
 
     if (
       !contentType.includes("text/plain") &&
