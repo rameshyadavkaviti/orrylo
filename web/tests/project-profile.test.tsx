@@ -104,8 +104,7 @@ test("public landing page does not render unsafe persisted metadata URLs", () =>
 });
 
 test("managed and public project views surface verified metadata publication without claiming asset creation", () => {
-  const issuer =
-    "GA6HCMBLTZS5VQ3FPJ4SCA5PXI4D54ZZG6EXOWZOCN2H7P7PVOQC7F3Y";
+  const issuer = "GA6HCMBLTZS5VQ3FPJ4SCA5PXI4D54ZZG6EXOWZOCN2H7P7PVOQC7F3Y";
   const managed: ManagedProjectProfile = {
     ...PROJECT,
     issuerPublicKey: issuer,
