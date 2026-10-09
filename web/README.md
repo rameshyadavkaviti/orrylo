@@ -107,6 +107,38 @@ and instances that share the same database.
 No Albedo implicit-flow token, callback URL, transaction intent, secret key,
 issuer key, or wallet signing key is stored.
 
+## Managed Project Profile bridge
+
+The anonymous token builder remains usable before authentication. When a visitor
+chooses **Save & manage project**, the application uses the existing Albedo
+session only as an ownership boundary:
+
+```text
+anonymous builder state
+→ authenticated wallet session
+→ idempotent managed-project creation
+→ Project Profile + owner association
+→ /my-assets/<project_id>
+→ optional Orrylo landing-page publication at /p/<slug>
+```
+
+The stable UUID `project_id` remains the application identity. The slug is
+routing state only. Stellar metadata hosting remains separate from both.
+
+Managed project creation revalidates builder data on the server and binds the
+client-generated UUID idempotency key to the authenticated wallet and canonical
+normalized payload through `workflow_intents`. Project Profile creation,
+ownership association, slug allocation, and workflow confirmation occur in one
+PostgreSQL transaction. Slug uniqueness is database-enforced; deterministic
+collision candidates use `<base>-2`, `<base>-3`, and so on.
+
+Newly saved projects are private `draft` profiles. An owner-only publish action
+may expose the Orrylo landing page at `/p/<slug>`; this does not publish
+`stellar.toml`, issue a Stellar asset, or perform any Stellar transaction.
+
+Builder logo images remain browser-local. No object URL or data URL is persisted
+as durable project media.
+
 Production wallet authentication requires an explicit `ORRYLO_AUTH_DOMAIN`
 matching the hostname users actually visit. Production no longer silently falls
 back to `localhost`; a missing value is a deployment misconfiguration. The
@@ -203,11 +235,17 @@ secondary utility/diagnostic routes rather than primary customer navigation.
 ## Current data boundary
 
 Wallet authentication and its database state are real application behavior.
+Managed Project Profile creation, wallet ownership association, owner-scoped
+management reads, and Orrylo landing-page publication are real application
+behavior. Public project lookup reads the persisted Project Profile only after
+its `public_status` is `published`.
+
 Trusted first-token eligibility/reward preparation is real server-only database
-behavior, but it has no event producer or public mutation route. Balances,
-eligibility UI, RYLO holdings, assets, activity, reward execution, protected
-operation execution, and on-chain transaction state remain demo/unavailable
-unless a future reviewed phase explicitly activates them.
+behavior, but it has no event producer or public mutation route. Stellar asset
+issuance, TOML publication, persistent project-media hosting, balances,
+eligibility UI, RYLO holdings, activity, reward execution, protected operation
+execution, and on-chain transaction state remain demo/unavailable unless a
+future reviewed phase explicitly activates them.
 
 ## Contract boundary
 
