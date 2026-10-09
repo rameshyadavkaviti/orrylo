@@ -7,6 +7,10 @@ import type {
   CreateManagedProjectFailure,
   CreateManagedProjectSuccess,
 } from "../lib/projects/managed-project-api";
+import {
+  prepareManagedProjectSave,
+  type PendingManagedProjectSave,
+} from "../lib/projects/pending-managed-project";
 import { SHARED_ASSET_DOMAIN } from "../lib/product/constants";
 import {
   type SharedAssetDraft,
@@ -40,7 +44,7 @@ export function CreateSharedTokenForm() {
   const [logoError, setLogoError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
   const idempotencyKeyRef = useRef<string | null>(null);
-  const pendingDraftRef = useRef<SharedAssetDraft | null>(null);
+  const pendingSaveRef = useRef<PendingManagedProjectSave | null>(null);
 
   function updateField(field: keyof SharedAssetDraft, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -48,7 +52,7 @@ export function CreateSharedTokenForm() {
     setConfigurationReady(false);
     setSaveState({ status: "idle" });
     idempotencyKeyRef.current = null;
-    pendingDraftRef.current = null;
+    pendingSaveRef.current = null;
   }
 
   function handleLogoChange(event: ChangeEvent<HTMLInputElement>) {
@@ -107,9 +111,22 @@ export function CreateSharedTokenForm() {
   }
 
   async function handleSaveProject() {
-    const normalized = validateCurrentDraft();
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = crypto.randomUUID();
+    }
 
-    if (!normalized) {
+    const prepared = prepareManagedProjectSave(
+      draft,
+      idempotencyKeyRef.current,
+    );
+
+    setDraft(
+      prepared.ok ? prepared.pending.normalizedDraft : prepared.normalizedDraft,
+    );
+    setErrors(prepared.errors);
+    setConfigurationReady(prepared.ok);
+
+    if (!prepared.ok) {
       setSaveState({
         status: "failure",
         message: "Review the highlighted token details before saving.",
@@ -117,16 +134,12 @@ export function CreateSharedTokenForm() {
       return;
     }
 
-    pendingDraftRef.current = normalized;
-    await persistProject(normalized);
+    pendingSaveRef.current = prepared.pending;
+    await persistProject(prepared.pending);
   }
 
-  async function persistProject(normalized: SharedAssetDraft) {
+  async function persistProject(pending: PendingManagedProjectSave) {
     setSaveState({ status: "saving" });
-
-    if (!idempotencyKeyRef.current) {
-      idempotencyKeyRef.current = crypto.randomUUID();
-    }
 
     try {
       const response = await fetch("/api/projects", {
@@ -135,12 +148,7 @@ export function CreateSharedTokenForm() {
           "Content-Type": "application/json",
         },
         credentials: "same-origin",
-        body: JSON.stringify({
-          idempotencyKey: idempotencyKeyRef.current,
-          code: normalized.code,
-          displayName: normalized.displayName,
-          description: normalized.description,
-        }),
+        body: JSON.stringify(pending.request),
       });
       const result = await readJson<
         CreateManagedProjectSuccess | CreateManagedProjectFailure
@@ -175,9 +183,9 @@ export function CreateSharedTokenForm() {
   }
 
   async function continueAfterAuthentication() {
-    const pendingDraft = pendingDraftRef.current;
+    const pendingSave = pendingSaveRef.current;
 
-    if (!pendingDraft) {
+    if (!pendingSave) {
       setSaveState({
         status: "failure",
         message: "Review the project once more before saving.",
@@ -185,7 +193,7 @@ export function CreateSharedTokenForm() {
       return;
     }
 
-    await persistProject(pendingDraft);
+    await persistProject(pendingSave);
   }
 
   const previewCode = draft.code.trim().toUpperCase() || "TOKEN";
