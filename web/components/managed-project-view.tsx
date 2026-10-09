@@ -1,9 +1,11 @@
 import Link from "next/link";
 
+import { buildMetadataReadiness } from "../lib/projects/metadata-readiness";
 import {
   type ManagedProjectProfile,
   projectPublicPath,
 } from "../lib/projects/project-profile";
+import { ManagedProjectMetadataForm } from "./managed-project-metadata-form";
 import { PublishProjectControl } from "./publish-project-control";
 
 export function ManagedProjectView({
@@ -13,6 +15,7 @@ export function ManagedProjectView({
 }) {
   const publicPath = projectPublicPath(project.slug);
   const published = project.publicStatus === "published";
+  const readiness = buildMetadataReadiness(project);
 
   return (
     <div className="page-stack">
@@ -99,6 +102,69 @@ export function ManagedProjectView({
             <PublishProjectControl projectId={project.projectId} />
           )}
         </article>
+      </section>
+
+      <ManagedProjectMetadataForm
+        projectId={project.projectId}
+        initial={{
+          displayName: project.displayName,
+          description: project.description ?? "",
+          logoUrl: project.logoUrl ?? "",
+          websiteUrl: project.websiteUrl ?? "",
+          communityUrl: project.communityUrl ?? "",
+        }}
+      />
+
+      <section className="surface-card readiness-card">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">Publication readiness</span>
+            <h2>What is ready, and what still needs infrastructure?</h2>
+          </div>
+          <span className="availability-badge">
+            {readiness.publicationReady
+              ? "Ready for future publication"
+              : "Needs attention"}
+          </span>
+        </div>
+
+        <div className="readiness-grid">
+          {readiness.items.map((item) => (
+            <article key={item.key} className="readiness-item">
+              <div className="readiness-item-heading">
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+              </div>
+              <p>{item.detail}</p>
+            </article>
+          ))}
+        </div>
+
+        {readiness.blockers.length > 0 ? (
+          <p className="readiness-note">
+            Publication blockers remain. Resolve the missing required fields
+            above before a future hosting step is enabled.
+          </p>
+        ) : null}
+
+        {readiness.toml.content ? (
+          <div className="toml-preview">
+            <div>
+              <span className="eyebrow">Generated stellar.toml preview</span>
+              <strong>Application-side only</strong>
+            </div>
+            <pre>{readiness.toml.content}</pre>
+            <small>
+              Generated: yes · Published: no · Reachable: no · Explorer
+              visibility: unverified
+            </small>
+          </div>
+        ) : null}
+
+        <p className="readiness-note">
+          Landing-page publication does not imply stellar.toml publication,
+          issuer deployment, explorer verification, or Stellar asset creation.
+        </p>
       </section>
 
       <section className="prototype-boundary">

@@ -117,6 +117,85 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
+  test("only the owner can update presentation metadata without changing project identity or metadata host", async () => {
+    const service = new ManagedProjectService(sql, {
+      network: "testnet",
+      now: () => NOW,
+    });
+    const repository = new PostgresProjectProfileRepository(sql);
+    const created = await service.createManagedProject({
+      ownerPublicKey: OWNER,
+      idempotencyKey: "acacacac-acac-4cac-8cac-acacacacacac",
+      code: "NOVA",
+      displayName: "Nova",
+      description: "Original metadata.",
+    });
+
+    const rejected = await repository.updateOwnedMetadata(
+      created.project.projectId,
+      OTHER,
+      {
+        displayName: "Hijacked",
+        description: "Must not persist.",
+        logoUrl: "https://evil.example/logo.png",
+        websiteUrl: null,
+        communityUrl: null,
+      },
+      NOW + 1,
+    );
+
+    assert.equal(rejected, null);
+
+    const unchanged = await repository.findOwnedById(
+      created.project.projectId,
+      OWNER,
+    );
+    assert.ok(unchanged);
+    assert.equal(unchanged.displayName, "Nova");
+    assert.equal(unchanged.logoUrl, null);
+
+    const updated = await repository.updateOwnedMetadata(
+      created.project.projectId,
+      OWNER,
+      {
+        displayName: "Nova Network",
+        description: "Updated managed metadata.",
+        logoUrl: "https://cdn.example.com/nova.png",
+        websiteUrl: "https://example.com/",
+        communityUrl: "https://community.example.com/nova",
+      },
+      NOW + 2,
+    );
+
+    assert.ok(updated);
+    assert.equal(updated.displayName, "Nova Network");
+    assert.equal(updated.description, "Updated managed metadata.");
+    assert.equal(updated.logoUrl, "https://cdn.example.com/nova.png");
+    assert.equal(updated.projectId, created.project.projectId);
+    assert.equal(updated.slug, created.project.slug);
+    assert.equal(updated.assetCode, created.project.assetCode);
+    assert.equal(updated.metadataHome, "assets.orrylo.com");
+    assert.equal(updated.issuerPublicKey, null);
+
+    await repository.publishOwned(created.project.projectId, OWNER, NOW + 3);
+    const publicProject = await repository.findPublishedBySlug(
+      created.project.slug,
+    );
+
+    assert.ok(publicProject);
+    assert.equal(publicProject.projectId, created.project.projectId);
+    assert.equal(publicProject.displayName, "Nova Network");
+    assert.equal(publicProject.websiteUrl, "https://example.com/");
+    assert.equal(publicProject.metadataHome, "assets.orrylo.com");
+
+    const html = renderToStaticMarkup(
+      ProjectLandingPage({ project: publicProject }),
+    );
+    assert.match(html, /Nova Network/);
+    assert.match(html, /Updated managed metadata/);
+    assert.match(html, /https:\/\/example\.com\//);
+  });
+
   test("wallet-session mismatch has zero project side effects and restored wallet A reuses the logical save", async () => {
     const service = new ManagedProjectService(sql, {
       network: "testnet",

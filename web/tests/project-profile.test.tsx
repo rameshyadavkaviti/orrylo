@@ -70,5 +70,34 @@ test("managed project view keeps ownership, routing, metadata, and on-chain stat
   assert.match(html, /TOML publication.*Not published/is);
   assert.match(html, /Stellar asset.*Not created/is);
   assert.match(html, /Publish public landing page/i);
+  assert.match(html, /Publication readiness/i);
+  assert.match(html, /stellar\.toml/i);
+  assert.match(html, /Explorer visibility/i);
+  assert.match(html, /Unverified/i);
+  assert.match(html, /Project image.*Missing/is);
+  assert.match(html, /Issuer linkage.*Not linked/is);
+  assert.match(html, /Generated stellar\.toml preview/i);
+  assert.match(html, /Generated: yes.*Published: no.*Reachable: no/is);
+  assert.match(html, /Save metadata/i);
   assert.doesNotMatch(html, /asset created successfully/i);
+});
+
+test("public landing page does not render unsafe persisted metadata URLs", () => {
+  const html = renderToStaticMarkup(
+    <ProjectLandingPage
+      project={{
+        ...PROJECT,
+        logoUrl: "data:image/png;base64,AAAA",
+        websiteUrl: "javascript:alert(1)",
+        communityUrl: "file:///tmp/community",
+        explorerUrl: "blob:https://orrylo.com/explorer",
+      }}
+    />,
+  );
+
+  assert.doesNotMatch(html, /javascript:alert/);
+  assert.doesNotMatch(html, /data:image/);
+  assert.doesNotMatch(html, /file:\/\/\//);
+  assert.doesNotMatch(html, /blob:https/);
+  assert.match(html, /project-public-logo-fallback/);
 });

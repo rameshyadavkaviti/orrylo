@@ -1,9 +1,14 @@
 import Link from "next/link";
 
+import { safeHttpsUrl } from "../lib/projects/project-metadata";
 import type { ProjectProfile } from "../lib/projects/project-profile";
 
 export function ProjectLandingPage({ project }: { project: ProjectProfile }) {
   const initial = project.assetCode.slice(0, 1);
+  const logoUrl = safeHttpsUrl(project.logoUrl);
+  const websiteUrl = safeHttpsUrl(project.websiteUrl);
+  const communityUrl = safeHttpsUrl(project.communityUrl);
+  const explorerUrl = safeHttpsUrl(project.explorerUrl);
 
   return (
     <div className="project-public-page">
@@ -19,8 +24,8 @@ export function ProjectLandingPage({ project }: { project: ProjectProfile }) {
           <a href="#about">About</a>
           <a href="#token">Token</a>
           <a href="#project">Project</a>
-          {project.explorerUrl ? (
-            <a href={project.explorerUrl} target="_blank" rel="noreferrer">
+          {explorerUrl ? (
+            <a href={explorerUrl ?? undefined} target="_blank" rel="noreferrer">
               Explorer ↗
             </a>
           ) : null}
@@ -34,12 +39,12 @@ export function ProjectLandingPage({ project }: { project: ProjectProfile }) {
               {project.category ?? "Stellar project"}
             </span>
             <div className="project-public-title-row">
-              {project.logoUrl ? (
+              {logoUrl ? (
                 <span
                   className="project-public-logo"
                   role="img"
                   aria-label={`${project.displayName} logo`}
-                  style={{ backgroundImage: `url("${project.logoUrl}")` }}
+                  style={{ backgroundImage: `url("${logoUrl}")` }}
                 />
               ) : (
                 <span className="project-public-logo project-public-logo-fallback">
@@ -56,20 +61,20 @@ export function ProjectLandingPage({ project }: { project: ProjectProfile }) {
                 "A Stellar project created and managed with Orrylo."}
             </p>
             <div className="project-public-actions">
-              {project.websiteUrl ? (
+              {websiteUrl ? (
                 <a
                   className="project-public-button project-public-button-primary"
-                  href={project.websiteUrl}
+                  href={websiteUrl ?? undefined}
                   target="_blank"
                   rel="noreferrer"
                 >
                   Visit project
                 </a>
               ) : null}
-              {project.communityUrl ? (
+              {communityUrl ? (
                 <a
                   className="project-public-button project-public-button-secondary"
-                  href={project.communityUrl}
+                  href={communityUrl ?? undefined}
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -132,8 +137,12 @@ export function ProjectLandingPage({ project }: { project: ProjectProfile }) {
               </span>
               <h2>Transparent Stellar identity</h2>
             </div>
-            {project.explorerUrl ? (
-              <a href={project.explorerUrl} target="_blank" rel="noreferrer">
+            {explorerUrl ? (
+              <a
+                href={explorerUrl ?? undefined}
+                target="_blank"
+                rel="noreferrer"
+              >
                 View on explorer ↗
               </a>
             ) : null}
@@ -175,13 +184,21 @@ export function ProjectLandingPage({ project }: { project: ProjectProfile }) {
               of truth.
             </p>
             <div className="project-public-links">
-              {project.websiteUrl ? (
-                <a href={project.websiteUrl} target="_blank" rel="noreferrer">
+              {websiteUrl ? (
+                <a
+                  href={websiteUrl ?? undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Website ↗
                 </a>
               ) : null}
-              {project.communityUrl ? (
-                <a href={project.communityUrl} target="_blank" rel="noreferrer">
+              {communityUrl ? (
+                <a
+                  href={communityUrl ?? undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Community ↗
                 </a>
               ) : null}

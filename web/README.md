@@ -145,6 +145,45 @@ back to `localhost`; a missing value is a deployment misconfiguration. The
 current public hostname must be updated when Orrylo moves from a temporary
 Railway hostname to the canonical custom domain.
 
+## Managed metadata publication readiness
+
+Managed Project Profiles now expose an owner-only metadata configuration step
+for the existing presentation fields: display name, description, durable logo
+URL, website URL, and one generic community/project link. The server derives
+the owner exclusively from the authenticated session and updates by stable
+`project_id`; asset code, slug, issuer model/network, metadata host, issuer
+public key, and publication status are not editable through this boundary.
+
+URL-bearing metadata accepts only normalized `https:` URLs without embedded
+credentials. Browser-local `data:` / `blob:` image references, `file:`,
+`javascript:`, and plain HTTP URLs are rejected and are also filtered from the
+public landing-page renderer as defense in depth. No media-storage provider is
+introduced.
+
+The application can deterministically generate an application-side
+`[[CURRENCIES]]` stellar.toml preview from Project Profile data. It includes
+`code`, `name`, optional `desc`, a checksum-valid issuer only when one is
+actually stored, and `image` only for a durable HTTPS image URL.
+
+Readiness deliberately keeps these states separate:
+
+```text
+Project metadata configured
+TOML generatable/generated locally
+TOML published = no
+TOML reachable = no
+Explorer visibility = unverified
+SAC visibility = unverified/not applicable
+Public landing-page publication = separate state
+Stellar asset creation = separate state
+```
+
+Shared Issuer readiness continues to use the canonical
+`assets.orrylo.com` metadata-home context. The reserved Shared Issuer
+candidate is not assigned to projects and no issuer/home_domain mutation is
+performed. Dedicated Issuer metadata remains future-facing when no real issuer
+or host exists.
+
 ## Workflow and idempotency foundation
 
 `workflow_intents` provides an inactive generic workflow record with:
@@ -236,9 +275,11 @@ secondary utility/diagnostic routes rather than primary customer navigation.
 
 Wallet authentication and its database state are real application behavior.
 Managed Project Profile creation, wallet ownership association, owner-scoped
-management reads, and Orrylo landing-page publication are real application
-behavior. Public project lookup reads the persisted Project Profile only after
-its `public_status` is `published`.
+management reads/metadata edits, application-side metadata readiness/TOML
+preview generation, and Orrylo landing-page publication are real application
+behavior. Public project lookup reads the same persisted Project Profile only
+after its `public_status` is `published`. TOML hosting/reachability and
+explorer verification are not implemented.
 
 Trusted first-token eligibility/reward preparation is real server-only database
 behavior, but it has no event producer or public mutation route. Stellar asset

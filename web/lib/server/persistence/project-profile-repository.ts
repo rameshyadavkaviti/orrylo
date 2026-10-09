@@ -1,3 +1,4 @@
+import type { NormalizedProjectMetadata } from "../../projects/project-metadata";
 import type {
   ManagedProjectProfile,
   ProjectProfile,
@@ -161,6 +162,36 @@ export class PostgresProjectProfileRepository {
     `;
 
     return rows.map(mapManagedProjectProfile);
+  }
+
+  async updateOwnedMetadata(
+    projectId: string,
+    ownerPublicKey: string,
+    input: NormalizedProjectMetadata,
+    now = Date.now(),
+  ): Promise<ManagedProjectProfile | null> {
+    if (!isValidProjectId(projectId)) {
+      return null;
+    }
+
+    const owner = normalizeWalletPublicKey(ownerPublicKey);
+    const [row] = await this.sql<ManagedProjectProfileRow[]>`
+      UPDATE project_profiles AS p
+      SET
+        display_name = ${input.displayName},
+        description = ${input.description},
+        logo_url = ${input.logoUrl},
+        website_url = ${input.websiteUrl},
+        community_url = ${input.communityUrl},
+        updated_at = ${new Date(now)}
+      FROM project_profile_owners AS o
+      WHERE p.project_id = ${projectId}
+        AND o.project_id = p.project_id
+        AND o.owner_public_key = ${owner}
+      RETURNING p.*, o.owner_public_key
+    `;
+
+    return row ? mapManagedProjectProfile(row) : null;
   }
 
   async publishOwned(
