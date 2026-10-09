@@ -11,7 +11,15 @@ This document records the decisions currently considered authoritative for Orryl
 - Primary network: **Stellar**
 - Initial wallet login target: **Albedo**
 
-Orrylo is intended to grow beyond a token creator. The product direction includes asset creation, contract-controlled token infrastructure, higher-level product creation, custom development, and supporting infrastructure on Stellar.
+Orrylo is not merely a Stellar token generator. Its core product lifecycle is:
+
+```
+Create → Publish → Manage → Grow
+```
+
+Token creation is the beginning of a persistent Orrylo project lifecycle, not the end of the workflow. A user should be able to create a Stellar token/project and continue managing and developing that project from Orrylo afterward.
+
+The broader product direction also includes contract-controlled token infrastructure, higher-level product creation, custom development, and supporting infrastructure on Stellar.
 
 ## 2. Product boundary
 
@@ -24,7 +32,49 @@ The first product family may expose services such as:
 - website / product development;
 - custom Stellar infrastructure.
 
-RYLO is intended to be the primary internal payment and membership asset for these services.
+RYLO is intended to be the primary internal payment and membership asset for these services, but it is a secondary ecosystem/member benefit rather than the primary reason a user enters Orrylo.
+
+### 2.1 Persistent Project Profile
+
+Every Orrylo-created project is intended to have a persistent managed Project Profile.
+
+The Project Profile is Orrylo's authoritative application-level representation of the project. It may expose appropriate editable project metadata over time, including display name, description, logo/image, project links, social/community links, and contact/project information.
+
+Editable project metadata must remain distinct from immutable or Stellar-constrained asset identity/state. The exact database schema and final mutability rules are not yet locked.
+
+The Project Profile is the common managed source for published/product representations such as:
+
+```
+Project Profile
+→ Orrylo Dashboard
+→ Public Landing Page
+→ stellar.toml / metadata publication
+→ explorer-facing metadata
+```
+
+These outputs must not become independent conflicting sources of truth.
+
+### 2.2 Publication and identity invariant
+
+The following separation is a canonical architecture invariant:
+
+**Project Identity ≠ Public URL ≠ Metadata Hosting**
+
+- **Project Identity** is represented by a stable internal project identifier (`project_id` or equivalent). It must not depend on the current slug, public URL, domain, metadata host, or hosting provider.
+- **Public URL** is a presentation/publication concern. For the MVP, the approved public project route is `orrylo.com/p/<slug>`. The slug is human-readable routing state, not the project's fundamental identity.
+- **Metadata Hosting** is a separate Stellar publication concern. `stellar.toml` and related issuer metadata must not be coupled to `/p/<slug>`.
+
+The architecture must allow a public project page to evolve from:
+
+```
+orrylo.com/p/nova
+→ nova.orrylo.com
+→ novatoken.com
+```
+
+without recreating the project or changing its internal identity. Old public routes should be able to use permanent redirects when publication locations move.
+
+Changing a landing-page hostname, slug, custom domain, or hosting provider must not implicitly move or redefine Stellar metadata hosting.
 
 ## 3. Asset issuance tiers
 
@@ -276,32 +326,85 @@ The immediate execution goal is to reach a **simple public prototype on the Orry
 The first public-facing experience should:
 
 - communicate Orrylo's core idea to a new visitor within approximately **30–60 seconds**;
+- follow the anonymous-first journey **Idea → Build → Live Preview → Readiness → Connect Wallet → Create on Stellar**;
+- allow a visitor to meaningfully configure and preview a project before wallet connection;
+- place wallet connection at the genuine identity/signing/ownership/on-chain execution boundary;
 - present a small number of obvious actions rather than a dense or unfinished dashboard;
 - make the primary interactive paths easy to discover and test;
 - clearly distinguish working prototype capabilities from unavailable or future capabilities;
-- avoid exposing half-implemented flows as if they were complete;
+- avoid fake on-chain completion or exposing half-implemented flows as if they were complete;
 - be suitable for early promotion, user acquisition, and product feedback once the deployed prototype path is stable.
 
 Prototype speed should come from constrained scope and clear UX, not from weakening security, data integrity, deployment evidence, or canonical policy.
 
-## 15. Domain architecture
+## 15. Domain and publication architecture
 
 Approved prototype public structure:
 
 ```
 orrylo.com                     public prototype application
+orrylo.com/p/<slug>            MVP public project / landing page
 assets.orrylo.com              Shared Issuer metadata
-<project>.orrylo.com           Dedicated Issuer metadata
-<custom-domain>                optional future dedicated-domain support
+<project>.orrylo.com           Dedicated Issuer metadata and possible future project publication host
+<custom-domain>                optional future dedicated/public-domain support
 ```
 
 For the prototype, the interactive Orrylo application is deployed directly at `orrylo.com`; `app.orrylo.com` is not required.
 
+The MVP free public project page is `orrylo.com/p/<slug>`. This route is only a publication layer and must not be used as the project's internal identity or as an implicit Stellar metadata-hosting location.
+
 A separate marketing/application split may be introduced later if it becomes operationally useful, but it is not part of the current prototype baseline.
 
-Shared assets use the shared issuer home domain.
+Shared assets continue to use the shared issuer home domain. Dedicated issuers may use per-project metadata domains and later custom domains according to the dedicated-issuer architecture. Public landing-page hosting and metadata hosting remain separate concerns even if a future domain happens to serve both roles.
 
-Dedicated issuers may use per-project subdomains and later custom domains.
+### 15.1 Managed Stellar metadata
+
+High-quality Stellar metadata publication is a first-class Orrylo product capability.
+
+Orrylo should ultimately generate, publish, update, and validate appropriate `stellar.toml` / Stellar metadata from the managed Project Profile so users do not need to understand TOML hosting mechanics merely to maintain a professionally presented Stellar project.
+
+Product/readiness status may expose concepts such as:
+
+- metadata configured;
+- TOML published and reachable;
+- image reachable;
+- issuer linkage valid;
+- SAC visibility/verification where applicable;
+- explorer visibility.
+
+These are product/readiness concepts, not guarantees that every external explorer will update instantly or identically.
+
+### 15.2 Free generated project landing page
+
+An Orrylo project receives a free generated public landing page as part of the managed project lifecycle.
+
+For MVP the route is:
+
+```
+orrylo.com/p/<slug>
+```
+
+The page is data-driven from the Project Profile and uses the approved Orrylo visual direction rather than project-specific hard-coded content.
+
+The approved free-template information hierarchy includes, where data exists:
+
+- Orrylo branding/navigation;
+- project/token logo;
+- asset code and display/project name;
+- description and project/category context;
+- community/project calls to action;
+- issuer identity and network;
+- project/asset status and explorer link;
+- About / project details;
+- useful project characteristics;
+- token information;
+- project/social/community links;
+- Stellar context;
+- Orrylo footer/branding.
+
+The approved NOVA mockup is the visual reference for this free template. NOVA-specific content, gaming visuals, Discord, Telegram, or any particular social network are not product requirements.
+
+Multiple template variants, custom-domain pricing, exact custom-domain verification, final media storage, exact slug mutation policy, exact metadata edit permissions, and the exact TOML deployment mechanism remain unresolved unless separately canonicalized.
 
 ## 16. Current RYLO issuer candidate
 
