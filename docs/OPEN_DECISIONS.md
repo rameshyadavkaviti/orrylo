@@ -72,7 +72,11 @@ Decided:
   `Master=0, A=1, B=1, C=1, low=2, medium=2, high=2`;
 - routine protected Testnet operations use A+B;
 - A+C or B+C is recovery-only;
-- Master is disabled only after the multisig path has been tested successfully.
+- Master remains at weight 1 during initial configuration;
+- after A/B/C and the intended thresholds are configured, the routine A+B path
+  must be successfully tested and proven;
+- only a successful A+B test satisfies the prerequisite for Master weight 0;
+  testing A+C or B+C does not satisfy that prerequisite.
 
 Still open:
 

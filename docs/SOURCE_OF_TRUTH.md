@@ -362,9 +362,18 @@ Operational interpretation:
 
 - routine protected operations require **A + B**;
 - recovery may use **A + C** or **B + C** only under the recovery procedure;
-- no individual signer may independently authorize issuer operations;
-- the Master signer is disabled only after the multisig configuration has been
-  tested successfully.
+- no individual signer may independently authorize issuer operations.
+
+Required Testnet safety sequence:
+
+1. Keep the Master signer at weight **1** during initial configuration.
+2. Configure A, B, C and the intended low/medium/high thresholds.
+3. Successfully test and prove the routine **A + B** authorization path.
+4. Only after the **A + B** test succeeds may the Master signer be reduced to
+   weight **0**.
+
+Testing **A + C** or **B + C** does not satisfy step 3 because those paths are
+recovery-only.
 
 The approved RYLO issuer flags remain:
 

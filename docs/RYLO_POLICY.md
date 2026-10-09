@@ -287,9 +287,18 @@ Interpretation:
 
 - routine protected operations use **A + B**;
 - **A + C** or **B + C** is reserved for an explicit recovery procedure;
-- no individual signer may independently authorize issuer operations;
-- the Master signer must not be reduced to weight `0` until the configured
-  multisig path has been tested successfully.
+- no individual signer may independently authorize issuer operations.
+
+Required Testnet safety sequence:
+
+1. Keep the Master signer at weight **1** during initial configuration.
+2. Configure A, B, C and the intended low/medium/high thresholds.
+3. Successfully test and prove the routine **A + B** authorization path.
+4. Only after the **A + B** test succeeds may the Master signer be reduced to
+   weight `0`.
+
+A successful **A + C** or **B + C** recovery-path test must not be treated as
+satisfying the prerequisite for Master weight `0`.
 
 This locks the account-level Testnet signer/threshold policy. It does not select
 the final production key-management provider, Signer B service infrastructure,

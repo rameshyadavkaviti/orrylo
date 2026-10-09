@@ -272,5 +272,8 @@ high   = 2
 
 The currently verified pre-ceremony Testnet state has Master/A/B/C at weight
 `1`, thresholds `0/0/0`, and all three RYLO authorization/clawback flags off.
-The Master weight may move to `0` only after the multisig path has been tested
-successfully. Routine operation is A+B; A+C or B+C is recovery-only.
+During initial configuration the Master must remain at weight `1`. After A, B,
+C and the intended thresholds are configured, the routine **A+B** authorization
+path must be successfully tested and proven. Only then may the Master weight move
+to `0`. A+C or B+C remains recovery-only and testing either recovery path does
+not satisfy the prerequisite for Master→0.
