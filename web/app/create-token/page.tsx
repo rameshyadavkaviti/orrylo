@@ -8,8 +8,8 @@ export function CreateTokenPage() {
         <h1>Build a Stellar token before you connect anything.</h1>
         <p>
           Explore Orrylo anonymously: shape the identity, brand, infrastructure,
-          and metadata presentation, then see the result update live. A wallet is
-          only needed at a future identity or on-chain execution boundary.
+          and metadata presentation, then see the result update live. A wallet
+          is only needed at a future identity or on-chain execution boundary.
         </p>
       </div>
 

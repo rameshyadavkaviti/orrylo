@@ -67,11 +67,8 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Diagnose formatting
-        run: |
-          npm run format
-          git diff -- app/create-token/page.tsx app/globals.css app/prototype.css app/rylo/page.tsx
-          exit 1
+      - name: Check formatting
+        run: npm run format:check
 
       - name: Lint
         run: npm run lint
