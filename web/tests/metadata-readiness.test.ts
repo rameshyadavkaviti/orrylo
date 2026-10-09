@@ -82,3 +82,23 @@ test("Shared Issuer readiness requires the canonical metadata host context", () 
   assert.equal(readiness.publicationReady, false);
   assert.ok(readiness.blockers.includes("metadata_home"));
 });
+
+test("optional description and image are reported without becoming invented publication blockers", () => {
+  const readiness = buildMetadataReadiness({
+    ...BASE,
+    description: null,
+    logoUrl: null,
+    issuerPublicKey: ISSUER,
+  });
+
+  assert.equal(readiness.metadataConfigured, true);
+  assert.equal(readiness.publicationReady, true);
+  assert.equal(readiness.blockers.includes("description"), false);
+  assert.equal(readiness.blockers.includes("image_reference"), false);
+
+  const byKey = Object.fromEntries(
+    readiness.items.map((item) => [item.key, item]),
+  );
+  assert.equal(byKey.description?.value, "Missing");
+  assert.equal(byKey.image_reference?.value, "Missing");
+});
