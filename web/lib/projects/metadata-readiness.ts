@@ -183,8 +183,7 @@ export function buildMetadataReadiness(
       label: "stellar.toml published",
       state: "not_published",
       value: "No",
-      detail:
-        "No TOML publication mechanism is activated by this feature.",
+      detail: "No TOML publication mechanism is activated by this feature.",
     },
     {
       key: "toml_reachable",
@@ -226,8 +225,7 @@ export function buildMetadataReadiness(
       label: "Stellar asset",
       state: "not_applicable",
       value: "Not created",
-      detail:
-        "Metadata readiness does not issue or mutate a Stellar asset.",
+      detail: "Metadata readiness does not issue or mutate a Stellar asset.",
     },
   ];
 
