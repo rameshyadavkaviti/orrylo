@@ -60,34 +60,37 @@ test("pending managed-project request never carries an owner wallet field", () =
   assert.equal("ownerPublicKey" in prepared.pending.request, false);
 });
 
-test("post-authentication retry carries the authenticated wallet only as a continuity assertion", () => {
-  const prepared = prepareManagedProjectSave(
-    {
-      code: "NOVA",
-      displayName: "Nova",
-      description: "Frozen before authentication.",
-    },
-    "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-  );
+test(
+  "post-authentication retry carries the authenticated wallet only as a continuity assertion",
+  () => {
+    const prepared = prepareManagedProjectSave(
+      {
+        code: "NOVA",
+        displayName: "Nova",
+        description: "Frozen before authentication.",
+      },
+      "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    );
 
-  assert.equal(prepared.ok, true);
+    assert.equal(prepared.ok, true);
 
-  if (!prepared.ok) {
-    return;
-  }
+    if (!prepared.ok) {
+      return;
+    }
 
-  const walletA =
-    "GA6HCMBLTZS5VQ3FPJ4SCA5PXI4D54ZZG6EXOWZOCN2H7P7PVOQC7F3Y";
-  const asserted = withWalletContinuityAssertion(prepared.pending, walletA);
+    const walletA =
+      "GA6HCMBLTZS5VQ3FPJ4SCA5PXI4D54ZZG6EXOWZOCN2H7P7PVOQC7F3Y";
+    const asserted = withWalletContinuityAssertion(prepared.pending, walletA);
 
-  assert.equal(asserted.request.authenticatedWalletAssertion, walletA);
-  assert.equal("ownerPublicKey" in asserted.request, false);
-  assert.equal(
-    prepared.pending.request.authenticatedWalletAssertion,
-    undefined,
-  );
-  assert.equal(
-    asserted.request.idempotencyKey,
-    prepared.pending.request.idempotencyKey,
-  );
-});
+    assert.equal(asserted.request.authenticatedWalletAssertion, walletA);
+    assert.equal("ownerPublicKey" in asserted.request, false);
+    assert.equal(
+      prepared.pending.request.authenticatedWalletAssertion,
+      undefined,
+    );
+      assert.equal(
+        asserted.request.idempotencyKey,
+        prepared.pending.request.idempotencyKey,
+      );
+  },
+);
