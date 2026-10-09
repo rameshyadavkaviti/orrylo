@@ -67,8 +67,11 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Check formatting
-        run: npm run format:check
+      - name: Diagnose CSS formatting
+        run: |
+          npm run format
+          git diff -- app/globals.css app/prototype.css
+          exit 1
 
       - name: Lint
         run: npm run lint
