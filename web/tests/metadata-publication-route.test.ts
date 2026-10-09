@@ -65,10 +65,10 @@ test("public shared TOML route aggregates only canonical Testnet publications de
   assert.match(response.headers.get("content-type") ?? "", /^text\/plain/);
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.equal(response.headers.get("access-control-allow-origin"), "*");
-  assert.equal(response.headers.get("x-orrylo-metadata-home"), "assets.orrylo.com");
   assert.equal(
-    body,
-    `${alpha.currencyToml}\n${nova.currencyToml}`,
+    response.headers.get("x-orrylo-metadata-home"),
+    "assets.orrylo.com",
   );
+  assert.equal(body, `${alpha.currencyToml}\n${nova.currencyToml}`);
   assert.doesNotMatch(body, /WRONG|MAIN/);
 });
