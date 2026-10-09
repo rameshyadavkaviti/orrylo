@@ -1,6 +1,6 @@
 export const NAV_ITEMS = [
   { label: "Home", href: "/" },
-  { label: "Create Token", href: "/create-token" },
+  { label: "Create Token", href: "/create" },
   { label: "RYLO", href: "/rylo" },
   { label: "Products & Services", href: "/products" },
   { label: "My Assets", href: "/my-assets" },

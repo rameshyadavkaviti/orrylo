@@ -549,7 +549,7 @@ code {
   font-weight: 700;
 }
 
-.field input {
+.field input,\n.field textarea {
   width: 100%;
   border: 1px solid #dfe2ec;
   border-radius: 12px;
@@ -559,7 +559,7 @@ code {
   outline: none;
 }
 
-.field input:focus {
+.field input:focus,\n.field textarea:focus {
   border-color: #9b89f7;
   box-shadow: 0 0 0 3px rgba(118, 86, 245, 0.12);
 }

@@ -36,8 +36,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="eyebrow">Early prototype</span>
           <strong>Explore before launch</strong>
           <p>
-            Draft and preview a token today. On-chain token creation is not
-            enabled yet.
+            Build and explore a token without a wallet. Connect only when a
+            later identity or execution step needs it.
           </p>
         </div>
       </aside>
@@ -47,7 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div>
             <span className="eyebrow">Stellar made approachable</span>
             <p className="topbar-copy">
-              Create a clear token draft, then grow into more Orrylo services.
+              Build and preview a Stellar token before you connect a wallet.
             </p>
           </div>
           <div id="wallet-connect" className="topbar-actions">
