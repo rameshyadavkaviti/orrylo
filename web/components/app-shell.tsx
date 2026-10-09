@@ -11,7 +11,7 @@ import { WalletAuthControl } from "./wallet-auth-control";
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
-  if (pathname.startsWith("/p/")) {
+  if (pathname?.startsWith("/p/")) {
     return <>{children}</>;
   }
 
