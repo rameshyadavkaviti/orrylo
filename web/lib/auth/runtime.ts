@@ -6,13 +6,8 @@ import {
 import { getDatabaseClient } from "../server/persistence/database";
 import { WalletAuthService } from "./service";
 
-interface AuthEnvironment {
-  ORRYLO_AUTH_DOMAIN?: string;
-  NEXT_PUBLIC_STELLAR_NETWORK?: string;
-}
-
 export function readServerAuthConfig(
-  env: AuthEnvironment = process.env,
+  env: Record<string, string | undefined> = process.env,
   nodeEnv = process.env.NODE_ENV,
 ): {
   domain: string;
