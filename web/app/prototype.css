@@ -1153,7 +1153,6 @@
   }
 }
 
-
 .readiness-card {
   display: grid;
   gap: 20px;
@@ -1217,7 +1216,6 @@
     grid-template-columns: 1fr;
   }
 }
-
 
 .metadata-editor {
   display: grid;
