@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { test } from "node:test";
 
 import { Keypair } from "@stellar/stellar-sdk/base";
@@ -37,9 +37,9 @@ test(
     assert.ok(challenge.payload);
 
     const signedMessage = `${wallet.publicKey()}:${challenge.payload}`;
-    const signature = wallet
-      .sign(createHash("sha256").update(signedMessage).digest())
-      .toString("hex");
+    const signature = Buffer.from(
+      wallet.sign(createHash("sha256").update(signedMessage).digest()),
+    ).toString("hex");
 
     const verifyResponse = await fetch(`${ORIGIN}/api/auth/verify`, {
       method: "POST",
