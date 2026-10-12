@@ -266,7 +266,8 @@ The approved first-prototype infrastructure baseline is intentionally low-cost a
 - application/backend hosting: **Railway**, expected starting cost about **$5/month**;
 - PostgreSQL: **Neon Free** initially;
 - DNS/CDN: **Cloudflare Free**;
-- Stellar environment: **Testnet**;
+- Stellar engineering/deployment baseline: **Testnet** for the currently recorded issuer and contract preparation evidence;
+- immediate execution direction: **Mainnet preparation**, without treating any issuer, asset, SAC, or application flow as Mainnet-deployed until explicit deployment evidence is recorded;
 - existing Orrylo domain: reused with no new prototype-domain purchase.
 
 This is a **prototype deployment baseline**, not a permanent production-provider commitment.
@@ -326,9 +327,9 @@ The immediate execution goal is to reach a **simple public prototype on the Orry
 The first public-facing experience should:
 
 - communicate Orrylo's core idea to a new visitor within approximately **30–60 seconds**;
-- follow the anonymous-first journey **Idea → Build → Live Preview → Readiness → Connect Wallet → Create on Stellar**;
-- allow a visitor to meaningfully configure and preview a project before wallet connection;
-- place wallet connection at the genuine identity/signing/ownership/on-chain execution boundary;
+- require **Albedo wallet login from the beginning of the interactive prototype flow**;
+- treat the authenticated wallet as the application identity and project-ownership boundary before token/project configuration is persisted or managed;
+- do not present the current prototype as an anonymous-first builder flow;
 - present a small number of obvious actions rather than a dense or unfinished dashboard;
 - make the primary interactive paths easy to discover and test;
 - clearly distinguish working prototype capabilities from unavailable or future capabilities;
@@ -533,6 +534,13 @@ The repository also contains an initial Next.js application foundation under
 - modular contract-read/transaction adapter interfaces plus a narrow Albedo authentication adapter;
 - Contract Interface v1 compatibility checks and typed error mapping;
 - application formatting, lint, typecheck, test, build, and CI gates.
+
+The public prototype is now served at `orrylo.com` through Railway with a valid
+TLS certificate, and production wallet authentication is configured for the
+`orrylo.com` hostname. This deployment evidence does not imply that project
+persistence, metadata publication, or any on-chain path is healthy or complete;
+those capabilities still require their own successful runtime/deployment
+evidence.
 
 The web application now implements authentication-only Albedo wallet proof with
 durable PostgreSQL-backed challenges and server-side sessions. It also contains
