@@ -21,8 +21,18 @@ test("accepts exact initial supply without floating-point rounding", () => {
 
 test("rejects invalid, negative, zero, overprecision and overflow amounts", () => {
   for (const value of [
-    "", "0", "0.0000000", "-1", "1e3", "1,000", "1.",
-    "1.00000001", "0.00000001", "Infinity", "1a", "922337203686",
+    "",
+    "0",
+    "0.0000000",
+    "-1",
+    "1e3",
+    "1,000",
+    "1.",
+    "1.00000001",
+    "0.00000001",
+    "Infinity",
+    "1a",
+    "922337203686",
   ]) {
     assert.equal(validateInitialSupply(value).valid, false, value);
   }
