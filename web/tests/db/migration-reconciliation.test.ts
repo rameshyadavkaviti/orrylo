@@ -78,7 +78,6 @@ if (!TEST_DATABASE_URL) {
     assert.deepEqual(again.verified, ALL_MIGRATIONS);
   });
 
-
   test("existing 001-005 database upgrades with 006 without rewriting earlier checksums or project rows", async () => {
     const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-metadata-"));
     try {
@@ -101,7 +100,9 @@ if (!TEST_DATABASE_URL) {
         SELECT name, checksum FROM schema_migrations ORDER BY name
       `;
       const upgraded = await migrateDatabase(sql, directory);
-      assert.deepEqual(upgraded.applied, ["006_project_metadata_publications.sql"]);
+      assert.deepEqual(upgraded.applied, [
+        "006_project_metadata_publications.sql",
+      ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 5));
       const after = await sql<{ name: string; checksum: string }[]>`
         SELECT name, checksum FROM schema_migrations ORDER BY name

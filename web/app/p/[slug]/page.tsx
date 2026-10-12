@@ -47,15 +47,18 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   );
   // Public profile presentation cannot infer issuer authority from mutable
   // project_profiles. The issuer is shown only when durable proof matches.
-  const [owner] = await getDatabaseClient()<{
-    owner_public_key: string;
-  }[]>`
+  const [owner] = await getDatabaseClient()<
+    {
+      owner_public_key: string;
+    }[]
+  >`
     SELECT owner_public_key FROM project_profile_owners
     WHERE project_id = ${project.projectId}
   `;
   const provenance = owner
-    ? await new PostgresSharedAssetProvenanceReader(getDatabaseClient())
-        .findConfirmed(project.projectId, owner.owner_public_key.trim())
+    ? await new PostgresSharedAssetProvenanceReader(
+        getDatabaseClient(),
+      ).findConfirmed(project.projectId, owner.owner_public_key.trim())
     : null;
   const trustedIssuer =
     provenance?.assetCode === project.assetCode &&

@@ -211,7 +211,8 @@ export class MetadataPublicationService {
           existing.asset_code === project.assetCode &&
           existing.issuer_public_key.trim() === generated.issuerPublicKey &&
           existing.issuance_request_id === provenance.issuanceRequestId &&
-          existing.issuance_fingerprint.trim() === provenance.reservationFingerprint
+          existing.issuance_fingerprint.trim() ===
+            provenance.reservationFingerprint
         ) {
           return {
             changed: false,

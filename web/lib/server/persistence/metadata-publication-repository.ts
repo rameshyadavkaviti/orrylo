@@ -42,14 +42,16 @@ export class PostgresMetadataPublicationRepository {
       source.assetCode === row.asset_code &&
       source.issuerPublicKey === row.issuer_public_key.trim() &&
       source.issuanceRequestId === row.issuance_request_id &&
-      source.reservationFingerprint === row.issuance_fingerprint.trim()
+      source.reservationFingerprint === row.issuance_fingerprint.trim(),
     );
   }
 
   async getByProjectId(
     projectId: string,
   ): Promise<MetadataPublicationState | null> {
-    const [row] = await this.sql<(MetadataPublicationRow & { owner_public_key: string })[]>`
+    const [row] = await this.sql<
+      (MetadataPublicationRow & { owner_public_key: string })[]
+    >`
       SELECT pub.*, owner.owner_public_key
       FROM project_metadata_publications AS pub
       JOIN project_profile_owners AS owner ON owner.project_id = pub.project_id
@@ -62,14 +64,19 @@ export class PostgresMetadataPublicationRepository {
           OR project.issuer_public_key = pub.issuer_public_key)
       LIMIT 1
     `;
-    if (!row || !(await this.hasValidProvenance(row, row.owner_public_key.trim()))) {
+    if (
+      !row ||
+      !(await this.hasValidProvenance(row, row.owner_public_key.trim()))
+    ) {
       return null;
     }
     return mapMetadataPublication(row);
   }
 
   async listSharedTestnetPublications(): Promise<MetadataPublicationState[]> {
-    const rows = await this.sql<(MetadataPublicationRow & { owner_public_key: string })[]>`
+    const rows = await this.sql<
+      (MetadataPublicationRow & { owner_public_key: string })[]
+    >`
       SELECT pub.*, owner.owner_public_key
       FROM project_metadata_publications AS pub
       JOIN project_profile_owners AS owner ON owner.project_id = pub.project_id

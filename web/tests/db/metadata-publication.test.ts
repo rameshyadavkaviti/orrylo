@@ -36,7 +36,9 @@ if (!TEST_DATABASE_URL) {
   const OWNER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 81)).publicKey();
   const OTHER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 82)).publicKey();
   const ISSUER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 83)).publicKey();
-  const ARBITRARY = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 84)).publicKey();
+  const ARBITRARY = Keypair.fromRawEd25519Seed(
+    Buffer.alloc(32, 84),
+  ).publicKey();
   const NOW = Date.parse("2026-10-09T12:00:00.000Z");
   let clock = NOW;
 
@@ -409,7 +411,6 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
-
   async function recordSyntheticConfirmedProvenance(
     projectId: string,
     assetCode: string,
@@ -456,8 +457,25 @@ if (!TEST_DATABASE_URL) {
     `;
     const audit = new PostgresAuditRepository(sql);
     for (const [eventType, metadata] of [
-      ["SHARED_ISSUANCE_INTENT_CREATED", { projectId, assetCode, issuerPublicKey: issuer, reservationFingerprint: fingerprint, network: "testnet" }],
-      ["SHARED_ISSUANCE_ASSET_CODE_RESERVED", { projectId, assetCode, issuerPublicKey: issuer, status: "awaiting_issuer_integration" }],
+      [
+        "SHARED_ISSUANCE_INTENT_CREATED",
+        {
+          projectId,
+          assetCode,
+          issuerPublicKey: issuer,
+          reservationFingerprint: fingerprint,
+          network: "testnet",
+        },
+      ],
+      [
+        "SHARED_ISSUANCE_ASSET_CODE_RESERVED",
+        {
+          projectId,
+          assetCode,
+          issuerPublicKey: issuer,
+          status: "awaiting_issuer_integration",
+        },
+      ],
     ] as const) {
       await audit.append({
         eventType,
@@ -472,7 +490,6 @@ if (!TEST_DATABASE_URL) {
     return { requestId, fingerprint };
   }
 
-
   test("arbitrary checksum-valid issuer from mutable Project Profile is rejected", async () => {
     const project = await createEligibleProject({
       code: "NOVA",
@@ -482,12 +499,19 @@ if (!TEST_DATABASE_URL) {
     await sql`UPDATE project_profiles SET issuer_public_key = ${ARBITRARY}
       WHERE project_id = ${project.projectId}`;
     await assert.rejects(
-      publicationService(successVerifier).publishOwnedProject(project.projectId, OWNER),
-      (error: unknown) => error instanceof MetadataPublicationError &&
+      publicationService(successVerifier).publishOwnedProject(
+        project.projectId,
+        OWNER,
+      ),
+      (error: unknown) =>
+        error instanceof MetadataPublicationError &&
         error.code === "issuer_provenance_mismatch",
     );
     assert.deepEqual(
-      await new PostgresMetadataPublicationRepository(sql, ISSUER).listSharedTestnetPublications(),
+      await new PostgresMetadataPublicationRepository(
+        sql,
+        ISSUER,
+      ).listSharedTestnetPublications(),
       [],
     );
   });
@@ -500,40 +524,71 @@ if (!TEST_DATABASE_URL) {
       skipProvenance: true,
     });
     await assert.rejects(
-      publicationService(successVerifier).publishOwnedProject(project.projectId, OWNER),
-      (error: unknown) => error instanceof MetadataPublicationError &&
+      publicationService(successVerifier).publishOwnedProject(
+        project.projectId,
+        OWNER,
+      ),
+      (error: unknown) =>
+        error instanceof MetadataPublicationError &&
         error.code === "issuer_provenance_unavailable",
     );
-    await recordSyntheticConfirmedProvenance(project.projectId, "NOVA", ARBITRARY);
+    await recordSyntheticConfirmedProvenance(
+      project.projectId,
+      "NOVA",
+      ARBITRARY,
+    );
     await assert.rejects(
-      publicationService(successVerifier).publishOwnedProject(project.projectId, OWNER),
-      (error: unknown) => error instanceof MetadataPublicationError &&
+      publicationService(successVerifier).publishOwnedProject(
+        project.projectId,
+        OWNER,
+      ),
+      (error: unknown) =>
+        error instanceof MetadataPublicationError &&
         error.code === "issuer_provenance_unavailable",
     );
   });
 
   test("cross-owner, wrong-network, mismatched asset code and tampered fingerprint are rejected", async () => {
     for (const mutation of [
-      async (id: string) => sql`UPDATE project_issuance_intents SET owner_public_key = ${OTHER}
+      async (
+        id: string,
+      ) => sql`UPDATE project_issuance_intents SET owner_public_key = ${OTHER}
         WHERE project_id = ${id}`,
-      async (id: string) => sql`UPDATE project_issuance_intents SET network = 'public'
+      async (
+        id: string,
+      ) => sql`UPDATE project_issuance_intents SET network = 'public'
         WHERE project_id = ${id}`,
-      async (id: string) => sql`UPDATE project_issuance_intents SET asset_code = 'WRONG'
+      async (
+        id: string,
+      ) => sql`UPDATE project_issuance_intents SET asset_code = 'WRONG'
         WHERE project_id = ${id}`,
-      async (id: string) => sql`UPDATE project_issuance_intents SET reservation_fingerprint = ${"f".repeat(64)}
+      async (
+        id: string,
+      ) => sql`UPDATE project_issuance_intents SET reservation_fingerprint = ${"f".repeat(64)}
         WHERE project_id = ${id}`,
     ]) {
       const project = await createEligibleProject({
-        code: "NOVA", displayName: "Nova", idempotencyKey: randomUUID(),
+        code: "NOVA",
+        displayName: "Nova",
+        idempotencyKey: randomUUID(),
       });
       await mutation(project.projectId);
       await assert.rejects(
-        publicationService(successVerifier).publishOwnedProject(project.projectId, OWNER),
-        (error: unknown) => error instanceof MetadataPublicationError &&
+        publicationService(successVerifier).publishOwnedProject(
+          project.projectId,
+          OWNER,
+        ),
+        (error: unknown) =>
+          error instanceof MetadataPublicationError &&
           error.code === "issuer_provenance_unavailable",
       );
       assert.equal(
-        (await new PostgresMetadataPublicationRepository(sql, ISSUER).listSharedTestnetPublications()).length,
+        (
+          await new PostgresMetadataPublicationRepository(
+            sql,
+            ISSUER,
+          ).listSharedTestnetPublications()
+        ).length,
         0,
       );
       await sql`DELETE FROM project_issuance_intents WHERE project_id = ${project.projectId}`;
@@ -542,9 +597,14 @@ if (!TEST_DATABASE_URL) {
 
   test("stale or failed issuance provenance removes previously published TOML and blocks retry", async () => {
     const project = await createEligibleProject({
-      code: "NOVA", displayName: "Nova", idempotencyKey: randomUUID(),
+      code: "NOVA",
+      displayName: "Nova",
+      idempotencyKey: randomUUID(),
     });
-    await publicationService(successVerifier).publishOwnedProject(project.projectId, OWNER);
+    await publicationService(successVerifier).publishOwnedProject(
+      project.projectId,
+      OWNER,
+    );
     const repository = new PostgresMetadataPublicationRepository(sql, ISSUER);
     assert.equal((await repository.listSharedTestnetPublications()).length, 1);
     await sql`UPDATE project_issuance_intents SET status = 'failed'
@@ -552,15 +612,21 @@ if (!TEST_DATABASE_URL) {
     assert.deepEqual(await repository.listSharedTestnetPublications(), []);
     assert.equal(await repository.getByProjectId(project.projectId), null);
     await assert.rejects(
-      publicationService(successVerifier).publishOwnedProject(project.projectId, OWNER),
-      (error: unknown) => error instanceof MetadataPublicationError &&
+      publicationService(successVerifier).publishOwnedProject(
+        project.projectId,
+        OWNER,
+      ),
+      (error: unknown) =>
+        error instanceof MetadataPublicationError &&
         error.code === "issuer_provenance_unavailable",
     );
   });
 
   test("no configured approved issuer can ever publish, regardless of database rows", async () => {
     const project = await createEligibleProject({
-      code: "NOVA", displayName: "Nova", idempotencyKey: randomUUID(),
+      code: "NOVA",
+      displayName: "Nova",
+      idempotencyKey: randomUUID(),
     });
     const unconfigured = new MetadataPublicationService(sql, {
       verifier: successVerifier,
@@ -568,11 +634,15 @@ if (!TEST_DATABASE_URL) {
     });
     await assert.rejects(
       unconfigured.publishOwnedProject(project.projectId, OWNER),
-      (error: unknown) => error instanceof MetadataPublicationError &&
+      (error: unknown) =>
+        error instanceof MetadataPublicationError &&
         error.code === "issuer_provenance_unavailable",
     );
     assert.deepEqual(
-      await new PostgresMetadataPublicationRepository(sql, null).listSharedTestnetPublications(),
+      await new PostgresMetadataPublicationRepository(
+        sql,
+        null,
+      ).listSharedTestnetPublications(),
       [],
     );
   });

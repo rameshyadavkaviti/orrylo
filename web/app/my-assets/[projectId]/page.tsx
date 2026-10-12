@@ -40,8 +40,9 @@ export default async function ManagedProjectPage({
 
   const publicationRepository = new PostgresMetadataPublicationRepository(sql);
   const publication = await publicationRepository.getByProjectId(projectId);
-  const provenance = await new PostgresSharedAssetProvenanceReader(sql)
-    .findConfirmed(projectId, session.publicKey);
+  const provenance = await new PostgresSharedAssetProvenanceReader(
+    sql,
+  ).findConfirmed(projectId, session.publicKey);
   const trustedIssuer =
     provenance?.assetCode === project.assetCode &&
     provenance.network === project.network &&

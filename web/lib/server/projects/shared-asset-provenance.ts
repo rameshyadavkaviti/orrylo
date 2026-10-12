@@ -51,7 +51,8 @@ export class PostgresSharedAssetProvenanceReader {
 
   constructor(
     private readonly sql: DatabaseClient,
-    approvedIssuer: string | null | undefined = process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY,
+    approvedIssuer: string | null | undefined = process.env
+      .ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY,
   ) {
     try {
       this.approvedIssuer = approvedIssuer
@@ -120,8 +121,10 @@ export class PostgresSharedAssetProvenanceReader {
     });
     if (
       !/^[A-Z0-9]{1,12}$/.test(code) ||
-      !hash || !/^[a-f0-9]{64}$/.test(hash) ||
-      !Number.isSafeInteger(ledger) || ledger <= 0 ||
+      !hash ||
+      !/^[a-f0-9]{64}$/.test(hash) ||
+      !Number.isSafeInteger(ledger) ||
+      ledger <= 0 ||
       r.owner_public_key.trim() !== owner ||
       r.subject_public_key?.trim() !== owner ||
       r.reservation_issuer_public_key.trim() !== issuer ||
@@ -132,17 +135,21 @@ export class PostgresSharedAssetProvenanceReader {
       r.workflow_state !== "confirmed" ||
       r.payload_hash.trim() !== expectedHash ||
       fingerprint !== expectedHash ||
-      canonicalJson(r.payload as Parameters<typeof canonicalJson>[0]) !== canonicalJson(payload)
-    ) return null;
+      canonicalJson(r.payload as Parameters<typeof canonicalJson>[0]) !==
+        canonicalJson(payload)
+    )
+      return null;
 
     // Both origin events must be durable and authored by the trusted
     // application workflow. The publication writer cannot create these.
-    const audit = await this.sql<{
-      event_type: string;
-      metadata: unknown;
-      source: string;
-      target_public_key: string | null;
-    }[]>`
+    const audit = await this.sql<
+      {
+        event_type: string;
+        metadata: unknown;
+        source: string;
+        target_public_key: string | null;
+      }[]
+    >`
       SELECT event_type, metadata, source, target_public_key
       FROM audit_events
       WHERE request_id = ${r.request_id}
@@ -151,17 +158,21 @@ export class PostgresSharedAssetProvenanceReader {
           'SHARED_ISSUANCE_ASSET_CODE_RESERVED'
         )
     `;
-    if (audit.length !== 2 ||
+    if (
+      audit.length !== 2 ||
       new Set(audit.map((e) => e.event_type)).size !== 2 ||
-      audit.some((e) =>
-        e.source !== "testnet-issuance-service" ||
-        e.target_public_key?.trim() !== owner ||
-        !e.metadata || typeof e.metadata !== "object" ||
-        (e.metadata as Record<string, unknown>).projectId !== projectId ||
-        (e.metadata as Record<string, unknown>).assetCode !== code ||
-        (e.metadata as Record<string, unknown>).issuerPublicKey !== issuer
+      audit.some(
+        (e) =>
+          e.source !== "testnet-issuance-service" ||
+          e.target_public_key?.trim() !== owner ||
+          !e.metadata ||
+          typeof e.metadata !== "object" ||
+          (e.metadata as Record<string, unknown>).projectId !== projectId ||
+          (e.metadata as Record<string, unknown>).assetCode !== code ||
+          (e.metadata as Record<string, unknown>).issuerPublicKey !== issuer,
       )
-    ) return null;
+    )
+      return null;
 
     return {
       projectId,
