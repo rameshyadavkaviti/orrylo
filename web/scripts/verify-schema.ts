@@ -18,6 +18,7 @@ const EXPECTED_TABLES = [
 ] as const;
 
 const EXPECTED_CONSTRAINTS = [
+  "reward_records_wallet_reward_type_unique",
   "project_profile_owners_wallet_check",
   "eligibility_records_first_token_event_required",
   "eligibility_records_qualifying_event_fk",
