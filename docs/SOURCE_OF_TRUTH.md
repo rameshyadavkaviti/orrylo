@@ -21,6 +21,30 @@ Token creation is the beginning of a persistent Orrylo project lifecycle, not th
 
 The broader product direction also includes contract-controlled token infrastructure, higher-level product creation, custom development, and supporting infrastructure on Stellar.
 
+### 1.1 Approved product-first positioning and project-first experience
+
+**Orrylo's primary mission** is to give Stellar users an accessible starting point to **create, publish, manage, and progressively develop meaningful blockchain-based projects and products**. Token issuance is an early infrastructure capability within this continuing relationship, not the platform's primary identity or endpoint.
+
+For high-level navigation, onboarding, and primary calls to action, prioritize **Project** over **Token** and present token creation as a clearly explained infrastructure step in the project journey. Encourage owners to articulate their project's identity, purpose, and intended utility without adding a mandatory purpose check, subjective quality judgment, identity verification, or new barrier to token creation. After a genuinely successful creation, guide the user to the persistent Project Profile and management experience. The approved **Create → Publish → Manage → Grow** lifecycle is the product's organizing principle; implemented, unavailable, and aspirational steps must be distinguishable.
+
+Orrylo aims to contribute to a healthier Stellar ecosystem by emphasizing purposeful use, transparent and verifiable infrastructure, professional presentation, and ongoing product development rather than token proliferation or speculative promotion. Creation through Orrylo **does not certify** any asset's legitimacy, trustworthiness, utility, investment suitability, economic value, or likelihood of success. Product language and interface claims must match the actual issuer, contract, metadata, and ledger evidence, without promising financial returns.
+
+The product should encourage owners to return to publish, improve, manage, and expand their projects through services that are actually available; later services may be presented as natural development opportunities, **not** as compulsory upgrades or aggressive upsells. This positioning is primarily expressed through information architecture, actions, progress and guided journeys, not slogans or inflated claims.
+
+**Strategic measurement principles (not authorization to implement analytics):** evaluate project activation/profile completion, successful publication, returning owners, adoption of additional development services, and progression toward functional products, alongside token-creation volume. These are candidate future measures; current tracking instrumentation and data availability are not implied.
+
+### 1.2 Approved primary audience and premium experience direction
+
+Orrylo's **primary target segment** is financially comfortable, entrepreneurial aspiring founders who are interested in launching small businesses or independent commercial projects on emerging technology ecosystems, particularly Stellar. They need not be software engineers, blockchain developers, or experienced traders. Their presumed interest in paying for convenience, reliability, polished presentation, time efficiency, ownership and growth is a **strategic hypothesis requiring customer research**, not an established demographic or market fact.
+
+The target experience is a **premium digital business-creation studio**, rather than a token factory, speculative trading product, or developer-only utility dashboard. Optimize for understandable decisions, visually refined and enjoyable interactions, low unnecessary technical friction, professional project identity, a sense of creative ownership and achievement, and meaningful milestones in the project lifecycle. Explain advanced blockchain concepts progressively; reduce needless jargon in primary journeys **without obscuring essential** issuer control, supply limitations, signing/payment risks, actual capabilities, or security warnings.
+
+Keep accessible entry-level options. Premium services should be offered for genuine convenience and added capabilities, without pressuring customers or implying guaranteed commercial outcomes. Marketing may emphasize launching a digital venture, expressing an idea professionally and growing a project using blockchain infrastructure, but must not claim guaranteed success, token appreciation or special legitimacy.
+
+**Audience positioning is not an eligibility rule:** this decision does **not** authorize wealth checks, customer financial screening, mandatory KYC or identity checks, exclusion of less affluent users, changes to approved fees/prices, wallet access, token issuance rules, membership eligibility, launch credit or RYLO rewards.
+
+**Status / implementation boundary:** these sections are approved product and experience guidance, **not** evidence that every journey, service, design treatment or measurement system is implemented. They do not authorize UI changes, new analytics, contract changes, marketing launches, deployments, or a new engineering scope. Existing Stellar, custody, issuer, financial and RYLO policies remain controlling.
+
 ## 2. Product boundary
 
 The first product family may expose services such as:
