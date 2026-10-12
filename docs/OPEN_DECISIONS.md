@@ -175,7 +175,7 @@ Decided:
 - abandoned/cancelled/failed orders can release reservations only after authoritative proof that no issuance was submitted or could have succeeded;
 - ambiguous or potentially successful submitted transactions must remain reserved until conclusive ledger reconciliation; confirmed issuance must never be released as if the asset identity were unused;
 - release/cancellation and rejected/limited attempts require auditable, server-authorized controls; multi-wallet abuse must be addressed beyond per-wallet quotas;
-- full immutable issuance intent and fingerprint are a separate future execution gate, not invented from reservation data.
+- full immutable issuance intent and fingerprint are an **immediate P0 Testnet MVP Lite pre-signing gate**, not inferred from reservation data; no signing or submission is allowed until that complete intent is durably committed and independently reviewed.
 
 Still open (must not be silently selected by implementation):
 
@@ -236,7 +236,7 @@ Approved first-prototype application baseline:
 - Neon Free for PostgreSQL;
 - Cloudflare Free for DNS/CDN.
 
-Stellar Testnet remains the currently recorded engineering/deployment-evidence environment and must stay reproducibly bootstrappable. The immediate execution direction is Mainnet preparation, but Mainnet deployment remains unproven until explicit repository/on-chain deployment evidence exists.
+Stellar Testnet remains the currently recorded engineering/deployment-evidence environment and must stay reproducibly bootstrappable. The immediate delivery priority is Testnet MVP Lite customer Shared Issuer issuance. Mainnet preparation is separate and Mainnet deployment remains unproven until explicit repository/on-chain deployment evidence exists.
 
 These are prototype choices, not permanent production-provider commitments.
 
