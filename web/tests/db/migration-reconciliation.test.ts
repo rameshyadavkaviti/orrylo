@@ -273,7 +273,10 @@ if (!TEST_DATABASE_URL) {
         FROM pg_constraint
         WHERE conname = 'project_issuance_attempt_number_mvp_lite'
       `;
-      assert.equal(attemptConstraint.definition, "CHECK ((attempt_number = 1))");
+      assert.equal(
+        attemptConstraint.definition,
+        "CHECK ((attempt_number = 1))",
+      );
       const [{ trigger_exists: triggerExists }] = await sql<
         { trigger_exists: boolean }[]
       >`

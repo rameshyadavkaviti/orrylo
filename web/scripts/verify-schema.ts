@@ -153,13 +153,15 @@ async function main() {
       );
     }
 
-    const [hardening] = await sql<{
-      attempt_constraint: string | null;
-      reachability_trigger: boolean;
-      reachability_function_security_definer: boolean;
-      reachability_function_search_path: string[] | null;
-      reachability_function_public_execute: boolean;
-    }[]>`
+    const [hardening] = await sql<
+      {
+        attempt_constraint: string | null;
+        reachability_trigger: boolean;
+        reachability_function_security_definer: boolean;
+        reachability_function_search_path: string[] | null;
+        reachability_function_public_execute: boolean;
+      }[]
+    >`
       SELECT
         (
           SELECT pg_get_constraintdef(constraint_row.oid)
