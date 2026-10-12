@@ -29,6 +29,8 @@ export type SharedIssuerIssuanceErrorCode =
   | "trustline_missing"
   | "trustline_unauthorized"
   | "trustline_capacity_exceeded"
+  | "trustline_snapshot_mismatch"
+  | "invalid_ledger_observation"
   | "invalid_sequence"
   | "invalid_fee"
   | "insufficient_fee_balance"
@@ -36,6 +38,10 @@ export type SharedIssuerIssuanceErrorCode =
   | "signed_envelope_invalid"
   | "signed_envelope_mismatch"
   | "unauthorized_signing_request"
+  | "invalid_signer_authorization"
+  | "missing_required_signatures"
+  | "invalid_signature"
+  | "issuance_intent_mismatch"
   | "submission_hash_mismatch"
   | "sequence_conflict";
 
@@ -62,10 +68,17 @@ export interface SharedIssuerIssuanceRequest {
 }
 
 export interface SharedIssuerTrustlineSnapshot {
+  network: typeof SHARED_ISSUER_TESTNET_NETWORK;
+  networkPassphrase: typeof SHARED_ISSUER_TESTNET_PASSPHRASE;
+  destinationPublicKey: string;
+  assetCode: string;
+  issuerPublicKey: string;
+  observedLedger: number;
   exists: boolean;
   authorized: boolean;
   balance: string;
   limit: string;
+  buyingLiabilities: string;
 }
 
 export interface SharedIssuerIssuancePreconditions {
@@ -112,6 +125,19 @@ export interface SharedIssuerSigner {
   ): Promise<{ signedEnvelopeXdr: string }>;
 }
 
+export interface SharedIssuerApprovedSigner {
+  publicKey: string;
+  weight: number;
+}
+
+export interface SharedIssuerSignerAuthorization {
+  network: typeof SHARED_ISSUER_TESTNET_NETWORK;
+  networkPassphrase: typeof SHARED_ISSUER_TESTNET_PASSPHRASE;
+  issuerPublicKey: string;
+  requiredWeight: number;
+  signers: SharedIssuerApprovedSigner[];
+}
+
 export interface SharedIssuerSubmissionResult {
   hash: string;
 }
@@ -124,13 +150,18 @@ export interface SharedIssuerSubmissionAdapter {
 
 export type SharedIssuerTransactionLookup =
   | { status: "confirmed"; hash: string; ledger: number }
-  | { status: "failed"; hash: string }
-  | { status: "not_found" };
+  | { status: "failed"; hash: string; ledger: number }
+  | {
+      status: "not_found";
+      observedLedger: number;
+      authoritative: boolean;
+    };
 
 export type SharedIssuerRecoveryDecision =
   | { action: "confirmed"; hash: string; ledger: number }
-  | { action: "terminal_failure"; hash: string }
+  | { action: "terminal_failure"; hash: string; ledger: number }
   | { action: "retry_same_envelope" }
+  | { action: "await_authoritative_reconciliation" }
   | { action: "rebuild_expired" }
   | { action: "reconcile_sequence" };
 
@@ -194,6 +225,13 @@ export function buildSharedIssuerIssuancePlan(
     );
   }
 
+  assertTrustlineSnapshotIdentity(
+    preconditions.destinationTrustline,
+    destinationPublicKey,
+    assetCode,
+    issuerPublicKey,
+  );
+
   if (!preconditions.destinationTrustline.exists) {
     throw new SharedIssuerIssuanceError(
       "trustline_missing",
@@ -216,11 +254,15 @@ export function buildSharedIssuerIssuancePlan(
     preconditions.destinationTrustline.limit,
     false,
   );
+  const buyingLiabilities = parseAssetUnits(
+    preconditions.destinationTrustline.buyingLiabilities,
+    true,
+  );
 
-  if (trustlineBalance + amountUnits > trustlineLimit) {
+  if (trustlineBalance + buyingLiabilities + amountUnits > trustlineLimit) {
     throw new SharedIssuerIssuanceError(
       "trustline_capacity_exceeded",
-      "Issuance would exceed the destination trustline limit.",
+      "Issuance would exceed destination trustline capacity after buying liabilities.",
     );
   }
 
@@ -352,6 +394,130 @@ export function assertSignedEnvelopeMatchesPlan(
   return transactionHash;
 }
 
+export function assertSignedEnvelopeAuthorizedForSubmission(
+  signedEnvelopeXdr: string,
+  plan: SharedIssuerIssuancePlan,
+  authorization: SharedIssuerSignerAuthorization,
+): string {
+  const transactionHash = assertSignedEnvelopeMatchesPlan(
+    signedEnvelopeXdr,
+    plan,
+  );
+
+  if (
+    authorization.network !== SHARED_ISSUER_TESTNET_NETWORK ||
+    authorization.networkPassphrase !== SHARED_ISSUER_TESTNET_PASSPHRASE ||
+    normalizePublicKey(authorization.issuerPublicKey, "invalid_issuer") !==
+      plan.intent.issuerPublicKey ||
+    !Number.isSafeInteger(authorization.requiredWeight) ||
+    authorization.requiredWeight <= 0 ||
+    authorization.signers.length === 0
+  ) {
+    throw new SharedIssuerIssuanceError(
+      "invalid_signer_authorization",
+      "Approved signer authorization does not match the issuance plan.",
+    );
+  }
+
+  const approvedSigners = new Map<
+    string,
+    { keypair: Keypair; weight: number }
+  >();
+
+  for (const signer of authorization.signers) {
+    const publicKey = normalizePublicKey(signer.publicKey, "invalid_issuer");
+
+    if (
+      !Number.isSafeInteger(signer.weight) ||
+      signer.weight <= 0 ||
+      approvedSigners.has(publicKey)
+    ) {
+      throw new SharedIssuerIssuanceError(
+        "invalid_signer_authorization",
+        "Approved signer configuration contains an invalid or duplicate signer.",
+      );
+    }
+
+    approvedSigners.set(publicKey, {
+      keypair: Keypair.fromPublicKey(publicKey),
+      weight: signer.weight,
+    });
+  }
+
+  let transaction;
+
+  try {
+    transaction = TransactionBuilder.fromXDR(
+      signedEnvelopeXdr,
+      SHARED_ISSUER_TESTNET_PASSPHRASE,
+    );
+  } catch {
+    throw new SharedIssuerIssuanceError(
+      "signed_envelope_invalid",
+      "Signed envelope is not valid Stellar Testnet transaction XDR.",
+    );
+  }
+
+  if (transaction.signatures.length === 0) {
+    throw new SharedIssuerIssuanceError(
+      "missing_required_signatures",
+      "Signed envelope contains no Stellar signatures.",
+    );
+  }
+
+  const transactionHashBytes = Buffer.from(transaction.hash());
+  const matchedSignerKeys = new Set<string>();
+  let approvedWeight = 0;
+
+  for (const signature of transaction.signatures) {
+    const signatureBytes = Buffer.from(signature.signature());
+    let matchedPublicKey: string | null = null;
+
+    for (const [publicKey, signer] of approvedSigners) {
+      if (
+        !matchedSignerKeys.has(publicKey) &&
+        signer.keypair.verify(transactionHashBytes, signatureBytes)
+      ) {
+        matchedPublicKey = publicKey;
+        approvedWeight += signer.weight;
+        matchedSignerKeys.add(publicKey);
+        break;
+      }
+    }
+
+    if (!matchedPublicKey) {
+      throw new SharedIssuerIssuanceError(
+        "invalid_signature",
+        "Envelope contains a missing, duplicate, unknown, or invalid approved-signer signature.",
+      );
+    }
+  }
+
+  if (approvedWeight < authorization.requiredWeight) {
+    throw new SharedIssuerIssuanceError(
+      "missing_required_signatures",
+      "Envelope does not satisfy the approved issuer signer threshold.",
+    );
+  }
+
+  return transactionHash;
+}
+
+export function assertReplacementPreservesIssuanceIntent(
+  originalPlan: SharedIssuerIssuancePlan,
+  replacementPlan: SharedIssuerIssuancePlan,
+): void {
+  if (
+    originalPlan.intentFingerprint !== replacementPlan.intentFingerprint ||
+    JSON.stringify(originalPlan.intent) !== JSON.stringify(replacementPlan.intent)
+  ) {
+    throw new SharedIssuerIssuanceError(
+      "issuance_intent_mismatch",
+      "Replacement transaction must preserve the immutable logical issuance intent.",
+    );
+  }
+}
+
 export function assertSubmissionHashMatchesPlan(
   submission: SharedIssuerSubmissionResult,
   plan: SharedIssuerIssuancePlan,
@@ -389,28 +555,83 @@ export function classifySharedIssuerRecovery(input: {
     return {
       action: "terminal_failure",
       hash: input.lookup.hash.toLowerCase(),
+      ledger: input.lookup.ledger,
     };
   }
 
-  if (input.nowUnix >= input.plan.validUntil) {
-    return { action: "rebuild_expired" };
-  }
+  assertLedgerObservation(input.lookup.observedLedger);
 
   const currentSequence = BigInt(parseSequence(input.currentIssuerSequence));
   const plannedSourceSequence = BigInt(input.plan.sourceSequence);
-
-  if (currentSequence === plannedSourceSequence) {
-    return { action: "retry_same_envelope" };
-  }
 
   if (currentSequence > plannedSourceSequence) {
     return { action: "reconcile_sequence" };
   }
 
-  throw new SharedIssuerIssuanceError(
-    "sequence_conflict",
-    "Observed issuer sequence moved backwards relative to the prepared transaction.",
-  );
+  if (currentSequence < plannedSourceSequence) {
+    throw new SharedIssuerIssuanceError(
+      "sequence_conflict",
+      "Observed issuer sequence moved backwards relative to the prepared transaction.",
+    );
+  }
+
+  if (input.nowUnix < input.plan.validUntil) {
+    return { action: "retry_same_envelope" };
+  }
+
+  if (!input.lookup.authoritative) {
+    return { action: "await_authoritative_reconciliation" };
+  }
+
+  return { action: "rebuild_expired" };
+}
+
+function assertTrustlineSnapshotIdentity(
+  snapshot: SharedIssuerTrustlineSnapshot,
+  destinationPublicKey: string,
+  assetCode: string,
+  issuerPublicKey: string,
+): void {
+  assertLedgerObservation(snapshot.observedLedger);
+
+  let snapshotDestination: string;
+  let snapshotIssuer: string;
+
+  try {
+    snapshotDestination = Keypair.fromPublicKey(
+      snapshot.destinationPublicKey.trim().toUpperCase(),
+    ).publicKey();
+    snapshotIssuer = Keypair.fromPublicKey(
+      snapshot.issuerPublicKey.trim().toUpperCase(),
+    ).publicKey();
+  } catch {
+    throw new SharedIssuerIssuanceError(
+      "trustline_snapshot_mismatch",
+      "Trustline snapshot contains an invalid Stellar identity.",
+    );
+  }
+
+  if (
+    snapshot.network !== SHARED_ISSUER_TESTNET_NETWORK ||
+    snapshot.networkPassphrase !== SHARED_ISSUER_TESTNET_PASSPHRASE ||
+    snapshotDestination !== destinationPublicKey ||
+    snapshot.assetCode.trim().toUpperCase() !== assetCode ||
+    snapshotIssuer !== issuerPublicKey
+  ) {
+    throw new SharedIssuerIssuanceError(
+      "trustline_snapshot_mismatch",
+      "Trustline snapshot does not match the requested Testnet asset identity.",
+    );
+  }
+}
+
+function assertLedgerObservation(observedLedger: number): void {
+  if (!Number.isSafeInteger(observedLedger) || observedLedger <= 0) {
+    throw new SharedIssuerIssuanceError(
+      "invalid_ledger_observation",
+      "Ledger observation must identify a positive integer ledger sequence.",
+    );
+  }
 }
 
 function normalizePublicKey(

@@ -6,6 +6,8 @@ import { Keypair, Networks, TransactionBuilder } from "@stellar/stellar-sdk";
 import {
   SHARED_ISSUER_TESTNET_PASSPHRASE,
   SharedIssuerIssuanceError,
+  assertReplacementPreservesIssuanceIntent,
+  assertSignedEnvelopeAuthorizedForSubmission,
   assertSignedEnvelopeMatchesPlan,
   assertSigningRequestMatchesPlan,
   assertSubmissionHashMatchesPlan,
@@ -16,10 +18,24 @@ import {
   type SharedIssuerIssuanceRequest,
 } from "../lib/stellar/shared-issuer-issuance";
 
-const ISSUER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 41)).publicKey();
+const ISSUER_KEYPAIR = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 41));
+const SIGNER_B_KEYPAIR = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 43));
+const UNKNOWN_SIGNER_KEYPAIR = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 44));
+const ISSUER = ISSUER_KEYPAIR.publicKey();
 const DESTINATION = Keypair.fromRawEd25519Seed(
   Buffer.alloc(32, 42),
 ).publicKey();
+
+const SIGNER_AUTHORIZATION = {
+  network: "testnet" as const,
+  networkPassphrase: SHARED_ISSUER_TESTNET_PASSPHRASE,
+  issuerPublicKey: ISSUER,
+  requiredWeight: 2,
+  signers: [
+    { publicKey: ISSUER_KEYPAIR.publicKey(), weight: 1 },
+    { publicKey: SIGNER_B_KEYPAIR.publicKey(), weight: 1 },
+  ],
+};
 
 const REQUEST: SharedIssuerIssuanceRequest = {
   projectId: "project-123",
@@ -39,10 +55,17 @@ const PRECONDITIONS: SharedIssuerIssuancePreconditions = {
   issuerSpendableNativeStroops: "5000000",
   feeStroops: "100",
   destinationTrustline: {
+    network: "testnet",
+    networkPassphrase: SHARED_ISSUER_TESTNET_PASSPHRASE,
+    destinationPublicKey: DESTINATION,
+    assetCode: "NOVA",
+    issuerPublicKey: ISSUER,
+    observedLedger: 900,
     exists: true,
     authorized: true,
     balance: "10",
     limit: "1000",
+    buyingLiabilities: "0",
   },
 };
 
@@ -183,14 +206,73 @@ test("rejects missing, unauthorized, and capacity-exceeded destination trustline
       buildSharedIssuerIssuancePlan(REQUEST, {
         ...PRECONDITIONS,
         destinationTrustline: {
-          exists: true,
-          authorized: true,
+          ...PRECONDITIONS.destinationTrustline,
           balance: "900",
           limit: "1000",
         },
       }),
     (error) => errorCode(error) === "trustline_capacity_exceeded",
   );
+});
+
+test("trustline capacity includes buying liabilities and permits the exact boundary", () => {
+  assert.doesNotThrow(() =>
+    buildSharedIssuerIssuancePlan(
+      { ...REQUEST, amount: "100" },
+      {
+        ...PRECONDITIONS,
+        destinationTrustline: {
+          ...PRECONDITIONS.destinationTrustline,
+          balance: "800",
+          buyingLiabilities: "100",
+          limit: "1000",
+        },
+      },
+    ),
+  );
+
+  assert.throws(
+    () =>
+      buildSharedIssuerIssuancePlan(
+        { ...REQUEST, amount: "100.0000001" },
+        {
+          ...PRECONDITIONS,
+          destinationTrustline: {
+            ...PRECONDITIONS.destinationTrustline,
+            balance: "800",
+            buyingLiabilities: "100",
+            limit: "1000",
+          },
+        },
+      ),
+    (error) => errorCode(error) === "trustline_capacity_exceeded",
+  );
+});
+
+test("rejects a trustline snapshot bound to the wrong identity or network", () => {
+  const mismatches = [
+    { destinationPublicKey: Keypair.random().publicKey() },
+    { assetCode: "OTHER" },
+    { issuerPublicKey: Keypair.random().publicKey() },
+    { networkPassphrase: Networks.PUBLIC },
+    { observedLedger: 0 },
+  ];
+
+  for (const mismatch of mismatches) {
+    assert.throws(
+      () =>
+        buildSharedIssuerIssuancePlan(REQUEST, {
+          ...PRECONDITIONS,
+          destinationTrustline: {
+            ...PRECONDITIONS.destinationTrustline,
+            ...mismatch,
+          } as SharedIssuerIssuancePreconditions["destinationTrustline"],
+        }),
+      (error) =>
+        errorCode(error) === "trustline_snapshot_mismatch" ||
+        errorCode(error) === "invalid_ledger_observation",
+    );
+  }
 });
 
 test("rejects insufficient issuer fee headroom", () => {
@@ -253,14 +335,13 @@ test("signer boundary accepts only the exact reviewed canonical plan", () => {
 });
 
 test("signed envelope validation accepts signatures without permitting transaction mutation", () => {
-  const issuerKeypair = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 41));
   const plan = buildSharedIssuerIssuancePlan(REQUEST, PRECONDITIONS);
   const transaction = TransactionBuilder.fromXDR(
     plan.unsignedEnvelopeXdr,
     Networks.TESTNET,
   );
 
-  transaction.sign(issuerKeypair);
+  transaction.sign(ISSUER_KEYPAIR);
   assert.equal(
     assertSignedEnvelopeMatchesPlan(transaction.toXDR(), plan),
     plan.transactionHash,
@@ -274,6 +355,105 @@ test("signed envelope validation accepts signatures without permitting transacti
   assert.throws(
     () => assertSignedEnvelopeMatchesPlan(transaction.toXDR(), mutatedPlan),
     (error) => errorCode(error) === "signed_envelope_mismatch",
+  );
+});
+
+test("submission authorization requires valid approved signatures meeting configured weight", () => {
+  const plan = buildSharedIssuerIssuancePlan(REQUEST, PRECONDITIONS);
+
+  const unsigned = TransactionBuilder.fromXDR(
+    plan.unsignedEnvelopeXdr,
+    Networks.TESTNET,
+  );
+  assert.throws(
+    () =>
+      assertSignedEnvelopeAuthorizedForSubmission(
+        unsigned.toXDR(),
+        plan,
+        SIGNER_AUTHORIZATION,
+      ),
+    (error) => errorCode(error) === "missing_required_signatures",
+  );
+
+  const insufficient = TransactionBuilder.fromXDR(
+    plan.unsignedEnvelopeXdr,
+    Networks.TESTNET,
+  );
+  insufficient.sign(ISSUER_KEYPAIR);
+  assert.throws(
+    () =>
+      assertSignedEnvelopeAuthorizedForSubmission(
+        insufficient.toXDR(),
+        plan,
+        SIGNER_AUTHORIZATION,
+      ),
+    (error) => errorCode(error) === "missing_required_signatures",
+  );
+
+  const invalid = TransactionBuilder.fromXDR(
+    plan.unsignedEnvelopeXdr,
+    Networks.TESTNET,
+  );
+  invalid.sign(ISSUER_KEYPAIR, UNKNOWN_SIGNER_KEYPAIR);
+  assert.throws(
+    () =>
+      assertSignedEnvelopeAuthorizedForSubmission(
+        invalid.toXDR(),
+        plan,
+        SIGNER_AUTHORIZATION,
+      ),
+    (error) => errorCode(error) === "invalid_signature",
+  );
+
+  const authorized = TransactionBuilder.fromXDR(
+    plan.unsignedEnvelopeXdr,
+    Networks.TESTNET,
+  );
+  authorized.sign(ISSUER_KEYPAIR, SIGNER_B_KEYPAIR);
+  assert.equal(
+    assertSignedEnvelopeAuthorizedForSubmission(
+      authorized.toXDR(),
+      plan,
+      SIGNER_AUTHORIZATION,
+    ),
+    plan.transactionHash,
+  );
+});
+
+test("replacement transactions must preserve the immutable logical issuance intent", () => {
+  const original = buildSharedIssuerIssuancePlan(REQUEST, PRECONDITIONS);
+  const safeReplacement = buildSharedIssuerIssuancePlan(
+    {
+      ...REQUEST,
+      validFrom: REQUEST.validFrom + 600,
+      validUntil: REQUEST.validUntil + 600,
+    },
+    {
+      ...PRECONDITIONS,
+      issuerSequence: "123457",
+    },
+  );
+  const otherDestination = Keypair.random().publicKey();
+  const changedDestination = buildSharedIssuerIssuancePlan(
+    {
+      ...REQUEST,
+      destinationPublicKey: otherDestination,
+    },
+    {
+      ...PRECONDITIONS,
+      destinationTrustline: {
+        ...PRECONDITIONS.destinationTrustline,
+        destinationPublicKey: otherDestination,
+      },
+    },
+  );
+
+  assert.doesNotThrow(() =>
+    assertReplacementPreservesIssuanceIntent(original, safeReplacement),
+  );
+  assert.throws(
+    () => assertReplacementPreservesIssuanceIntent(original, changedDestination),
+    (error) => errorCode(error) === "issuance_intent_mismatch",
   );
 });
 
@@ -312,36 +492,106 @@ test("lost response recovery confirms an already-successful transaction without 
   );
 });
 
-test("not-found recovery distinguishes safe same-envelope retry, expiry, and sequence conflict", () => {
+test("not-found recovery retries only the same live envelope while outcome remains ambiguous", () => {
   const plan = buildSharedIssuerIssuancePlan(REQUEST, PRECONDITIONS);
 
   assert.deepEqual(
     classifySharedIssuerRecovery({
       plan,
-      lookup: { status: "not_found" },
+      lookup: {
+        status: "not_found",
+        observedLedger: 1000,
+        authoritative: false,
+      },
       currentIssuerSequence: "123456",
       nowUnix: REQUEST.validFrom + 30,
     }),
     { action: "retry_same_envelope" },
   );
+});
+
+test("expired ambiguous transactions wait for authoritative reconciliation before rebuild", () => {
+  const plan = buildSharedIssuerIssuancePlan(REQUEST, PRECONDITIONS);
 
   assert.deepEqual(
     classifySharedIssuerRecovery({
       plan,
-      lookup: { status: "not_found" },
+      lookup: {
+        status: "not_found",
+        observedLedger: 1000,
+        authoritative: false,
+      },
       currentIssuerSequence: "123456",
       nowUnix: REQUEST.validUntil,
     }),
-    { action: "rebuild_expired" },
+    { action: "await_authoritative_reconciliation" },
   );
 
   assert.deepEqual(
     classifySharedIssuerRecovery({
       plan,
-      lookup: { status: "not_found" },
+      lookup: {
+        status: "not_found",
+        observedLedger: 1005,
+        authoritative: true,
+      },
+      currentIssuerSequence: "123456",
+      nowUnix: REQUEST.validUntil + 30,
+    }),
+    { action: "rebuild_expired" },
+  );
+});
+
+test("issuer sequence advancement wins over expiry and requires reconciliation", () => {
+  const plan = buildSharedIssuerIssuancePlan(REQUEST, PRECONDITIONS);
+
+  assert.deepEqual(
+    classifySharedIssuerRecovery({
+      plan,
+      lookup: {
+        status: "not_found",
+        observedLedger: 1010,
+        authoritative: true,
+      },
       currentIssuerSequence: "123457",
-      nowUnix: REQUEST.validFrom + 30,
+      nowUnix: REQUEST.validUntil + 30,
     }),
     { action: "reconcile_sequence" },
+  );
+});
+
+test("delayed lookup visibility can later resolve the same lost-response transaction", () => {
+  const plan = buildSharedIssuerIssuancePlan(REQUEST, PRECONDITIONS);
+
+  assert.deepEqual(
+    classifySharedIssuerRecovery({
+      plan,
+      lookup: {
+        status: "not_found",
+        observedLedger: 1000,
+        authoritative: false,
+      },
+      currentIssuerSequence: "123456",
+      nowUnix: REQUEST.validUntil + 1,
+    }),
+    { action: "await_authoritative_reconciliation" },
+  );
+
+  assert.deepEqual(
+    classifySharedIssuerRecovery({
+      plan,
+      lookup: {
+        status: "confirmed",
+        hash: plan.transactionHash,
+        ledger: 1001,
+      },
+      currentIssuerSequence: "123457",
+      nowUnix: REQUEST.validUntil + 20,
+    }),
+    {
+      action: "confirmed",
+      hash: plan.transactionHash,
+      ledger: 1001,
+    },
   );
 });

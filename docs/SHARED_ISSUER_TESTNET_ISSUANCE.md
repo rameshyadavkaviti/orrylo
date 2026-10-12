@@ -37,8 +37,10 @@ verification boundary. It:
   sequence, and time bounds;
 - requires the application layer to prove the asset code is already atomically
   reserved for that project;
-- requires an existing authorized destination trustline with enough remaining
-  limit;
+- requires a ledger-observed destination trustline bound to the exact Testnet
+  network, destination, asset code, and issuer;
+- includes trustline buying liabilities when calculating remaining receiving
+  capacity;
 - requires sufficient issuer spendable XLM for the proposed fee;
 - constructs exactly one Classic Stellar payment operation from issuer to
   destination;
@@ -46,9 +48,13 @@ verification boundary. It:
 - creates a signer request containing only public/canonical transaction
   material;
 - verifies returned signed XDR hashes to the exact reviewed transaction;
+- verifies cryptographic signatures against an injected approved signer/weight
+  configuration before submission acceptance;
 - verifies the submission response hash;
-- classifies lost-response recovery without blindly resubmitting after expiry or
-  sequence advancement.
+- preserves the immutable logical issuance intent across replacement envelopes;
+- classifies lost-response recovery without allowing a replacement hash until
+  authoritative ledger reconciliation proves the original outcome is safe to
+  replace.
 
 The module contains **no secret-key loading**, Horizon credentials, environment
 issuer selection, database writes, HTTP routes, or automatic signer invocation.
@@ -67,8 +73,9 @@ must perform these steps before invoking the Stellar preparation function:
    fingerprint/idempotency key;
 6. supply the explicit customer destination and issuance amount selected by
    approved product policy;
-7. query current ledger state for issuer sequence/fee headroom and destination
-   trustline state;
+7. query current ledger state for issuer sequence/fee headroom and a trustline
+   snapshot bound to network, destination, asset code, issuer, liabilities, and
+   observed ledger;
 8. persist the unsigned transaction hash/XDR or a safe reference before any
    signer call;
 9. invoke the independently reviewed signer boundary only after policy approval;
@@ -99,6 +106,8 @@ For each request it must independently verify at minimum:
 - exact amount;
 - explicit time bounds;
 - transaction hash matches the reviewed unsigned envelope;
+- returned envelope contains only valid signatures from the injected approved
+  issuer signer configuration and meets its required weight;
 - request/policy identity has not been superseded.
 
 No issuer secret may be logged, returned to the application, stored in GitHub,
@@ -113,13 +122,21 @@ changing project, asset identity, destination, or amount does.
 After an ambiguous submission result:
 
 - check the canonical transaction hash on-chain first;
+- always compare the current issuer sequence with the prepared source sequence
+  before considering expiry;
 - if confirmed, record confirmation and do not resubmit;
-- if terminally failed, rebuild only under the same logical intent;
-- if not found and the issuer sequence is unchanged and time bounds are still
-  valid, the same signed envelope may be retried;
-- if expired, rebuild with fresh time bounds under the same logical intent;
-- if issuer sequence advanced, reconcile ledger state before constructing any
-  replacement.
+- if terminally failed, any replacement must preserve the same immutable logical
+  issuance intent;
+- if not found, the issuer sequence is unchanged, and time bounds are still
+  valid, only the exact same signed envelope/hash may be retried;
+- if the transaction is expired but lookup finality is not authoritative, wait
+  for authoritative reconciliation and do not create a replacement hash;
+- if the issuer sequence advanced, reconcile which transaction consumed it
+  before constructing any replacement, even when the original transaction is
+  already expired;
+- only an authoritative not-found reconciliation with the unchanged issuer
+  sequence may classify an expired envelope as rebuildable;
+- every rebuilt envelope must pass the immutable intent-fingerprint assertion.
 
 ## Verification matrix
 
@@ -131,14 +148,20 @@ Covered by deterministic tests in this slice:
 - duplicate/unreserved asset-code rejection;
 - invalid asset code;
 - wrong network/passphrase;
-- missing/unauthorized/insufficient-capacity trustline;
+- missing/unauthorized/identity-mismatched trustline;
+- trustline buying-liability capacity boundary and rejection;
 - insufficient issuer fee headroom;
 - invalid sequence/time bounds/amount;
 - unauthorized signer request mutation;
 - signed-envelope mutation detection;
+- missing/invalid/insufficient approved signer signatures;
 - submission-hash mismatch;
-- lost-response confirmed transaction recovery;
-- same-envelope retry vs expiry vs sequence-advance reconciliation.
+- immutable logical-intent preservation across replacement envelopes;
+- lost-response and delayed-lookup confirmation recovery;
+- same-envelope retry while live;
+- expired ambiguous outcome blocking;
+- authoritative expired rebuild classification;
+- sequence advancement taking precedence over expiry.
 
 Still requires Full-stack/database integration tests:
 
