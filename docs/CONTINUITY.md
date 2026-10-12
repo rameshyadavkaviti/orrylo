@@ -84,6 +84,18 @@ The deterministic SAC address is not deployment evidence by itself. SAC deployme
 - PR #19: Shared Issuer managed metadata publication on Testnet; remains a separate work stream and must not be conflated with RYLO TOML publication.
 - PR #24: merged; production rollout verification is the immediate database/application gate.
 
+## Immediate execution priority
+
+The current practical challenge is no longer to treat the prior production migration defect as the main product-development objective. PR #24 is merged; its production rollout evidence remains a bounded verification item.
+
+The immediate Testnet proof objective is now:
+
+1. prove a real customer token can be created on Stellar Testnet through Orrylo;
+2. prove Orrylo can publish and verify the token's managed `stellar.toml` metadata;
+3. create/configure and verify RYLO on Testnet according to the canonical issuer policy.
+
+These are prerequisites toward the already-approved final Testnet acceptance flow. Do not claim them complete until repository, deployment, and on-chain evidence exists.
+
 ## Approved final Testnet acceptance gate
 
 The user approved the final Testnet acceptance operation order:
