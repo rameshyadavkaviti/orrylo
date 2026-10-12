@@ -1,0 +1,41 @@
+/* Orbital Noir v1.0 — additive, opt-in foundation. Not imported by app/layout.tsx. */
+:root {
+  --on-void: #050716;
+  --on-nightglass: #0d1028;
+  --on-panel: #151936;
+  --on-border: #303a65;
+  --on-electric-blue: #789aff;
+  --on-ultraviolet: #955dff;
+  --on-ice: #f3f5ff;
+  --on-muted: #a8b3d0;
+
+  --on-canvas: var(--on-void);
+  --on-surface: var(--on-nightglass);
+  --on-surface-raised: var(--on-panel);
+  --on-stroke: var(--on-border);
+  --on-text-primary: var(--on-ice);
+  --on-text-secondary: var(--on-muted);
+  --on-accent-primary: var(--on-electric-blue);
+  --on-accent-secondary: var(--on-ultraviolet);
+  --on-focus-ring: var(--on-electric-blue);
+
+  --on-space-1: 4px;
+  --on-space-2: 8px;
+  --on-space-3: 12px;
+  --on-space-4: 16px;
+  --on-space-6: 24px;
+  --on-space-8: 32px;
+  --on-radius-control: 8px;
+  --on-radius-card: 12px;
+  --on-radius-panel: 20px;
+  --on-duration-fast: 120ms;
+  --on-duration-standard: 200ms;
+  --on-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --on-duration-fast: 0ms;
+    --on-duration-standard: 0ms;
+  }
+}
