@@ -7,11 +7,15 @@ import {
 } from "../lib/projects/project-profile";
 import { ManagedProjectMetadataForm } from "./managed-project-metadata-form";
 import { PublishProjectControl } from "./publish-project-control";
+import { TestnetIssuanceSection } from "./testnet-issuance-section";
+import type { TestnetIssuanceRecord } from "../lib/server/projects/testnet-issuance-service";
 
 export function ManagedProjectView({
   project,
+  issuance = null,
 }: {
   project: ManagedProjectProfile;
+  issuance?: TestnetIssuanceRecord | null;
 }) {
   const publicPath = projectPublicPath(project.slug);
   const published = project.publicStatus === "published";
@@ -103,6 +107,8 @@ export function ManagedProjectView({
           )}
         </article>
       </section>
+
+      <TestnetIssuanceSection project={project} issuance={issuance} />
 
       <ManagedProjectMetadataForm
         projectId={project.projectId}

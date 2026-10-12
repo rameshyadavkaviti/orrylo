@@ -77,6 +77,7 @@ if (!TEST_DATABASE_URL) {
       "003_eligibility_reward_workflow.sql",
       "004_project_profiles.sql",
       "005_project_profile_ownership.sql",
+      "006_testnet_project_issuance.sql",
     ]);
 
     const [{ count }] = await sql<{ count: string }[]>`
@@ -93,11 +94,12 @@ if (!TEST_DATABASE_URL) {
           'protected_operation_intents',
           'token_creation_qualifying_events',
           'project_profiles',
-          'project_profile_owners'
+          'project_profile_owners',
+          'project_issuance_intents'
         )
     `;
 
-    assert.equal(count, "10");
+    assert.equal(count, "11");
   });
 
   test("eligibility reward migration installs evidence integrity constraints", async () => {

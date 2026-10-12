@@ -6,6 +6,7 @@ import { SESSION_COOKIE_NAME } from "../../../lib/auth/constants";
 import { getWalletAuthService } from "../../../lib/auth/runtime";
 import { getDatabaseClient } from "../../../lib/server/persistence/database";
 import { PostgresProjectProfileRepository } from "../../../lib/server/persistence/project-profile-repository";
+import { TestnetIssuanceService } from "../../../lib/server/projects/testnet-issuance-service";
 
 export const dynamic = "force-dynamic";
 
@@ -32,5 +33,10 @@ export default async function ManagedProjectPage({
     notFound();
   }
 
-  return <ManagedProjectView project={project} />;
+  const issuanceService = new TestnetIssuanceService(getDatabaseClient(), {
+    network: project.network,
+  });
+  const issuance = await issuanceService.getOwnedStatus(projectId, session.publicKey);
+
+  return <ManagedProjectView project={project} issuance={issuance} />;
 }

@@ -299,6 +299,32 @@ only:
 
 No live contract ID is committed and no contract mutation is implemented.
 
+## Testnet issuance integration foundation (draft branch only)
+
+The `feat/testnet-shared-issuance-integration` draft prepares an
+authenticated, owner-scoped application intent for **Testnet Shared Issuer**
+projects. An issuance request is durable, project-unique, and idempotent in
+PostgreSQL. The shared asset code is reserved once per Testnet issuance intent.
+The initial state is `awaiting_issuer_integration`; neither the request nor
+the project's saved profile is a Stellar-issued asset.
+
+The issuance status is read from `project_issuance_intents` and presented on
+the managed project page. The read-only UI does **not** enable token issuance.
+Issuer public keys, transaction hashes, ledger confirmations, and explorer
+verification remain absent until genuine evidence is produced by a reviewed
+Stellar service. The server-only `SharedIssuerExecutionAdapter` currently
+has an explicit unavailable implementation. POST intent creation requires an
+authenticated wallet, the owned project, a UUID idempotency key and a matching
+asset-code assertion; browser-provided issuer, network and wallet authority
+are rejected. No route signs or submits transactions, and no route transitions
+an intent to pending, submitted, confirmed, failed, or reconciliation-required.
+
+This foundation is **not merged or deployed** until approved. Migration 006
+must be reviewed against the real production database before any rollout.
+The Stellar Agent must provide the final issuer identity and a reviewed
+submission/confirmation interface before application execution is activated.
+Project publication and PR #19 metadata hosting remain separate.
+
 ## Remaining production gates
 
 This phase intentionally does not add general network abuse/rate-limit
