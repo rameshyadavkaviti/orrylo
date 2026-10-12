@@ -30,7 +30,8 @@ export function validateInitialSupply(input: string): InitialSupplyValidation {
   if (stroops <= 0n || stroops > STELLAR_MAX_AMOUNT_STROOPS) {
     return {
       valid: false,
-      error: "The amount must be above zero and within Stellar's native amount limit.",
+      error:
+        "The amount must be above zero and within Stellar's native amount limit.",
     };
   }
 
