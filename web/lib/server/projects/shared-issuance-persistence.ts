@@ -509,6 +509,11 @@ function mapConfirmation(
     networkPassphraseHash: row.network_passphrase_hash.trim(),
     transactionHash: row.transaction_hash.trim(),
     envelopeXdrSha256: row.envelope_xdr_sha256.trim(),
+    ...(row.signed_envelope_xdr_sha256 === null
+      ? {}
+      : {
+          signedEnvelopeXdrSha256: row.signed_envelope_xdr_sha256.trim(),
+        }),
     resultXdrSha256: row.result_xdr_sha256.trim(),
     resultSuccess: row.result_success,
     ledgerSequence: Number(row.ledger_sequence),
@@ -527,10 +532,6 @@ function mapConfirmation(
     verifiedAt: row.verified_at.toISOString(),
     createdAt: row.created_at.toISOString(),
   };
-  if (row.signed_envelope_xdr_sha256 !== null) {
-    confirmation.signedEnvelopeXdrSha256 =
-      row.signed_envelope_xdr_sha256.trim();
-  }
   return confirmation;
 }
 
