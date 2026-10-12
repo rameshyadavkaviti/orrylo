@@ -16,6 +16,8 @@ const ALL_MIGRATIONS = [
   "003_eligibility_reward_workflow.sql",
   "004_project_profiles.sql",
   "005_project_profile_ownership.sql",
+  "006_project_metadata_publications.sql",
+  "007_testnet_project_issuance.sql",
 ];
 
 if (!TEST_DATABASE_URL) {
@@ -65,7 +67,7 @@ if (!TEST_DATABASE_URL) {
     `;
   }
 
-  test("fresh bootstrap applies 001-005 and repeated runs verify without changes", async () => {
+  test("fresh bootstrap applies 001-007 and repeated runs verify without changes", async () => {
     const first = await migrateDatabase(sql, directory);
     assert.deepEqual(first.applied, ALL_MIGRATIONS);
     assert.deepEqual(first.reconciled, []);
@@ -75,6 +77,114 @@ if (!TEST_DATABASE_URL) {
     assert.deepEqual(again.applied, []);
     assert.deepEqual(again.reconciled, []);
     assert.deepEqual(again.verified, ALL_MIGRATIONS);
+  });
+
+  test("existing 001-005 database upgrades with 006-007 without rewriting earlier checksums or project rows", async () => {
+    const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-metadata-"));
+    try {
+      for (const migration of ALL_MIGRATIONS.slice(0, 5)) {
+        await copyFile(join(directory, migration), join(temporary, migration));
+      }
+      const old = await migrateDatabase(sql, temporary);
+      assert.deepEqual(old.applied, ALL_MIGRATIONS.slice(0, 5));
+      const projectId = "00000000-0000-4000-8000-000000000112";
+      await sql`
+        INSERT INTO project_profiles (
+          project_id, slug, asset_code, display_name, issuer_model, network,
+          created_at, updated_at
+        ) VALUES (
+          ${projectId}, 'upgrade-fixture', 'UPGRADE', 'Upgrade Fixture',
+          'shared', 'testnet', now(), now()
+        )
+      `;
+      const before = await sql<{ name: string; checksum: string }[]>`
+        SELECT name, checksum FROM schema_migrations ORDER BY name
+      `;
+      const upgraded = await migrateDatabase(sql, directory);
+      assert.deepEqual(upgraded.applied, [
+        "006_project_metadata_publications.sql",
+        "007_testnet_project_issuance.sql",
+      ]);
+      assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 5));
+      const after = await sql<{ name: string; checksum: string }[]>`
+        SELECT name, checksum FROM schema_migrations ORDER BY name
+      `;
+      assert.deepEqual(after.slice(0, 5), [...before]);
+      const [retained] = await sql<{ asset_code: string }[]>`
+        SELECT asset_code FROM project_profiles WHERE project_id = ${projectId}
+      `;
+      assert.equal(retained.asset_code, "UPGRADE");
+      const [{ exists }] = await sql<{ exists: string | null }[]>`
+        SELECT to_regclass('project_metadata_publications')::text AS "exists"
+      `;
+      assert.equal(exists, "project_metadata_publications");
+    } finally {
+      await rm(temporary, { recursive: true, force: true });
+    }
+  });
+
+  test("existing 001-006 publication rows are retained but fail closed during 007 upgrade", async () => {
+    const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-confirmation-"));
+    try {
+      for (const migration of ALL_MIGRATIONS.slice(0, 6)) {
+        await copyFile(join(directory, migration), join(temporary, migration));
+      }
+      await migrateDatabase(sql, temporary);
+      const requestId = "00000000-0000-4000-8000-000000000201";
+      const projectId = "00000000-0000-4000-8000-000000000202";
+      const publicKey = `G${"A".repeat(55)}`;
+      await sql`
+        INSERT INTO workflow_intents (
+          request_id, workflow_scope, workflow_type, state, idempotency_key,
+          payload_hash, payload, created_at, updated_at, policy_version
+        ) VALUES (
+          ${requestId}, 'legacy', 'legacy', 'created', ${requestId},
+          ${"a".repeat(64)}, ${sql.json({ legacy: true })}, now(), now(), 'legacy-v1'
+        )
+      `;
+      await sql`
+        INSERT INTO project_profiles (
+          project_id, slug, asset_code, display_name, issuer_model, network,
+          created_at, updated_at
+        ) VALUES (
+          ${projectId}, 'legacy-publication', 'LEGACY', 'Legacy Publication',
+          'shared', 'testnet', now(), now()
+        )
+      `;
+      await sql`
+        INSERT INTO project_metadata_publications (
+          project_id, metadata_home, network, asset_code, issuer_public_key,
+          issuance_request_id, issuance_fingerprint, currency_toml,
+          content_hash, published_at, updated_at, reachable, verified_at,
+          last_verification_at
+        ) VALUES (
+          ${projectId}, 'assets.orrylo.com', 'testnet', 'LEGACY', ${publicKey},
+          ${requestId}, ${"b".repeat(64)}, '[[CURRENCIES]]', ${"c".repeat(64)},
+          now(), now(), true, now(), now()
+        )
+      `;
+
+      const upgraded = await migrateDatabase(sql, directory);
+      assert.deepEqual(upgraded.applied, ["007_testnet_project_issuance.sql"]);
+      const [legacy] = await sql<
+        {
+          confirmation_id: string | null;
+          reachable: boolean;
+          verification_error_code: string | null;
+        }[]
+      >`
+        SELECT confirmation_id, reachable, verification_error_code
+        FROM project_metadata_publications WHERE project_id = ${projectId}
+      `;
+      assert.equal(legacy.confirmation_id, null);
+      assert.equal(legacy.reachable, false);
+      assert.equal(
+        legacy.verification_error_code,
+        "confirmation_contract_unavailable",
+      );
+    } finally {
+      await rm(temporary, { recursive: true, force: true });
+    }
   });
 
   test("approved production-like constraint is adopted without changing existing objects or data", async () => {
@@ -266,6 +376,6 @@ if (!TEST_DATABASE_URL) {
     const [{ count }] = await sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM schema_migrations
     `;
-    assert.equal(count, "5");
+    assert.equal(count, "7");
   });
 }

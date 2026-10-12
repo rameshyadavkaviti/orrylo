@@ -15,16 +15,41 @@ const EXPECTED_TABLES = [
   "token_creation_qualifying_events",
   "project_profiles",
   "project_profile_owners",
+  "project_metadata_publications",
+  "project_issuance_intents",
+  "project_issuance_full_intents",
+  "project_issuance_transaction_attempts",
+  "project_issuance_ledger_confirmations",
 ] as const;
 
 const EXPECTED_CONSTRAINTS = [
   "project_profile_owners_wallet_check",
+  "project_metadata_publications_updated_after_published",
+  "project_metadata_publications_reachable_verified",
+  "project_metadata_publications_verified_attempted",
+  "project_metadata_publications_asset_identity_unique",
+  "project_metadata_publications_issuance_request_fk",
+  "project_metadata_publications_issuance_request_unique",
+  "project_metadata_publications_confirmation_fk",
+  "project_metadata_publications_confirmation_unique",
+  "project_metadata_publications_confirmation_required",
   "eligibility_records_first_token_event_required",
   "eligibility_records_qualifying_event_fk",
   "reward_records_first_token_amount_check",
   "reward_records_first_token_evidence_required",
   "reward_records_qualifying_event_fk",
   "token_creation_qualifying_events_processing_check",
+  "project_issuance_unique_asset_code",
+  "project_issuance_reservation_identity_unique",
+  "project_issuance_full_intent_identity_unique",
+  "project_issuance_full_intent_reservation_fk",
+  "project_issuance_attempt_intent_fk",
+  "project_issuance_attempt_confirmation_identity_unique",
+  "project_issuance_confirmation_intent_fk",
+  "project_issuance_confirmation_attempt_fk",
+  "project_issuance_confirmation_provenance_unique",
+  "project_issuance_confirmation_request_unique",
+  "project_issuance_confirmation_transaction_unique",
 ] as const;
 
 async function main() {
@@ -66,6 +91,17 @@ async function main() {
       throw new Error(
         `Missing required constraints: ${missingConstraints.join(", ")}`,
       );
+    }
+
+    const [writerRole] = await sql<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_roles
+        WHERE rolname = 'orrylo_confirmation_writer'
+          AND rolcanlogin = false
+      ) AS "exists"
+    `;
+    if (!writerRole?.exists) {
+      throw new Error("Missing non-login trusted confirmation writer role.");
     }
 
     process.stdout.write("Database schema verified.\n");

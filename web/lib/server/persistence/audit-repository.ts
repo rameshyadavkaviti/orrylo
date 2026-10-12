@@ -35,6 +35,16 @@ export class PostgresAuditRepository {
   constructor(private readonly sql: DatabaseClient) {}
 
   async append(input: AppendAuditEventInput): Promise<AuditEventRecord> {
+    return this.sql.begin(async (transaction) =>
+      this.appendInTransaction(transaction as unknown as DatabaseClient, input),
+    );
+  }
+
+  /** Append within an existing caller-owned SQL transaction; no nested COMMIT. */
+  async appendInTransaction(
+    transaction: DatabaseClient,
+    input: AppendAuditEventInput,
+  ): Promise<AuditEventRecord> {
     assertAuditMetadataSafe(input.metadata);
 
     const targetPublicKey = input.targetPublicKey
@@ -43,35 +53,34 @@ export class PostgresAuditRepository {
     const occurredAt = input.occurredAt ?? Date.now();
     const eventId = randomUUID();
 
-    return this.sql.begin(async (transaction) => {
-      const [head] = await transaction<
-        { last_sequence: string; last_event_hash: string | null }[]
-      >`
+    const [head] = await transaction<
+      { last_sequence: string; last_event_hash: string | null }[]
+    >`
         SELECT last_sequence::text AS last_sequence, last_event_hash
         FROM audit_chain_heads
         WHERE chain_id = ${CHAIN_ID}
         FOR UPDATE
       `;
 
-      if (!head) {
-        throw new Error("Audit chain head is unavailable.");
-      }
+    if (!head) {
+      throw new Error("Audit chain head is unavailable.");
+    }
 
-      const sequence = (BigInt(head.last_sequence) + 1n).toString();
-      const eventHash = hashAuditEvent({
-        eventId,
-        sequence,
-        requestId: input.requestId ?? null,
-        eventType: input.eventType,
-        source: input.source,
-        targetPublicKey,
-        occurredAt,
-        policyVersion: input.policyVersion,
-        metadata: input.metadata,
-        previousEventHash: head.last_event_hash,
-      });
+    const sequence = (BigInt(head.last_sequence) + 1n).toString();
+    const eventHash = hashAuditEvent({
+      eventId,
+      sequence,
+      requestId: input.requestId ?? null,
+      eventType: input.eventType,
+      source: input.source,
+      targetPublicKey,
+      occurredAt,
+      policyVersion: input.policyVersion,
+      metadata: input.metadata,
+      previousEventHash: head.last_event_hash,
+    });
 
-      const [row] = await transaction<AuditRow[]>`
+    const [row] = await transaction<AuditRow[]>`
         INSERT INTO audit_events (
           event_id,
           chain_id,
@@ -114,18 +123,17 @@ export class PostgresAuditRepository {
           event_hash
       `;
 
-      await transaction`
+    await transaction`
         UPDATE audit_chain_heads
         SET last_sequence = ${sequence}, last_event_hash = ${eventHash}
         WHERE chain_id = ${CHAIN_ID}
       `;
 
-      if (!row) {
-        throw new Error("Audit event insert did not return a row.");
-      }
+    if (!row) {
+      throw new Error("Audit event insert did not return a row.");
+    }
 
-      return mapAuditRow(row);
-    });
+    return mapAuditRow(row);
   }
 
   async list(): Promise<AuditEventRecord[]> {
