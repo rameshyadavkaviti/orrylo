@@ -132,7 +132,7 @@ export interface SharedIssuerApprovedSigner {
 
 export interface SharedIssuerSignerAuthorization {
   network: typeof SHARED_ISSUER_TESTNET_NETWORK;
-  networkPassphrase: typeof SHARED_ISSUER_TESTNET_PASSPHRASE;
+  networkPassphrase: string;
   issuerPublicKey: string;
   requiredWeight: number;
   signers: SharedIssuerApprovedSigner[];
@@ -470,7 +470,7 @@ export function assertSignedEnvelopeAuthorizedForSubmission(
   let approvedWeight = 0;
 
   for (const signature of transaction.signatures) {
-    const signatureBytes = Buffer.from(signature.signature());
+    const signatureBytes = Buffer.from(signature.signature);
     let matchedPublicKey: string | null = null;
 
     for (const [publicKey, signer] of approvedSigners) {
