@@ -77,11 +77,7 @@ WHERE publication.reachable = true
       AND confirmation.asset_code = publication.asset_code
       AND confirmation.issuer_public_key = publication.issuer_public_key
       AND confirmation.signed_envelope_xdr_sha256 IS NOT NULL
-      AND confirmation.signed_envelope_xdr_sha256 ~ '^[0-9a-f]{64} project_metadata_publications_signed_confirmation_guard
-BEFORE INSERT OR UPDATE ON project_metadata_publications
-FOR EACH ROW
-EXECUTE FUNCTION assert_metadata_reachability_signed_confirmation();
-
+      AND confirmation.signed_envelope_xdr_sha256 ~ '^[0-9a-f]{64}$'
   );
 
 CREATE TRIGGER project_metadata_publications_signed_confirmation_guard
