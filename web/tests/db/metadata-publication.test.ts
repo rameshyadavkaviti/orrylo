@@ -372,7 +372,7 @@ if (!TEST_DATABASE_URL) {
       service().publishOwnedProject(project.projectId, OWNER),
       (error: unknown) =>
         error instanceof MetadataPublicationError &&
-        error.code === "issuer_provenance_mismatch",
+        error.code === "issuer_provenance_unavailable",
     );
 
     reader.records.set(project.projectId, {
@@ -384,7 +384,7 @@ if (!TEST_DATABASE_URL) {
       service().publishOwnedProject(project.projectId, OWNER),
       (error: unknown) =>
         error instanceof MetadataPublicationError &&
-        error.code === "issuer_provenance_mismatch",
+        error.code === "issuer_provenance_unavailable",
     );
   });
 
