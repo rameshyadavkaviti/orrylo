@@ -44,6 +44,14 @@ Expected domain:
 
 A vanity address is optional. Technical correctness and key security take priority over address aesthetics.
 
+### First-product supply and disclosure boundary
+
+The initial amount entered by a customer is the exact amount of the first authorized Stellar issuance, not a standalone metadata number or implicit maximum lifetime supply. It must be persisted as part of the immutable server-authoritative issuance intent, revalidated at the transaction and ledger-confirmation boundaries, and displayed in a final review before any execution.
+
+The client must not offer a working Fixed Supply, Mintable or Capped control unless the selected issuer/control tier provably enforces that control, including its effective signing and alternate mint authorities. Under a Shared Issuer, disclose the shared operator authority and prevent claims of dedicated customer-exclusive issuer control. Advanced control templates remain target architecture, not implemented product functionality.
+
+See `docs/SOURCE_OF_TRUTH.md` §3.3 and `docs/OPEN_DECISIONS.md` for the approved minimum Testnet creation UX, unresolved limits and release gates.
+
 ## 3. Dedicated Issuer boundary
 
 Each Dedicated Issuer belongs to one customer/project infrastructure instance.
