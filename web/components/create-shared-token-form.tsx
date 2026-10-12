@@ -51,7 +51,8 @@ export function CreateSharedTokenForm() {
     null,
   );
   const [review, setReview] = useState<TokenBuilderReview | null>(null);
-  const [acknowledgedProfileOnlySave, setAcknowledgedProfileOnlySave] = useState(false);
+  const [acknowledgedProfileOnlySave, setAcknowledgedProfileOnlySave] =
+    useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoName, setLogoName] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
@@ -108,7 +109,10 @@ export function CreateSharedTokenForm() {
     const reader = new FileReader();
 
     reader.onload = () => {
-      if (readVersion === logoReadVersionRef.current && typeof reader.result === "string") {
+      if (
+        readVersion === logoReadVersionRef.current &&
+        typeof reader.result === "string"
+      ) {
         setLogoPreview(reader.result);
         setLogoName(file.name);
       }
@@ -151,7 +155,8 @@ export function CreateSharedTokenForm() {
     ) {
       setSaveState({
         status: "failure",
-        message: "Review the configuration and acknowledge that the supply is not saved.",
+        message:
+          "Review the configuration and acknowledge that the supply is not saved.",
       });
       return;
     }
@@ -159,7 +164,10 @@ export function CreateSharedTokenForm() {
     if (!idempotencyKeyRef.current) {
       idempotencyKeyRef.current = crypto.randomUUID();
     }
-    const prepared = prepareManagedProjectSave(draft, idempotencyKeyRef.current);
+    const prepared = prepareManagedProjectSave(
+      draft,
+      idempotencyKeyRef.current,
+    );
     setErrors(prepared.errors);
     if (!prepared.ok) {
       setReview(null);
@@ -276,11 +284,13 @@ export function CreateSharedTokenForm() {
           <span className="eyebrow">Interactive token builder</span>
           <h2>Shape the token you want Orrylo to create.</h2>
           <p>
-            Explore your configuration without connecting a wallet. A wallet
-            is required to save a Project Profile, not to preview tokens.
+            Explore your configuration without connecting a wallet. A wallet is
+            required to save a Project Profile, not to preview tokens.
           </p>
         </div>
-        <span className="builder-anonymous-note">Preview: no wallet required</span>
+        <span className="builder-anonymous-note">
+          Preview: no wallet required
+        </span>
       </div>
 
       <div className="draft-layout">
@@ -353,8 +363,8 @@ export function CreateSharedTokenForm() {
               <textarea
                 name="description"
                 value={draft.description}
-                  disabled={saveState.status === "saving"}
-                  aria-invalid={Boolean(errors.description)}
+                disabled={saveState.status === "saving"}
+                aria-invalid={Boolean(errors.description)}
                 onChange={(event) =>
                   updateField("description", event.target.value)
                 }
@@ -396,8 +406,8 @@ export function CreateSharedTokenForm() {
                 type="text"
                 inputMode="decimal"
                 value={initialSupply}
-                  disabled={saveState.status === "saving"}
-                  aria-invalid={Boolean(initialSupplyError)}
+                disabled={saveState.status === "saving"}
+                aria-invalid={Boolean(initialSupplyError)}
                 onChange={(event) => updateInitialSupply(event.target.value)}
                 placeholder="Example: 2500.5"
                 autoComplete="off"
@@ -534,26 +544,75 @@ export function CreateSharedTokenForm() {
           </div>
 
           {review ? (
-            <section className="draft-step" aria-labelledby="final-review-title">
+            <section
+              className="draft-step"
+              aria-labelledby="final-review-title"
+            >
               <div className="step-heading">
                 <span className="step-number">6</span>
                 <div>
                   <h3 id="final-review-title">Final draft review</h3>
-                  <p>Review the exact configuration before saving project details.</p>
+                  <p>
+                    Review the exact configuration before saving project
+                    details.
+                  </p>
                 </div>
               </div>
-              <dl className="preview-facts" aria-label="Reviewed draft settings">
-                <div><dt>Display name</dt><dd>{review.displayName}</dd></div>
-                <div><dt>Asset code</dt><dd>{review.assetCode}</dd></div>
-                <div><dt>Description</dt><dd>{review.description || "None"}</dd></div>
-                <div><dt>Logo</dt><dd>{review.logoFileName ? `${review.logoFileName} (browser only)` : "None"}</dd></div>
-                <div><dt>Selected initial supply (preview only)</dt><dd>{review.initialSupply} tokens</dd></div>
-                <div><dt>Maximum lifetime supply</dt><dd>Not configured or guaranteed</dd></div>
-                <div><dt>Target network</dt><dd>Stellar Testnet; no on-chain submission</dd></div>
-                <div><dt>Issuer authority</dt><dd>Orrylo-operated Shared Issuer, not customer-owned; account not yet approved</dd></div>
-                <div><dt>Distribution destination</dt><dd>Not selected or approved</dd></div>
-                <div><dt>Fees</dt><dd>Not configured</dd></div>
-                <div><dt>On-chain status</dt><dd>Not started; no transaction or confirmation</dd></div>
+              <dl
+                className="preview-facts"
+                aria-label="Reviewed draft settings"
+              >
+                <div>
+                  <dt>Display name</dt>
+                  <dd>{review.displayName}</dd>
+                </div>
+                <div>
+                  <dt>Asset code</dt>
+                  <dd>{review.assetCode}</dd>
+                </div>
+                <div>
+                  <dt>Description</dt>
+                  <dd>{review.description || "None"}</dd>
+                </div>
+                <div>
+                  <dt>Logo</dt>
+                  <dd>
+                    {review.logoFileName
+                      ? `${review.logoFileName} (browser only)`
+                      : "None"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Selected initial supply (preview only)</dt>
+                  <dd>{review.initialSupply} tokens</dd>
+                </div>
+                <div>
+                  <dt>Maximum lifetime supply</dt>
+                  <dd>Not configured or guaranteed</dd>
+                </div>
+                <div>
+                  <dt>Target network</dt>
+                  <dd>Stellar Testnet; no on-chain submission</dd>
+                </div>
+                <div>
+                  <dt>Issuer authority</dt>
+                  <dd>
+                    Orrylo-operated Shared Issuer, not customer-owned; account
+                    not yet approved
+                  </dd>
+                </div>
+                <div>
+                  <dt>Distribution destination</dt>
+                  <dd>Not selected or approved</dd>
+                </div>
+                <div>
+                  <dt>Fees</dt>
+                  <dd>Not configured</dd>
+                </div>
+                <div>
+                  <dt>On-chain status</dt>
+                  <dd>Not started; no transaction or confirmation</dd>
+                </div>
               </dl>
               <label className="field">
                 <span>
@@ -561,23 +620,25 @@ export function CreateSharedTokenForm() {
                     type="checkbox"
                     checked={acknowledgedProfileOnlySave}
                     disabled={saveState.status === "saving"}
-                    onChange={(event) => setAcknowledgedProfileOnlySave(event.target.checked)}
+                    onChange={(event) =>
+                      setAcknowledgedProfileOnlySave(event.target.checked)
+                    }
                   />{" "}
-                  I understand that saving creates only a managed Project Profile.
-                  The selected initial supply and browser logo are NOT saved,
-                  and no token is issued. Supply must be selected again once
-                  secure issuance becomes available.
+                  I understand that saving creates only a managed Project
+                  Profile. The selected initial supply and browser logo are NOT
+                  saved, and no token is issued. Supply must be selected again
+                  once secure issuance becomes available.
                 </span>
               </label>
               <p className="builder-boundary-note" role="status">
-                Reviewed browser draft. Saving a Project Profile is the only available
-                next action; token issuance is disabled.
+                Reviewed browser draft. Saving a Project Profile is the only
+                available next action; token issuance is disabled.
               </p>
             </section>
           ) : (
             <p className="builder-boundary-note" role="status">
-              Browser draft only. Review this configuration before saving
-              the Project Profile. Nothing has been submitted to Stellar.
+              Browser draft only. Review this configuration before saving the
+              Project Profile. Nothing has been submitted to Stellar.
             </p>
           )}
         </div>
@@ -627,7 +688,10 @@ export function CreateSharedTokenForm() {
             </div>
             <div>
               <dt>Supply authority</dt>
-              <dd>Orrylo may retain future mint authority. No fixed lifetime supply is guaranteed.</dd>
+              <dd>
+                Orrylo may retain future mint authority. No fixed lifetime
+                supply is guaranteed.
+              </dd>
             </div>
             <div>
               <dt>Issuer model</dt>
@@ -651,7 +715,9 @@ export function CreateSharedTokenForm() {
             <button
               className="button button-primary"
               type="button"
-              disabled={saveState.status === "saving" || !canSaveReviewedProfile}
+              disabled={
+                saveState.status === "saving" || !canSaveReviewedProfile
+              }
               onClick={() => void handleSaveProject()}
             >
               {saveState.status === "saving"

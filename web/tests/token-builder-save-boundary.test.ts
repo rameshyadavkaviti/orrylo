@@ -52,7 +52,10 @@ test("project-only save refuses browser supply and cap fields before any write",
       dependencies,
     );
     assert.equal(response.status, 400);
-    assert.deepEqual(await response.json(), { ok: false, code: "invalid_request" });
+    assert.deepEqual(await response.json(), {
+      ok: false,
+      code: "invalid_request",
+    });
   }
   assert.equal(count, 0);
 });
@@ -65,6 +68,9 @@ test("Project Profile request remains independent of unsupported browser supply"
       throw new Error("unauthenticated clients cannot save");
     },
   };
-  const response = await handleCreateManagedProject(request(DEFAULT), dependencies);
+  const response = await handleCreateManagedProject(
+    request(DEFAULT),
+    dependencies,
+  );
   assert.equal(response.status, 401);
 });
