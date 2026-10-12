@@ -1,0 +1,35 @@
+name: Temporary PR39 formatter
+on:
+  push:
+    branches:
+      - feat/token-builder-initial-supply-preview
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Format PR39 builder component
+        working-directory: web
+        run: |
+          npm ci
+          npx prettier --write components/create-shared-token-form.tsx
+      - name: Commit formatted component
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/components/create-shared-token-form.tsx
+          if ! git diff --cached --quiet; then
+            git commit -m 'style: format initial supply builder with Prettier'
+            git push origin HEAD:feat/token-builder-initial-supply-preview
+          fi
