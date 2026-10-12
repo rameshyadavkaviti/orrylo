@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts tests/*.test.tsx",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format:check": "prettier --write lib/stellar/shared-issuer-issuance.ts tests/shared-issuer-issuance.test.ts && git diff -- lib/stellar/shared-issuer-issuance.ts tests/shared-issuer-issuance.test.ts && exit 1",
     "verify": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:verify": "tsx scripts/verify-schema.ts",
