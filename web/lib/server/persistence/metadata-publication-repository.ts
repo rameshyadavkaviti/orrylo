@@ -65,9 +65,11 @@ export class PostgresMetadataPublicationRepository {
     if (!source || !HASH_PATTERN.test(source.signedEnvelopeXdrSha256)) {
       return false;
     }
-    const [durable] = await this.sql<{
-      signed_envelope_xdr_sha256: string;
-    }[]>`
+    const [durable] = await this.sql<
+      {
+        signed_envelope_xdr_sha256: string;
+      }[]
+    >`
       SELECT signed_envelope_xdr_sha256
       FROM project_issuance_ledger_confirmations
       WHERE confirmation_id = ${source.confirmationId}

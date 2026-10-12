@@ -165,9 +165,11 @@ export class MetadataPublicationService {
         ) {
           throw new MetadataPublicationError("issuer_provenance_unavailable");
         }
-        const [durableConfirmation] = await transaction<{
-          signed_envelope_xdr_sha256: string;
-        }[]>`
+        const [durableConfirmation] = await transaction<
+          {
+            signed_envelope_xdr_sha256: string;
+          }[]
+        >`
           SELECT signed_envelope_xdr_sha256
           FROM project_issuance_ledger_confirmations
           WHERE confirmation_id = ${provenance.confirmationId}
