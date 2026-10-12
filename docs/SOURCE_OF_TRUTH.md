@@ -598,8 +598,23 @@ issuer ceremony, SAC deployment, or mainnet deployment should be inferred
 merely from the presence of the contract/application workspace or the partial
 Testnet account setup.
 
-## 18. Canonical companion documents
+## 18. Continuity checkpoint protocol
 
+The keyword **`CHECKPOINT`** means: reconcile current GitHub `main`, canonical documents, and verified developments from the active Orrylo conversation; persist material facts, approved decisions, blockers, and next gates so a replacement agent can continue without relying on chat memory.
+
+Checkpoint rules:
+
+- this file remains the highest-level product source of truth; a checkpoint must never create a competing SOT;
+- verified implementation/deployment facts may be recorded as operational evidence;
+- explicitly approved product decisions may be promoted into the appropriate canonical document;
+- unresolved items remain unresolved and must not be silently decided;
+- recommendations or agent ideas are not policy unless explicitly approved;
+- repository state must be reconciled before checkpoint documentation is written;
+- [`CONTINUITY.md`](CONTINUITY.md) records the latest operational handoff snapshot and does not override canonical product/policy documents.
+
+## 19. Canonical companion documents
+
+- [CONTINUITY.md](CONTINUITY.md) — latest operational checkpoint / replacement-agent handoff
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system architecture and boundaries
 - [RYLO_POLICY.md](RYLO_POLICY.md) — RYLO-specific rules
 - [OPEN_DECISIONS.md](OPEN_DECISIONS.md) — decisions intentionally left unresolved
