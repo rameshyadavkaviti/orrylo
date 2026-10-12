@@ -509,7 +509,8 @@ export function assertReplacementPreservesIssuanceIntent(
 ): void {
   if (
     originalPlan.intentFingerprint !== replacementPlan.intentFingerprint ||
-    JSON.stringify(originalPlan.intent) !== JSON.stringify(replacementPlan.intent)
+    JSON.stringify(originalPlan.intent) !==
+      JSON.stringify(replacementPlan.intent)
   ) {
     throw new SharedIssuerIssuanceError(
       "issuance_intent_mismatch",

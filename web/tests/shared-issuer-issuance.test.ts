@@ -452,7 +452,8 @@ test("replacement transactions must preserve the immutable logical issuance inte
     assertReplacementPreservesIssuanceIntent(original, safeReplacement),
   );
   assert.throws(
-    () => assertReplacementPreservesIssuanceIntent(original, changedDestination),
+    () =>
+      assertReplacementPreservesIssuanceIntent(original, changedDestination),
     (error) => errorCode(error) === "issuance_intent_mismatch",
   );
 });
