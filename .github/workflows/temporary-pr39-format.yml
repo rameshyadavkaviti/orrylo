@@ -1,0 +1,36 @@
+name: Temporary PR39 formatter
+on:
+  push:
+    branches:
+      - feat/token-builder-initial-supply-preview
+permissions:
+  contents: write
+jobs:
+  format:
+    if: ${{ !contains(github.event.head_commit.message, '[autoformat]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/token-builder-initial-supply-preview
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Format edited builder files with canonical Prettier
+        working-directory: web
+        run: |
+          npm ci --no-audit --no-fund
+          npx prettier --write components/create-shared-token-form.tsx tests/token-builder-review.test.tsx tests/token-builder-save-boundary.test.ts
+      - name: Commit formatter output only
+        run: |
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web
+          if ! git diff --cached --quiet; then
+            git commit -m 'style: format token builder review [autoformat]'
+            git push origin HEAD:refs/heads/feat/token-builder-initial-supply-preview
+          fi
