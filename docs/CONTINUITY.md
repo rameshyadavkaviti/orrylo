@@ -84,6 +84,30 @@ The deterministic SAC address is not deployment evidence by itself. SAC deployme
 - PR #19: Shared Issuer managed metadata publication on Testnet; remains a separate work stream and must not be conflated with RYLO TOML publication.
 - PR #24: merged; production rollout verification is the immediate database/application gate.
 
+## Approved final Testnet acceptance gate
+
+The user approved the final Testnet acceptance operation order:
+
+```text
+new wallet
+→ Albedo login
+→ project creation
+→ token creation
+→ TOML / explorer verification
+→ eligibility
+→ RYLO trustline
+→ issuer authorization
+→ 150 RYLO reward
+→ visible RYLO balance
+→ RYLO/XLM liquidity pool
+→ successful swap
+→ project management
+→ logout
+→ login again
+```
+
+After the clean path passes, repeat with controlled failure/retry at sensitive points. The sequence is locked as the final Testnet-to-Mainnet acceptance gate unless the user explicitly approves a later change.
+
 ## Mainnet direction
 
 The approved execution direction is Mainnet preparation **after** Testnet acceptance evidence, not immediate Mainnet mutation.
