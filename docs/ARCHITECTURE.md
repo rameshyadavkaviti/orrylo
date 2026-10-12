@@ -228,7 +228,9 @@ Railway app/backend
 Neon PostgreSQL
 ```
 
-The repository's currently recorded Stellar issuer/contract preparation evidence is on **Testnet**. Testnet remains the reproducible engineering/safety environment, but the immediate execution direction is now **Mainnet preparation**. No issuer, asset, SAC, or application flow may be described as Mainnet-deployed until explicit deployment evidence is recorded.
+**Immediate P0 delivery milestone:** Testnet MVP Lite: one authenticated customer Shared Issuer creation path, with selected initial supply bound to immutable server-authoritative intent, protected Testnet submission, independently verified ledger outcome and a trustworthy project result. This is a constrained milestone, not a change to long-term custody, authorization or economic rules. Full RYLO reward/liquidity/swap execution, Dedicated Issuer and Mainnet activation are outside its critical path.
+
+The repository's currently recorded Stellar issuer/contract preparation evidence is on **Testnet**. Testnet is the immediate product-validation environment and must remain reproducible. **Mainnet preparation is a separate parallel/later workstream, not a dependency for Testnet MVP Lite.** No issuer, asset, SAC or application path may be described as live on any network without explicit deployment and transaction evidence. No issuer, asset, SAC, or application flow may be described as Mainnet-deployed until explicit deployment evidence is recorded.
 
 The expected starting infrastructure cost is approximately **$5/month**, driven primarily by Railway. Neon and Cloudflare are expected to remain on their free tiers for the initial prototype.
 
