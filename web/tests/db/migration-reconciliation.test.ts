@@ -16,6 +16,7 @@ const ALL_MIGRATIONS = [
   "003_eligibility_reward_workflow.sql",
   "004_project_profiles.sql",
   "005_project_profile_ownership.sql",
+  "006_project_metadata_publications.sql",
 ];
 
 if (!TEST_DATABASE_URL) {
@@ -65,7 +66,7 @@ if (!TEST_DATABASE_URL) {
     `;
   }
 
-  test("fresh bootstrap applies 001-005 and repeated runs verify without changes", async () => {
+  test("fresh bootstrap applies 001-006 and repeated runs verify without changes", async () => {
     const first = await migrateDatabase(sql, directory);
     assert.deepEqual(first.applied, ALL_MIGRATIONS);
     assert.deepEqual(first.reconciled, []);
@@ -75,6 +76,48 @@ if (!TEST_DATABASE_URL) {
     assert.deepEqual(again.applied, []);
     assert.deepEqual(again.reconciled, []);
     assert.deepEqual(again.verified, ALL_MIGRATIONS);
+  });
+
+
+  test("existing 001-005 database upgrades with 006 without rewriting earlier checksums or project rows", async () => {
+    const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-metadata-"));
+    try {
+      for (const migration of ALL_MIGRATIONS.slice(0, 5)) {
+        await copyFile(join(directory, migration), join(temporary, migration));
+      }
+      const old = await migrateDatabase(sql, temporary);
+      assert.deepEqual(old.applied, ALL_MIGRATIONS.slice(0, 5));
+      const projectId = "00000000-0000-4000-8000-000000000112";
+      await sql`
+        INSERT INTO project_profiles (
+          project_id, slug, asset_code, display_name, issuer_model, network,
+          created_at, updated_at
+        ) VALUES (
+          ${projectId}, 'upgrade-fixture', 'UPGRADE', 'Upgrade Fixture',
+          'shared', 'testnet', now(), now()
+        )
+      `;
+      const before = await sql<{ name: string; checksum: string }[]>`
+        SELECT name, checksum FROM schema_migrations ORDER BY name
+      `;
+      const upgraded = await migrateDatabase(sql, directory);
+      assert.deepEqual(upgraded.applied, ["006_project_metadata_publications.sql"]);
+      assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 5));
+      const after = await sql<{ name: string; checksum: string }[]>`
+        SELECT name, checksum FROM schema_migrations ORDER BY name
+      `;
+      assert.deepEqual(after.slice(0, 5), before);
+      const [retained] = await sql<{ asset_code: string }[]>`
+        SELECT asset_code FROM project_profiles WHERE project_id = ${projectId}
+      `;
+      assert.equal(retained.asset_code, "UPGRADE");
+      const [{ exists }] = await sql<{ exists: string | null }[]>`
+        SELECT to_regclass('project_metadata_publications')::text AS "exists"
+      `;
+      assert.equal(exists, "project_metadata_publications");
+    } finally {
+      await rm(temporary, { recursive: true, force: true });
+    }
   });
 
   test("approved production-like constraint is adopted without changing existing objects or data", async () => {
@@ -266,6 +309,6 @@ if (!TEST_DATABASE_URL) {
     const [{ count }] = await sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM schema_migrations
     `;
-    assert.equal(count, "5");
+    assert.equal(count, "6");
   });
 }

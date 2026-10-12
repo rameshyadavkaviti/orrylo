@@ -6,6 +6,7 @@ import { safeHttpsUrl } from "./project-metadata";
 export interface GeneratedStellarToml {
   content: string;
   issuerIncluded: boolean;
+  issuerPublicKey: string | null;
   imageIncluded: boolean;
 }
 
@@ -43,6 +44,7 @@ export function generateProjectCurrencyToml(
   return {
     content: `${lines.join("\n")}\n`,
     issuerIncluded: Boolean(issuer),
+    issuerPublicKey: issuer,
     imageIncluded: Boolean(image),
   };
 }
@@ -66,5 +68,7 @@ function normalizedIssuer(publicKey: string | null | undefined): string | null {
 }
 
 function tomlString(value: string): string {
-  return JSON.stringify(value);
+  return JSON.stringify(value.normalize("NFC"))
+    .replaceAll("\u2028", "\\u2028")
+    .replaceAll("\u2029", "\\u2029");
 }

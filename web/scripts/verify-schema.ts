@@ -15,10 +15,15 @@ const EXPECTED_TABLES = [
   "token_creation_qualifying_events",
   "project_profiles",
   "project_profile_owners",
+  "project_metadata_publications",
 ] as const;
 
 const EXPECTED_CONSTRAINTS = [
   "project_profile_owners_wallet_check",
+  "project_metadata_publications_updated_after_published",
+  "project_metadata_publications_reachable_verified",
+  "project_metadata_publications_verified_attempted",
+  "project_metadata_publications_asset_identity_unique",
   "eligibility_records_first_token_event_required",
   "eligibility_records_qualifying_event_fk",
   "reward_records_first_token_amount_check",
