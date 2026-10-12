@@ -20,6 +20,7 @@ const ALL_MIGRATIONS = [
   "007_testnet_project_issuance.sql",
   "008_gate_a_confirmation_provenance.sql",
   "009_signed_envelope_digest.sql",
+  "010_mvp_lite_db_security_hardening.sql",
 ];
 
 if (!TEST_DATABASE_URL) {
@@ -69,7 +70,7 @@ if (!TEST_DATABASE_URL) {
     `;
   }
 
-  test("fresh bootstrap applies 001-009 and repeated runs verify without changes", async () => {
+  test("fresh bootstrap applies 001-010 and repeated runs verify without changes", async () => {
     const first = await migrateDatabase(sql, directory);
     assert.deepEqual(first.applied, ALL_MIGRATIONS);
     assert.deepEqual(first.reconciled, []);
@@ -81,7 +82,7 @@ if (!TEST_DATABASE_URL) {
     assert.deepEqual(again.verified, ALL_MIGRATIONS);
   });
 
-  test("existing 001-005 database upgrades with 006-009 without rewriting earlier checksums or project rows", async () => {
+  test("existing 001-005 database upgrades with 006-010 without rewriting earlier checksums or project rows", async () => {
     const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-metadata-"));
     try {
       for (const migration of ALL_MIGRATIONS.slice(0, 5)) {
@@ -108,6 +109,7 @@ if (!TEST_DATABASE_URL) {
         "007_testnet_project_issuance.sql",
         "008_gate_a_confirmation_provenance.sql",
         "009_signed_envelope_digest.sql",
+        "010_mvp_lite_db_security_hardening.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 5));
       const after = await sql<{ name: string; checksum: string }[]>`
@@ -127,7 +129,7 @@ if (!TEST_DATABASE_URL) {
     }
   });
 
-  test("existing 001-006 publication rows are retained but fail closed during 007-009 upgrade", async () => {
+  test("existing 001-006 publication rows are retained but fail closed during 007-010 upgrade", async () => {
     const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-confirmation-"));
     try {
       for (const migration of ALL_MIGRATIONS.slice(0, 6)) {
@@ -173,6 +175,7 @@ if (!TEST_DATABASE_URL) {
         "007_testnet_project_issuance.sql",
         "008_gate_a_confirmation_provenance.sql",
         "009_signed_envelope_digest.sql",
+        "010_mvp_lite_db_security_hardening.sql",
       ]);
       const [legacy] = await sql<
         {
@@ -209,6 +212,7 @@ if (!TEST_DATABASE_URL) {
       assert.deepEqual(upgraded.applied, [
         "008_gate_a_confirmation_provenance.sql",
         "009_signed_envelope_digest.sql",
+        "010_mvp_lite_db_security_hardening.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 7));
       const after = await sql<{ name: string; checksum: string }[]>`
@@ -220,7 +224,7 @@ if (!TEST_DATABASE_URL) {
     }
   });
 
-  test("existing 001-008 database adds signed-envelope persistence without rewriting history", async () => {
+  test("existing 001-008 database adds signed-envelope persistence and MVP Lite hardening without rewriting history", async () => {
     const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-digest-"));
     try {
       for (const migration of ALL_MIGRATIONS.slice(0, 8)) {
@@ -231,12 +235,57 @@ if (!TEST_DATABASE_URL) {
         SELECT name, checksum FROM schema_migrations ORDER BY name
       `;
       const upgraded = await migrateDatabase(sql, directory);
-      assert.deepEqual(upgraded.applied, ["009_signed_envelope_digest.sql"]);
+      assert.deepEqual(upgraded.applied, [
+        "009_signed_envelope_digest.sql",
+        "010_mvp_lite_db_security_hardening.sql",
+      ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 8));
       const after = await sql<{ name: string; checksum: string }[]>`
         SELECT name, checksum FROM schema_migrations ORDER BY name
       `;
       assert.deepEqual(after.slice(0, 8), [...before]);
+    } finally {
+      await rm(temporary, { recursive: true, force: true });
+    }
+  });
+
+  test("existing 001-009 database adds only MVP Lite DB hardening without rewriting history", async () => {
+    const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-db-hardening-"));
+    try {
+      for (const migration of ALL_MIGRATIONS.slice(0, 9)) {
+        await copyFile(join(directory, migration), join(temporary, migration));
+      }
+      await migrateDatabase(sql, temporary);
+      const before = await sql<{ name: string; checksum: string }[]>`
+        SELECT name, checksum FROM schema_migrations ORDER BY name
+      `;
+      const upgraded = await migrateDatabase(sql, directory);
+      assert.deepEqual(upgraded.applied, [
+        "010_mvp_lite_db_security_hardening.sql",
+      ]);
+      assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 9));
+      const after = await sql<{ name: string; checksum: string }[]>`
+        SELECT name, checksum FROM schema_migrations ORDER BY name
+      `;
+      assert.deepEqual(after.slice(0, 9), [...before]);
+      const [attemptConstraint] = await sql<{ definition: string }[]>`
+        SELECT pg_get_constraintdef(oid) AS definition
+        FROM pg_constraint
+        WHERE conname = 'project_issuance_attempt_number_mvp_lite'
+      `;
+      assert.equal(attemptConstraint.definition, "CHECK ((attempt_number = 1))");
+      const [{ trigger_exists: triggerExists }] = await sql<
+        { trigger_exists: boolean }[]
+      >`
+        SELECT EXISTS (
+          SELECT 1 FROM pg_trigger
+          WHERE tgname =
+            'project_metadata_publications_signed_confirmation_guard'
+            AND tgrelid = 'project_metadata_publications'::regclass
+            AND NOT tgisinternal
+        ) AS trigger_exists
+      `;
+      assert.equal(triggerExists, true);
     } finally {
       await rm(temporary, { recursive: true, force: true });
     }

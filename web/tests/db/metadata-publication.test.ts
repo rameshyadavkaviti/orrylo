@@ -33,6 +33,9 @@ if (!TEST_DATABASE_URL) {
       "metadata-writer-test",
     ),
   );
+  const appSql = createDatabaseClient(
+    roleUrl(TEST_DATABASE_URL, "orrylo_metadata_app_test", "metadata-app-test"),
+  );
   const OWNER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 81)).publicKey();
   const OTHER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 82)).publicKey();
   const ISSUER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 83)).publicKey();
@@ -89,10 +92,17 @@ if (!TEST_DATABASE_URL) {
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_metadata_writer_test') THEN
           CREATE ROLE orrylo_metadata_writer_test LOGIN PASSWORD 'metadata-writer-test';
         END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_metadata_app_test') THEN
+          CREATE ROLE orrylo_metadata_app_test LOGIN PASSWORD 'metadata-app-test';
+        END IF;
       END;
       $$;
       ALTER ROLE orrylo_metadata_writer_test PASSWORD 'metadata-writer-test';
+      ALTER ROLE orrylo_metadata_app_test PASSWORD 'metadata-app-test';
       GRANT orrylo_confirmation_writer TO orrylo_metadata_writer_test;
+      GRANT USAGE ON SCHEMA public TO orrylo_metadata_app_test;
+      GRANT SELECT, INSERT, UPDATE ON project_metadata_publications
+        TO orrylo_metadata_app_test;
     `);
   });
 
@@ -107,7 +117,11 @@ if (!TEST_DATABASE_URL) {
   });
 
   after(async () => {
-    await Promise.all([writerSql.end({ timeout: 5 }), sql.end({ timeout: 5 })]);
+    await Promise.all([
+      appSql.end({ timeout: 5 }),
+      writerSql.end({ timeout: 5 }),
+      sql.end({ timeout: 5 }),
+    ]);
   });
 
   function repository() {
@@ -311,6 +325,20 @@ if (!TEST_DATABASE_URL) {
     // Durable confirmation provenance must override that claim.
     assert.equal(await repository().getByProjectId(project.projectId), null);
     assert.deepEqual(await repository().listSharedTestnetPublications(), []);
+    for (let directReplay = 0; directReplay < 2; directReplay++) {
+      await assert.rejects(
+        appSql`
+          UPDATE project_metadata_publications
+          SET reachable = true,
+              verified_at = ${new Date(clock + directReplay + 1)},
+              last_verification_at = ${new Date(clock + directReplay + 1)}
+          WHERE project_id = ${project.projectId}
+        `,
+        (error: unknown) =>
+          (error as { constraint_name?: string }).constraint_name ===
+          "project_metadata_publications_signed_confirmation_required",
+      );
+    }
     const [row] = await sql<{ content_hash: string }[]>`
       SELECT content_hash FROM project_metadata_publications
       WHERE project_id = ${project.projectId}

@@ -314,6 +314,77 @@ if (!TEST_DATABASE_URL) {
     ]);
   });
 
+  test("PostgreSQL itself permits attempt 1 and rejects direct SQL attempt 2 for the authorized app identity", async () => {
+    const { intent, attempt, signedEnvelopeXdrSha256 } = await createFixture();
+    await repository.appendIntent(intent);
+    await appSql`
+      INSERT INTO project_issuance_transaction_attempts (
+        attempt_id, issuance_request_id, issuance_intent_fingerprint,
+        attempt_number, transaction_hash, envelope_xdr_sha256,
+        source_sequence, fee_stroops, valid_from, valid_until,
+        transaction_source_public_key, operation_count, operation_type,
+        operation_source_public_key, asset_code, issuer_public_key,
+        destination_public_key, amount, created_at
+      ) VALUES (
+        ${attempt.attemptId}, ${attempt.issuanceRequestId},
+        ${attempt.issuanceIntentFingerprint}, 1, ${attempt.transactionHash},
+        ${attempt.envelopeXdrSha256}, ${attempt.sourceSequence},
+        ${attempt.feeStroops}, ${attempt.validFrom}, ${attempt.validUntil},
+        ${attempt.transactionSourcePublicKey}, 1, 'payment',
+        ${attempt.operationSourcePublicKey}, ${attempt.assetCode},
+        ${attempt.issuerPublicKey}, ${attempt.destinationPublicKey},
+        ${attempt.amount}, ${new Date(attempt.createdAt)}
+      )
+    `;
+
+    await assert.rejects(
+      appSql`
+        INSERT INTO project_issuance_transaction_attempts (
+          attempt_id, issuance_request_id, issuance_intent_fingerprint,
+          attempt_number, transaction_hash, envelope_xdr_sha256,
+          source_sequence, fee_stroops, valid_from, valid_until,
+          transaction_source_public_key, operation_count, operation_type,
+          operation_source_public_key, asset_code, issuer_public_key,
+          destination_public_key, amount, created_at
+        ) VALUES (
+          ${randomUUID()}, ${attempt.issuanceRequestId},
+          ${attempt.issuanceIntentFingerprint}, 2, ${"d".repeat(64)},
+          ${"e".repeat(64)}, 124, ${attempt.feeStroops},
+          ${attempt.validFrom}, ${attempt.validUntil},
+          ${attempt.transactionSourcePublicKey}, 1, 'payment',
+          ${attempt.operationSourcePublicKey}, ${attempt.assetCode},
+          ${attempt.issuerPublicKey}, ${attempt.destinationPublicKey},
+          ${attempt.amount}, ${new Date(attempt.createdAt)}
+        )
+      `,
+      (error: unknown) =>
+        (error as { constraint_name?: string }).constraint_name ===
+        "project_issuance_attempt_number_mvp_lite",
+    );
+
+    const [{ count }] = await appSql<{ count: string }[]>`
+      SELECT count(*)::text AS count
+      FROM project_issuance_transaction_attempts
+      WHERE issuance_request_id = ${attempt.issuanceRequestId}
+    `;
+    assert.equal(count, "1");
+
+    const recorded = await repository.recordSignedEnvelope({
+      attemptId: attempt.attemptId,
+      transactionHash: attempt.transactionHash,
+      signedEnvelopeXdrSha256,
+    });
+    assert.equal(recorded.signedEnvelopeXdrSha256, signedEnvelopeXdrSha256);
+    await assert.rejects(
+      appSql`
+        UPDATE project_issuance_transaction_attempts
+        SET signed_envelope_xdr_sha256 = ${"f".repeat(64)}
+        WHERE attempt_id = ${attempt.attemptId}
+      `,
+      /append-only/,
+    );
+  });
+
   test("attempts remain immutable and the ordinary application identity cannot fabricate confirmation", async () => {
     const { intent, attempt } = await createFixture();
     await repository.appendIntent(intent);
