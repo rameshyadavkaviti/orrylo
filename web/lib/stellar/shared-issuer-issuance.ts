@@ -470,13 +470,12 @@ export function assertSignedEnvelopeAuthorizedForSubmission(
   let approvedWeight = 0;
 
   for (const signature of transaction.signatures) {
-    const signatureBytes = Buffer.from(signature.signature);
     let matchedPublicKey: string | null = null;
 
     for (const [publicKey, signer] of approvedSigners) {
       if (
         !matchedSignerKeys.has(publicKey) &&
-        signer.keypair.verify(transactionHashBytes, signatureBytes)
+        signer.keypair.verify(transactionHashBytes, signature.signature)
       ) {
         matchedPublicKey = publicKey;
         approvedWeight += signer.weight;
