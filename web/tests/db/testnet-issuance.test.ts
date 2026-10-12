@@ -237,7 +237,8 @@ if (!TEST_DATABASE_URL) {
     await assert.rejects(
       unavailable.request(input(project.projectId)),
       (error: unknown) =>
-        error instanceof TestnetIssuanceError && error.code === "issuer_integration_unavailable",
+        error instanceof TestnetIssuanceError &&
+        error.code === "issuer_integration_unavailable",
     );
     const [{ count }] = await sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM project_issuance_intents
@@ -269,7 +270,8 @@ if (!TEST_DATABASE_URL) {
     await assert.rejects(
       service.request(input(two.projectId, randomUUID(), "TWO")),
       (error: unknown) =>
-        error instanceof TestnetIssuanceError && error.code === "reservation_limit_reached",
+        error instanceof TestnetIssuanceError &&
+        error.code === "reservation_limit_reached",
     );
   });
 
@@ -287,7 +289,10 @@ if (!TEST_DATABASE_URL) {
       await assert.rejects(mutation);
     }
     const loaded = await service.getOwnedStatus(project.projectId, OWNER);
-    assert.equal(loaded?.reservationFingerprint, created.issuance.reservationFingerprint);
+    assert.equal(
+      loaded?.reservationFingerprint,
+      created.issuance.reservationFingerprint,
+    );
     assert.equal(loaded?.reservationIssuerPublicKey, ISSUER);
     assert.equal(loaded?.assetCode, "NOVA");
   });
@@ -300,10 +305,10 @@ if (!TEST_DATABASE_URL) {
     assert.equal(replay.created, false);
     assert.equal(replay.issuance.requestId, created.issuance.requestId);
     const events = await new PostgresAuditRepository(sql).list();
-    assert.deepEqual(events.map((event) => event.eventType), [
-      "SHARED_ISSUANCE_INTENT_CREATED",
-      "SHARED_ISSUANCE_ASSET_CODE_RESERVED",
-    ]);
+    assert.deepEqual(
+      events.map((event) => event.eventType),
+      ["SHARED_ISSUANCE_INTENT_CREATED", "SHARED_ISSUANCE_ASSET_CODE_RESERVED"],
+    );
     for (const event of events) {
       assert.equal(event.requestId, created.issuance.requestId);
       assert.equal(event.targetPublicKey, OWNER);
@@ -360,8 +365,13 @@ if (!TEST_DATABASE_URL) {
     await assert.rejects(
       other.request(same),
       (error: unknown) =>
-        error instanceof TestnetIssuanceError && error.code === "idempotency_conflict",
+        error instanceof TestnetIssuanceError &&
+        error.code === "idempotency_conflict",
     );
-    assert.equal((await service.getOwnedStatus(project.projectId, OWNER))?.reservationIssuerPublicKey, ISSUER);
+    assert.equal(
+      (await service.getOwnedStatus(project.projectId, OWNER))
+        ?.reservationIssuerPublicKey,
+      ISSUER,
+    );
   });
 }

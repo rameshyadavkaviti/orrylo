@@ -100,7 +100,11 @@ interface WorkflowRow {
 }
 
 /** This is NOT the PR #27 complete issuance intent. No amount/destination is chosen. */
-function reservationPayload(projectId: string, assetCode: string, issuer: string) {
+function reservationPayload(
+  projectId: string,
+  assetCode: string,
+  issuer: string,
+) {
   return {
     projectId,
     network: "testnet",
@@ -111,7 +115,10 @@ function reservationPayload(projectId: string, assetCode: string, issuer: string
   } as const;
 }
 
-function fingerprint(owner: string, payload: ReturnType<typeof reservationPayload>) {
+function fingerprint(
+  owner: string,
+  payload: ReturnType<typeof reservationPayload>,
+) {
   return hashJson({
     workflowType: WORKFLOW_TYPE,
     subjectPublicKey: owner,
@@ -121,7 +128,8 @@ function fingerprint(owner: string, payload: ReturnType<typeof reservationPayloa
 }
 
 function mapRow(row: IssuanceRow): TestnetIssuanceRecord {
-  const ledger = row.ledger_sequence === null ? null : Number(row.ledger_sequence);
+  const ledger =
+    row.ledger_sequence === null ? null : Number(row.ledger_sequence);
   if (ledger !== null && (!Number.isSafeInteger(ledger) || ledger <= 0)) {
     throw new TestnetIssuanceError("database_invariant");
   }
@@ -149,7 +157,10 @@ function mapRow(row: IssuanceRow): TestnetIssuanceRecord {
 export function prepareReservedSharedIssuerPlan(
   reserved: TestnetIssuanceRecord,
   request: SharedIssuerIssuanceRequest,
-  preconditions: Omit<SharedIssuerIssuancePreconditions, "assetCodeReservedForProject">,
+  preconditions: Omit<
+    SharedIssuerIssuancePreconditions,
+    "assetCodeReservedForProject"
+  >,
 ): SharedIssuerIssuancePlan {
   if (
     reserved.network !== "testnet" ||
@@ -209,7 +220,10 @@ export class TestnetIssuanceService {
     if (this.options.network !== "testnet") {
       throw new TestnetIssuanceError("unsupported_network");
     }
-    if (!isValidProjectId(input.projectId) || !UUID_PATTERN.test(input.idempotencyKey)) {
+    if (
+      !isValidProjectId(input.projectId) ||
+      !UUID_PATTERN.test(input.idempotencyKey)
+    ) {
       throw new TestnetIssuanceError("invalid_request");
     }
 
@@ -246,7 +260,10 @@ export class TestnetIssuanceService {
         if (project.network !== "testnet") {
           throw new TestnetIssuanceError("unsupported_network");
         }
-        if (project.issuer_model !== "shared" || project.issuer_public_key !== null) {
+        if (
+          project.issuer_model !== "shared" ||
+          project.issuer_public_key !== null
+        ) {
           throw new TestnetIssuanceError("ineligible_project");
         }
         const validation = validateSharedAssetDraft({
@@ -261,7 +278,11 @@ export class TestnetIssuanceService {
           throw new TestnetIssuanceError("asset_code_mismatch");
         }
 
-        const payload = reservationPayload(input.projectId, validation.normalized.code, issuer);
+        const payload = reservationPayload(
+          input.projectId,
+          validation.normalized.code,
+          issuer,
+        );
         const expectedFingerprint = fingerprint(owner, payload);
         const boundKey = `${owner}:${input.projectId}:${key}`;
         const [workflow] = await transaction<WorkflowRow[]>`
@@ -272,19 +293,24 @@ export class TestnetIssuanceService {
           FOR UPDATE
         `;
         if (workflow) {
-          if (workflow.payload_hash.trim() !== expectedFingerprint ||
-              workflow.subject_public_key?.trim() !== owner ||
-              workflow.workflow_type !== WORKFLOW_TYPE ||
-              workflow.policy_version !== POLICY_VERSION) {
+          if (
+            workflow.payload_hash.trim() !== expectedFingerprint ||
+            workflow.subject_public_key?.trim() !== owner ||
+            workflow.workflow_type !== WORKFLOW_TYPE ||
+            workflow.policy_version !== POLICY_VERSION
+          ) {
             throw new TestnetIssuanceError("idempotency_conflict");
           }
           const [existing] = await transaction<IssuanceRow[]>`
             SELECT * FROM project_issuance_intents WHERE request_id = ${workflow.request_id}
           `;
-          if (!existing || existing.project_id !== input.projectId ||
-              existing.reservation_issuer_public_key.trim() !== issuer ||
-              existing.asset_code !== payload.assetCode ||
-              existing.reservation_fingerprint.trim() !== expectedFingerprint) {
+          if (
+            !existing ||
+            existing.project_id !== input.projectId ||
+            existing.reservation_issuer_public_key.trim() !== issuer ||
+            existing.asset_code !== payload.assetCode ||
+            existing.reservation_fingerprint.trim() !== expectedFingerprint
+          ) {
             throw new TestnetIssuanceError("database_invariant");
           }
           return { created: false, issuance: mapRow(existing) };
@@ -293,7 +319,8 @@ export class TestnetIssuanceService {
         const [existing] = await transaction<IssuanceRow[]>`
           SELECT * FROM project_issuance_intents WHERE project_id = ${input.projectId}
         `;
-        if (existing) throw new TestnetIssuanceError("issuance_already_requested");
+        if (existing)
+          throw new TestnetIssuanceError("issuance_already_requested");
 
         const requestId = randomUUID();
         await transaction`
@@ -320,45 +347,56 @@ export class TestnetIssuanceService {
         `;
         if (!created) throw new TestnetIssuanceError("database_invariant");
 
-        const audit = new PostgresAuditRepository(transaction as unknown as DatabaseClient);
+        const audit = new PostgresAuditRepository(
+          transaction as unknown as DatabaseClient,
+        );
         // Both events share the same transaction, request ID and hash chain.
         // A failure to append either event rolls back the reservation and workflow.
-        await audit.appendInTransaction(transaction as unknown as DatabaseClient, {
-          requestId,
-          eventType: "SHARED_ISSUANCE_INTENT_CREATED",
-          source: "testnet-issuance-service",
-          targetPublicKey: owner,
-          policyVersion: POLICY_VERSION,
-          occurredAt: now,
-          metadata: {
-            projectId: input.projectId,
-            assetCode: payload.assetCode,
-            issuerPublicKey: issuer,
-            reservationFingerprint: expectedFingerprint,
-            network: "testnet",
+        await audit.appendInTransaction(
+          transaction as unknown as DatabaseClient,
+          {
+            requestId,
+            eventType: "SHARED_ISSUANCE_INTENT_CREATED",
+            source: "testnet-issuance-service",
+            targetPublicKey: owner,
+            policyVersion: POLICY_VERSION,
+            occurredAt: now,
+            metadata: {
+              projectId: input.projectId,
+              assetCode: payload.assetCode,
+              issuerPublicKey: issuer,
+              reservationFingerprint: expectedFingerprint,
+              network: "testnet",
+            },
           },
-        });
-        await audit.appendInTransaction(transaction as unknown as DatabaseClient, {
-          requestId,
-          eventType: "SHARED_ISSUANCE_ASSET_CODE_RESERVED",
-          source: "testnet-issuance-service",
-          targetPublicKey: owner,
-          policyVersion: POLICY_VERSION,
-          occurredAt: now,
-          metadata: {
-            projectId: input.projectId,
-            assetCode: payload.assetCode,
-            issuerPublicKey: issuer,
-            status: "awaiting_issuer_integration",
+        );
+        await audit.appendInTransaction(
+          transaction as unknown as DatabaseClient,
+          {
+            requestId,
+            eventType: "SHARED_ISSUANCE_ASSET_CODE_RESERVED",
+            source: "testnet-issuance-service",
+            targetPublicKey: owner,
+            policyVersion: POLICY_VERSION,
+            occurredAt: now,
+            metadata: {
+              projectId: input.projectId,
+              assetCode: payload.assetCode,
+              issuerPublicKey: issuer,
+              status: "awaiting_issuer_integration",
+            },
           },
-        });
+        );
         return { created: true, issuance: mapRow(created) };
       });
     } catch (error) {
       if (error instanceof TestnetIssuanceError) throw error;
       const constraint =
-        typeof error === "object" && error !== null && "constraint_name" in error
-          ? error.constraint_name : null;
+        typeof error === "object" &&
+        error !== null &&
+        "constraint_name" in error
+          ? error.constraint_name
+          : null;
       if (constraint === "project_issuance_unique_asset_code") {
         throw new TestnetIssuanceError("asset_code_reserved");
       }

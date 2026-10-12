@@ -40,7 +40,8 @@ function dependencies(): IssuanceRouteDependencies {
   const config = readServerAuthConfig();
   const service = new TestnetIssuanceService(getDatabaseClient(), {
     network: config.network,
-    approvedIssuerPublicKey: process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY,
+    approvedIssuerPublicKey:
+      process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY,
   });
   return {
     authDomain: config.domain,

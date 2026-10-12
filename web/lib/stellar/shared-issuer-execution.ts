@@ -13,23 +13,24 @@ import type {
  * submission and lookup are separate facilities and currently unavailable.
  */
 export interface SharedIssuerExecutionAdapter
-  extends SharedIssuerSubmissionAdapter,
-    SharedIssuerSigner {
-  lookupTransaction(transactionHash: string): Promise<SharedIssuerTransactionLookup>;
+  extends SharedIssuerSubmissionAdapter, SharedIssuerSigner {
+  lookupTransaction(
+    transactionHash: string,
+  ): Promise<SharedIssuerTransactionLookup>;
 }
 
 export class SharedIssuerUnavailableError extends Error {
   readonly code = "issuer_integration_unavailable";
   constructor() {
-    super("The reviewed Testnet Shared Issuer execution service is unavailable.");
+    super(
+      "The reviewed Testnet Shared Issuer execution service is unavailable.",
+    );
     this.name = "SharedIssuerUnavailableError";
   }
 }
 
 /** No signing, Horizon requests, account mutation, or network side effects. */
-export class UnavailableSharedIssuerExecutionAdapter
-  implements SharedIssuerExecutionAdapter
-{
+export class UnavailableSharedIssuerExecutionAdapter implements SharedIssuerExecutionAdapter {
   async signCanonicalEnvelope(
     _request: SharedIssuerSigningRequest,
   ): Promise<{ signedEnvelopeXdr: string }> {
