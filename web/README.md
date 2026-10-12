@@ -257,13 +257,13 @@ No workflow signs, submits, mints, authorizes, confirms, or moves value.
 ## Public prototype presentation
 
 The primary application shell is customer-facing rather than an engineering
-status dashboard. The homepage leads with token creation and wallet connection,
-then provides direct paths to Products & Services and RYLO. The anonymous token
-builder does not require wallet authentication: visitors can configure asset
-code, display name, description, a browser-local logo preview, Shared Issuer
-infrastructure context, and metadata-domain presentation. The live preview stops
-at one explicit execution boundary and never presents the configuration as an
-on-chain asset.
+status dashboard. The homepage leads with wallet authentication and token
+creation, then provides direct paths to Products & Services and RYLO. The current
+public token builder requires an authenticated Albedo wallet before interactive
+configuration. Authenticated users can configure asset code, display name,
+description, a browser-local logo preview, Shared Issuer infrastructure context,
+and metadata-domain presentation. The live preview stops at one explicit
+execution boundary and never presents the configuration as an on-chain asset.
 
 RYLO presentation reflects the approved membership, 50 RYLO-equivalent Free
 Build Credit, 150 RYLO launch reward, 60-day reward-window, supply, and direct
