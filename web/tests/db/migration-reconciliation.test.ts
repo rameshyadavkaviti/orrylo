@@ -107,7 +107,7 @@ if (!TEST_DATABASE_URL) {
       const after = await sql<{ name: string; checksum: string }[]>`
         SELECT name, checksum FROM schema_migrations ORDER BY name
       `;
-      assert.deepEqual(after.slice(0, 5), before);
+      assert.deepEqual(after.slice(0, 5), [...before]);
       const [retained] = await sql<{ asset_code: string }[]>`
         SELECT asset_code FROM project_profiles WHERE project_id = ${projectId}
       `;
