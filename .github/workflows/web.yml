@@ -72,6 +72,9 @@ jobs:
           npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.56.1
           google-chrome --version
 
+      - name: Format isolated verification test
+        run: npx prettier --write tests/production-project-save-smoke.test.ts
+
       - name: Check formatting
         run: npm run format:check
 
