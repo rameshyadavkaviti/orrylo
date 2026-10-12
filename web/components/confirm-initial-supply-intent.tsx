@@ -38,7 +38,9 @@ export function ConfirmInitialSupplyIntent({
         `orrylo:reviewed-supply:${projectId}`,
       );
       if (value && validateInitialSupply(value).valid) {
-        setAmount(value);
+        // Schedule the browser-only handoff after the effect rather than
+        // synchronously cascading a render during hydration.
+        queueMicrotask(() => setAmount(value));
       }
     } catch {
       // Private/locked-down browsers can still re-enter the amount manually.
