@@ -19,7 +19,7 @@ async function main() {
     );
 
     process.stdout.write(
-      `Migrations applied: ${result.applied.length}; verified: ${result.verified.length}\n`,
+      `Migrations applied: ${result.applied.length}; reconciled: ${result.reconciled.length}; verified: ${result.verified.length}\n`,
     );
   } finally {
     await sql.end({ timeout: 5 });
