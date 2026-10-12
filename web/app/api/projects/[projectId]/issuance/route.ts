@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { SESSION_COOKIE_NAME } from "../../../../../lib/auth/constants";
 import { isTrustedAuthOrigin } from "../../../../../lib/auth/origin";
-import { getWalletAuthService, readServerAuthConfig } from "../../../../../lib/auth/runtime";
+import {
+  getWalletAuthService,
+  readServerAuthConfig,
+} from "../../../../../lib/auth/runtime";
 import type { AuthSession } from "../../../../../lib/auth/stores";
 import { isValidProjectId } from "../../../../../lib/projects/project-profile";
 import { getDatabaseClient } from "../../../../../lib/server/persistence/database";
@@ -21,7 +24,10 @@ interface RouteContext {
 export interface IssuanceRouteDependencies {
   authDomain: string;
   getSession(token: string | undefined): Promise<AuthSession | null>;
-  getStatus(projectId: string, wallet: string): Promise<TestnetIssuanceRecord | null>;
+  getStatus(
+    projectId: string,
+    wallet: string,
+  ): Promise<TestnetIssuanceRecord | null>;
   requestIssuance(input: {
     projectId: string;
     ownerPublicKey: string;
@@ -56,7 +62,9 @@ export async function handleGetIssuance(
   context: RouteContext,
   deps: IssuanceRouteDependencies,
 ) {
-  const session = await deps.getSession(request.cookies.get(SESSION_COOKIE_NAME)?.value);
+  const session = await deps.getSession(
+    request.cookies.get(SESSION_COOKIE_NAME)?.value,
+  );
   if (!session) return failure("unauthenticated", 401);
   const { projectId } = await context.params;
   if (!isValidProjectId(projectId)) return failure("invalid_request", 400);
@@ -80,7 +88,9 @@ export async function handleRequestIssuance(
   if (!isTrustedAuthOrigin(request.headers.get("origin"), deps.authDomain)) {
     return failure("untrusted_origin", 403);
   }
-  const session = await deps.getSession(request.cookies.get(SESSION_COOKIE_NAME)?.value);
+  const session = await deps.getSession(
+    request.cookies.get(SESSION_COOKIE_NAME)?.value,
+  );
   if (!session) return failure("unauthenticated", 401);
   const { projectId } = await context.params;
   if (!isValidProjectId(projectId)) return failure("invalid_request", 400);
@@ -118,14 +128,19 @@ function parseRequest(
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const fields = body as Record<string, unknown>;
   if (
-    Object.keys(fields).sort().join(",") !== "expectedAssetCode,idempotencyKey" ||
+    Object.keys(fields).sort().join(",") !==
+      "expectedAssetCode,idempotencyKey" ||
     typeof fields.idempotencyKey !== "string" ||
     typeof fields.expectedAssetCode !== "string"
-  ) return null;
+  )
+    return null;
   if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(fields.idempotencyKey) ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      fields.idempotencyKey,
+    ) ||
     !/^[A-Z0-9]{1,12}$/.test(fields.expectedAssetCode)
-  ) return null;
+  )
+    return null;
   return {
     idempotencyKey: fields.idempotencyKey,
     expectedAssetCode: fields.expectedAssetCode,
@@ -136,11 +151,19 @@ function mapError(error: unknown) {
   if (error instanceof TestnetIssuanceError) {
     const code = error.code;
     if (code === "project_not_found") return failure(code, 404);
-    if (code === "invalid_request" || code === "invalid_asset_configuration" ||
-        code === "asset_code_mismatch") return failure(code, 400);
+    if (
+      code === "invalid_request" ||
+      code === "invalid_asset_configuration" ||
+      code === "asset_code_mismatch"
+    )
+      return failure(code, 400);
     if (code === "unsupported_network") return failure(code, 403);
-    if (code === "ineligible_project" || code === "idempotency_conflict" ||
-        code === "issuance_already_requested" || code === "asset_code_reserved") {
+    if (
+      code === "ineligible_project" ||
+      code === "idempotency_conflict" ||
+      code === "issuance_already_requested" ||
+      code === "asset_code_reserved"
+    ) {
       return failure(code, 409);
     }
   }

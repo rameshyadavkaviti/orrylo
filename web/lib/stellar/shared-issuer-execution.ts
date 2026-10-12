@@ -31,7 +31,9 @@ export type SharedIssuerLookupResult =
     };
 
 export interface SharedIssuerExecutionAdapter {
-  submit(request: SharedIssuerSubmission): Promise<SharedIssuerSubmissionResult>;
+  submit(
+    request: SharedIssuerSubmission,
+  ): Promise<SharedIssuerSubmissionResult>;
   lookup(request: SharedIssuerLookup): Promise<SharedIssuerLookupResult>;
 }
 
@@ -45,14 +47,16 @@ export class SharedIssuerUnavailableError extends Error {
 }
 
 /** Deliberately no network access, signing, or transaction side effects. */
-export class UnavailableSharedIssuerExecutionAdapter
-  implements SharedIssuerExecutionAdapter
-{
-  async submit(_request: SharedIssuerSubmission): Promise<SharedIssuerSubmissionResult> {
+export class UnavailableSharedIssuerExecutionAdapter implements SharedIssuerExecutionAdapter {
+  async submit(
+    _request: SharedIssuerSubmission,
+  ): Promise<SharedIssuerSubmissionResult> {
     throw new SharedIssuerUnavailableError();
   }
 
-  async lookup(_request: SharedIssuerLookup): Promise<SharedIssuerLookupResult> {
+  async lookup(
+    _request: SharedIssuerLookup,
+  ): Promise<SharedIssuerLookupResult> {
     throw new SharedIssuerUnavailableError();
   }
 }

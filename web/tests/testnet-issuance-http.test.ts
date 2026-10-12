@@ -42,21 +42,34 @@ function dependencies(): IssuanceRouteDependencies {
 }
 
 function request(body: unknown, origin = "https://orrylo.com") {
-  return new NextRequest(`https://orrylo.com/api/projects/${PROJECT_ID}/issuance`, {
-    method: "POST",
-    headers: { Origin: origin, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  return new NextRequest(
+    `https://orrylo.com/api/projects/${PROJECT_ID}/issuance`,
+    {
+      method: "POST",
+      headers: { Origin: origin, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
 }
 const VALID = { idempotencyKey: KEY, expectedAssetCode: "NOVA" };
 
 test("unauthenticated requests cannot see or create issuance intents", async () => {
   const deps = dependencies();
   deps.getSession = async () => null;
-  deps.getStatus = async () => { throw new Error("must not read"); };
-  deps.requestIssuance = async () => { throw new Error("must not write"); };
-  assert.equal((await handleGetIssuance(request(VALID), CONTEXT, deps)).status, 401);
-  assert.equal((await handleRequestIssuance(request(VALID), CONTEXT, deps)).status, 401);
+  deps.getStatus = async () => {
+    throw new Error("must not read");
+  };
+  deps.requestIssuance = async () => {
+    throw new Error("must not write");
+  };
+  assert.equal(
+    (await handleGetIssuance(request(VALID), CONTEXT, deps)).status,
+    401,
+  );
+  assert.equal(
+    (await handleRequestIssuance(request(VALID), CONTEXT, deps)).status,
+    401,
+  );
 });
 
 test("request boundary binds owner to session, not browser body", async () => {
@@ -78,17 +91,50 @@ test("request boundary binds owner to session, not browser body", async () => {
     { transactionHash: "0".repeat(64) },
     { status: "confirmed" },
   ]) {
-    const denied = await handleRequestIssuance(request({ ...VALID, ...added }), CONTEXT, deps);
+    const denied = await handleRequestIssuance(
+      request({ ...VALID, ...added }),
+      CONTEXT,
+      deps,
+    );
     assert.equal(denied.status, 400);
   }
 });
 
 test("origin and payload validation happen before service mutation", async () => {
   const deps = dependencies();
-  deps.requestIssuance = async () => { throw new Error("unexpected write"); };
-  assert.equal((await handleRequestIssuance(request(VALID, "https://evil.example"), CONTEXT, deps)).status, 403);
-  assert.equal((await handleRequestIssuance(request({ idempotencyKey: KEY }), CONTEXT, deps)).status, 400);
-  assert.equal((await handleRequestIssuance(request({ ...VALID, expectedAssetCode: "novA" }), CONTEXT, deps)).status, 400);
+  deps.requestIssuance = async () => {
+    throw new Error("unexpected write");
+  };
+  assert.equal(
+    (
+      await handleRequestIssuance(
+        request(VALID, "https://evil.example"),
+        CONTEXT,
+        deps,
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await handleRequestIssuance(
+        request({ idempotencyKey: KEY }),
+        CONTEXT,
+        deps,
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await handleRequestIssuance(
+        request({ ...VALID, expectedAssetCode: "novA" }),
+        CONTEXT,
+        deps,
+      )
+    ).status,
+    400,
+  );
 });
 
 test("service authorization and state errors map to actionable HTTP statuses", async () => {
@@ -103,7 +149,9 @@ test("service authorization and state errors map to actionable HTTP statuses", a
     ["asset_code_mismatch", 400],
   ] as const) {
     const deps = dependencies();
-    deps.requestIssuance = async () => { throw new TestnetIssuanceError(code); };
+    deps.requestIssuance = async () => {
+      throw new TestnetIssuanceError(code);
+    };
     const response = await handleRequestIssuance(request(VALID), CONTEXT, deps);
     assert.equal(response.status, status, code);
     assert.equal((await response.json()).code, code);
@@ -126,11 +174,20 @@ test("owner sees only recorded issuance evidence or not_started", async () => {
 test("unavailable Stellar adapter rejects both execution and lookup without side effects", async () => {
   const adapter = new UnavailableSharedIssuerExecutionAdapter();
   await assert.rejects(
-    adapter.submit({ requestId: ISSUANCE.requestId, projectId: PROJECT_ID, network: "testnet", assetCode: "NOVA" }),
+    adapter.submit({
+      requestId: ISSUANCE.requestId,
+      projectId: PROJECT_ID,
+      network: "testnet",
+      assetCode: "NOVA",
+    }),
     SharedIssuerUnavailableError,
   );
   await assert.rejects(
-    adapter.lookup({ requestId: ISSUANCE.requestId, transactionHash: "0".repeat(64), network: "testnet" }),
+    adapter.lookup({
+      requestId: ISSUANCE.requestId,
+      transactionHash: "0".repeat(64),
+      network: "testnet",
+    }),
     SharedIssuerUnavailableError,
   );
 });

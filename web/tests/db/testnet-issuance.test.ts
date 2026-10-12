@@ -23,12 +23,20 @@ if (!TEST_DATABASE_URL) {
   const OWNER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 91)).publicKey();
   const OTHER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 92)).publicKey();
   const NOW = Date.parse("2026-10-12T08:00:00.000Z");
-  const service = new TestnetIssuanceService(sql, { network: "testnet", now: () => NOW });
-  const projectService = new ManagedProjectService(sql, { network: "testnet", now: () => NOW });
+  const service = new TestnetIssuanceService(sql, {
+    network: "testnet",
+    now: () => NOW,
+  });
+  const projectService = new ManagedProjectService(sql, {
+    network: "testnet",
+    now: () => NOW,
+  });
 
   before(async () => {
     if (!/test/i.test(new URL(databaseUrl).pathname.slice(1))) {
-      throw new Error("TEST_DATABASE_URL must point to an isolated test database.");
+      throw new Error(
+        "TEST_DATABASE_URL must point to an isolated test database.",
+      );
     }
     await sql.unsafe("DROP SCHEMA public CASCADE");
     await sql.unsafe("CREATE SCHEMA public");
@@ -56,8 +64,17 @@ if (!TEST_DATABASE_URL) {
     return outcome.project;
   }
 
-  function input(projectId: string, idempotencyKey = randomUUID(), expectedAssetCode = "NOVA") {
-    return { ownerPublicKey: OWNER, projectId, idempotencyKey, expectedAssetCode };
+  function input(
+    projectId: string,
+    idempotencyKey = randomUUID(),
+    expectedAssetCode = "NOVA",
+  ) {
+    return {
+      ownerPublicKey: OWNER,
+      projectId,
+      idempotencyKey,
+      expectedAssetCode,
+    };
   }
 
   test("a new project has no issuance and first request has no fabricated evidence", async () => {
@@ -71,7 +88,9 @@ if (!TEST_DATABASE_URL) {
     assert.equal(result.issuance.ledgerSequence, null);
     assert.equal(result.issuance.failureCode, null);
 
-    const [workflow] = await sql<{state:string; onchain_reference:string|null}[]>`
+    const [workflow] = await sql<
+      { state: string; onchain_reference: string | null }[]
+    >`
       SELECT state, onchain_reference FROM workflow_intents
       WHERE request_id = ${result.issuance.requestId}
     `;
@@ -82,10 +101,13 @@ if (!TEST_DATABASE_URL) {
   test("concurrent replay of one idempotency key creates exactly one issuance", async () => {
     const project = await makeProject();
     const same = input(project.projectId);
-    const results = await Promise.all([service.request(same), service.request(same)]);
+    const results = await Promise.all([
+      service.request(same),
+      service.request(same),
+    ]);
     assert.equal(results.filter((result) => result.created).length, 1);
     assert.equal(results[0].issuance.requestId, results[1].issuance.requestId);
-    const [{ count }] = await sql<{count:string}[]>`
+    const [{ count }] = await sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM project_issuance_intents
     `;
     assert.equal(count, "1");
@@ -96,7 +118,9 @@ if (!TEST_DATABASE_URL) {
     await service.request(input(project.projectId));
     await assert.rejects(
       service.request(input(project.projectId)),
-      (error: unknown) => error instanceof TestnetIssuanceError && error.code === "issuance_already_requested",
+      (error: unknown) =>
+        error instanceof TestnetIssuanceError &&
+        error.code === "issuance_already_requested",
     );
   });
 
@@ -107,7 +131,9 @@ if (!TEST_DATABASE_URL) {
     await sql`UPDATE project_profiles SET asset_code = 'CHANGED', updated_at = ${new Date(NOW + 1)} WHERE project_id = ${project.projectId}`;
     await assert.rejects(
       service.request({ ...same, expectedAssetCode: "CHANGED" }),
-      (error: unknown) => error instanceof TestnetIssuanceError && error.code === "idempotency_conflict",
+      (error: unknown) =>
+        error instanceof TestnetIssuanceError &&
+        error.code === "idempotency_conflict",
     );
   });
 
@@ -118,7 +144,10 @@ if (!TEST_DATABASE_URL) {
       service.request(input(first.projectId)),
       service.request(input(second.projectId)),
     ]);
-    assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(
+      results.filter((result) => result.status === "fulfilled").length,
+      1,
+    );
     const rejected = results.find((result) => result.status === "rejected");
     assert.ok(rejected && rejected.status === "rejected");
     assert.ok(rejected.reason instanceof TestnetIssuanceError);
@@ -129,13 +158,17 @@ if (!TEST_DATABASE_URL) {
     const project = await makeProject();
     await assert.rejects(
       service.getOwnedStatus(project.projectId, OTHER),
-      (error: unknown) => error instanceof TestnetIssuanceError && error.code === "project_not_found",
+      (error: unknown) =>
+        error instanceof TestnetIssuanceError &&
+        error.code === "project_not_found",
     );
     await assert.rejects(
       service.request({ ...input(project.projectId), ownerPublicKey: OTHER }),
-      (error: unknown) => error instanceof TestnetIssuanceError && error.code === "project_not_found",
+      (error: unknown) =>
+        error instanceof TestnetIssuanceError &&
+        error.code === "project_not_found",
     );
-    const [{ count }] = await sql<{count:string}[]>`
+    const [{ count }] = await sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM project_issuance_intents
     `;
     assert.equal(count, "0");
@@ -146,22 +179,30 @@ if (!TEST_DATABASE_URL) {
     const mainnet = new TestnetIssuanceService(sql, { network: "public" });
     await assert.rejects(
       mainnet.request(input(project.projectId)),
-      (error: unknown) => error instanceof TestnetIssuanceError && error.code === "unsupported_network",
+      (error: unknown) =>
+        error instanceof TestnetIssuanceError &&
+        error.code === "unsupported_network",
     );
     await sql`UPDATE project_profiles SET network = 'public' WHERE project_id = ${project.projectId}`;
     await assert.rejects(
       service.request(input(project.projectId)),
-      (error: unknown) => error instanceof TestnetIssuanceError && error.code === "unsupported_network",
+      (error: unknown) =>
+        error instanceof TestnetIssuanceError &&
+        error.code === "unsupported_network",
     );
     await sql`UPDATE project_profiles SET network = 'testnet', issuer_model = 'dedicated' WHERE project_id = ${project.projectId}`;
     await assert.rejects(
       service.request(input(project.projectId)),
-      (error: unknown) => error instanceof TestnetIssuanceError && error.code === "ineligible_project",
+      (error: unknown) =>
+        error instanceof TestnetIssuanceError &&
+        error.code === "ineligible_project",
     );
     await sql`UPDATE project_profiles SET issuer_model = 'shared', display_name = ${"X".repeat(50)} WHERE project_id = ${project.projectId}`;
     await assert.rejects(
       service.request(input(project.projectId)),
-      (error: unknown) => error instanceof TestnetIssuanceError && error.code === "invalid_asset_configuration",
+      (error: unknown) =>
+        error instanceof TestnetIssuanceError &&
+        error.code === "invalid_asset_configuration",
     );
   });
 
@@ -176,6 +217,9 @@ if (!TEST_DATABASE_URL) {
       UPDATE project_issuance_intents SET status = 'submitted'
       WHERE request_id = ${result.issuance.requestId}
     `);
-    assert.equal((await service.getOwnedStatus(project.projectId, OWNER))?.status, "awaiting_issuer_integration");
+    assert.equal(
+      (await service.getOwnedStatus(project.projectId, OWNER))?.status,
+      "awaiting_issuer_integration",
+    );
   });
 }

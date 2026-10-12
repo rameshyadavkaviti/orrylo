@@ -89,7 +89,8 @@ function mapRow(row: IssuanceRow): TestnetIssuanceRecord {
     status: row.status,
     issuerPublicKey: row.issuer_public_key?.trim() ?? null,
     transactionHash: row.transaction_hash?.trim() ?? null,
-    ledgerSequence: row.ledger_sequence === null ? null : Number(row.ledger_sequence),
+    ledgerSequence:
+      row.ledger_sequence === null ? null : Number(row.ledger_sequence),
     failureCode: row.failure_code,
   };
 }
@@ -103,7 +104,10 @@ export class TestnetIssuanceService {
     },
   ) {}
 
-  async getOwnedStatus(projectId: string, ownerPublicKey: string): Promise<TestnetIssuanceRecord | null> {
+  async getOwnedStatus(
+    projectId: string,
+    ownerPublicKey: string,
+  ): Promise<TestnetIssuanceRecord | null> {
     const owner = normalizeWalletPublicKey(ownerPublicKey);
     if (!isValidProjectId(projectId)) {
       throw new TestnetIssuanceError("invalid_request");
@@ -133,7 +137,10 @@ export class TestnetIssuanceService {
       throw new TestnetIssuanceError("unsupported_network");
     }
 
-    if (!isValidProjectId(input.projectId) || !UUID_PATTERN.test(input.idempotencyKey)) {
+    if (
+      !isValidProjectId(input.projectId) ||
+      !UUID_PATTERN.test(input.idempotencyKey)
+    ) {
       throw new TestnetIssuanceError("invalid_request");
     }
 
@@ -157,7 +164,10 @@ export class TestnetIssuanceService {
         if (project.network !== "testnet") {
           throw new TestnetIssuanceError("unsupported_network");
         }
-        if (project.issuer_model !== "shared" || project.issuer_public_key !== null) {
+        if (
+          project.issuer_model !== "shared" ||
+          project.issuer_public_key !== null
+        ) {
           throw new TestnetIssuanceError("ineligible_project");
         }
         const validation = validateSharedAssetDraft({
@@ -193,8 +203,10 @@ export class TestnetIssuanceService {
         `;
 
         if (workflow) {
-          if (workflow.payload_hash.trim() !== fingerprint ||
-              workflow.subject_public_key?.trim() !== owner) {
+          if (
+            workflow.payload_hash.trim() !== fingerprint ||
+            workflow.subject_public_key?.trim() !== owner
+          ) {
             throw new TestnetIssuanceError("idempotency_conflict");
           }
           const [existing] = await transaction<IssuanceRow[]>`
@@ -241,7 +253,8 @@ export class TestnetIssuanceService {
       if (error instanceof TestnetIssuanceError) throw error;
       // Shared code reservation is enforced by PostgreSQL for concurrent projects.
       if (
-        typeof error === "object" && error !== null &&
+        typeof error === "object" &&
+        error !== null &&
         "constraint_name" in error &&
         error.constraint_name === "project_issuance_unique_asset_code"
       ) {

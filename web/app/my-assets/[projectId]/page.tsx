@@ -36,7 +36,10 @@ export default async function ManagedProjectPage({
   const issuanceService = new TestnetIssuanceService(getDatabaseClient(), {
     network: project.network,
   });
-  const issuance = await issuanceService.getOwnedStatus(projectId, session.publicKey);
+  const issuance = await issuanceService.getOwnedStatus(
+    projectId,
+    session.publicKey,
+  );
 
   return <ManagedProjectView project={project} issuance={issuance} />;
 }
