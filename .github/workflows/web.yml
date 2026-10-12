@@ -68,15 +68,7 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Check formatting
-        run: |
-          echo "FORMAT_MIGRATIONS_BEGIN"
-          npx prettier lib/server/persistence/migrations.ts | base64 -w0
-          echo
-          echo "FORMAT_TESTS_BEGIN"
-          npx prettier tests/db/migration-reconciliation.test.ts | base64 -w0
-          echo
-          echo "FORMAT_END"
-          npm run format:check
+        run: npm run format:check
 
       - name: Lint
         run: npm run lint
