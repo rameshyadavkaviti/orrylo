@@ -133,6 +133,19 @@ Still open:
 - exact definition/evidence event for “successful token creation” before the reward is released;
 - exact on-chain transaction construction and submission implementation.
 
+## Immediate Testnet MVP Lite — execution decisions and sequencing
+
+**Approved 2026-10-12:** First delivery milestone is one real end-to-end customer Shared Issuer asset issuance on Testnet, *not* the entire RYLO economy/reward/liquidity demonstration. This does not alter approved RYLO eligibility, 150 RYLO reward, timing, issuer control, mint/supply economics, or any Mainnet rules. Mainnet and full RYLO ecosystem demonstrations remain separate later work.
+
+**Execution-critical decisions still open — obtain explicit owner/Stellar/Security approval before signing or funding:**
+- exact Testnet Shared Issuer account identity, readiness, signer/custody and applicable account flags;
+- receiving wallet, trustline setup and authorization behavior, including transaction-fee/funding responsibility (do not invent automatic funding);
+- safe bounded test-activation procedure and evidence required before allowing broad public creation;
+- remaining PR #32 proof/reconciliation blockers, any required intent persistence and database authority split;
+- practical server-side rate limiting and abuse controls for broad public creation, without an unapproved wallet allowlist.
+
+**Minimal delivery gates:** Full-stack owns app UI/server intent flow; Stellar/Contract owns issuer account/configuration, transaction construction/signing/trustline boundaries; Security/Enablement owns adversarial verification, proof/unknown-outcome/DB privilege gates; Product Architect coordinates critical path and obtains owner decisions. No agent may treat a draft PR, UI preview, Project Profile save or Testnet preparation as completed issuance. Detailed bounded work belongs to agent PRs/issues; do not open unrelated features before the first real Testnet issuance evidence.
+
 ## Shared Issuer
 
 Decided:
