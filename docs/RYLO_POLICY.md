@@ -103,7 +103,7 @@ Treasury inventory does not create mint authority. Minting remains limited to th
 
 Approved Bootstrap Liquidity Reserve:
 
-**1,000,000 RYLO**
+**3,000,000 RYLO**
 
 Approved initial liquidity deployment:
 
@@ -115,9 +115,9 @@ Purpose:
 - avoid a market whose tradable supply depends only on small user rewards;
 - support member-to-member buying and selling.
 
-The 1,000,000 RYLO reserve is the approved lifetime policy cap for Orrylo-managed bootstrap-liquidity allocation, not the total amount of RYLO that may ever be tradable.
+The 3,000,000 RYLO reserve is the approved lifetime policy cap for Orrylo-managed bootstrap-liquidity allocation, not the total amount of RYLO that may ever be tradable.
 
-The initial deployment uses only 1,000 RYLO, leaving **999,000 RYLO** of undeployed liquidity-reserve capacity.
+The initial deployment uses only 1,000 RYLO, leaving **2,999,000 RYLO** of undeployed liquidity-reserve capacity.
 
 Undeployed reserve capacity does **not** require advance minting. RYLO allocated from this reserve should be minted/deployed only when an approved liquidity operation actually requires it and remains subject to the global maximum supply cap.
 
@@ -131,7 +131,7 @@ Further liquidity additions beyond the approved initial 1,000 RYLO + 100 XLM dep
 - each operation has a unique `request_id`, `policy_version`, and append-only audit evidence;
 - the ordinary public application backend cannot independently execute the liquidity operation;
 - undeployed reserve remains unminted until an approved liquidity operation actually requires it;
-- total bootstrap-liquidity allocation can never exceed 1,000,000 RYLO.
+- total bootstrap-liquidity allocation can never exceed 3,000,000 RYLO.
 
 The exact size of each future addition remains a case-by-case operational decision based on available XLM and then-current market conditions.
 
