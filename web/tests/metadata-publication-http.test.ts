@@ -160,3 +160,25 @@ test("Dedicated Issuer publication remains unavailable instead of falling back t
     code: "unsupported_issuer_model",
   });
 });
+
+test("missing confirmed issuer provenance fails closed", async () => {
+  const dependencies: PublishMetadataRouteDependencies = {
+    authDomain: "app.orrylo.com",
+    getSession: async () => SESSION,
+    publish: async () => {
+      throw new MetadataPublicationError("issuer_provenance_unavailable");
+    },
+  };
+
+  const response = await handlePublishMetadata(
+    request(),
+    context(),
+    dependencies,
+  );
+
+  assert.equal(response.status, 409);
+  assert.deepEqual(await response.json(), {
+    ok: false,
+    code: "issuer_provenance_unavailable",
+  });
+});
