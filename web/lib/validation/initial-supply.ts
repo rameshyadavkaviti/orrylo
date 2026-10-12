@@ -25,8 +25,8 @@ export function validateInitialSupply(input: string): InitialSupplyValidation {
   }
 
   const [whole, fraction = ""] = value.split(".");
-  const stroops = BigInt(whole) * 10_000_000n +
-    BigInt(fraction.padEnd(7, "0") || "0");
+  const stroops =
+    BigInt(whole) * 10_000_000n + BigInt(fraction.padEnd(7, "0") || "0");
   if (stroops <= 0n || stroops > STELLAR_MAX_AMOUNT_STROOPS) {
     return {
       valid: false,
