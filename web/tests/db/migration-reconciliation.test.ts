@@ -1,0 +1,267 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { after, beforeEach, test } from "node:test";
+
+import { createDatabaseClient } from "../../lib/server/persistence/database";
+import { migrateDatabase } from "../../lib/server/persistence/migrations";
+
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL?.trim();
+
+const ALL_MIGRATIONS = [
+  "001_application_persistence.sql",
+  "002_reward_wallet_type_uniqueness.sql",
+  "003_eligibility_reward_workflow.sql",
+  "004_project_profiles.sql",
+  "005_project_profile_ownership.sql",
+];
+
+if (!TEST_DATABASE_URL) {
+  test("migration reconciliation PostgreSQL suite", { skip: true }, () => {});
+} else {
+  const databaseUrl = TEST_DATABASE_URL;
+  const sql = createDatabaseClient(databaseUrl);
+  const directory = resolve(process.cwd(), "db/migrations");
+  const migration002 = "002_reward_wallet_type_uniqueness.sql";
+
+  beforeEach(async () => {
+    const databaseName = new URL(databaseUrl).pathname.slice(1);
+    if (!/test/i.test(databaseName)) {
+      throw new Error(
+        "TEST_DATABASE_URL must point to a database whose name contains 'test'.",
+      );
+    }
+
+    await sql.unsafe("DROP SCHEMA public CASCADE");
+    await sql.unsafe("CREATE SCHEMA public");
+  });
+
+  after(async () => {
+    await sql.end({ timeout: 5 });
+  });
+
+  async function applyOnly001(): Promise<void> {
+    const temporary = await mkdtemp(join(tmpdir(), "orrylo-migrate-"));
+    try {
+      await copyFile(
+        join(directory, ALL_MIGRATIONS[0]),
+        join(temporary, ALL_MIGRATIONS[0]),
+      );
+      const result = await migrateDatabase(sql, temporary);
+      assert.deepEqual(result.applied, [ALL_MIGRATIONS[0]]);
+      assert.deepEqual(result.reconciled, []);
+    } finally {
+      await rm(temporary, { recursive: true, force: true });
+    }
+  }
+
+  async function installApprovedConstraint(): Promise<void> {
+    await sql`
+      ALTER TABLE reward_records
+      ADD CONSTRAINT reward_records_wallet_reward_type_unique
+      UNIQUE (wallet_public_key, reward_type)
+    `;
+  }
+
+  test("fresh bootstrap applies 001-005 and repeated runs verify without changes", async () => {
+    const first = await migrateDatabase(sql, directory);
+    assert.deepEqual(first.applied, ALL_MIGRATIONS);
+    assert.deepEqual(first.reconciled, []);
+    assert.deepEqual(first.verified, []);
+
+    const again = await migrateDatabase(sql, directory);
+    assert.deepEqual(again.applied, []);
+    assert.deepEqual(again.reconciled, []);
+    assert.deepEqual(again.verified, ALL_MIGRATIONS);
+  });
+
+  test("approved production-like constraint is adopted without changing existing objects or data", async () => {
+    await applyOnly001();
+    await installApprovedConstraint();
+
+    await sql`
+      INSERT INTO reward_records (
+        reward_id, wallet_public_key, reward_type, amount, status,
+        idempotency_key, reward_uniqueness_key, policy_version,
+        created_at, updated_at
+      )
+      VALUES (
+        '00000000-0000-4000-8000-000000000001',
+        ${"G" + "A".repeat(55)},
+        'INTEGRATION_TEST', 1, 'created',
+        'existing-key', 'existing-reward', 'test-policy',
+        now(), now()
+      )
+    `;
+
+    const [before] = await sql<{ constraint_oid: string; index_oid: string }[]>`
+      SELECT c.oid::text AS constraint_oid, c.conindid::text AS index_oid
+      FROM pg_constraint AS c
+      WHERE c.conname = 'reward_records_wallet_reward_type_unique'
+        AND c.conrelid = 'reward_records'::regclass
+    `;
+    assert.ok(before);
+
+    const result = await migrateDatabase(sql, directory);
+    assert.deepEqual(result.verified, [ALL_MIGRATIONS[0]]);
+    assert.deepEqual(result.reconciled, [migration002]);
+    assert.deepEqual(result.applied, ALL_MIGRATIONS.slice(2));
+
+    const [ledger] = await sql<{
+      checksum: string;
+      applied_at: Date;
+    }[]>`
+      SELECT checksum, applied_at
+      FROM schema_migrations
+      WHERE name = ${migration002}
+    `;
+    const originalSql = await readFile(join(directory, migration002), "utf8");
+    assert.equal(
+      ledger?.checksum.trim(),
+      createHash("sha256").update(originalSql).digest("hex"),
+    );
+    assert.ok(ledger?.applied_at instanceof Date);
+
+    const [afterState] = await sql<{
+      constraint_oid: string;
+      index_oid: string;
+    }[]>`
+      SELECT c.oid::text AS constraint_oid, c.conindid::text AS index_oid
+      FROM pg_constraint AS c
+      WHERE c.conname = 'reward_records_wallet_reward_type_unique'
+        AND c.conrelid = 'reward_records'::regclass
+    `;
+    assert.deepEqual(afterState, before);
+
+    const [{ count }] = await sql<{ count: string }[]>`
+      SELECT count(*)::text AS count FROM reward_records
+    `;
+    assert.equal(count, "1");
+
+    await assert.rejects(
+      sql`
+        INSERT INTO reward_records (
+          reward_id, wallet_public_key, reward_type, amount, status,
+          idempotency_key, reward_uniqueness_key, policy_version,
+          created_at, updated_at
+        )
+        VALUES (
+          '00000000-0000-4000-8000-000000000002',
+          ${"G" + "A".repeat(55)},
+          'INTEGRATION_TEST', 2, 'created',
+          'different-key', 'different-reward', 'test-policy',
+          now(), now()
+        )
+      `,
+      (error: unknown) =>
+        (error as { constraint_name?: string }).constraint_name ===
+        "reward_records_wallet_reward_type_unique",
+    );
+
+    const again = await migrateDatabase(sql, directory);
+    assert.deepEqual(again.applied, []);
+    assert.deepEqual(again.reconciled, []);
+    assert.deepEqual(again.verified, ALL_MIGRATIONS);
+  });
+
+  test("rejects a same-named UNIQUE constraint with the wrong column order", async () => {
+    await applyOnly001();
+    await sql`
+      ALTER TABLE reward_records
+      ADD CONSTRAINT reward_records_wallet_reward_type_unique
+      UNIQUE (reward_type, wallet_public_key)
+    `;
+
+    await assert.rejects(
+      migrateDatabase(sql, directory),
+      /Refusing migration 002/,
+    );
+
+    const [{ count }] = await sql<{ count: string }[]>`
+      SELECT count(*)::text AS count FROM schema_migrations
+    `;
+    assert.equal(count, "1");
+  });
+
+  test("rejects a standalone unique index with the expected name", async () => {
+    await applyOnly001();
+    await sql`
+      CREATE UNIQUE INDEX reward_records_wallet_reward_type_unique
+      ON reward_records (wallet_public_key, reward_type)
+    `;
+
+    await assert.rejects(
+      migrateDatabase(sql, directory),
+      /Refusing migration 002/,
+    );
+
+    const [{ count }] = await sql<{ count: string }[]>`
+      SELECT count(*)::text AS count FROM schema_migrations
+    `;
+    assert.equal(count, "1");
+  });
+
+  test("recorded migration checksum mismatch still fails closed", async () => {
+    await migrateDatabase(sql, directory);
+    await sql`
+      UPDATE schema_migrations
+      SET checksum = ${"0".repeat(64)}
+      WHERE name = ${migration002}
+    `;
+
+    await assert.rejects(
+      migrateDatabase(sql, directory),
+      /Migration checksum mismatch: 002_reward_wallet_type_uniqueness.sql/,
+    );
+  });
+
+  test("cannot reconcile a modified 002 file even when its constraint matches", async () => {
+    await applyOnly001();
+    await installApprovedConstraint();
+
+    const temporary = await mkdtemp(join(tmpdir(), "orrylo-migrate-"));
+    try {
+      await copyFile(
+        join(directory, ALL_MIGRATIONS[0]),
+        join(temporary, ALL_MIGRATIONS[0]),
+      );
+      const originalSql = await readFile(join(directory, migration002), "utf8");
+      await writeFile(join(temporary, migration002), originalSql + "\n");
+
+      await assert.rejects(
+        migrateDatabase(sql, temporary),
+        /Refusing to reconcile modified migration/,
+      );
+
+      const [{ count }] = await sql<{ count: string }[]>`
+        SELECT count(*)::text AS count FROM schema_migrations
+      `;
+      assert.equal(count, "1");
+    } finally {
+      await rm(temporary, { recursive: true, force: true });
+    }
+  });
+
+  test("concurrent runners reconcile migration 002 only once", async () => {
+    await applyOnly001();
+    await installApprovedConstraint();
+
+    const results = await Promise.all([
+      migrateDatabase(sql, directory),
+      migrateDatabase(sql, directory),
+    ]);
+
+    assert.equal(
+      results.filter((result) => result.reconciled.includes(migration002))
+        .length,
+      1,
+    );
+
+    const [{ count }] = await sql<{ count: string }[]>`
+      SELECT count(*)::text AS count FROM schema_migrations
+    `;
+    assert.equal(count, "5");
+  });
+}
