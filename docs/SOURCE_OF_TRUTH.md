@@ -338,7 +338,7 @@ The approved first-prototype infrastructure baseline is intentionally low-cost a
 - PostgreSQL: **Neon Free** initially;
 - DNS/CDN: **Cloudflare Free**;
 - Stellar engineering/deployment baseline: **Testnet** for the currently recorded issuer and contract preparation evidence;
-- immediate execution direction: **Mainnet preparation**, without treating any issuer, asset, SAC, or application flow as Mainnet-deployed until explicit deployment evidence is recorded;
+- immediate execution direction: **Testnet MVP Lite customer Shared Issuer issuance**; Mainnet preparation remains a separate workstream, without treating any issuer, asset, SAC, or application flow as Mainnet-deployed until explicit deployment evidence is recorded;
 - existing Orrylo domain: reused with no new prototype-domain purchase.
 
 This is a **prototype deployment baseline**, not a permanent production-provider commitment.
