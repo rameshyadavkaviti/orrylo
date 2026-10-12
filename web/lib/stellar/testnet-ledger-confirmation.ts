@@ -170,6 +170,11 @@ export class AuthoritativeSharedIssuanceConfirmationValidator {
     verificationPolicyVersion: string;
   }): Promise<ValidatedSharedIssuanceLedgerConfirmation> {
     assertConfirmationRequest(input);
+    // Migration 009 intentionally leaves historical attempts/confirmations
+    // nullable. Those rows are permanently ineligible for new validation.
+    if (!input.attempt.signedEnvelopeXdrSha256) {
+      throw new StellarLedgerEvidenceError("signed_envelope_mismatch");
+    }
     if (this.reader.authority !== "official_testnet_horizon") {
       throw new StellarLedgerEvidenceError("non_authoritative_evidence");
     }
@@ -251,10 +256,7 @@ export class AuthoritativeSharedIssuanceConfirmationValidator {
       throw new StellarLedgerEvidenceError("envelope_mismatch");
     }
     const signedEnvelopeXdrSha256 = sha256(evidence.envelopeXdr);
-    if (
-      input.attempt.signedEnvelopeXdrSha256 !== undefined &&
-      signedEnvelopeXdrSha256 !== input.attempt.signedEnvelopeXdrSha256
-    ) {
+    if (signedEnvelopeXdrSha256 !== input.attempt.signedEnvelopeXdrSha256) {
       throw new StellarLedgerEvidenceError("signed_envelope_mismatch");
     }
 
@@ -399,12 +401,10 @@ export async function reconcileSharedIssuanceAttempt(input: {
         transactionHash: input.attempt.transactionHash,
       };
     case "rebuild_expired":
-      return {
-        action: "replacement_permitted",
-        issuanceIntentFingerprint: input.intent.issuanceIntentFingerprint,
-        supersededAttemptId: input.attempt.attemptId,
-        nextAttemptNumber: input.attempt.attemptNumber + 1,
-      };
+      // MVP Lite has exactly one immutable transaction attempt. Even after
+      // authoritative post-expiry reconciliation, replacement construction is
+      // deliberately unavailable until a separately reviewed retry design.
+      return { action: "await_authoritative_reconciliation" };
     default:
       return decision;
   }

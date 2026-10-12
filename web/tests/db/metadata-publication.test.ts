@@ -221,6 +221,7 @@ if (!TEST_DATABASE_URL) {
       issuanceRequestId: reservation.issuance.requestId,
       issuanceIntentFingerprint: intentFingerprint,
       transactionHash,
+      signedEnvelopeXdrSha256: signedEnvelopeHash,
       ledgerSequence: 456,
     };
     reader.records.set(project.project.projectId, provenance);
@@ -270,6 +271,71 @@ if (!TEST_DATABASE_URL) {
       (await repository().listSharedTestnetPublications()).length,
       1,
     );
+  });
+
+  test("legacy NULL-digest confirmation can never reactivate publication", async () => {
+    const { project, provenance } = await createConfirmedProject();
+    const first = await service().publishOwnedProject(project.projectId, OWNER);
+    assert.equal(first.publication.reachable, true);
+
+    // Simulate a pre-009 row after upgrade. Constraints intentionally permit
+    // NULL for historical rows; production append-only triggers prevent this
+    // mutation, so the isolated test owner temporarily disables only them.
+    await sql.unsafe(
+      "ALTER TABLE project_issuance_transaction_attempts DISABLE TRIGGER project_issuance_transaction_attempts_append_only",
+    );
+    await sql.unsafe(
+      "ALTER TABLE project_issuance_ledger_confirmations DISABLE TRIGGER project_issuance_ledger_confirmations_append_only",
+    );
+    try {
+      await sql`UPDATE project_issuance_transaction_attempts
+        SET signed_envelope_xdr_sha256 = NULL
+        WHERE issuance_request_id = ${provenance.issuanceRequestId}`;
+      await sql`UPDATE project_issuance_ledger_confirmations
+        SET signed_envelope_xdr_sha256 = NULL
+        WHERE confirmation_id = ${provenance.confirmationId}`;
+    } finally {
+      await sql.unsafe(
+        "ALTER TABLE project_issuance_transaction_attempts ENABLE TRIGGER project_issuance_transaction_attempts_append_only",
+      );
+      await sql.unsafe(
+        "ALTER TABLE project_issuance_ledger_confirmations ENABLE TRIGGER project_issuance_ledger_confirmations_append_only",
+      );
+    }
+    await sql`UPDATE project_metadata_publications
+      SET reachable = false, verified_at = NULL,
+          verification_error_code = 'signed_envelope_provenance_required'
+      WHERE project_id = ${project.projectId}`;
+
+    // The reader still replays the old confirmation and even claims a digest.
+    // Durable confirmation provenance must override that claim.
+    assert.equal(await repository().getByProjectId(project.projectId), null);
+    assert.deepEqual(await repository().listSharedTestnetPublications(), []);
+    const [row] = await sql<{ content_hash: string }[]>`
+      SELECT content_hash FROM project_metadata_publications
+      WHERE project_id = ${project.projectId}
+    `;
+    assert.equal(
+      await repository().markVerifiedIfCurrent({
+        projectId: project.projectId,
+        contentHash: row.content_hash.trim(),
+        now: clock + 1,
+      }),
+      null,
+    );
+    for (let replay = 0; replay < 2; replay++) {
+      await assert.rejects(
+        service().publishOwnedProject(project.projectId, OWNER),
+        (error: unknown) =>
+          error instanceof MetadataPublicationError &&
+          error.code === "issuer_provenance_unavailable",
+      );
+    }
+    const [stored] = await sql<{ reachable: boolean }[]>`
+      SELECT reachable FROM project_metadata_publications
+      WHERE project_id = ${project.projectId}
+    `;
+    assert.equal(stored.reachable, false);
   });
 
   test("owner authorization and approved issuer matching remain fail closed", async () => {

@@ -70,7 +70,7 @@ function resultXdr(
   }).toXDR("base64");
 }
 
-function fixture() {
+function unsignedFixture() {
   const plan = buildSharedIssuerIssuancePlan(
     {
       projectId: PROJECT_ID,
@@ -162,7 +162,7 @@ function fixture() {
 }
 
 function signedFixture() {
-  const base = fixture();
+  const base = unsignedFixture();
   const transaction = TransactionBuilder.fromXDR(
     base.lookup.status === "confirmed" ? base.lookup.envelopeXdr : "",
     Networks.TESTNET,
@@ -186,6 +186,10 @@ function signedFixture() {
     signedEnvelopeXdr,
     signedEnvelopeXdrSha256,
   };
+}
+
+function fixture() {
+  return signedFixture();
 }
 
 class FixtureReader implements StellarTestnetLedgerReader {
@@ -241,7 +245,7 @@ function readerFor(
   );
 }
 
-test("validates exact authoritative raw-XDR evidence into an immutable confirmation", async () => {
+test("validates exact authoritative signed-XDR evidence into an immutable confirmation", async () => {
   const { intent, attempt, lookup } = fixture();
   const confirmation =
     await new AuthoritativeSharedIssuanceConfirmationValidator(
@@ -260,6 +264,25 @@ test("validates exact authoritative raw-XDR evidence into an immutable confirmat
   assert.equal(confirmation.record.ownerPublicKey, intent.ownerPublicKey);
   assert.equal(confirmation.record.resultSuccess, true);
   assert.equal(confirmation.record.ledgerSequence, 500);
+});
+
+test("rejects missing signed-envelope digest before any ledger lookup", async () => {
+  const { intent, attempt, lookup } = unsignedFixture();
+  const reader = readerFor(lookup);
+  await assert.rejects(
+    new AuthoritativeSharedIssuanceConfirmationValidator(reader, {
+      now: () => NOW,
+    }).validate({
+      confirmationId: randomUUID(),
+      intent,
+      attempt,
+      verifierIdentity: "official-testnet-horizon",
+      verificationPolicyVersion: "gate-a-v2",
+    }),
+    (error: unknown) =>
+      (error as StellarLedgerEvidenceError).code === "signed_envelope_mismatch",
+  );
+  assert.equal(reader.requestedTransactionHash, undefined);
 });
 
 test("accepts real signed XDR while preserving the signature-independent transaction hash", async () => {
@@ -597,7 +620,7 @@ test("pre-expiry and mixed-freshness checkpoints cannot permit replacement", asy
   }
 });
 
-test("post-expiry exact not-found plus unchanged sequence permits replacement", async () => {
+test("post-expiry exact not-found remains reconciliation-required for one-attempt MVP Lite", async () => {
   const { intent, attempt } = fixture();
   const afterExpiry = new Date((attempt.validUntil + 1) * 1_000).toISOString();
   const notFound: StellarTestnetTransactionLookup = {
@@ -620,12 +643,7 @@ test("post-expiry exact not-found plus unchanged sequence permits replacement", 
       attempt,
       nowUnix: attempt.validUntil + 2,
     }),
-    {
-      action: "replacement_permitted",
-      issuanceIntentFingerprint: intent.issuanceIntentFingerprint,
-      supersededAttemptId: attempt.attemptId,
-      nextAttemptNumber: 2,
-    },
+    { action: "await_authoritative_reconciliation" },
   );
 });
 

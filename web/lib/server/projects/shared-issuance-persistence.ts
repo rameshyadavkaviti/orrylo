@@ -568,7 +568,7 @@ function assertAttempt(
     (attempt.signedEnvelopeXdrSha256 !== undefined &&
       !HASH_PATTERN.test(attempt.signedEnvelopeXdrSha256)) ||
     !Number.isSafeInteger(attempt.attemptNumber) ||
-    attempt.attemptNumber <= 0 ||
+    attempt.attemptNumber !== 1 ||
     !INTEGER_PATTERN.test(attempt.sourceSequence) ||
     !INTEGER_PATTERN.test(attempt.feeStroops) ||
     BigInt(attempt.feeStroops) <= 0n ||

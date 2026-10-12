@@ -7,6 +7,8 @@ import {
   UnavailableSharedAssetConfirmationReader,
 } from "../projects/shared-asset-provenance";
 
+const HASH_PATTERN = /^[0-9a-f]{64}$/;
+
 export interface MetadataPublicationRow {
   project_id: string;
   metadata_home: string;
@@ -60,7 +62,33 @@ export class PostgresMetadataPublicationRepository {
       row.project_id,
       ownerPublicKey,
     );
+    if (!source || !HASH_PATTERN.test(source.signedEnvelopeXdrSha256)) {
+      return false;
+    }
+    const [durable] = await this.sql<{
+      signed_envelope_xdr_sha256: string;
+    }[]>`
+      SELECT signed_envelope_xdr_sha256
+      FROM project_issuance_ledger_confirmations
+      WHERE confirmation_id = ${source.confirmationId}
+        AND issuance_request_id = ${source.issuanceRequestId}
+        AND issuance_intent_fingerprint = ${source.issuanceIntentFingerprint}
+        AND project_id = ${source.projectId}
+        AND owner_public_key = ${source.ownerPublicKey}
+        AND network = 'testnet'
+        AND asset_code = ${source.assetCode}
+        AND issuer_public_key = ${source.issuerPublicKey}
+        AND destination_public_key = ${source.destinationPublicKey}
+        AND amount = ${source.amount}
+        AND transaction_hash = ${source.transactionHash}
+        AND ledger_sequence = ${source.ledgerSequence}
+        AND signed_envelope_xdr_sha256 IS NOT NULL
+      LIMIT 1
+    `;
     return Boolean(
+      durable &&
+      durable.signed_envelope_xdr_sha256.trim() ===
+        source.signedEnvelopeXdrSha256 &&
       source &&
       row.owner_public_key !== null &&
       source.confirmationId === row.confirmation_id &&
@@ -148,6 +176,26 @@ export class PostgresMetadataPublicationRepository {
         updated_at = ${new Date(input.now)}
       WHERE project_id = ${input.projectId}
         AND content_hash = ${input.contentHash}
+        AND EXISTS (
+          SELECT 1
+          FROM project_issuance_ledger_confirmations AS confirmation
+          WHERE confirmation.confirmation_id =
+              project_metadata_publications.confirmation_id
+            AND confirmation.issuance_request_id =
+              project_metadata_publications.issuance_request_id
+            AND confirmation.issuance_intent_fingerprint =
+              project_metadata_publications.issuance_fingerprint
+            AND confirmation.project_id =
+              project_metadata_publications.project_id
+            AND confirmation.owner_public_key =
+              project_metadata_publications.owner_public_key
+            AND confirmation.network = project_metadata_publications.network
+            AND confirmation.asset_code =
+              project_metadata_publications.asset_code
+            AND confirmation.issuer_public_key =
+              project_metadata_publications.issuer_public_key
+            AND confirmation.signed_envelope_xdr_sha256 IS NOT NULL
+        )
       RETURNING *
     `;
 

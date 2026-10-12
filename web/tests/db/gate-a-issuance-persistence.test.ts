@@ -271,6 +271,49 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
+  test("MVP Lite accepts attempt 1 but rejects every successor or conflicting attempt replay", async () => {
+    const { intent, attempt } = await createFixture();
+    await repository.appendIntent(intent);
+    const first = await repository.appendAttempt(attempt);
+    assert.equal(first.attemptNumber, 1);
+
+    // Direct repository use is the application persistence boundary. It cannot
+    // bypass reconciliation to construct a successor, even when the logical
+    // issuance identity is otherwise identical.
+    await assert.rejects(
+      repository.appendAttempt({
+        ...attempt,
+        attemptId: randomUUID(),
+        attemptNumber: 2,
+        transactionHash: "d".repeat(64),
+        envelopeXdrSha256: "e".repeat(64),
+        sourceSequence: "124",
+      }),
+      SharedIssuancePersistenceConflictError,
+    );
+
+    // A different attempt-1 identity is also a conflict; the first immutable
+    // transaction attempt is the only attempt for MVP Lite.
+    await assert.rejects(
+      repository.appendAttempt({
+        ...attempt,
+        attemptId: randomUUID(),
+        transactionHash: "c".repeat(64),
+        envelopeXdrSha256: "b".repeat(64),
+      }),
+      SharedIssuancePersistenceConflictError,
+    );
+
+    // Conflicting replay of the real attempt 1 continues to fail safely.
+    await assert.rejects(
+      repository.appendAttempt({ ...attempt, sourceSequence: "124" }),
+      SharedIssuancePersistenceConflictError,
+    );
+    assert.deepEqual(await repository.listAttempts(intent.issuanceRequestId), [
+      attempt,
+    ]);
+  });
+
   test("attempts remain immutable and the ordinary application identity cannot fabricate confirmation", async () => {
     const { intent, attempt } = await createFixture();
     await repository.appendIntent(intent);

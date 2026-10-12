@@ -18,6 +18,8 @@ export interface VerifiedSharedAssetProvenance {
   issuanceRequestId: string;
   issuanceIntentFingerprint: string;
   transactionHash: string;
+  /** Exact digest of the decorated envelope proved by post-009 validation. */
+  signedEnvelopeXdrSha256: string;
   ledgerSequence: number;
 }
 
