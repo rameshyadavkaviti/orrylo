@@ -345,7 +345,10 @@ export function CreateSharedTokenForm() {
               <span className="step-number">2</span>
               <div>
                 <h3 id="supply-step">Initial token supply</h3>
-                <p>Choose the amount intended for the first issuance. This is not a fixed lifetime cap.</p>
+                <p>
+                  Choose the amount intended for the first issuance. This is
+                  not a fixed lifetime cap.
+                </p>
               </div>
             </div>
             <label className="field">
@@ -358,18 +361,26 @@ export function CreateSharedTokenForm() {
                 onChange={(event) => updateInitialSupply(event.target.value)}
                 placeholder="1000000"
                 autoComplete="off"
-                aria-describedby={initialSupplyError ? "supply-error" : "supply-help"}
+                aria-describedby={
+                  initialSupplyError ? "supply-error" : "supply-help"
+                }
               />
               {initialSupplyError ? (
-                <small id="supply-error" className="field-error" role="alert">{initialSupplyError}</small>
+                <small id="supply-error" className="field-error" role="alert">
+                  {initialSupplyError}
+                </small>
               ) : (
-                <small id="supply-help">Positive amount, up to seven decimal places. No tokens are minted here.</small>
+                <small id="supply-help">
+                  Positive amount, up to seven decimal places. No tokens are
+                  minted here.
+                </small>
               )}
             </label>
             <p className="builder-boundary-note">
               Preview only: this amount is not yet saved with the Project Profile,
               included in an immutable issuance order, or issued on Stellar.
-              Real issuance stays unavailable until the backend supports it safely.
+              Real issuance stays unavailable until the backend supports it
+              safely.
             </p>
           </section>
 
@@ -519,7 +530,9 @@ export function CreateSharedTokenForm() {
             </div>
             <div>
               <dt>Initial supply (preview only)</dt>
-              <dd>{amountPreview.valid ? amountPreview.normalized : "Not set"}</dd>
+              <dd>
+                {amountPreview.valid ? amountPreview.normalized : "Not set"}
+              </dd>
             </div>
             <div>
               <dt>Supply authority</dt>
