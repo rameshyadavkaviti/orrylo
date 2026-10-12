@@ -290,6 +290,16 @@ Albedo wallet
 
 Testnet bootstrap/deployment should be reproducible because Testnet state may be reset.
 
+### Immediate Testnet proof objective
+
+The current execution priority before the broader final Testnet acceptance flow is to obtain real Testnet evidence for three foundational capabilities:
+
+1. Orrylo can create a real customer token on Stellar Testnet through the intended application/Shared Issuer path.
+2. Orrylo can publish the corresponding managed `stellar.toml` metadata and verify that it is reachable and correctly linked to the created asset.
+3. RYLO itself can be created/configured on Testnet according to the approved RYLO issuer policy and then proceed through its required metadata, authorization, reward, SAC, liquidity, and final acceptance gates.
+
+This is an execution priority, not evidence that any of these three capabilities already works. The repository and on-chain state must continue to distinguish preparation from verified Testnet execution.
+
 ### Final Testnet acceptance flow
 
 Before Orrylo is considered ready to proceed from Testnet acceptance into Mainnet readiness, the final end-to-end acceptance run must preserve this approved operation order:
