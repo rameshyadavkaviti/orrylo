@@ -12,6 +12,11 @@ import {
   type PendingManagedProjectSave,
   withWalletContinuityAssertion,
 } from "../lib/projects/pending-managed-project";
+import {
+  matchesCurrentBuilderReview,
+  prepareTokenBuilderReview,
+  type TokenBuilderReview,
+} from "../lib/projects/token-builder-review";
 import { SHARED_ASSET_DOMAIN } from "../lib/product/constants";
 import { validateInitialSupply } from "../lib/validation/initial-supply";
 import {
@@ -45,40 +50,48 @@ export function CreateSharedTokenForm() {
   const [initialSupplyError, setInitialSupplyError] = useState<string | null>(
     null,
   );
-  const [configurationReady, setConfigurationReady] = useState(false);
+  const [review, setReview] = useState<TokenBuilderReview | null>(null);
+  const [acknowledgedProfileOnlySave, setAcknowledgedProfileOnlySave] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoName, setLogoName] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
   const idempotencyKeyRef = useRef<string | null>(null);
   const pendingSaveRef = useRef<PendingManagedProjectSave | null>(null);
+  const revisionRef = useRef(0);
+  const savingRef = useRef(false);
+  const logoReadVersionRef = useRef(0);
 
-  function updateField(field: keyof SharedAssetDraft, value: string) {
-    setDraft((current) => ({ ...current, [field]: value }));
-    setErrors((current) => ({ ...current, [field]: undefined }));
-    setConfigurationReady(false);
+  function invalidateReview() {
+    revisionRef.current += 1;
+    setReview(null);
+    setAcknowledgedProfileOnlySave(false);
     setSaveState({ status: "idle" });
     idempotencyKeyRef.current = null;
     pendingSaveRef.current = null;
   }
 
+  function updateField(field: keyof SharedAssetDraft, value: string) {
+    setDraft((current) => ({ ...current, [field]: value }));
+    setErrors((current) => ({ ...current, [field]: undefined }));
+    invalidateReview();
+  }
+
   function updateInitialSupply(value: string) {
     setInitialSupply(value);
     setInitialSupplyError(null);
-    setConfigurationReady(false);
-    setSaveState({ status: "idle" });
+    invalidateReview();
   }
 
   function handleLogoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-
+    const readVersion = ++logoReadVersionRef.current;
+    invalidateReview();
     setLogoError(null);
+    setLogoPreview(null);
+    setLogoName(null);
 
-    if (!file) {
-      setLogoPreview(null);
-      setLogoName(null);
-      return;
-    }
+    if (!file) return;
 
     if (!LOGO_TYPES.has(file.type)) {
       setLogoError("Use a PNG, JPEG, or WebP image for the preview.");
@@ -95,44 +108,50 @@ export function CreateSharedTokenForm() {
     const reader = new FileReader();
 
     reader.onload = () => {
-      if (typeof reader.result === "string") {
+      if (readVersion === logoReadVersionRef.current && typeof reader.result === "string") {
         setLogoPreview(reader.result);
         setLogoName(file.name);
       }
     };
 
     reader.onerror = () => {
-      setLogoError("The image could not be loaded. Try another file.");
-      setLogoPreview(null);
-      setLogoName(null);
+      if (readVersion === logoReadVersionRef.current) {
+        setLogoError("The image could not be loaded. Try another file.");
+        setLogoPreview(null);
+        setLogoName(null);
+      }
     };
 
     reader.readAsDataURL(file);
   }
 
-  function validateCurrentDraft(): SharedAssetDraft | null {
-    const result = validateSharedAssetDraft(draft);
-    setDraft(result.normalized);
-    setErrors(result.errors);
-    const amount = validateInitialSupply(initialSupply);
-    setInitialSupplyError(amount.valid ? null : amount.error);
-    setConfigurationReady(result.valid && amount.valid);
-
-    return result.valid && amount.valid ? result.normalized : null;
-  }
-
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    validateCurrentDraft();
+    const checked = prepareTokenBuilderReview(draft, initialSupply, logoName);
+    const project = validateSharedAssetDraft(draft);
+    setErrors(project.errors);
+    setInitialSupplyError(checked.valid ? null : checked.supplyError);
+    if (!checked.valid || logoError) {
+      setReview(null);
+      setAcknowledgedProfileOnlySave(false);
+      return;
+    }
+    setDraft(project.normalized);
+    setReview(checked.review);
+    setAcknowledgedProfileOnlySave(false);
+    setSaveState({ status: "idle" });
   }
 
   async function handleSaveProject() {
-    const amount = validateInitialSupply(initialSupply);
-    if (!amount.valid) {
-      setInitialSupplyError(amount.error);
+    if (
+      !review ||
+      !acknowledgedProfileOnlySave ||
+      !matchesCurrentBuilderReview(review, draft, initialSupply, logoName) ||
+      logoError
+    ) {
       setSaveState({
         status: "failure",
-        message: "Review the initial supply before continuing.",
+        message: "Review the configuration and acknowledge that the supply is not saved.",
       });
       return;
     }
@@ -140,31 +159,25 @@ export function CreateSharedTokenForm() {
     if (!idempotencyKeyRef.current) {
       idempotencyKeyRef.current = crypto.randomUUID();
     }
-
-    const prepared = prepareManagedProjectSave(
-      draft,
-      idempotencyKeyRef.current,
-    );
-
-    setDraft(
-      prepared.ok ? prepared.pending.normalizedDraft : prepared.normalizedDraft,
-    );
+    const prepared = prepareManagedProjectSave(draft, idempotencyKeyRef.current);
     setErrors(prepared.errors);
-    setConfigurationReady(prepared.ok);
-
     if (!prepared.ok) {
+      setReview(null);
+      setAcknowledgedProfileOnlySave(false);
       setSaveState({
         status: "failure",
         message: "Review the highlighted token details before saving.",
       });
       return;
     }
-
     pendingSaveRef.current = prepared.pending;
     await persistProject(prepared.pending);
   }
 
   async function persistProject(pending: PendingManagedProjectSave) {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    const submittedRevision = revisionRef.current;
     setSaveState({ status: "saving" });
 
     try {
@@ -179,6 +192,9 @@ export function CreateSharedTokenForm() {
       const result = await readJson<
         CreateManagedProjectSuccess | CreateManagedProjectFailure
       >(response);
+
+      // Discard responses tied to older browser edits or wallet continuations.
+      if (submittedRevision !== revisionRef.current) return;
 
       if (
         response.status === 401 &&
@@ -210,18 +226,27 @@ export function CreateSharedTokenForm() {
 
       window.location.assign(result.managePath);
     } catch {
-      setSaveState({
-        status: "failure",
-        message:
-          "Orrylo could not save the project right now. Your configuration is still on this page.",
-      });
+      if (submittedRevision === revisionRef.current) {
+        setSaveState({
+          status: "failure",
+          message:
+            "Orrylo could not save the project right now. Your configuration is still on this page.",
+        });
+      }
+    } finally {
+      savingRef.current = false;
     }
   }
 
   async function continueAfterAuthentication(publicKey: string) {
     const pendingSave = pendingSaveRef.current;
 
-    if (!pendingSave) {
+    if (
+      !pendingSave ||
+      !review ||
+      !acknowledgedProfileOnlySave ||
+      !matchesCurrentBuilderReview(review, draft, initialSupply, logoName)
+    ) {
       setSaveState({
         status: "failure",
         message: "Review the project once more before saving.",
@@ -233,6 +258,11 @@ export function CreateSharedTokenForm() {
   }
 
   const amountPreview = validateInitialSupply(initialSupply);
+  const canSaveReviewedProfile =
+    review !== null &&
+    acknowledgedProfileOnlySave &&
+    matchesCurrentBuilderReview(review, draft, initialSupply, logoName) &&
+    !logoError;
   const previewCode = draft.code.trim().toUpperCase() || "TOKEN";
   const previewName = draft.displayName.trim() || "Your token";
   const previewDescription =
@@ -246,11 +276,11 @@ export function CreateSharedTokenForm() {
           <span className="eyebrow">Interactive token builder</span>
           <h2>Shape the token you want Orrylo to create.</h2>
           <p>
-            Everything below is available without a wallet. Your preview updates
-            as you build.
+            Explore your configuration without connecting a wallet. A wallet
+            is required to save a Project Profile, not to preview tokens.
           </p>
         </div>
-        <span className="builder-anonymous-note">No wallet required</span>
+        <span className="builder-anonymous-note">Preview: no wallet required</span>
       </div>
 
       <div className="draft-layout">
@@ -273,6 +303,8 @@ export function CreateSharedTokenForm() {
                 <input
                   name="code"
                   value={draft.code}
+                  disabled={saveState.status === "saving"}
+                  aria-invalid={Boolean(errors.code)}
                   onChange={(event) => updateField("code", event.target.value)}
                   placeholder="MYTOKEN"
                   autoComplete="off"
@@ -295,6 +327,8 @@ export function CreateSharedTokenForm() {
                 <input
                   name="displayName"
                   value={draft.displayName}
+                  disabled={saveState.status === "saving"}
+                  aria-invalid={Boolean(errors.displayName)}
                   onChange={(event) =>
                     updateField("displayName", event.target.value)
                   }
@@ -319,6 +353,8 @@ export function CreateSharedTokenForm() {
               <textarea
                 name="description"
                 value={draft.description}
+                  disabled={saveState.status === "saving"}
+                  aria-invalid={Boolean(errors.description)}
                 onChange={(event) =>
                   updateField("description", event.target.value)
                 }
@@ -360,8 +396,10 @@ export function CreateSharedTokenForm() {
                 type="text"
                 inputMode="decimal"
                 value={initialSupply}
+                  disabled={saveState.status === "saving"}
+                  aria-invalid={Boolean(initialSupplyError)}
                 onChange={(event) => updateInitialSupply(event.target.value)}
-                placeholder="1000000"
+                placeholder="Example: 2500.5"
                 autoComplete="off"
                 aria-describedby={
                   initialSupplyError ? "supply-error" : "supply-help"
@@ -405,6 +443,8 @@ export function CreateSharedTokenForm() {
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 onChange={handleLogoChange}
+                disabled={saveState.status === "saving"}
+                aria-invalid={Boolean(logoError)}
                 aria-describedby={logoError ? "logo-error" : "logo-help"}
               />
               {logoError ? (
@@ -484,17 +524,62 @@ export function CreateSharedTokenForm() {
           </section>
 
           <div className="form-actions">
-            <button type="submit" className="button button-secondary">
-              Check configuration
+            <button
+              type="submit"
+              className="button button-secondary"
+              disabled={saveState.status === "saving"}
+            >
+              Review configuration
             </button>
           </div>
 
-          {configurationReady ? (
-            <p className="form-message" role="status">
-              Configuration looks good. You can save it as a managed Orrylo
-              project whenever you are ready.
+          {review ? (
+            <section className="draft-step" aria-labelledby="final-review-title">
+              <div className="step-heading">
+                <span className="step-number">6</span>
+                <div>
+                  <h3 id="final-review-title">Final draft review</h3>
+                  <p>Review the exact configuration before saving project details.</p>
+                </div>
+              </div>
+              <dl className="preview-facts" aria-label="Reviewed draft settings">
+                <div><dt>Display name</dt><dd>{review.displayName}</dd></div>
+                <div><dt>Asset code</dt><dd>{review.assetCode}</dd></div>
+                <div><dt>Description</dt><dd>{review.description || "None"}</dd></div>
+                <div><dt>Logo</dt><dd>{review.logoFileName ? `${review.logoFileName} (browser only)` : "None"}</dd></div>
+                <div><dt>Selected initial supply (preview only)</dt><dd>{review.initialSupply} tokens</dd></div>
+                <div><dt>Maximum lifetime supply</dt><dd>Not configured or guaranteed</dd></div>
+                <div><dt>Target network</dt><dd>Stellar Testnet; no on-chain submission</dd></div>
+                <div><dt>Issuer authority</dt><dd>Orrylo-operated Shared Issuer, not customer-owned; account not yet approved</dd></div>
+                <div><dt>Distribution destination</dt><dd>Not selected or approved</dd></div>
+                <div><dt>Fees</dt><dd>Not configured</dd></div>
+                <div><dt>On-chain status</dt><dd>Not started; no transaction or confirmation</dd></div>
+              </dl>
+              <label className="field">
+                <span>
+                  <input
+                    type="checkbox"
+                    checked={acknowledgedProfileOnlySave}
+                    disabled={saveState.status === "saving"}
+                    onChange={(event) => setAcknowledgedProfileOnlySave(event.target.checked)}
+                  />{" "}
+                  I understand that saving creates only a managed Project Profile.
+                  The selected initial supply and browser logo are NOT saved,
+                  and no token is issued. Supply must be selected again once
+                  secure issuance becomes available.
+                </span>
+              </label>
+              <p className="builder-boundary-note" role="status">
+                Reviewed browser draft. Saving a Project Profile is the only available
+                next action; token issuance is disabled.
+              </p>
+            </section>
+          ) : (
+            <p className="builder-boundary-note" role="status">
+              Browser draft only. Review this configuration before saving
+              the Project Profile. Nothing has been submitted to Stellar.
             </p>
-          ) : null}
+          )}
         </div>
 
         <aside className="draft-preview" aria-label="Live token preview">
@@ -527,22 +612,26 @@ export function CreateSharedTokenForm() {
 
           <dl className="preview-facts">
             <div>
-              <dt>Network</dt>
-              <dd>Stellar</dd>
+              <dt>Target network</dt>
+              <dd>Stellar Testnet preview · issuance unavailable</dd>
             </div>
             <div>
               <dt>Initial supply (preview only)</dt>
               <dd>
-                {amountPreview.valid ? amountPreview.normalized : "Not set"}
+                {amountPreview.valid
+                  ? amountPreview.normalized
+                  : initialSupply.trim()
+                    ? "Invalid amount"
+                    : "Not selected"}
               </dd>
             </div>
             <div>
               <dt>Supply authority</dt>
-              <dd>Orrylo Shared Issuer — no fixed cap guaranteed</dd>
+              <dd>Orrylo may retain future mint authority. No fixed lifetime supply is guaranteed.</dd>
             </div>
             <div>
               <dt>Issuer model</dt>
-              <dd>Orrylo Shared Issuer</dd>
+              <dd>Orrylo-operated Shared Issuer; not customer-owned</dd>
             </div>
             <div>
               <dt>Metadata home</dt>
@@ -551,8 +640,8 @@ export function CreateSharedTokenForm() {
           </dl>
 
           <div className="execution-boundary">
-            <span className="eyebrow">Ready to manage</span>
-            <strong>Save this as your managed Orrylo project.</strong>
+            <span className="eyebrow">Project Profile only</span>
+            <strong>Save name, code and description — not token supply.</strong>
             <p>
               Your wallet is used here only to prove who owns the Project
               Profile. Saving does not create a Stellar asset, sign a
@@ -562,12 +651,12 @@ export function CreateSharedTokenForm() {
             <button
               className="button button-primary"
               type="button"
-              disabled={saveState.status === "saving"}
+              disabled={saveState.status === "saving" || !canSaveReviewedProfile}
               onClick={() => void handleSaveProject()}
             >
               {saveState.status === "saving"
                 ? "Saving project…"
-                : "Save & manage project"}
+                : "Save Project Profile only"}
             </button>
 
             {saveState.status === "needs_wallet" ||
@@ -576,7 +665,7 @@ export function CreateSharedTokenForm() {
                 <p>
                   {saveState.status === "wallet_session_changed"
                     ? "Your wallet session changed before the project could be saved. Reconnect or confirm the wallet that completed this save flow, then retry."
-                    : "Connect with Albedo to claim this Project Profile. Your configured values stay on this page while authentication completes."}
+                    : "Connect with Albedo to claim this Project Profile. The selected initial supply is not sent to the server."}
                 </p>
                 <WalletAuthControl
                   connectLabel="Connect wallet & save"
