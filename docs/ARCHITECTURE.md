@@ -173,13 +173,15 @@ The approved v1 enforcement mechanism is Stellar issuer-side trustline authoriza
 Approved prototype routing:
 
 ```
-orrylo.com                     public prototype application
-assets.orrylo.com              Shared Issuer metadata
+orrylo.com                     public prototype application + RYLO issuer home_domain / metadata
+assets.orrylo.com              Shared Issuer customer-asset metadata
 <project>.orrylo.com           Dedicated Issuer metadata
 <custom-domain>                optional future dedicated-domain support
 ```
 
 The prototype application is intentionally served directly from `orrylo.com` to reduce launch friction and keep the first user journey simple. A future split to `app.orrylo.com` remains optional rather than required.
+
+RYLO uses `orrylo.com` as its approved issuer `home_domain`. Its canonical metadata path is `https://orrylo.com/.well-known/stellar.toml`; the referenced RYLO image must also be publicly reachable over HTTPS before any issuer `home_domain` mutation. This is intentionally separate from `assets.orrylo.com`, which remains the Shared Issuer metadata domain for customer assets.
 
 A wildcard domain may be used so one application can serve project-specific subdomains dynamically.
 
