@@ -11,6 +11,12 @@ export type InitialSupplyValidation =
 
 export function validateInitialSupply(input: string): InitialSupplyValidation {
   const value = input.trim();
+  if (value.length > 40) {
+    return {
+      valid: false,
+      error: "The amount is too long for a Stellar asset.",
+    };
+  }
   if (!/^[0-9]+(?:\.[0-9]{1,7})?$/.test(value)) {
     return {
       valid: false,
