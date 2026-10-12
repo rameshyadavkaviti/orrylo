@@ -57,6 +57,18 @@ export function parseCreateManagedProjectRequest(
     return null;
   }
 
+  // This endpoint stores Project Profile identity ONLY. Reject supply fields
+  // rather than silently discard amounts that must eventually be committed to
+  // a reviewed immutable issuance intent via a different trusted boundary.
+  if (
+    "initialSupply" in input ||
+    "initialSupplyStroops" in input ||
+    "maximumSupply" in input ||
+    "supplyMode" in input
+  ) {
+    return null;
+  }
+
   if (
     typeof input.idempotencyKey !== "string" ||
     typeof input.code !== "string" ||
