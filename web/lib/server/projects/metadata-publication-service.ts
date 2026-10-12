@@ -307,7 +307,10 @@ export class MetadataPublicationService {
 
     const verification = await this.verifier.verify(outcome.publication);
     const verificationNow = this.options.now?.() ?? Date.now();
-    const repository = new PostgresMetadataPublicationRepository(this.sql);
+    const repository = new PostgresMetadataPublicationRepository(
+      this.sql,
+      this.options.approvedIssuerPublicKey,
+    );
 
     const publication = verification.ok
       ? await repository.markVerifiedIfCurrent({
@@ -326,10 +329,19 @@ export class MetadataPublicationService {
       throw new MetadataPublicationError("publication_superseded");
     }
 
+    const currentPublication = await repository.getByProjectId(projectId);
+
+    if (
+      !currentPublication ||
+      currentPublication.contentHash !== publication.contentHash
+    ) {
+      throw new MetadataPublicationError("issuer_provenance_unavailable");
+    }
+
     return {
       status: verification.ok ? "verified" : "published_not_reachable",
       changed: outcome.changed,
-      publication,
+      publication: currentPublication,
     };
   }
 }
