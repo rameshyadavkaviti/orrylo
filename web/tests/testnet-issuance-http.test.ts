@@ -14,6 +14,7 @@ import {
   UnavailableSharedIssuerExecutionAdapter,
 } from "../lib/stellar/shared-issuer-execution";
 import { TestnetIssuanceError } from "../lib/server/projects/testnet-issuance-service";
+import { SHARED_ISSUER_TESTNET_PASSPHRASE } from "../lib/stellar/shared-issuer-issuance";
 
 const OWNER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 81)).publicKey();
 const PROJECT_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
@@ -183,7 +184,7 @@ test("unavailable reviewed Stellar execution adapter rejects signing, submission
       policyVersion: "shared-issuer-testnet-v1",
       issuerPublicKey: OWNER,
       network: "testnet",
-      networkPassphrase: "Test SDF Network ; September 2015",
+      networkPassphrase: SHARED_ISSUER_TESTNET_PASSPHRASE,
       transactionHash: "0".repeat(64),
       unsignedEnvelopeXdr: "unused",
     }),
