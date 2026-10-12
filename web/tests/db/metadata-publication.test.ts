@@ -595,6 +595,42 @@ if (!TEST_DATABASE_URL) {
     }
   });
 
+  test("provenance invalidated during HTTPS verification cannot return a successful publication", async () => {
+    const project = await createEligibleProject({
+      code: "RACE",
+      displayName: "Race",
+      idempotencyKey: randomUUID(),
+    });
+    const invalidatingVerifier: MetadataPublicationVerifier = {
+      verify: async () => {
+        await sql`
+          UPDATE project_issuance_intents
+          SET status = 'failed'
+          WHERE project_id = ${project.projectId}
+        `;
+        return { ok: true };
+      },
+    };
+
+    await assert.rejects(
+      publicationService(invalidatingVerifier).publishOwnedProject(
+        project.projectId,
+        OWNER,
+      ),
+      (error: unknown) =>
+        error instanceof MetadataPublicationError &&
+        error.code === "issuer_provenance_unavailable",
+    );
+
+    assert.deepEqual(
+      await new PostgresMetadataPublicationRepository(
+        sql,
+        ISSUER,
+      ).listSharedTestnetPublications(),
+      [],
+    );
+  });
+
   test("stale or failed issuance provenance removes previously published TOML and blocks retry", async () => {
     const project = await createEligibleProject({
       code: "NOVA",
