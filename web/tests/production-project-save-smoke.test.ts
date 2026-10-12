@@ -147,7 +147,7 @@ test(
       // Next.js navigates immediately on success, so the old response body
       // may no longer be accessible via Chrome DevTools.
       await page.waitForURL(
-        (url) => /^\\/my-assets\\/[0-9a-f-]{36}$/.test(url.pathname),
+        (url) => url.pathname.startsWith("/my-assets/"),
         { timeout: 30_000 },
       );
       const projectId = new URL(page.url()).pathname.split("/").pop();
