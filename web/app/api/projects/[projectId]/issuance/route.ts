@@ -125,9 +125,7 @@ export async function handleRequestIssuance(
   }
 }
 
-function parseRequest(
-  body: unknown,
-): {
+function parseRequest(body: unknown): {
   idempotencyKey: string;
   expectedAssetCode: string;
   initialSupply: string;
