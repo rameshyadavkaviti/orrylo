@@ -40,7 +40,10 @@ export type SharedIssuerIssuanceErrorCode =
   | "sequence_conflict";
 
 export class SharedIssuerIssuanceError extends Error {
-  constructor(readonly code: SharedIssuerIssuanceErrorCode, message: string) {
+  constructor(
+    readonly code: SharedIssuerIssuanceErrorCode,
+    message: string,
+  ) {
     super(message);
     this.name = "SharedIssuerIssuanceError";
   }

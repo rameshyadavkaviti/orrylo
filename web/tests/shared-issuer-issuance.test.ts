@@ -17,7 +17,9 @@ import {
 } from "../lib/stellar/shared-issuer-issuance";
 
 const ISSUER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 41)).publicKey();
-const DESTINATION = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 42)).publicKey();
+const DESTINATION = Keypair.fromRawEd25519Seed(
+  Buffer.alloc(32, 42),
+).publicKey();
 
 const REQUEST: SharedIssuerIssuanceRequest = {
   projectId: "project-123",
@@ -233,7 +235,9 @@ test("signer boundary accepts only the exact reviewed canonical plan", () => {
   const plan = buildSharedIssuerIssuancePlan(REQUEST, PRECONDITIONS);
   const signingRequest = createSharedIssuerSigningRequest(plan);
 
-  assert.doesNotThrow(() => assertSigningRequestMatchesPlan(signingRequest, plan));
+  assert.doesNotThrow(() =>
+    assertSigningRequestMatchesPlan(signingRequest, plan),
+  );
 
   assert.throws(
     () =>
