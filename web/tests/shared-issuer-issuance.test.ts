@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash, randomUUID } from "node:crypto";
 import test from "node:test";
 
 import { Keypair, Networks, TransactionBuilder } from "@stellar/stellar-sdk";
@@ -418,6 +419,69 @@ test("submission authorization requires valid approved signatures meeting config
     ),
     plan.transactionHash,
   );
+});
+
+test("signed-envelope digest is persisted immutably before submission", async () => {
+  const execution =
+    (await import("../lib/stellar/shared-issuer-execution")) as unknown as {
+      persistAndSubmitSharedIssuerEnvelope?: (input: {
+        writer: {
+          recordSignedEnvelope(input: {
+            attemptId: string;
+            transactionHash: string;
+            signedEnvelopeXdrSha256: string;
+          }): Promise<{ signedEnvelopeXdrSha256?: string }>;
+        };
+        attemptId: string;
+        plan: ReturnType<typeof buildSharedIssuerIssuancePlan>;
+        signedEnvelopeXdr: string;
+        authorization: typeof SIGNER_AUTHORIZATION;
+        submission: {
+          submitSignedEnvelope(value: string): Promise<{ hash: string }>;
+        };
+      }) => Promise<{ hash: string }>;
+    };
+  assert.equal(
+    typeof execution.persistAndSubmitSharedIssuerEnvelope,
+    "function",
+  );
+
+  const plan = buildSharedIssuerIssuancePlan(REQUEST, PRECONDITIONS);
+  const transaction = TransactionBuilder.fromXDR(
+    plan.unsignedEnvelopeXdr,
+    Networks.TESTNET,
+  );
+  transaction.sign(ISSUER_KEYPAIR, SIGNER_B_KEYPAIR);
+  const signedEnvelopeXdr = transaction.toXDR();
+  const expectedDigest = createHash("sha256")
+    .update(signedEnvelopeXdr)
+    .digest("hex");
+  const attemptId = randomUUID();
+  let persistedDigest: string | undefined;
+  const result = await execution.persistAndSubmitSharedIssuerEnvelope!({
+    writer: {
+      async recordSignedEnvelope(input) {
+        assert.equal(input.attemptId, attemptId);
+        assert.equal(input.transactionHash, plan.transactionHash);
+        persistedDigest = input.signedEnvelopeXdrSha256;
+        return { signedEnvelopeXdrSha256: persistedDigest };
+      },
+    },
+    attemptId,
+    plan,
+    signedEnvelopeXdr,
+    authorization: SIGNER_AUTHORIZATION,
+    submission: {
+      async submitSignedEnvelope(value) {
+        assert.equal(value, signedEnvelopeXdr);
+        assert.equal(persistedDigest, expectedDigest);
+        return { hash: plan.transactionHash };
+      },
+    },
+  });
+
+  assert.equal(result.hash, plan.transactionHash);
+  assert.equal(persistedDigest, expectedDigest);
 });
 
 test("replacement transactions must preserve the immutable logical issuance intent", () => {

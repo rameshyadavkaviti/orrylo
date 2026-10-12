@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type {
   SharedIssuerIssuancePlan,
   SharedIssuerSigner,
@@ -5,6 +7,12 @@ import type {
   SharedIssuerSubmissionAdapter,
   SharedIssuerSubmissionResult,
   SharedIssuerTransactionLookup,
+} from "./shared-issuer-issuance";
+import {
+  SharedIssuerIssuanceError,
+  assertSignedEnvelopeAuthorizedForSubmission,
+  assertSubmissionHashMatchesPlan,
+  type SharedIssuerSignerAuthorization,
 } from "./shared-issuer-issuance";
 
 /**
@@ -59,3 +67,51 @@ export type PreparedSharedIssuerOperation = {
   signer: SharedIssuerSigner;
   submission: SharedIssuerSubmissionAdapter;
 };
+
+export interface SignedEnvelopeAttemptWriter {
+  recordSignedEnvelope(input: {
+    attemptId: string;
+    transactionHash: string;
+    signedEnvelopeXdrSha256: string;
+  }): Promise<{ signedEnvelopeXdrSha256?: string }>;
+}
+
+/**
+ * Future execution ordering boundary. It validates signatures, durably records
+ * the decorated-envelope digest, and only then invokes the supplied submission
+ * adapter. The production adapter remains unavailable.
+ */
+export async function persistAndSubmitSharedIssuerEnvelope(input: {
+  writer: SignedEnvelopeAttemptWriter;
+  attemptId: string;
+  plan: SharedIssuerIssuancePlan;
+  signedEnvelopeXdr: string;
+  authorization: SharedIssuerSignerAuthorization;
+  submission: SharedIssuerSubmissionAdapter;
+}): Promise<SharedIssuerSubmissionResult> {
+  assertSignedEnvelopeAuthorizedForSubmission(
+    input.signedEnvelopeXdr,
+    input.plan,
+    input.authorization,
+  );
+  const signedEnvelopeXdrSha256 = createHash("sha256")
+    .update(input.signedEnvelopeXdr, "utf8")
+    .digest("hex");
+  const persisted = await input.writer.recordSignedEnvelope({
+    attemptId: input.attemptId,
+    transactionHash: input.plan.transactionHash,
+    signedEnvelopeXdrSha256,
+  });
+  if (persisted.signedEnvelopeXdrSha256 !== signedEnvelopeXdrSha256) {
+    throw new SharedIssuerIssuanceError(
+      "signed_envelope_mismatch",
+      "Persisted signed-envelope digest does not match the authorized envelope.",
+    );
+  }
+
+  const result = await input.submission.submitSignedEnvelope(
+    input.signedEnvelopeXdr,
+  );
+  assertSubmissionHashMatchesPlan(result, input.plan);
+  return result;
+}

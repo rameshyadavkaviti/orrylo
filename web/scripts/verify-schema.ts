@@ -51,6 +51,8 @@ const EXPECTED_CONSTRAINTS = [
   "project_issuance_confirmation_request_unique",
   "project_issuance_confirmation_transaction_unique",
   "project_issuance_confirmation_publication_identity_unique",
+  "project_issuance_attempt_signed_envelope_hash",
+  "project_issuance_confirmation_signed_envelope_hash",
   "project_metadata_publications_confirmation_scope_fk",
   "project_metadata_publications_owner_required",
 ] as const;
@@ -133,6 +135,7 @@ async function main() {
         AND procedure.proname IN (
           'assert_issuance_attempt_matches_intent',
           'assert_trusted_confirmation_writer',
+          'protect_issuance_transaction_attempt',
           'prevent_issuance_evidence_mutation'
         )
     `;
@@ -142,7 +145,7 @@ async function main() {
     const wrongOwners = ownershipRows.filter(
       (row) => row.owner_name !== migrationIdentity?.role_name,
     );
-    if (ownershipRows.length !== 6 || wrongOwners.length > 0) {
+    if (ownershipRows.length !== 7 || wrongOwners.length > 0) {
       throw new Error(
         "Sensitive issuance tables and enforcement functions must be owned by the migration identity.",
       );

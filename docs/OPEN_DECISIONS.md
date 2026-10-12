@@ -15,6 +15,7 @@ Decided:
 - direct sale price: 1 RYLO = 0.1 XLM;
 - service-spent RYLO returns to Treasury and is not burned;
 - Treasury-first direct-sale distribution;
+- XLM payments for direct Orrylo sales of RYLO are received by the separately approved Mainnet TREASURY account, not OPERATIONS; delivery remains gated on verified, order-bound payment evidence;
 - 150 RYLO first-successful-token launch reward;
 - 50 RYLO-equivalent non-tradable Free Build Credit;
 - 60-day reward window from a fixed official launch timestamp;
@@ -30,6 +31,32 @@ Still open:
 - exact pool/market deployment mechanism;
 - exact service prices denominated in RYLO;
 - whether additional non-launch reward programs are introduced later.
+
+## Mainnet infrastructure account topology
+
+Decided:
+
+- The initial Orrylo-operated Mainnet infrastructure has **five distinct Stellar account roles**: **RYLO ISSUER (ORRYLO)**, **SHARED ISSUER (ASSETS)**, **TREASURY**, **OPERATIONS**, and **LIQUIDITY**.
+- RYLO ISSUER authorizes/controls RYLO issuance and is separate from the customer Shared Issuer.
+- SHARED ISSUER issues customer Shared Issuer-tier assets only, not RYLO.
+- TREASURY holds RYLO inventory, XLM reserves and realized service revenue, and supplies policy-approved distributions.
+- OPERATIONS is a limited-exposure operational funding/fee account, not the principal reserve or issuer account.
+- LIQUIDITY holds Orrylo-managed liquidity allocation/pool positions and conducts only policy-approved liquidity operations.
+- Signer A/B/C are key authorities, not automatically three additional Stellar accounts; confirmation services and DB roles are not Stellar accounts; customer wallets and Dedicated Issuer accounts are outside the five-account count.
+- The Mainnet account-role decision does **not** approve a specific public key, imply any Mainnet deployment or funding, or change existing RYLO Treasury-first, sale, mint or liquidity economics.
+- Mainnet signer topology is approved: 2-of-3 for RYLO ISSUER, SHARED ISSUER, TREASURY and LIQUIDITY; a single isolated operational signer with limited working balance for OPERATIONS, alongside a separate recovery/rotation procedure. Existing RYLO routine A+B and recovery-only C restrictions continue to apply.
+- Protected Treasury transfers and liquidity deposits/withdrawals require independent authorization. Pool withdrawal remains subject to actual pool rules and does not guarantee recovery of originally deposited XLM.
+- The owner must explicitly approve each future account/key/funding/authority/finance activation step and securely retain secrets, hardware/offline backups, custody and recovery information outside GitHub and chat. At each owner-action gate, execution runbooks must clearly identify the exact manual action, public information to verify and secret material to safeguard.
+
+Still open:
+
+- Exact secure settlement coupling between confirmed XLM receipt at TREASURY and RYLO delivery, including payment verification, order-bound idempotency, failed/partial payments, delayed delivery, refunds and recovery.
+- Actual Mainnet public keys, activation/funding amount and order for each role. The two branded issuer addresses remain reserved candidates only.
+- Concrete signer public keys, custody technologies, per-operation threshold weights, master-key treatment, flags, recovery ceremonies and independent operators remain open despite the approved overall signer topology.
+- Operations wallet funding limits, monitoring, replenishment and enforceable constraints (limited funds are not a native Stellar spending cap).
+- Operational XLM limits, transfers/approvals and fee payment/sponsorship rules.
+- Treasury/LIQUIDITY movement permissions and exact custody/pool-position handling.
+- Security-reviewed Mainnet setup, audit and emergency runbooks; no Mainnet actions are authorized by the architecture decision.
 
 ## RYLO eligibility and authorization
 
@@ -106,6 +133,19 @@ Still open:
 - exact definition/evidence event for “successful token creation” before the reward is released;
 - exact on-chain transaction construction and submission implementation.
 
+## Immediate Testnet MVP Lite — execution decisions and sequencing
+
+**Approved 2026-10-12:** First delivery milestone is one real end-to-end customer Shared Issuer asset issuance on Testnet, *not* the entire RYLO economy/reward/liquidity demonstration. This does not alter approved RYLO eligibility, 150 RYLO reward, timing, issuer control, mint/supply economics, or any Mainnet rules. Mainnet and full RYLO ecosystem demonstrations remain separate later work.
+
+**Execution-critical decisions still open — obtain explicit owner/Stellar/Security approval before signing or funding:**
+- exact Testnet Shared Issuer account identity, readiness, signer/custody and applicable account flags;
+- receiving wallet, trustline setup and authorization behavior, including transaction-fee/funding responsibility (do not invent automatic funding);
+- safe bounded test-activation procedure and evidence required before allowing broad public creation;
+- remaining PR #32 proof/reconciliation blockers, any required intent persistence and database authority split;
+- practical server-side rate limiting and abuse controls for broad public creation, without an unapproved wallet allowlist.
+
+**Minimal delivery gates:** Full-stack owns app UI/server intent flow; Stellar/Contract owns issuer account/configuration, transaction construction/signing/trustline boundaries; Security/Enablement owns adversarial verification, proof/unknown-outcome/DB privilege gates; Product Architect coordinates critical path and obtains owner decisions. No agent may treat a draft PR, UI preview, Project Profile save or Testnet preparation as completed issuance. Detailed bounded work belongs to agent PRs/issues; do not open unrelated features before the first real Testnet issuance evidence.
+
 ## Shared Issuer
 
 Decided:
@@ -135,7 +175,7 @@ Decided:
 - abandoned/cancelled/failed orders can release reservations only after authoritative proof that no issuance was submitted or could have succeeded;
 - ambiguous or potentially successful submitted transactions must remain reserved until conclusive ledger reconciliation; confirmed issuance must never be released as if the asset identity were unused;
 - release/cancellation and rejected/limited attempts require auditable, server-authorized controls; multi-wallet abuse must be addressed beyond per-wallet quotas;
-- full immutable issuance intent and fingerprint are a separate future execution gate, not invented from reservation data.
+- full immutable issuance intent and fingerprint are an **immediate P0 Testnet MVP Lite pre-signing gate**, not inferred from reservation data; no signing or submission is allowed until that complete intent is durably committed and independently reviewed.
 
 Still open (must not be silently selected by implementation):
 
@@ -196,7 +236,7 @@ Approved first-prototype application baseline:
 - Neon Free for PostgreSQL;
 - Cloudflare Free for DNS/CDN.
 
-Stellar Testnet remains the currently recorded engineering/deployment-evidence environment and must stay reproducibly bootstrappable. The immediate execution direction is Mainnet preparation, but Mainnet deployment remains unproven until explicit repository/on-chain deployment evidence exists.
+Stellar Testnet remains the currently recorded engineering/deployment-evidence environment and must stay reproducibly bootstrappable. The immediate delivery priority is Testnet MVP Lite customer Shared Issuer issuance. Mainnet preparation is separate and Mainnet deployment remains unproven until explicit repository/on-chain deployment evidence exists.
 
 These are prototype choices, not permanent production-provider commitments.
 

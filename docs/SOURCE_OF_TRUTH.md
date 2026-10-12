@@ -261,6 +261,63 @@ No manual/admin/marketing/emergency/developer mint path is approved for v1.
 
 The direct sale price must not be described as intrinsic value, guaranteed market value, guaranteed resale value, or guaranteed future value.
 
+### 10.1 Approved five-account Mainnet infrastructure model
+
+The product owner approved **exactly five persistent Orrylo-operated Stellar account roles** for the initial Mainnet architecture. This is a **role/topology decision**, not evidence that five accounts have been created, funded, deployed, assigned signer keys, or authorized on Mainnet.
+
+| Role | Primary responsibility | Authority boundary |
+| --- | --- | --- |
+| **RYLO ISSUER (ORRYLO)** | Issuer and on-chain authorization policy for RYLO only. | Separate from all customer issuers; follows the separately approved protected RYLO signer/2-of-3 policy. Not the day-to-day revenue or liquidity wallet. |
+| **SHARED ISSUER (ASSETS)** | Issue Shared Issuer-tier customer assets under one explicitly approved issuer identity. | Never issues RYLO; separate signing/custody from the ordinary web application. Exact account identity, flags and signer thresholds still require approval. |
+| **TREASURY** | Hold RYLO inventory, XLM reserves and realized service revenue; make policy-approved RYLO transfers and treasury allocations. | No independent RYLO mint authority; no unrestricted application-initiated withdrawals. |
+| **OPERATIONS** | Limited working XLM for ordinary network fees and explicitly approved day-to-day operational funding/transactions. | Small capped exposure and scoped transaction permissions; no issuer keys or custody of primary treasury reserves. Exact limits still require approval. |
+| **LIQUIDITY** | Custody Orrylo-managed liquidity allocations and any relevant pool positions/share balances; coordinate approved RYLO/XLM liquidity operations. | No issuer or treasury mint authority; no automatic funding from Treasury; each liquidity operation remains protected, manual/staged and auditable under section 10. |
+
+**Scope/counting rules:**
+
+- These five roles are five distinct **Orrylo infrastructure Stellar accounts** for Mainnet; a single account must not silently serve multiple roles.
+- **Signer A / B / C are signing keys/authorities, not automatically three additional Stellar accounts.** Their independent custody and authorization still matter.
+- The ledger confirmation verifier and database confirmation-writer are **off-chain services and separate database identities**, not Stellar accounts.
+- Customer wallets, per-project Dedicated Issuer accounts, pools and network contracts are outside the five Orrylo infrastructure-account count.
+- The previously reserved public-key candidates for ORRYLO and ASSETS remain **candidates, not approved or deployed Mainnet accounts**. Do not hardcode, fund or activate a candidate merely because its role is approved.
+- Existing RYLO Treasury-first distribution, service-spend recycling, and protected liquidity policy remain authoritative; five-account separation does not change mint, supply, sale-price or liquidity rules.
+
+**Approved direct-sale payment destination:** XLM paid for a direct Orrylo sale of RYLO must be sent to the explicitly approved Mainnet **TREASURY** Stellar account, not the OPERATIONS account. The destination must be independently checked against trusted server-side configuration and the correct network before a payment request is presented. This rule concerns direct Orrylo sales of RYLO only, not third-party customer-asset sales or other services. Receiving XLM does not by itself authorize RYLO delivery; require verified payment evidence, owner/order binding, amount and asset correctness, idempotent fulfillment and a reviewed recovery/refund path. No real-payment functionality is enabled by this policy approval.
+
+**Not yet decided:** Exact payment/RYLO-delivery settlement mechanism and failure recovery; fee-funding/sponsorship flow; exact signer keys, account flags, per-operation thresholds, custody providers and recovery procedures; operational balance caps and transfer permissions; final public keys and Mainnet deployment sequence. The independently approved XLM payment destination is TREASURY for direct RYLO sales. No real-payment flow should activate until these decisions and settlement security are approved.
+
+**Owner-managed manual setup and secure-record obligations (mandatory checkpoints before Mainnet activation):**
+
+1. **Identity and funding checkpoint — owner action required.** Review and explicitly approve the intended public key, network, purpose, initial funding source and funding amount for each account before account creation/funding. Verify each account independently on the correct Stellar network. Never confuse a Testnet address/state with proof of Mainnet funding.
+2. **Key-generation and custody checkpoint — owner action required.** Generate/import each required signer key using a reviewed, isolated mechanism. Keep secret seeds, recovery material and backups in a secure offline/hardware-backed location under owner control. **Never place secrets in GitHub, SOT, chat, tickets, screenshots, browser client code, app databases, build logs or environment examples.** Only public keys, non-secret configuration and independent validation evidence belong in repository documentation.
+3. **Signer/authority checkpoint — owner explicit approval required.** Record the proposed signer public keys, weights, thresholds, account flags, master-key treatment, custody operators and recovery plan **without secrets**. Independently verify successful authorized signing/recovery paths before any irreversible master-key reduction or authority removal. The existing RYLO 2-of-3 policy is not automatically extended to other accounts without a decision.
+4. **Finance/operations checkpoint — owner approval required.** Approve transfer limits, XLM payment destination, RYLO delivery/failure handling, Treasury/Operations/Liquidity movement policy, monitoring and emergency response before enabling purchase, payout or liquidity operations. Keep personal secure records of account-to-role mapping, signing-device locations, recovery custodians and protected ceremony instructions.
+5. **Activation checkpoint — separate authorization required.** A reviewed runbook must remind the owner at the exact point of each manual action, what to verify, and what confidential data to safeguard. Require explicit approval before any Mainnet account mutation, funding, key/threshold/flag change, signing, transfer, pool operation or deployment. Documentation approval does **not** authorize those operations.
+
+### 10.2 Approved Mainnet signing and recovery policy for five infrastructure accounts
+
+The owner approves the **authorization topology** below for Orrylo's five distinct Mainnet infrastructure accounts. This is policy approval only; no signer key, threshold, custody device, account flag, transfer limit, or Mainnet account state is deployed or verified by this document.
+
+| Account | Approved normal authorization | Recovery and exposure boundary |
+| --- | --- | --- |
+| **RYLO ISSUER (ORRYLO)** | **2-of-3**, preserving the separately approved RYLO policy: independent operational signer A plus independent policy co-signer B for routine protected actions; signer C is recovery-only. | Recovery-only use requires a documented owner-approved ceremony; issuer mint/authorization rules remain unchanged. |
+| **SHARED ISSUER (ASSETS)** | **2-of-3** independent signing authorities for issuer operations, with a routine operational signer plus independent approval and a recovery signer. | An application order alone cannot authorize minting; signer verifies exact approved issuance and on-chain transaction independently. |
+| **TREASURY** | **2-of-3** independent signing authorities for transfers, payouts and movements of reserves. | The ordinary public application may not unilaterally withdraw, sweep or redirect customer payments or Treasury funds. |
+| **OPERATIONS** | **One active operational signer** for narrowly scoped daily operations and network-fee funding. | Maintain an independently secured recovery/rotation path and deliberately limited working balance. A low balance is a risk-control objective, **not** an on-chain spending cap; precise technical limits remain to be approved and enforced through custody, funding and monitoring design. |
+| **LIQUIDITY** | **2-of-3** independent signing authorities for deposits, withdrawals, pool-share transfers and liquidity management. | Liquidity withdrawal may be requested when two authorized signers approve; withdrawal remains subject to the actual pool's liquidity/position rules, and the amounts of XLM and RYLO recovered are **not guaranteed** to equal amounts originally deposited. |
+
+For the four 2-of-3 accounts, no single signing key may independently meet the thresholds governing protected operations. Signer C is reserved for recovery, not a shortcut for unattended daily operations. Signer identities for different accounts must have separately reviewed custody and trust boundaries; this decision does **not** permit silently reusing the same key across all accounts or automatically applying RYLO's exact Testnet signer identities to Mainnet.
+
+**Owner manual-action and secure-record gates (mandatory before any actual Mainnet configuration):**
+
+1. Independently approve and record **public** account identities, each signer public key, role, proposed weights/thresholds, account flags and intended master-key treatment. Verify all on the correct network. Do not treat the two reserved vanity addresses as deployed or approved.
+2. Personally establish protected custody and multiple recoverable backups for all required **secret seeds**, hardware-wallet recovery phrases, access-control credentials and recovery-ceremony instructions outside GitHub, chat, source files, web forms, and ordinary application logs. No secret material is to be pasted into this project or reported to an agent.
+3. Before a master-weight reduction or lockout-prone authority change, exercise and independently verify the authorized normal 2-of-3 path and the approved recovery procedure; arrange a separate owner-approved manual ceremony for irreversible changes. For RYLO, retain its already approved specific A+B-before-master-zero sequence.
+4. Before activating OPERATIONS, approve a concrete funding cap, signer isolation, monitoring and replenishment procedure. Before enabling TREASURY or LIQUIDITY transfers, approve authorization workflow, audit record and emergency stop/recovery instructions; LIQUIDITY cannot automatically pull funds from TREASURY.
+5. Every creation, funding, signer/threshold/flag mutation, transfer, liquidity withdrawal/deposit or activation requires a separate explicit owner authorization at execution time. This document **does not** authorize Mainnet transactions or secret generation.
+
+**Still open (do not invent):** exact Mainnet keys and accounts; specific threshold numerical configuration for each operation class; flags/master-key changes; independent signer/custody providers and recovery operators; precise OPERATIONS balance/transfer limits and enforceable controls; Treasury payout and liquidity authorization implementation; emergency/recovery ceremonies and deployment order. The already-approved RYLO-specific policy overrides any general example here. The XLM receipt destination for direct RYLO sales is already approved as TREASURY, independently of this signing policy.
+
 ## 11. No investment section for v1
 
 The first version must not introduce an official investment program such as:
@@ -281,14 +338,45 @@ The approved first-prototype infrastructure baseline is intentionally low-cost a
 - PostgreSQL: **Neon Free** initially;
 - DNS/CDN: **Cloudflare Free**;
 - Stellar engineering/deployment baseline: **Testnet** for the currently recorded issuer and contract preparation evidence;
-- immediate execution direction: **Mainnet preparation**, without treating any issuer, asset, SAC, or application flow as Mainnet-deployed until explicit deployment evidence is recorded;
+- immediate execution direction: **Testnet MVP Lite customer Shared Issuer issuance**; Mainnet preparation remains a separate workstream, without treating any issuer, asset, SAC, or application flow as Mainnet-deployed until explicit deployment evidence is recorded;
 - existing Orrylo domain: reused with no new prototype-domain purchase.
 
 This is a **prototype deployment baseline**, not a permanent production-provider commitment.
 
 The application must remain portable enough to move away from Railway, Neon, or Cloudflare if pricing, availability, sanctions/access, scale, security, or operational requirements change.
 
-The first Testnet prototype is considered complete when the real end-to-end path demonstrates:
+### 12.1 Immediate delivery milestone — Testnet MVP Lite (owner approved 2026-10-12)
+
+**Priority P0: first real customer Shared Issuer token issuance on Stellar Testnet.** This is the next delivery milestone, not proof of a production-ready service or an instruction to bypass existing security gates. It is intentionally smaller than the RYLO ecosystem demonstration below.
+
+The minimum end-to-end acceptance path is:
+
+```
+Authenticated Albedo wallet
+→ project / asset identity and user-selected exact initial supply
+→ owner-visible configuration and Shared Issuer authority review
+→ explicit confirmed issuance request
+→ immutable server-authoritative issuance intent and safe asset-code reservation
+→ receiving account trustline / authorization readiness
+→ authorized Testnet issuer signing and submission
+→ authoritative ledger confirmation of correct issuer, asset, destination and amount
+→ explorer-verifiable result and truthful persistent project status
+```
+
+- A genuine Stellar Testnet-issued customer asset must be visible through authoritative network evidence. A saved Project Profile, browser draft, simulated result or transaction hash alone is **not** acceptance.
+- Scope is **Shared Issuer, Testnet, one minimal creation path only**. No Dedicated Issuer, production-grade token governance, RYLO liquidity/swap path, Mainnet funding, or five-account Mainnet execution is required for this milestone.
+- Preserve the approved first-success eligibility / 150 RYLO reward policy and its financial/authorization/launch rules **unchanged**. Executing the reward, RYLO trustline/issuer ceremony and market liquidity is not a prerequisite for the *Lite customer asset issuance demonstration*. Do not falsely mark rewards as granted or silently change when eligibility legally/product-wise applies. Implementing deferred reward delivery requires separately reviewed policy-consistent evidence and scheduling; do not claim its live execution.
+- Limit launch access to appropriately gated, explicitly authorized Testnet demonstration until the owner approves public availability and concrete abuse controls. This gate is **not** a wallet allowlist or new eligibility policy: approved public Testnet creation remains open to any authenticated supported wallet once safely launched.
+- The receiving wallet must be technically able to hold the issued asset: explicit account / trustline and applicable authorization readiness, with no unapproved automatic account funding or invented default destination.
+- Security minimums are mandatory: server-side auth and ownership, exact 7-decimal amount/int64 validation, immutable full intent before signing, issuer-scoped uniqueness, idempotent submission, forged-proof resistance, safe retry/unknown-outcome reconciliation, trusted independent ledger confirmation, protected signing/secrets, and honest status. PR #32's unresolved security blockers cannot be waived by a smaller MVP.
+- No new pricing, signer identity, Shared Issuer account, flags, supply-control promise, rate limit, payment step or expiry rule is approved by this milestone. Resolve execution-critical open decisions with the appropriate owner before live actions.
+- First prove a repeatable, authorized Testnet demonstration and record exact transaction/asset/network evidence; broader publicly available Testnet release remains subject to security, abuse and deployment gates.
+
+**Delivery order:** (1) confirm minimum issuer / destination / trustline / signer decisions; (2) close issuance-proof blockers and persist immutable issuance intent; (3) connect the existing reviewed builder to one safe Testnet execution path; (4) demonstrate and independently verify a real result. Keep parallel Mainnet/RYLO economy, growth features and styling work outside the Lite critical path.
+
+### 12.2 Later milestone — complete RYLO Testnet ecosystem demonstration
+
+The **later RYLO ecosystem Testnet milestone** is considered complete when the real end-to-end path demonstrates:
 
 ```
 Albedo wallet

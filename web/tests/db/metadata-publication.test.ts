@@ -155,6 +155,7 @@ if (!TEST_DATABASE_URL) {
     const confirmationId = randomUUID();
     const transactionHash = "a".repeat(64);
     const envelopeHash = "b".repeat(64);
+    const signedEnvelopeHash = "d".repeat(64);
     await sql`
       INSERT INTO project_issuance_full_intents (
         issuance_request_id, issuance_intent_fingerprint,
@@ -173,13 +174,15 @@ if (!TEST_DATABASE_URL) {
       INSERT INTO project_issuance_transaction_attempts (
         attempt_id, issuance_request_id, issuance_intent_fingerprint,
         attempt_number, transaction_hash, envelope_xdr_sha256,
+        signed_envelope_xdr_sha256,
         source_sequence, fee_stroops, valid_from, valid_until,
         transaction_source_public_key, operation_count, operation_type,
         operation_source_public_key, asset_code, issuer_public_key,
         destination_public_key, amount, created_at
       ) VALUES (
         ${attemptId}, ${reservation.issuance.requestId}, ${intentFingerprint},
-        1, ${transactionHash}, ${envelopeHash}, 123, 100, 1, 2, ${ISSUER},
+        1, ${transactionHash}, ${envelopeHash}, ${signedEnvelopeHash},
+        123, 100, 1, 2, ${ISSUER},
         1, 'payment', ${ISSUER}, ${code}, ${ISSUER}, ${DESTINATION},
         100.0000000, ${new Date(clock)}
       )
@@ -189,7 +192,8 @@ if (!TEST_DATABASE_URL) {
         confirmation_id, issuance_request_id, issuance_intent_fingerprint,
         attempt_id, project_id, owner_public_key, network,
         network_passphrase_hash, transaction_hash, envelope_xdr_sha256,
-        result_xdr_sha256, result_success, ledger_sequence, ledger_closed_at,
+        signed_envelope_xdr_sha256, result_xdr_sha256, result_success,
+        ledger_sequence, ledger_closed_at,
         transaction_source_public_key, operation_count, operation_type,
         operation_source_public_key, asset_code, issuer_public_key,
         destination_public_key, amount, source_sequence, verifier_identity,
@@ -198,7 +202,8 @@ if (!TEST_DATABASE_URL) {
         ${confirmationId}, ${reservation.issuance.requestId},
         ${intentFingerprint}, ${attemptId}, ${project.project.projectId},
         ${OWNER}, 'testnet', ${PASSPHRASE_HASH}, ${transactionHash},
-        ${envelopeHash}, ${"c".repeat(64)}, true, 456, ${new Date(clock)},
+        ${envelopeHash}, ${signedEnvelopeHash}, ${"c".repeat(64)}, true, 456,
+        ${new Date(clock)},
         ${ISSUER}, 1, 'payment', ${ISSUER}, ${code}, ${ISSUER}, ${DESTINATION},
         100.0000000, 123, 'isolated-test-ledger-verifier',
         'test-verification-v1', ${new Date(clock)}, ${new Date(clock)}

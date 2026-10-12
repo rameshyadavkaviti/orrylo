@@ -112,6 +112,7 @@ if (!TEST_DATABASE_URL) {
     const attemptId = randomUUID();
     const transactionHash = "2".repeat(64);
     const envelopeHash = "3".repeat(64);
+    const signedEnvelopeHash = "4".repeat(64);
     await sql`
       INSERT INTO project_issuance_full_intents (
         issuance_request_id, issuance_intent_fingerprint,
@@ -130,13 +131,15 @@ if (!TEST_DATABASE_URL) {
       INSERT INTO project_issuance_transaction_attempts (
         attempt_id, issuance_request_id, issuance_intent_fingerprint,
         attempt_number, transaction_hash, envelope_xdr_sha256,
+        signed_envelope_xdr_sha256,
         source_sequence, fee_stroops, valid_from, valid_until,
         transaction_source_public_key, operation_count, operation_type,
         operation_source_public_key, asset_code, issuer_public_key,
         destination_public_key, amount, created_at
       ) VALUES (
         ${attemptId}, ${reservation.issuance.requestId}, ${intentFingerprint},
-        1, ${transactionHash}, ${envelopeHash}, 123, 100, 1, 2,
+        1, ${transactionHash}, ${envelopeHash}, ${signedEnvelopeHash},
+        123, 100, 1, 2,
         ${ISSUER}, 1, 'payment', ${ISSUER}, 'NOVA', ${ISSUER},
         ${DESTINATION}, 100.0000000, ${new Date(NOW)}
       )
@@ -148,6 +151,7 @@ if (!TEST_DATABASE_URL) {
       attemptId,
       transactionHash,
       envelopeHash,
+      signedEnvelopeHash,
     };
   }
 
@@ -163,7 +167,8 @@ if (!TEST_DATABASE_URL) {
           confirmation_id, issuance_request_id, issuance_intent_fingerprint,
           attempt_id, project_id, owner_public_key, network,
           network_passphrase_hash, transaction_hash, envelope_xdr_sha256,
-          result_xdr_sha256, result_success, ledger_sequence,
+          signed_envelope_xdr_sha256, result_xdr_sha256, result_success,
+          ledger_sequence,
           ledger_closed_at, transaction_source_public_key, operation_count,
           operation_type, operation_source_public_key, asset_code,
           issuer_public_key, destination_public_key, amount, source_sequence,
@@ -173,7 +178,8 @@ if (!TEST_DATABASE_URL) {
           ${randomUUID()}, ${fixture.requestId}, ${fixture.intentFingerprint},
           ${fixture.attemptId}, ${fixture.projectId}, ${OWNER}, 'testnet',
           ${PASSPHRASE_HASH}, ${fixture.transactionHash},
-          ${fixture.envelopeHash}, ${"4".repeat(64)}, true, 456,
+          ${fixture.envelopeHash}, ${fixture.signedEnvelopeHash},
+          ${"5".repeat(64)}, true, 456,
           ${new Date(NOW)}, ${ISSUER}, 1, 'payment', ${ISSUER}, ${assetCode},
           ${ISSUER}, ${DESTINATION}, 100.0000000, 123,
           'isolated-test-ledger-verifier', 'test-verification-v1',

@@ -106,6 +106,7 @@ async function readIdentity(sql: DatabaseClient): Promise<DatabaseIdentityRow> {
           AND procedure.proname IN (
             'assert_issuance_attempt_matches_intent',
             'assert_trusted_confirmation_writer',
+            'protect_issuance_transaction_attempt',
             'prevent_issuance_evidence_mutation'
           )
           AND pg_get_userbyid(procedure.proowner) = current_user

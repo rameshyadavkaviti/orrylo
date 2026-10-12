@@ -329,7 +329,9 @@ the managed project page. The read-only UI does **not** enable token issuance.
 The database contract and Gate A repositories separate the reservation from an
 immutable full issuance intent, append-only transaction attempts, and an
 immutable ledger confirmation. Exact replay is idempotent; conflicting replay
-fails closed. The confirmation binds the request and full-intent fingerprint
+fails closed. A transaction attempt permits one immutable transition that
+records the decorated signed-envelope SHA-256 digest after signature validation
+and before submission. The confirmation binds the request and full-intent fingerprint
 to the exact Testnet passphrase hash, envelope/result hashes, successful result,
 transaction and operation sources, single payment operation, configured issuer,
 asset, destination, amount, source sequence, transaction hash, and ledger. Only
@@ -340,7 +342,10 @@ ordinary application identities at the confirmation-writer boundary.
 Status fields and application audit events cannot authorize publication.
 
 Gate A includes a typed Testnet ledger-reader contract and a raw-XDR validator.
-The validator recomputes transaction/envelope/result binding and validates the
+The validator requires exact equality across the requested hash, provider hash,
+result-associated hash, recomputed Testnet transaction hash, and persisted
+attempt hash. It separately compares decorated signed-envelope digests and
+requires exactly one successful Classic payment result. It validates the
 exact immutable issuer, asset, destination, amount, sequence, operation,
 network, successful result, ledger, project, and owner before creating a
 runtime-only validated confirmation value. Reconciliation cannot permit a
@@ -363,7 +368,9 @@ Migration 007 follows PR #19 migration 006 and upgrades legacy 006 publication
 rows by retaining them but marking them unreachable until exact immutable
 confirmation provenance is attached. Migration 008 upgrades 001–007 databases
 without rewriting their checksums, binds metadata to confirmation project and
-owner scope, and hardens the dedicated-writer login check.
+owner scope, and hardens the dedicated-writer login check. Migration 009 adds
+the one-time signed-envelope digest transition and binds new confirmations to
+that exact digest without rewriting migrations 001–008.
 The API fails closed with HTTP 503 until the reviewed issuer identity is explicitly
 provided as server-only `ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY`.
 The reserved candidate is never automatically selected. The database enforces

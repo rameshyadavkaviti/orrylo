@@ -62,17 +62,19 @@ issuer selection, database writes, HTTP routes, or automatic signer invocation.
 Gate A also implements, without activating production network access:
 
 - immutable PostgreSQL repositories for full issuance intents and transaction
-  attempts, with exact idempotent replay and conflicting-replay rejection;
+  attempts, with a one-time immutable signed-envelope digest transition, exact
+  idempotent replay, and conflicting-replay rejection;
 - a typed Testnet ledger-reader interface whose production implementation is
   explicitly unavailable;
 - an authoritative confirmation validator that parses raw envelope and result
-  XDR and matches the exact immutable intent/attempt before producing a
-  runtime-only validated confirmation value;
+  XDR, requires one successful Classic payment result, and matches the
+  requested, returned, result-associated, recomputed, and persisted transaction
+  hashes before producing a runtime-only validated confirmation value;
 - a dedicated confirmation-writer persistence boundary that rejects an ordinary
   application identity, schema owner, superuser, or `SET ROLE` substitution;
 - read-only ambiguity reconciliation that permits a replacement decision only
-  after authoritative expired not-found evidence and a non-stale unchanged
-  issuer sequence;
+  when exact-hash not-found and unchanged issuer-sequence checkpoints both
+  represent ledgers closed strictly after expiry;
 - metadata provenance binding to the exact project and owner as well as the
   existing confirmation/request/fingerprint identity.
 
@@ -127,6 +129,8 @@ For each request it must independently verify at minimum:
 - exact amount;
 - explicit time bounds;
 - transaction hash matches the reviewed unsigned envelope;
+- decorated signed-envelope digest is persisted before submission and matches
+  independently returned ledger evidence;
 - returned envelope contains only valid signatures from the injected approved
   issuer signer configuration and meets its required weight;
 - request/policy identity has not been superseded.
@@ -175,6 +179,7 @@ Covered by deterministic tests in this slice:
 - invalid sequence/time bounds/amount;
 - unauthorized signer request mutation;
 - signed-envelope mutation detection;
+- exact four-way transaction-hash and successful payment-result binding;
 - missing/invalid/insufficient approved signer signatures;
 - submission-hash mismatch;
 - immutable logical-intent preservation across replacement envelopes;
@@ -193,7 +198,8 @@ Covered by Full-stack/database integration tests:
 - dedicated writer versus ordinary application database-role isolation;
 - forged confirmation writes, immutable evidence, confirmation replay, and
   exact project/owner provenance scope;
-- ambiguous lookup, stale evidence, and conflicting sequence rejection.
+- ambiguous lookup, stale evidence, and conflicting sequence rejection;
+- immutable one-time signed-envelope persistence and conflicting replay rejection.
 
 Still requires real Testnet acceptance after policy/operations are authorized:
 

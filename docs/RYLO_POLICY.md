@@ -87,6 +87,8 @@ Treasury inventory insufficient
 → mint only the approved shortfall
 ```
 
+**Approved XLM receipt rule:** For direct Orrylo sales of RYLO, the buyer sends XLM to the explicitly approved Mainnet TREASURY account. OPERATIONS is not the buyer-payment destination. The application must verify the network, trusted configured Treasury public key, exact order/payment binding and actual receipt before fulfilling RYLO delivery. Treasury-first distribution remains unchanged. Payment alone is not proof of fulfilled RYLO delivery; use idempotent, audited settlement and a reviewed failure/refund procedure. No payment or issuance adapter is enabled by recording this rule.
+
 The previously considered rule that additional RYLO could be acquired only through Orrylo direct sales is rejected. Eligible/authorized users may trade RYLO with one another.
 
 ## 5. Treasury and service-spend policy

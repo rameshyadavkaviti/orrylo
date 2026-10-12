@@ -34,13 +34,15 @@ interface StellarTestnetLedgerObservation {
   networkPassphrase: typeof SHARED_ISSUER_TESTNET_PASSPHRASE;
   observedLedger: number;
   observedAt: string;
-  authoritative: boolean;
+  /** Close time of the newest ledger represented by this observation. */
+  observedLedgerClosedAt: string;
 }
 
 export type StellarTestnetTransactionLookup =
   | (StellarTestnetLedgerObservation & {
       status: "confirmed";
       transactionHash: string;
+      resultTransactionHash: string;
       envelopeXdr: string;
       resultXdr: string;
       ledgerSequence: number;
@@ -66,6 +68,8 @@ export interface StellarTestnetAccountSequenceEvidence extends StellarTestnetLed
  * their Stellar data source; the ordinary application database is not a ledger.
  */
 export interface StellarTestnetLedgerReader {
+  /** Authority belongs to the configured reader, never to returned records. */
+  readonly authority: "official_testnet_horizon" | "untrusted" | "unavailable";
   lookupTransaction(
     transactionHash: string,
   ): Promise<StellarTestnetTransactionLookup>;
@@ -85,6 +89,8 @@ export class StellarLedgerReaderUnavailableError extends Error {
 
 /** No Horizon/RPC client or network access is enabled by this adapter. */
 export class UnavailableStellarTestnetLedgerReader implements StellarTestnetLedgerReader {
+  readonly authority = "unavailable" as const;
+
   async lookupTransaction(
     _transactionHash: string,
   ): Promise<StellarTestnetTransactionLookup> {
@@ -111,6 +117,8 @@ export type StellarLedgerEvidenceErrorCode =
   | "invalid_result_xdr"
   | "transaction_failed"
   | "envelope_mismatch"
+  | "signed_envelope_mismatch"
+  | "result_mismatch"
   | "operation_mismatch"
   | "sequence_mismatch"
   | "stale_ledger_evidence"
@@ -162,6 +170,9 @@ export class AuthoritativeSharedIssuanceConfirmationValidator {
     verificationPolicyVersion: string;
   }): Promise<ValidatedSharedIssuanceLedgerConfirmation> {
     assertConfirmationRequest(input);
+    if (this.reader.authority !== "official_testnet_horizon") {
+      throw new StellarLedgerEvidenceError("non_authoritative_evidence");
+    }
     const evidence = await this.reader.lookupTransaction(
       input.attempt.transactionHash,
     );
@@ -170,13 +181,16 @@ export class AuthoritativeSharedIssuanceConfirmationValidator {
     if (evidence.status !== "confirmed") {
       throw new StellarLedgerEvidenceError("transaction_not_confirmed");
     }
-    if (!evidence.authoritative) {
-      throw new StellarLedgerEvidenceError("non_authoritative_evidence");
-    }
     if (
       evidence.transactionHash.toLowerCase() !== input.attempt.transactionHash
     ) {
       throw new StellarLedgerEvidenceError("wrong_transaction");
+    }
+    if (
+      evidence.resultTransactionHash.toLowerCase() !==
+      input.attempt.transactionHash
+    ) {
+      throw new StellarLedgerEvidenceError("result_mismatch");
     }
     const ledgerClosedAtMs = parseTimestamp(evidence.ledgerClosedAt);
     if (
@@ -220,13 +234,28 @@ export class AuthoritativeSharedIssuanceConfirmationValidator {
     if (transactionResult.result.type !== "txSuccess") {
       throw new StellarLedgerEvidenceError("transaction_failed");
     }
+    const [operationResult] = transactionResult.result.results;
+    if (
+      transactionResult.result.results.length !== 1 ||
+      operationResult?.type !== "opInner" ||
+      operationResult.tr.type !== "payment"
+    ) {
+      throw new StellarLedgerEvidenceError("operation_mismatch");
+    }
+    if (operationResult.tr.paymentResult.type !== "paymentSuccess") {
+      throw new StellarLedgerEvidenceError("transaction_failed");
+    }
 
     const transactionHash = Buffer.from(transaction.hash()).toString("hex");
-    if (
-      transactionHash !== input.attempt.transactionHash ||
-      sha256(evidence.envelopeXdr) !== input.attempt.envelopeXdrSha256
-    ) {
+    if (transactionHash !== input.attempt.transactionHash) {
       throw new StellarLedgerEvidenceError("envelope_mismatch");
+    }
+    const signedEnvelopeXdrSha256 = sha256(evidence.envelopeXdr);
+    if (
+      input.attempt.signedEnvelopeXdrSha256 !== undefined &&
+      signedEnvelopeXdrSha256 !== input.attempt.signedEnvelopeXdrSha256
+    ) {
+      throw new StellarLedgerEvidenceError("signed_envelope_mismatch");
     }
 
     assertTransactionMatchesAttempt(transaction, input.intent, input.attempt);
@@ -249,6 +278,7 @@ export class AuthoritativeSharedIssuanceConfirmationValidator {
       networkPassphraseHash: TESTNET_PASSPHRASE_SHA256,
       transactionHash,
       envelopeXdrSha256: input.attempt.envelopeXdrSha256,
+      signedEnvelopeXdrSha256: input.attempt.signedEnvelopeXdrSha256,
       resultXdrSha256: sha256(evidence.resultXdr),
       resultSuccess: true,
       ledgerSequence: evidence.ledgerSequence,
@@ -303,6 +333,9 @@ export async function reconcileSharedIssuanceAttempt(input: {
   nowUnix: number;
 }): Promise<SharedIssuanceReconciliationDecision> {
   assertIntentAttemptMatch(input.intent, input.attempt);
+  if (input.reader.authority !== "official_testnet_horizon") {
+    return { action: "await_authoritative_reconciliation" };
+  }
   const [lookup, sequence] = await Promise.all([
     input.reader.lookupTransaction(input.attempt.transactionHash),
     input.reader.readAccountSequence(input.intent.issuerPublicKey),
@@ -315,13 +348,9 @@ export async function reconcileSharedIssuanceAttempt(input: {
   ) {
     throw new StellarLedgerEvidenceError("wrong_transaction");
   }
-  if (
-    !sequence.authoritative ||
-    sequence.observedLedger < lookup.observedLedger
-  ) {
+  if (sequence.observedLedger < lookup.observedLedger) {
     return { action: "await_authoritative_reconciliation" };
   }
-
   const decision = classifySharedIssuerRecovery({
     plan: asRecoveryPlan(input.intent, input.attempt),
     lookup:
@@ -329,7 +358,7 @@ export async function reconcileSharedIssuanceAttempt(input: {
         ? {
             status: "not_found",
             observedLedger: lookup.observedLedger,
-            authoritative: lookup.authoritative,
+            authoritative: true,
           }
         : {
             status: lookup.status,
@@ -339,6 +368,16 @@ export async function reconcileSharedIssuanceAttempt(input: {
     currentIssuerSequence: sequence.sequence,
     nowUnix: input.nowUnix,
   });
+
+  if (
+    decision.action === "rebuild_expired" &&
+    (parseTimestamp(lookup.observedLedgerClosedAt) <=
+      input.attempt.validUntil * 1_000 ||
+      parseTimestamp(sequence.observedLedgerClosedAt) <=
+        input.attempt.validUntil * 1_000)
+  ) {
+    return { action: "await_authoritative_reconciliation" };
+  }
 
   switch (decision.action) {
     case "confirmed":
@@ -411,6 +450,8 @@ function assertIntentAttemptMatch(
     !HASH_PATTERN.test(intent.issuanceIntentFingerprint) ||
     !HASH_PATTERN.test(attempt.transactionHash) ||
     !HASH_PATTERN.test(attempt.envelopeXdrSha256) ||
+    (attempt.signedEnvelopeXdrSha256 !== undefined &&
+      !HASH_PATTERN.test(attempt.signedEnvelopeXdrSha256)) ||
     !isValidStellarPublicKey(intent.ownerPublicKey) ||
     !isValidStellarPublicKey(intent.issuerPublicKey) ||
     !isValidStellarPublicKey(intent.destinationPublicKey) ||
@@ -474,6 +515,12 @@ function assertLedgerObservation(
     throw new StellarLedgerEvidenceError("invalid_ledger_sequence");
   }
   parseTimestamp(evidence.observedAt);
+  const observedLedgerClosedAt = parseTimestamp(
+    evidence.observedLedgerClosedAt,
+  );
+  if (parseTimestamp(evidence.observedAt) < observedLedgerClosedAt) {
+    throw new StellarLedgerEvidenceError("stale_ledger_evidence");
+  }
   if (
     "ledgerSequence" in evidence &&
     (typeof evidence.ledgerSequence !== "number" ||

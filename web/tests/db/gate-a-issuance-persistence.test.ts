@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { after, before, beforeEach, test } from "node:test";
 
-import { Keypair, Networks, xdr } from "@stellar/stellar-sdk";
+import { Keypair, Networks, Transaction, xdr } from "@stellar/stellar-sdk";
 
 import { createDatabaseClient } from "../../lib/server/persistence/database";
 import {
@@ -53,7 +53,8 @@ if (!TEST_DATABASE_URL) {
   const appSql = createDatabaseClient(appUrl);
   const writerSql = createDatabaseClient(writerUrl);
   const OWNER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 121)).publicKey();
-  const ISSUER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 122)).publicKey();
+  const ISSUER_KEYPAIR = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 122));
+  const ISSUER = ISSUER_KEYPAIR.publicKey();
   const DESTINATION = Keypair.fromRawEd25519Seed(
     Buffer.alloc(32, 123),
   ).publicKey();
@@ -86,6 +87,8 @@ if (!TEST_DATABASE_URL) {
       GRANT USAGE ON SCHEMA public TO orrylo_gate_a_app_test;
       GRANT SELECT, INSERT ON project_issuance_full_intents,
         project_issuance_transaction_attempts TO orrylo_gate_a_app_test;
+      GRANT UPDATE (signed_envelope_xdr_sha256)
+        ON project_issuance_transaction_attempts TO orrylo_gate_a_app_test;
       GRANT orrylo_confirmation_writer TO orrylo_gate_a_writer_test;
     `);
     repository = new PostgresSharedIssuancePersistenceRepository(
@@ -205,7 +208,21 @@ if (!TEST_DATABASE_URL) {
       amount: "100.0000000",
       createdAt: new Date(NOW - 2_000).toISOString(),
     };
-    return { intent, attempt, plan };
+    const transaction = new Transaction(
+      plan.unsignedEnvelopeXdr,
+      Networks.TESTNET,
+    );
+    transaction.sign(ISSUER_KEYPAIR);
+    const signedEnvelopeXdr = transaction.toXDR();
+    const signedEnvelopeXdrSha256 = createHash("sha256")
+      .update(signedEnvelopeXdr)
+      .digest("hex");
+    return {
+      intent,
+      attempt,
+      signedEnvelopeXdr,
+      signedEnvelopeXdrSha256,
+    };
   }
 
   test("application and trusted-writer identities are mutually isolated from the migration owner", async () => {
@@ -285,28 +302,75 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
-  test("only validated ledger evidence can be written and confirmation replay is immutable", async () => {
-    const { intent, attempt, plan } = await createFixture();
+  test("signed-envelope digest has one immutable pre-submission transition", async () => {
+    const { intent, attempt, signedEnvelopeXdrSha256 } = await createFixture();
     await repository.appendIntent(intent);
     await repository.appendAttempt(attempt);
+
+    const recorded = await repository.recordSignedEnvelope({
+      attemptId: attempt.attemptId,
+      transactionHash: attempt.transactionHash,
+      signedEnvelopeXdrSha256,
+    });
+    assert.equal(recorded.signedEnvelopeXdrSha256, signedEnvelopeXdrSha256);
+    assert.deepEqual(
+      await repository.recordSignedEnvelope({
+        attemptId: attempt.attemptId,
+        transactionHash: attempt.transactionHash,
+        signedEnvelopeXdrSha256,
+      }),
+      recorded,
+    );
+    await assert.rejects(
+      repository.recordSignedEnvelope({
+        attemptId: attempt.attemptId,
+        transactionHash: attempt.transactionHash,
+        signedEnvelopeXdrSha256: "f".repeat(64),
+      }),
+      SharedIssuancePersistenceConflictError,
+    );
+    await assert.rejects(
+      appSql`UPDATE project_issuance_transaction_attempts
+        SET signed_envelope_xdr_sha256 = ${"e".repeat(64)}
+        WHERE attempt_id = ${attempt.attemptId}`,
+      /append-only/,
+    );
+  });
+
+  test("only validated ledger evidence can be written and confirmation replay is immutable", async () => {
+    const { intent, attempt, signedEnvelopeXdr, signedEnvelopeXdrSha256 } =
+      await createFixture();
+    await repository.appendIntent(intent);
+    await repository.appendAttempt(attempt);
+    const persistedAttempt = await repository.recordSignedEnvelope({
+      attemptId: attempt.attemptId,
+      transactionHash: attempt.transactionHash,
+      signedEnvelopeXdrSha256,
+    });
     const successfulResultXdr = new xdr.TransactionResult({
       feeCharged: xdr.Int64.fromString("100"),
-      result: xdr.TransactionResultResult.txSuccess([]),
+      result: xdr.TransactionResultResult.txSuccess([
+        xdr.OperationResult.opInner(
+          xdr.OperationResultTr.payment(xdr.PaymentResult.paymentSuccess()),
+        ),
+      ]),
       ext: xdr.TransactionResultExt.v0(),
     }).toXDR("base64");
     const reader: StellarTestnetLedgerReader = {
+      authority: "official_testnet_horizon",
       lookupTransaction: async () => ({
         status: "confirmed",
-        authoritative: true,
         network: "testnet",
         networkPassphrase: SHARED_ISSUER_TESTNET_PASSPHRASE,
         transactionHash: attempt.transactionHash,
-        envelopeXdr: plan.unsignedEnvelopeXdr,
+        resultTransactionHash: attempt.transactionHash,
+        envelopeXdr: signedEnvelopeXdr,
         resultXdr: successfulResultXdr,
         ledgerSequence: 500,
         ledgerClosedAt: new Date(NOW - 1_000).toISOString(),
         observedLedger: 501,
         observedAt: new Date(NOW - 500).toISOString(),
+        observedLedgerClosedAt: new Date(NOW - 1_000).toISOString(),
       }),
       readAccountSequence: async () => ({
         network: "testnet",
@@ -315,7 +379,7 @@ if (!TEST_DATABASE_URL) {
         sequence: "124",
         observedLedger: 501,
         observedAt: new Date(NOW).toISOString(),
-        authoritative: true,
+        observedLedgerClosedAt: new Date(NOW - 500).toISOString(),
       }),
     };
     const validated =
@@ -324,7 +388,7 @@ if (!TEST_DATABASE_URL) {
       }).validate({
         confirmationId: randomUUID(),
         intent,
-        attempt,
+        attempt: persistedAttempt,
         verifierIdentity: "gate-a-testnet-ledger-verifier",
         verificationPolicyVersion: "gate-a-v1",
       });
@@ -341,7 +405,7 @@ if (!TEST_DATABASE_URL) {
     ).validate({
       confirmationId: randomUUID(),
       intent,
-      attempt,
+      attempt: persistedAttempt,
       verifierIdentity: "gate-a-testnet-ledger-verifier",
       verificationPolicyVersion: "gate-a-v1",
     });

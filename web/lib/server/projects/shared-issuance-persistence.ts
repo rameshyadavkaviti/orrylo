@@ -35,7 +35,10 @@ export interface ImmutableSharedIssuanceTransactionAttempt {
   issuanceIntentFingerprint: string;
   attemptNumber: number;
   transactionHash: string;
+  /** Digest of the unsigned envelope persisted before signing. */
   envelopeXdrSha256: string;
+  /** Digest of the fully decorated envelope, populated once after signing. */
+  signedEnvelopeXdrSha256?: string;
   sourceSequence: string;
   feeStroops: string;
   validFrom: number;
@@ -61,7 +64,9 @@ export interface ImmutableSharedIssuanceLedgerConfirmation {
   network: "testnet";
   networkPassphraseHash: string;
   transactionHash: string;
+  /** Digest of the unsigned envelope persisted before signing. */
   envelopeXdrSha256: string;
+  signedEnvelopeXdrSha256?: string;
   resultXdrSha256: string;
   resultSuccess: true;
   ledgerSequence: number;
@@ -88,6 +93,11 @@ export interface SharedIssuancePersistenceRepository {
   appendAttempt(
     attempt: ImmutableSharedIssuanceTransactionAttempt,
   ): Promise<ImmutableSharedIssuanceTransactionAttempt>;
+  recordSignedEnvelope(input: {
+    attemptId: string;
+    transactionHash: string;
+    signedEnvelopeXdrSha256: string;
+  }): Promise<ImmutableSharedIssuanceTransactionAttempt>;
   getIntent(
     issuanceRequestId: string,
   ): Promise<ImmutableSharedIssuanceIntent | null>;
@@ -149,6 +159,7 @@ interface AttemptRow {
   attempt_number: number;
   transaction_hash: string;
   envelope_xdr_sha256: string;
+  signed_envelope_xdr_sha256: string | null;
   source_sequence: string;
   fee_stroops: string;
   valid_from: string;
@@ -175,6 +186,7 @@ interface ConfirmationRow {
   network_passphrase_hash: string;
   transaction_hash: string;
   envelope_xdr_sha256: string;
+  signed_envelope_xdr_sha256: string | null;
   result_xdr_sha256: string;
   result_success: true;
   ledger_sequence: string;
@@ -233,6 +245,9 @@ export class PostgresSharedIssuancePersistenceRepository implements SharedIssuan
     attempt: ImmutableSharedIssuanceTransactionAttempt,
   ): Promise<ImmutableSharedIssuanceTransactionAttempt> {
     assertAttempt(attempt);
+    if (attempt.signedEnvelopeXdrSha256 !== undefined) {
+      throw new SharedIssuancePersistenceConflictError();
+    }
     const intent = await this.getIntent(attempt.issuanceRequestId);
     if (!intent || !attemptMatchesIntent(attempt, intent)) {
       throw new SharedIssuancePersistenceConflictError();
@@ -261,6 +276,36 @@ export class PostgresSharedIssuancePersistenceRepository implements SharedIssuan
     `;
     const stored = await this.getAttempt(attempt.attemptId);
     if (!stored || !sameRecord(stored, attempt)) {
+      throw new SharedIssuancePersistenceConflictError();
+    }
+    return stored;
+  }
+
+  async recordSignedEnvelope(input: {
+    attemptId: string;
+    transactionHash: string;
+    signedEnvelopeXdrSha256: string;
+  }): Promise<ImmutableSharedIssuanceTransactionAttempt> {
+    if (
+      !UUID_PATTERN.test(input.attemptId) ||
+      !HASH_PATTERN.test(input.transactionHash) ||
+      !HASH_PATTERN.test(input.signedEnvelopeXdrSha256)
+    ) {
+      throw new SharedIssuancePersistenceConflictError();
+    }
+    await this.boundary.sql`
+      UPDATE project_issuance_transaction_attempts
+      SET signed_envelope_xdr_sha256 = ${input.signedEnvelopeXdrSha256}
+      WHERE attempt_id = ${input.attemptId}
+        AND transaction_hash = ${input.transactionHash}
+        AND signed_envelope_xdr_sha256 IS NULL
+    `;
+    const stored = await this.getAttempt(input.attemptId);
+    if (
+      !stored ||
+      stored.transactionHash !== input.transactionHash ||
+      stored.signedEnvelopeXdrSha256 !== input.signedEnvelopeXdrSha256
+    ) {
       throw new SharedIssuancePersistenceConflictError();
     }
     return stored;
@@ -319,7 +364,8 @@ export class PostgresTrustedLedgerConfirmationWriter implements TrustedLedgerCon
         confirmation_id, issuance_request_id, issuance_intent_fingerprint,
         attempt_id, project_id, owner_public_key, network,
         network_passphrase_hash, transaction_hash, envelope_xdr_sha256,
-        result_xdr_sha256, result_success, ledger_sequence, ledger_closed_at,
+        signed_envelope_xdr_sha256, result_xdr_sha256, result_success,
+        ledger_sequence, ledger_closed_at,
         transaction_source_public_key, operation_count, operation_type,
         operation_source_public_key, asset_code, issuer_public_key,
         destination_public_key, amount, source_sequence, verifier_identity,
@@ -329,7 +375,9 @@ export class PostgresTrustedLedgerConfirmationWriter implements TrustedLedgerCon
         ${record.issuanceIntentFingerprint}, ${record.attemptId},
         ${record.projectId}, ${record.ownerPublicKey}, 'testnet',
         ${record.networkPassphraseHash}, ${record.transactionHash},
-        ${record.envelopeXdrSha256}, ${record.resultXdrSha256}, true,
+        ${record.envelopeXdrSha256},
+        ${record.signedEnvelopeXdrSha256 ?? null},
+        ${record.resultXdrSha256}, true,
         ${record.ledgerSequence}, ${new Date(record.ledgerClosedAt)},
         ${record.transactionSourcePublicKey}, 1, 'payment',
         ${record.operationSourcePublicKey}, ${record.assetCode},
@@ -362,6 +410,15 @@ export class UnavailableSharedIssuancePersistenceWriter implements SharedIssuanc
     attempt: ImmutableSharedIssuanceTransactionAttempt,
   ): Promise<never> {
     void attempt;
+    throw new SharedIssuancePersistenceUnavailableError();
+  }
+
+  async recordSignedEnvelope(_input: {
+    attemptId: string;
+    transactionHash: string;
+    signedEnvelopeXdrSha256: string;
+  }): Promise<never> {
+    void _input;
     throw new SharedIssuancePersistenceUnavailableError();
   }
 
@@ -411,7 +468,7 @@ function mapIntent(row: IntentRow): ImmutableSharedIssuanceIntent {
 function mapAttempt(
   row: AttemptRow,
 ): ImmutableSharedIssuanceTransactionAttempt {
-  return {
+  const attempt: ImmutableSharedIssuanceTransactionAttempt = {
     attemptId: row.attempt_id,
     issuanceRequestId: row.issuance_request_id,
     issuanceIntentFingerprint: row.issuance_intent_fingerprint.trim(),
@@ -432,12 +489,16 @@ function mapAttempt(
     amount: row.amount,
     createdAt: row.created_at.toISOString(),
   };
+  if (row.signed_envelope_xdr_sha256 !== null) {
+    attempt.signedEnvelopeXdrSha256 = row.signed_envelope_xdr_sha256.trim();
+  }
+  return attempt;
 }
 
 function mapConfirmation(
   row: ConfirmationRow,
 ): ImmutableSharedIssuanceLedgerConfirmation {
-  return {
+  const confirmation: ImmutableSharedIssuanceLedgerConfirmation = {
     confirmationId: row.confirmation_id,
     issuanceRequestId: row.issuance_request_id,
     issuanceIntentFingerprint: row.issuance_intent_fingerprint.trim(),
@@ -466,6 +527,11 @@ function mapConfirmation(
     verifiedAt: row.verified_at.toISOString(),
     createdAt: row.created_at.toISOString(),
   };
+  if (row.signed_envelope_xdr_sha256 !== null) {
+    confirmation.signedEnvelopeXdrSha256 =
+      row.signed_envelope_xdr_sha256.trim();
+  }
+  return confirmation;
 }
 
 function assertIntent(intent: ImmutableSharedIssuanceIntent): void {
@@ -498,6 +564,8 @@ function assertAttempt(
     !HASH_PATTERN.test(attempt.issuanceIntentFingerprint) ||
     !HASH_PATTERN.test(attempt.transactionHash) ||
     !HASH_PATTERN.test(attempt.envelopeXdrSha256) ||
+    (attempt.signedEnvelopeXdrSha256 !== undefined &&
+      !HASH_PATTERN.test(attempt.signedEnvelopeXdrSha256)) ||
     !Number.isSafeInteger(attempt.attemptNumber) ||
     attempt.attemptNumber <= 0 ||
     !INTEGER_PATTERN.test(attempt.sourceSequence) ||
