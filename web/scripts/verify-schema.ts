@@ -15,6 +15,7 @@ const EXPECTED_TABLES = [
   "token_creation_qualifying_events",
   "project_profiles",
   "project_profile_owners",
+  "project_issuance_intents",
 ] as const;
 
 const EXPECTED_CONSTRAINTS = [
@@ -25,6 +26,11 @@ const EXPECTED_CONSTRAINTS = [
   "reward_records_first_token_evidence_required",
   "reward_records_qualifying_event_fk",
   "token_creation_qualifying_events_processing_check",
+  "project_issuance_confirmed_evidence_check",
+  "project_issuance_unique_asset_code",
+  "project_issuance_unavailable_evidence_check",
+  "project_issuance_issuer_evidence_matches",
+  "project_issuance_submitted_hash_check",
 ] as const;
 
 async function main() {

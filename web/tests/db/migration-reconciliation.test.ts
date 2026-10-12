@@ -16,6 +16,7 @@ const ALL_MIGRATIONS = [
   "003_eligibility_reward_workflow.sql",
   "004_project_profiles.sql",
   "005_project_profile_ownership.sql",
+  "007_testnet_project_issuance.sql",
 ];
 
 if (!TEST_DATABASE_URL) {
@@ -65,7 +66,7 @@ if (!TEST_DATABASE_URL) {
     `;
   }
 
-  test("fresh bootstrap applies 001-005 and repeated runs verify without changes", async () => {
+  test("fresh bootstrap applies 001-006 and repeated runs verify without changes", async () => {
     const first = await migrateDatabase(sql, directory);
     assert.deepEqual(first.applied, ALL_MIGRATIONS);
     assert.deepEqual(first.reconciled, []);
@@ -266,6 +267,6 @@ if (!TEST_DATABASE_URL) {
     const [{ count }] = await sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM schema_migrations
     `;
-    assert.equal(count, "5");
+    assert.equal(count, "6");
   });
 }

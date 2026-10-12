@@ -299,6 +299,44 @@ only:
 
 No live contract ID is committed and no contract mutation is implemented.
 
+## Testnet issuance integration foundation (draft branch only)
+
+The `feat/testnet-shared-issuance-integration` draft prepares an
+authenticated, owner-scoped application intent for **Testnet Shared Issuer**
+projects. An issuance request is durable, project-unique, and idempotent in
+PostgreSQL. The shared asset code is reserved once per approved issuer identity and Testnet issuance intent.
+The initial state is `awaiting_issuer_integration`; neither the request nor
+the project's saved profile is a Stellar-issued asset.
+
+The issuance status is read from `project_issuance_intents` and presented on
+the managed project page. The read-only UI does **not** enable token issuance.
+Confirmed issuer keys, transaction hashes, ledger confirmations, and explorer
+verification remain absent until genuine evidence is produced by a reviewed
+Stellar service. The server-only `SharedIssuerExecutionAdapter` currently
+has an explicit unavailable implementation. POST intent creation requires an
+authenticated wallet, the owned project, a UUID idempotency key and a matching
+asset-code assertion; browser-provided issuer, network and wallet authority
+are rejected. No route signs or submits transactions, and no route transitions
+an intent to pending, submitted, confirmed, failed, or reconciliation-required.
+
+This foundation is **not merged or deployed** until approved. Migration 007
+must be reviewed after PR #19 migration 006 and against the real production database before any rollout.
+The API fails closed with HTTP 503 until the reviewed issuer identity is explicitly
+provided as server-only `ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY`.
+The reserved candidate is never automatically selected. Each pending wallet
+may hold only one reservation; the database enforces uniqueness for each
+`(network, reservation_issuer_public_key, asset_code)`. A reservation identity
+is immutable, and its audit events commit atomically with its durable
+`workflow_intents` record. Requests do not contain destination/amount and
+therefore do **not** claim PR #27's complete issuance-intent fingerprint.
+
+The Stellar Agent must provide the final issuer identity, explicit approved
+destination and amount, ledger preconditions and a reviewed
+submission/confirmation interface before application execution is activated.
+The distinct pure `prepareReservedSharedIssuerPlan` entrypoint accepts PR #27
+types but is not exposed by any public API and cannot sign or submit.
+Project publication and PR #19 metadata hosting remain separate. The issuance UI is in an additive managed-project layout, not PR #19's page or view.
+
 ## Remaining production gates
 
 This phase intentionally does not add general network abuse/rate-limit
