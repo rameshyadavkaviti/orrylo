@@ -292,6 +292,30 @@ The product owner approved **exactly five persistent Orrylo-operated Stellar acc
 4. **Finance/operations checkpoint — owner approval required.** Approve transfer limits, XLM payment destination, RYLO delivery/failure handling, Treasury/Operations/Liquidity movement policy, monitoring and emergency response before enabling purchase, payout or liquidity operations. Keep personal secure records of account-to-role mapping, signing-device locations, recovery custodians and protected ceremony instructions.
 5. **Activation checkpoint — separate authorization required.** A reviewed runbook must remind the owner at the exact point of each manual action, what to verify, and what confidential data to safeguard. Require explicit approval before any Mainnet account mutation, funding, key/threshold/flag change, signing, transfer, pool operation or deployment. Documentation approval does **not** authorize those operations.
 
+### 10.2 Approved Mainnet signing and recovery policy for five infrastructure accounts
+
+The owner approves the **authorization topology** below for Orrylo's five distinct Mainnet infrastructure accounts. This is policy approval only; no signer key, threshold, custody device, account flag, transfer limit, or Mainnet account state is deployed or verified by this document.
+
+| Account | Approved normal authorization | Recovery and exposure boundary |
+| --- | --- | --- |
+| **RYLO ISSUER (ORRYLO)** | **2-of-3**, preserving the separately approved RYLO policy: independent operational signer A plus independent policy co-signer B for routine protected actions; signer C is recovery-only. | Recovery-only use requires a documented owner-approved ceremony; issuer mint/authorization rules remain unchanged. |
+| **SHARED ISSUER (ASSETS)** | **2-of-3** independent signing authorities for issuer operations, with a routine operational signer plus independent approval and a recovery signer. | An application order alone cannot authorize minting; signer verifies exact approved issuance and on-chain transaction independently. |
+| **TREASURY** | **2-of-3** independent signing authorities for transfers, payouts and movements of reserves. | The ordinary public application may not unilaterally withdraw, sweep or redirect customer payments or Treasury funds. |
+| **OPERATIONS** | **One active operational signer** for narrowly scoped daily operations and network-fee funding. | Maintain an independently secured recovery/rotation path and deliberately limited working balance. A low balance is a risk-control objective, **not** an on-chain spending cap; precise technical limits remain to be approved and enforced through custody, funding and monitoring design. |
+| **LIQUIDITY** | **2-of-3** independent signing authorities for deposits, withdrawals, pool-share transfers and liquidity management. | Liquidity withdrawal may be requested when two authorized signers approve; withdrawal remains subject to the actual pool's liquidity/position rules, and the amounts of XLM and RYLO recovered are **not guaranteed** to equal amounts originally deposited. |
+
+For the four 2-of-3 accounts, no single signing key may independently meet the thresholds governing protected operations. Signer C is reserved for recovery, not a shortcut for unattended daily operations. Signer identities for different accounts must have separately reviewed custody and trust boundaries; this decision does **not** permit silently reusing the same key across all accounts or automatically applying RYLO's exact Testnet signer identities to Mainnet.
+
+**Owner manual-action and secure-record gates (mandatory before any actual Mainnet configuration):**
+
+1. Independently approve and record **public** account identities, each signer public key, role, proposed weights/thresholds, account flags and intended master-key treatment. Verify all on the correct network. Do not treat the two reserved vanity addresses as deployed or approved.
+2. Personally establish protected custody and multiple recoverable backups for all required **secret seeds**, hardware-wallet recovery phrases, access-control credentials and recovery-ceremony instructions outside GitHub, chat, source files, web forms, and ordinary application logs. No secret material is to be pasted into this project or reported to an agent.
+3. Before a master-weight reduction or lockout-prone authority change, exercise and independently verify the authorized normal 2-of-3 path and the approved recovery procedure; arrange a separate owner-approved manual ceremony for irreversible changes. For RYLO, retain its already approved specific A+B-before-master-zero sequence.
+4. Before activating OPERATIONS, approve a concrete funding cap, signer isolation, monitoring and replenishment procedure. Before enabling TREASURY or LIQUIDITY transfers, approve authorization workflow, audit record and emergency stop/recovery instructions; LIQUIDITY cannot automatically pull funds from TREASURY.
+5. Every creation, funding, signer/threshold/flag mutation, transfer, liquidity withdrawal/deposit or activation requires a separate explicit owner authorization at execution time. This document **does not** authorize Mainnet transactions or secret generation.
+
+**Still open (do not invent):** exact Mainnet keys and accounts; specific threshold numerical configuration for each operation class; flags/master-key changes; independent signer/custody providers and recovery operators; precise OPERATIONS balance/transfer limits and enforceable controls; Treasury payout and liquidity authorization implementation; emergency/recovery ceremonies and deployment order. The already-approved RYLO-specific policy overrides any general example here. The XLM receipt destination for direct RYLO sales is a separate product decision and is not changed by this signing policy.
+
 ## 11. No investment section for v1
 
 The first version must not introduce an official investment program such as:
