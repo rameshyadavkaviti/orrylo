@@ -138,31 +138,20 @@ test(
         .click();
 
       const resultResponse = await resultPromise;
-      const result = (await resultResponse.json()) as {
-        ok: boolean;
-        created: boolean;
-        projectId: string;
-        slug: string;
-        managePath: string;
-        publicStatus: string;
-      };
-
       assert.equal(
         resultResponse.status(),
         201,
-        `POST /api/projects returned ${resultResponse.status()}: ${JSON.stringify(result)}`,
+        `POST /api/projects returned ${resultResponse.status()}`,
       );
-      assert.equal(result.ok, true);
-      assert.equal(result.created, true);
-      assert.equal(result.publicStatus, "draft");
-      assert.ok(result.projectId);
-      assert.ok(result.slug);
-      assert.ok(result.managePath);
 
+      // Next.js navigates immediately on success, so the old response body
+      // may no longer be accessible via Chrome DevTools.
       await page.waitForURL(
-        (url) => url.pathname === result.managePath,
+        (url) => /^\\/my-assets\\/[0-9a-f-]{36}$/.test(url.pathname),
         { timeout: 30_000 },
       );
+      const projectId = new URL(page.url()).pathname.split("/").pop();
+      assert.ok(projectId);
       await page.getByText(displayName).first().waitFor({ timeout: 15_000 });
 
       assert.ok(savePayload, "Browser must submit the project-save payload.");
@@ -181,13 +170,16 @@ test(
         ok: boolean;
         created: boolean;
         projectId: string;
+        slug: string;
+        publicStatus: string;
       };
       assert.equal(replayResult.ok, true);
       assert.equal(replayResult.created, false);
-      assert.equal(replayResult.projectId, result.projectId);
+      assert.equal(replayResult.projectId, projectId);
+      assert.equal(replayResult.publicStatus, "draft");
 
       console.log(
-        `PRODUCTION_SMOKE_PASS projectId=${result.projectId} slug=${result.slug} post=201 replay=200 ui=managed_page`,
+        `PRODUCTION_SMOKE_PASS projectId=${projectId} slug=${replayResult.slug} post=201 replay=200 ui=managed_page`,
       );
     } finally {
       await browser.close();
