@@ -179,10 +179,16 @@ Stellar asset creation = separate state
 ```
 
 Shared Issuer readiness continues to use the canonical
-`assets.orrylo.com` metadata-home context. The reserved Shared Issuer
-candidate is not assigned to projects and no issuer/home_domain mutation is
-performed. Dedicated Issuer metadata remains future-facing when no real issuer
-or host exists.
+`assets.orrylo.com` metadata-home context. Real publication additionally
+requires server-authoritative, ledger-confirmed issuance provenance matching
+the exact project owner, Testnet network, asset code, and issuer public key.
+The provenance reader also verifies the immutable issuance workflow
+fingerprint/payload and its origin audit evidence. A checksum-valid issuer or
+mutable Project Profile value is never sufficient. If the approved issuer
+configuration, reviewed issuance table, or confirmed ledger evidence is absent,
+publication fails closed. The reserved Shared Issuer candidate is not selected
+or assigned by this metadata slice. Dedicated Issuer metadata remains
+future-facing when no real issuer or host exists.
 
 ## Workflow and idempotency foundation
 
@@ -276,10 +282,13 @@ secondary utility/diagnostic routes rather than primary customer navigation.
 Wallet authentication and its database state are real application behavior.
 Managed Project Profile creation, wallet ownership association, owner-scoped
 management reads/metadata edits, application-side metadata readiness/TOML
-preview generation, and Orrylo landing-page publication are real application
-behavior. Public project lookup reads the same persisted Project Profile only
-after its `public_status` is `published`. TOML hosting/reachability and
-explorer verification are not implemented.
+preview generation, Orrylo landing-page publication, and the durable Shared
+Issuer TOML publication/verification foundation are real application behavior.
+Public project lookup reads the same persisted Project Profile only after its
+`public_status` is `published`. Metadata publication remains fail-closed
+until the reviewed issuance boundary supplies ledger-confirmed provenance for
+the exact asset identity. Canonical domain routing/reachability and explorer
+verification remain deployment/integration gates.
 
 Trusted first-token eligibility/reward preparation is real server-only database
 behavior, but it has no event producer or public mutation route. Stellar asset
