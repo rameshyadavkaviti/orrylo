@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { validateInitialSupply } from "../lib/validation/initial-supply";
 
@@ -31,6 +31,17 @@ export function ConfirmInitialSupplyIntent({
   const keyRef = useRef<string | null>(null);
   const busyRef = useRef(false);
   const revision = useRef(0);
+
+  useEffect(() => {
+    try {
+      const value = window.sessionStorage.getItem(`orrylo:reviewed-supply:${projectId}`);
+      if (value && validateInitialSupply(value).valid) {
+        setAmount(value);
+      }
+    } catch {
+      // Private/locked-down browsers can still re-enter the amount manually.
+    }
+  }, [projectId]);
 
   const validated = validateInitialSupply(amount);
   const isCurrent = reviewed !== null && validated.valid &&
@@ -78,6 +89,11 @@ export function ConfirmInitialSupplyIntent({
       const result: unknown = await response.json();
       if (revision.current !== revisionAtRequest) return;
       if (response.ok && isCommittedIntentResponse(result, amountAtReview)) {
+        try {
+          window.sessionStorage.removeItem(`orrylo:reviewed-supply:${projectId}`);
+        } catch {
+          // Browser-only handoff cleanup is best effort.
+        }
         setConfirmed({
           fingerprint: result.issuance.completeIntent.fingerprint,
           amount: result.issuance.completeIntent.initialSupply,
@@ -111,7 +127,7 @@ export function ConfirmInitialSupplyIntent({
   return (
     <form onSubmit={review} className="draft-step" noValidate>
       <h3>Review and confirm initial issuance intent</h3>
-      <p>The amount is re-entered here because browser previews are not saved with Project Profiles. This action reserves an identity and persists an immutable intent only.</p>
+      <p>The reviewed browser-only amount may be prefilled from the previous builder page, or you can re-enter it. Check it again before confirming. It has not been stored in the Project Profile or committed to Stellar.</p>
       <label className="field">
         <span>Selected initial supply (token units)</span>
         <input type="text" inputMode="decimal" value={amount}

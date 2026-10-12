@@ -232,6 +232,18 @@ export function CreateSharedTokenForm() {
         return;
       }
 
+      // Browser-only continuity for the already-reviewed PR #39 supply.
+      // This is never part of the Project Profile payload or issuance proof.
+      if (review && matchesCurrentBuilderReview(review, draft, initialSupply, logoName)) {
+        try {
+          window.sessionStorage.setItem(
+            `orrylo:reviewed-supply:${result.projectId}`,
+            review.initialSupply,
+          );
+        } catch {
+          // Storage may be disabled; the managed-project form permits re-entry.
+        }
+      }
       window.location.assign(result.managePath);
     } catch {
       if (submittedRevision === revisionRef.current) {
