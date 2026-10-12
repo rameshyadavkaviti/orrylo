@@ -287,7 +287,7 @@ export function buildSharedIssuerIssuancePlan(
     validUntil: request.validUntil,
     feeStroops: feeStroops.toString(),
     unsignedEnvelopeXdr: transaction.toXDR(),
-    transactionHash: transaction.hash().toString("hex"),
+    transactionHash: Buffer.from(transaction.hash()).toString("hex"),
   };
 }
 
@@ -334,7 +334,7 @@ export function assertSignedEnvelopeMatchesPlan(
       signedEnvelopeXdr,
       SHARED_ISSUER_TESTNET_PASSPHRASE,
     );
-    transactionHash = transaction.hash().toString("hex");
+    transactionHash = Buffer.from(transaction.hash()).toString("hex");
   } catch {
     throw new SharedIssuerIssuanceError(
       "signed_envelope_invalid",
@@ -396,7 +396,7 @@ export function classifySharedIssuerRecovery(input: {
     return { action: "rebuild_expired" };
   }
 
-  const currentSequence = parseSequence(input.currentIssuerSequence);
+  const currentSequence = BigInt(parseSequence(input.currentIssuerSequence));
   const plannedSourceSequence = BigInt(input.plan.sourceSequence);
 
   if (currentSequence === plannedSourceSequence) {
