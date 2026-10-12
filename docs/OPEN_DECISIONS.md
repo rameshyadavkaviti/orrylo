@@ -44,13 +44,16 @@ Decided:
 - LIQUIDITY holds Orrylo-managed liquidity allocation/pool positions and conducts only policy-approved liquidity operations.
 - Signer A/B/C are key authorities, not automatically three additional Stellar accounts; confirmation services and DB roles are not Stellar accounts; customer wallets and Dedicated Issuer accounts are outside the five-account count.
 - The Mainnet account-role decision does **not** approve a specific public key, imply any Mainnet deployment or funding, or change existing RYLO Treasury-first, sale, mint or liquidity economics.
+- Mainnet signer topology is approved: 2-of-3 for RYLO ISSUER, SHARED ISSUER, TREASURY and LIQUIDITY; a single isolated operational signer with limited working balance for OPERATIONS, alongside a separate recovery/rotation procedure. Existing RYLO routine A+B and recovery-only C restrictions continue to apply.
+- Protected Treasury transfers and liquidity deposits/withdrawals require independent authorization. Pool withdrawal remains subject to actual pool rules and does not guarantee recovery of originally deposited XLM.
 - The owner must explicitly approve each future account/key/funding/authority/finance activation step and securely retain secrets, hardware/offline backups, custody and recovery information outside GitHub and chat. At each owner-action gate, execution runbooks must clearly identify the exact manual action, public information to verify and secret material to safeguard.
 
 Still open:
 
 - Exact secure settlement coupling between confirmed XLM receipt at TREASURY and RYLO delivery, including payment verification, order-bound idempotency, failed/partial payments, delayed delivery, refunds and recovery.
 - Actual Mainnet public keys, activation/funding amount and order for each role. The two branded issuer addresses remain reserved candidates only.
-- Concrete account thresholds, signers, master-key handling, flags, independent custody, and recovery for roles without separately approved policies.
+- Concrete signer public keys, custody technologies, per-operation threshold weights, master-key treatment, flags, recovery ceremonies and independent operators remain open despite the approved overall signer topology.
+- Operations wallet funding limits, monitoring, replenishment and enforceable constraints (limited funds are not a native Stellar spending cap).
 - Operational XLM limits, transfers/approvals and fee payment/sponsorship rules.
 - Treasury/LIQUIDITY movement permissions and exact custody/pool-position handling.
 - Security-reviewed Mainnet setup, audit and emergency runbooks; no Mainnet actions are authorized by the architecture decision.
