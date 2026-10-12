@@ -17,9 +17,9 @@ export class MigrationSchemaDriftError extends Error {
     readonly missingEffects: string[],
   ) {
     super(
-      `Migration schema drift: ${migrationName}; present: ${presentEffects.join(
-        ", ",
-      ) || "none"}; missing: ${missingEffects.join(", ") || "none"}`,
+      `Migration schema drift: ${migrationName}; present: ${
+        presentEffects.join(", ") || "none"
+      }; missing: ${missingEffects.join(", ") || "none"}`,
     );
     this.name = "MigrationSchemaDriftError";
   }
