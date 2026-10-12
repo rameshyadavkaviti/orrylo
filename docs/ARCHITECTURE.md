@@ -216,7 +216,7 @@ No agent should state that a contract, asset policy, domain route, issuer transi
 
 ## 12. Prototype deployment baseline
 
-For the first working prototype, Orrylo uses a low-cost provider-neutral deployment baseline:
+For the first working prototype, Orrylo uses a low-cost provider-neutral application deployment baseline:
 
 ```
 Cloudflare DNS/CDN
@@ -226,18 +226,15 @@ Railway app/backend
       │
       ▼
 Neon PostgreSQL
-      │
-      ├── durable auth/workflows/audit
-      │
-      ▼
-Stellar Testnet
 ```
+
+The repository's currently recorded Stellar issuer/contract preparation evidence is on **Testnet**. Testnet remains the reproducible engineering/safety environment, but the immediate execution direction is now **Mainnet preparation**. No issuer, asset, SAC, or application flow may be described as Mainnet-deployed until explicit deployment evidence is recorded.
 
 The expected starting infrastructure cost is approximately **$5/month**, driven primarily by Railway. Neon and Cloudflare are expected to remain on their free tiers for the initial prototype.
 
 This is not a permanent production-provider commitment. Application/database boundaries should remain portable.
 
-The Testnet environment should be reproducibly bootstrappable because Testnet state is disposable/resettable.
+The Testnet environment should remain reproducibly bootstrappable because Testnet state is disposable/resettable.
 
 ## 13. Protected issuer operations
 

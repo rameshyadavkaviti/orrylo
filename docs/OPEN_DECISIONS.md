@@ -170,12 +170,13 @@ Still open:
 
 Target domain architecture is decided conceptually.
 
-Approved first-prototype baseline:
+Approved first-prototype application baseline:
 
 - Railway for app/backend hosting;
 - Neon Free for PostgreSQL;
-- Cloudflare Free for DNS/CDN;
-- Stellar Testnet for the first end-to-end prototype.
+- Cloudflare Free for DNS/CDN.
+
+Stellar Testnet remains the currently recorded engineering/deployment-evidence environment and must stay reproducibly bootstrappable. The immediate execution direction is Mainnet preparation, but Mainnet deployment remains unproven until explicit repository/on-chain deployment evidence exists.
 
 These are prototype choices, not permanent production-provider commitments.
 
