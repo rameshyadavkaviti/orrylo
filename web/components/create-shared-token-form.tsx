@@ -234,7 +234,10 @@ export function CreateSharedTokenForm() {
 
       // Browser-only continuity for the already-reviewed PR #39 supply.
       // This is never part of the Project Profile payload or issuance proof.
-      if (review && matchesCurrentBuilderReview(review, draft, initialSupply, logoName)) {
+      if (
+        review &&
+        matchesCurrentBuilderReview(review, draft, initialSupply, logoName)
+      ) {
         try {
           window.sessionStorage.setItem(
             `orrylo:reviewed-supply:${result.projectId}`,

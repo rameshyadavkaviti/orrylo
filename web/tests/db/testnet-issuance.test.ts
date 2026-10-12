@@ -377,18 +377,27 @@ if (!TEST_DATABASE_URL) {
   });
   test("confirmed owner-selected amount creates immutable intent and audit in one transaction", async () => {
     const project = await makeProject();
-    const result = await service.request({ ...input(project.projectId), initialSupply: "0002.5000000" });
+    const result = await service.request({
+      ...input(project.projectId),
+      initialSupply: "0002.5000000",
+    });
     assert.equal(result.created, true);
     assert.equal(result.issuance.completeIntent?.initialSupply, "2.5");
     assert.equal(result.issuance.completeIntent?.amountStroops, "25000000");
     assert.equal(result.issuance.completeIntent?.destinationPublicKey, OWNER);
     assert.equal(result.issuance.status, "awaiting_issuer_integration");
     assert.equal(result.issuance.transactionHash, null);
-    const [stored] = await sql<{
-      owner_public_key: string; destination_public_key: string;
-      issuer_public_key: string; asset_code: string; amount: string;
-      issuance_intent_fingerprint: string; reservation_fingerprint: string;
-    }[]>`
+    const [stored] = await sql<
+      {
+        owner_public_key: string;
+        destination_public_key: string;
+        issuer_public_key: string;
+        asset_code: string;
+        amount: string;
+        issuance_intent_fingerprint: string;
+        reservation_fingerprint: string;
+      }[]
+    >`
       SELECT owner_public_key, destination_public_key, issuer_public_key, asset_code,
         amount::text AS amount, issuance_intent_fingerprint, reservation_fingerprint
       FROM project_issuance_full_intents
@@ -399,11 +408,25 @@ if (!TEST_DATABASE_URL) {
     assert.equal(stored.issuer_public_key.trim(), ISSUER);
     assert.equal(stored.asset_code, "NOVA");
     assert.equal(stored.amount, "2.5000000");
-    assert.equal(stored.reservation_fingerprint.trim(), result.issuance.reservationFingerprint);
-    assert.equal(stored.issuance_intent_fingerprint.trim(), result.issuance.completeIntent?.fingerprint);
+    assert.equal(
+      stored.reservation_fingerprint.trim(),
+      result.issuance.reservationFingerprint,
+    );
+    assert.equal(
+      stored.issuance_intent_fingerprint.trim(),
+      result.issuance.completeIntent?.fingerprint,
+    );
     const events = await new PostgresAuditRepository(sql).list();
-    assert.equal(events.filter(e => e.eventType === "SHARED_ISSUANCE_FULL_INTENT_COMMITTED").length, 1);
-    assert.equal(events.filter(e => e.requestId === result.issuance.requestId).length, 3);
+    assert.equal(
+      events.filter(
+        (e) => e.eventType === "SHARED_ISSUANCE_FULL_INTENT_COMMITTED",
+      ).length,
+      1,
+    );
+    assert.equal(
+      events.filter((e) => e.requestId === result.issuance.requestId).length,
+      3,
+    );
     assert.equal(await new PostgresAuditRepository(sql).verifyChain(), true);
     const [{ attempts }] = await sql<{ attempts: string }[]>`
       SELECT count(*)::text AS attempts FROM project_issuance_transaction_attempts
@@ -414,15 +437,29 @@ if (!TEST_DATABASE_URL) {
   test("canonical decimal values replay to the same immutable fingerprint without additional audit", async () => {
     const project = await makeProject();
     const key = randomUUID();
-    const original = await service.request({ ...input(project.projectId, key), initialSupply: "0002.5000000" });
-    const replay = await service.request({ ...input(project.projectId, key), initialSupply: "2.5" });
+    const original = await service.request({
+      ...input(project.projectId, key),
+      initialSupply: "0002.5000000",
+    });
+    const replay = await service.request({
+      ...input(project.projectId, key),
+      initialSupply: "2.5",
+    });
     assert.equal(replay.created, false);
     assert.equal(replay.issuance.requestId, original.issuance.requestId);
-    assert.equal(replay.issuance.completeIntent?.fingerprint, original.issuance.completeIntent?.fingerprint);
+    assert.equal(
+      replay.issuance.completeIntent?.fingerprint,
+      original.issuance.completeIntent?.fingerprint,
+    );
     assert.equal((await new PostgresAuditRepository(sql).list()).length, 3);
     await assert.rejects(
-      service.request({ ...input(project.projectId, key), initialSupply: "2.5000001" }),
-      (error: unknown) => error instanceof TestnetIssuanceError && error.code === "idempotency_conflict",
+      service.request({
+        ...input(project.projectId, key),
+        initialSupply: "2.5000001",
+      }),
+      (error: unknown) =>
+        error instanceof TestnetIssuanceError &&
+        error.code === "idempotency_conflict",
     );
     const [stored] = await sql<{ amount: string }[]>`
       SELECT amount::text AS amount FROM project_issuance_full_intents WHERE issuance_request_id = ${original.issuance.requestId}
@@ -433,26 +470,45 @@ if (!TEST_DATABASE_URL) {
   test("full intent never permits a second key or a different issuer for the same project", async () => {
     const project = await makeProject();
     const key = randomUUID();
-    await service.request({ ...input(project.projectId, key), initialSupply: "1" });
-    await assert.rejects(
-      service.request({ ...input(project.projectId), initialSupply: "1" }),
-      (e: unknown) => e instanceof TestnetIssuanceError && e.code === "issuance_already_requested",
-    );
-    const alternate = new TestnetIssuanceService(sql, {
-      network: "testnet", approvedIssuerPublicKey: ISSUER2,
+    await service.request({
+      ...input(project.projectId, key),
+      initialSupply: "1",
     });
     await assert.rejects(
-      alternate.request({ ...input(project.projectId, key), initialSupply: "1" }),
-      (e: unknown) => e instanceof TestnetIssuanceError && e.code === "idempotency_conflict",
+      service.request({ ...input(project.projectId), initialSupply: "1" }),
+      (e: unknown) =>
+        e instanceof TestnetIssuanceError &&
+        e.code === "issuance_already_requested",
+    );
+    const alternate = new TestnetIssuanceService(sql, {
+      network: "testnet",
+      approvedIssuerPublicKey: ISSUER2,
+    });
+    await assert.rejects(
+      alternate.request({
+        ...input(project.projectId, key),
+        initialSupply: "1",
+      }),
+      (e: unknown) =>
+        e instanceof TestnetIssuanceError && e.code === "idempotency_conflict",
     );
   });
 
   test("rejects invalid, overprecision, overflow and zero amounts before reservation mutation", async () => {
     const project = await makeProject();
-    for (const initialSupply of ["0", "0.0000000", "-1", "1e2", "2.00000001", "922337203685.4775808"]) {
+    for (const initialSupply of [
+      "0",
+      "0.0000000",
+      "-1",
+      "1e2",
+      "2.00000001",
+      "922337203685.4775808",
+    ]) {
       await assert.rejects(
         service.request({ ...input(project.projectId), initialSupply }),
-        (e: unknown) => e instanceof TestnetIssuanceError && e.code === "invalid_initial_supply",
+        (e: unknown) =>
+          e instanceof TestnetIssuanceError &&
+          e.code === "invalid_initial_supply",
       );
     }
     const [{ count }] = await sql<{ count: string }[]>`
@@ -464,15 +520,24 @@ if (!TEST_DATABASE_URL) {
   test("owner swapping, unsupported network and project ownership cannot create immutable intent", async () => {
     const project = await makeProject();
     await assert.rejects(
-      service.request({ ...input(project.projectId, randomUUID(), "NOVA", OTHER), initialSupply: "5" }),
-      (e: unknown) => e instanceof TestnetIssuanceError && e.code === "project_not_found",
+      service.request({
+        ...input(project.projectId, randomUUID(), "NOVA", OTHER),
+        initialSupply: "5",
+      }),
+      (e: unknown) =>
+        e instanceof TestnetIssuanceError && e.code === "project_not_found",
     );
     const publicService = new TestnetIssuanceService(sql, {
-      network: "public", approvedIssuerPublicKey: ISSUER,
+      network: "public",
+      approvedIssuerPublicKey: ISSUER,
     });
     await assert.rejects(
-      publicService.request({ ...input(project.projectId), initialSupply: "5" }),
-      (e: unknown) => e instanceof TestnetIssuanceError && e.code === "unsupported_network",
+      publicService.request({
+        ...input(project.projectId),
+        initialSupply: "5",
+      }),
+      (e: unknown) =>
+        e instanceof TestnetIssuanceError && e.code === "unsupported_network",
     );
     const [{ count }] = await sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM project_issuance_full_intents
@@ -483,17 +548,29 @@ if (!TEST_DATABASE_URL) {
   test("concurrent matching confirmations are idempotent, while conflicting amount cannot mutate", async () => {
     const project = await makeProject();
     const key = randomUUID();
-    const request = { ...input(project.projectId, key), initialSupply: "13.1000000" };
-    const results = await Promise.all([service.request(request), service.request({...request, initialSupply:"13.1"})]);
-    assert.equal(results.filter(r => r.created).length, 1);
-    assert.equal(results[0].issuance.completeIntent?.fingerprint, results[1].issuance.completeIntent?.fingerprint);
+    const request = {
+      ...input(project.projectId, key),
+      initialSupply: "13.1000000",
+    };
+    const results = await Promise.all([
+      service.request(request),
+      service.request({ ...request, initialSupply: "13.1" }),
+    ]);
+    assert.equal(results.filter((r) => r.created).length, 1);
+    assert.equal(
+      results[0].issuance.completeIntent?.fingerprint,
+      results[1].issuance.completeIntent?.fingerprint,
+    );
     const [row] = await sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM project_issuance_full_intents WHERE project_id = ${project.projectId}
     `;
     assert.equal(row.count, "1");
-    await assert.rejects(sql`
+    await assert.rejects(
+      sql`
       UPDATE project_issuance_full_intents SET amount = '15.0000000' WHERE project_id = ${project.projectId}
-    `, /append-only/);
+    `,
+      /append-only/,
+    );
   });
 
   test("full intent rolls back with reservation if audit head disappears", async () => {
@@ -517,13 +594,16 @@ if (!TEST_DATABASE_URL) {
     const key = randomUUID();
     const reserved = await service.request(input(project.projectId, key));
     assert.equal(reserved.issuance.completeIntent, undefined);
-    const committed = await service.request({ ...input(project.projectId, key), initialSupply: "3" });
+    const committed = await service.request({
+      ...input(project.projectId, key),
+      initialSupply: "3",
+    });
     assert.equal(committed.created, false);
     assert.equal(committed.issuance.completeIntent?.initialSupply, "3");
     await assert.rejects(
       service.request({ ...input(project.projectId, key), initialSupply: "4" }),
-      (e: unknown) => e instanceof TestnetIssuanceError && e.code === "idempotency_conflict",
+      (e: unknown) =>
+        e instanceof TestnetIssuanceError && e.code === "idempotency_conflict",
     );
   });
-
 }

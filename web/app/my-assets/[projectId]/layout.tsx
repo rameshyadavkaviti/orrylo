@@ -41,7 +41,9 @@ export default async function ManagedAssetIssuanceLayout({
         <TestnetIssuanceSection
           project={project}
           issuance={issuance}
-          intentConfigurationAvailable={Boolean(process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY)}
+          intentConfigurationAvailable={Boolean(
+            process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY,
+          )}
         />
       </div>
     </>

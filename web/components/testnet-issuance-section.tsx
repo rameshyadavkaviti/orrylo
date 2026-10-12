@@ -60,7 +60,11 @@ export function TestnetIssuanceSection({
           Dedicated and public-network execution are not enabled.
         </p>
       ) : issuance ? (
-        <p role="status">{issuance.completeIntent ? "A complete immutable intent is saved. Execution is unavailable; no Stellar transaction has been submitted." : descriptions[issuance.status]}</p>
+        <p role="status">
+          {issuance.completeIntent
+            ? "A complete immutable intent is saved. Execution is unavailable; no Stellar transaction has been submitted."
+            : descriptions[issuance.status]}
+        </p>
       ) : (
         <p role="status">
           Issuance has not started. The reviewed Stellar signing and ledger
@@ -69,11 +73,30 @@ export function TestnetIssuanceSection({
       )}
       {issuance?.completeIntent ? (
         <dl className="managed-project-facts">
-          <div><dt>Immutable initial supply</dt><dd>{issuance.completeIntent.initialSupply}</dd></div>
-          <div><dt>Amount in stroops</dt><dd>{issuance.completeIntent.amountStroops}</dd></div>
-          <div><dt>Receiving owner wallet</dt><dd><code>{issuance.completeIntent.destinationPublicKey}</code></dd></div>
-          <div><dt>Committed intent fingerprint</dt><dd><code>{issuance.completeIntent.fingerprint}</code></dd></div>
-          <div><dt>Execution state</dt><dd>Ready for integration; not signed, submitted, or confirmed</dd></div>
+          <div>
+            <dt>Immutable initial supply</dt>
+            <dd>{issuance.completeIntent.initialSupply}</dd>
+          </div>
+          <div>
+            <dt>Amount in stroops</dt>
+            <dd>{issuance.completeIntent.amountStroops}</dd>
+          </div>
+          <div>
+            <dt>Receiving owner wallet</dt>
+            <dd>
+              <code>{issuance.completeIntent.destinationPublicKey}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Committed intent fingerprint</dt>
+            <dd>
+              <code>{issuance.completeIntent.fingerprint}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Execution state</dt>
+            <dd>Ready for integration; not signed, submitted, or confirmed</dd>
+          </div>
         </dl>
       ) : supported && !issuance ? (
         <ConfirmInitialSupplyIntent

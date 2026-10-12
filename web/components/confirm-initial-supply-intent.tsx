@@ -34,7 +34,9 @@ export function ConfirmInitialSupplyIntent({
 
   useEffect(() => {
     try {
-      const value = window.sessionStorage.getItem(`orrylo:reviewed-supply:${projectId}`);
+      const value = window.sessionStorage.getItem(
+        `orrylo:reviewed-supply:${projectId}`,
+      );
       if (value && validateInitialSupply(value).valid) {
         setAmount(value);
       }
@@ -44,7 +46,9 @@ export function ConfirmInitialSupplyIntent({
   }, [projectId]);
 
   const validated = validateInitialSupply(amount);
-  const isCurrent = reviewed !== null && validated.valid &&
+  const isCurrent =
+    reviewed !== null &&
+    validated.valid &&
     validated.stroops.toString() === reviewed;
 
   function edit(value: string) {
@@ -67,7 +71,14 @@ export function ConfirmInitialSupplyIntent({
   }
 
   async function confirm() {
-    if (!available || !isCurrent || !validated.valid || busyRef.current || confirmed) return;
+    if (
+      !available ||
+      !isCurrent ||
+      !validated.valid ||
+      busyRef.current ||
+      confirmed
+    )
+      return;
     const amountAtReview = validated.normalized;
     const revisionAtRequest = revision.current;
     const idempotencyKey = keyRef.current ?? crypto.randomUUID();
@@ -90,7 +101,9 @@ export function ConfirmInitialSupplyIntent({
       if (revision.current !== revisionAtRequest) return;
       if (response.ok && isCommittedIntentResponse(result, amountAtReview)) {
         try {
-          window.sessionStorage.removeItem(`orrylo:reviewed-supply:${projectId}`);
+          window.sessionStorage.removeItem(
+            `orrylo:reviewed-supply:${projectId}`,
+          );
         } catch {
           // Browser-only handoff cleanup is best effort.
         }
@@ -101,10 +114,14 @@ export function ConfirmInitialSupplyIntent({
         });
         return;
       }
-      setError("Intent not confirmed. Check your wallet session, amount and project status. Retry preserves this request key.");
+      setError(
+        "Intent not confirmed. Check your wallet session, amount and project status. Retry preserves this request key.",
+      );
     } catch {
       if (revision.current === revisionAtRequest) {
-        setError("Request outcome is unknown. Retry the same reviewed amount; do not start another order.");
+        setError(
+          "Request outcome is unknown. Retry the same reviewed amount; do not start another order.",
+        );
       }
     } finally {
       busyRef.current = false;
@@ -113,53 +130,123 @@ export function ConfirmInitialSupplyIntent({
   }
 
   if (!available) {
-    return <p role="status">Intent confirmation is unavailable until the Testnet Shared Issuer is independently approved and configured. No token has been issued.</p>;
+    return (
+      <p role="status">
+        Intent confirmation is unavailable until the Testnet Shared Issuer is
+        independently approved and configured. No token has been issued.
+      </p>
+    );
   }
   if (confirmed) {
     return (
       <div role="status">
-        <p>Immutable application intent committed for {confirmed.amount} tokens. No transaction has been submitted or confirmed.</p>
-        <p>Request ID: <code>{confirmed.requestId}</code></p>
-        <p>Intent fingerprint: <code>{confirmed.fingerprint}</code></p>
+        <p>
+          Immutable application intent committed for {confirmed.amount} tokens.
+          No transaction has been submitted or confirmed.
+        </p>
+        <p>
+          Request ID: <code>{confirmed.requestId}</code>
+        </p>
+        <p>
+          Intent fingerprint: <code>{confirmed.fingerprint}</code>
+        </p>
       </div>
     );
   }
   return (
     <form onSubmit={review} className="draft-step" noValidate>
       <h3>Review and confirm initial issuance intent</h3>
-      <p>The reviewed browser-only amount may be prefilled from the previous builder page, or you can re-enter it. Check it again before confirming. It has not been stored in the Project Profile or committed to Stellar.</p>
+      <p>
+        The reviewed browser-only amount may be prefilled from the previous
+        builder page, or you can re-enter it. Check it again before confirming.
+        It has not been stored in the Project Profile or committed to Stellar.
+      </p>
       <label className="field">
         <span>Selected initial supply (token units)</span>
-        <input type="text" inputMode="decimal" value={amount}
+        <input
+          type="text"
+          inputMode="decimal"
+          value={amount}
           onChange={(e) => edit(e.target.value)}
-          disabled={busy} aria-invalid={Boolean(error)} aria-describedby="intent-amount-help"/>
-        <small id="intent-amount-help">Positive amount, up to seven decimal places. No default, cap or mint operation.</small>
+          disabled={busy}
+          aria-invalid={Boolean(error)}
+          aria-describedby="intent-amount-help"
+        />
+        <small id="intent-amount-help">
+          Positive amount, up to seven decimal places. No default, cap or mint
+          operation.
+        </small>
       </label>
       {!isCurrent ? (
-        <button type="submit" className="button button-secondary" disabled={busy}>Review exact intent</button>
+        <button
+          type="submit"
+          className="button button-secondary"
+          disabled={busy}
+        >
+          Review exact intent
+        </button>
       ) : (
         <div>
           <dl className="preview-facts" aria-label="Immutable intent review">
-            <div><dt>Network</dt><dd>Stellar Testnet only</dd></div>
-            <div><dt>Asset code</dt><dd>{assetCode}</dd></div>
-            <div><dt>Destination (authenticated owner)</dt><dd><code>{ownerPublicKey}</code></dd></div>
-            <div><dt>Initial supply</dt><dd>{validated.valid ? validated.normalized : ""}</dd></div>
-            <div><dt>Maximum supply</dt><dd>Not guaranteed</dd></div>
-            <div><dt>Shared Issuer</dt><dd>Orrylo controlled, server-approved identity only; no customer-exclusive authority</dd></div>
-            <div><dt>Execution</dt><dd>Unavailable — intent only</dd></div>
+            <div>
+              <dt>Network</dt>
+              <dd>Stellar Testnet only</dd>
+            </div>
+            <div>
+              <dt>Asset code</dt>
+              <dd>{assetCode}</dd>
+            </div>
+            <div>
+              <dt>Destination (authenticated owner)</dt>
+              <dd>
+                <code>{ownerPublicKey}</code>
+              </dd>
+            </div>
+            <div>
+              <dt>Initial supply</dt>
+              <dd>{validated.valid ? validated.normalized : ""}</dd>
+            </div>
+            <div>
+              <dt>Maximum supply</dt>
+              <dd>Not guaranteed</dd>
+            </div>
+            <div>
+              <dt>Shared Issuer</dt>
+              <dd>
+                Orrylo controlled, server-approved identity only; no
+                customer-exclusive authority
+              </dd>
+            </div>
+            <div>
+              <dt>Execution</dt>
+              <dd>Unavailable — intent only</dd>
+            </div>
           </dl>
-          <button className="button button-secondary" type="button"
-            disabled={busy || !isCurrent} onClick={() => void confirm()}>
-            {busy ? "Saving immutable intent…" : "Confirm immutable issuance intent"}
+          <button
+            className="button button-secondary"
+            type="button"
+            disabled={busy || !isCurrent}
+            onClick={() => void confirm()}
+          >
+            {busy
+              ? "Saving immutable intent…"
+              : "Confirm immutable issuance intent"}
           </button>
         </div>
       )}
-      {error ? <p className="field-error" role="alert">{error}</p> : null}
+      {error ? (
+        <p className="field-error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </form>
   );
 }
 
-function isCommittedIntentResponse(value: unknown, amount: string): value is {
+function isCommittedIntentResponse(
+  value: unknown,
+  amount: string,
+): value is {
   issuance: {
     requestId: string;
     completeIntent: { fingerprint: string; initialSupply: string };
@@ -167,16 +254,26 @@ function isCommittedIntentResponse(value: unknown, amount: string): value is {
 } {
   if (!value || typeof value !== "object") return false;
   const root = value as Record<string, unknown>;
-  if (root.ok !== true || !root.issuance || typeof root.issuance !== "object") return false;
+  if (root.ok !== true || !root.issuance || typeof root.issuance !== "object")
+    return false;
   const issuance = root.issuance as Record<string, unknown>;
-  if (!issuance.completeIntent || typeof issuance.completeIntent !== "object") return false;
+  if (!issuance.completeIntent || typeof issuance.completeIntent !== "object")
+    return false;
   const intent = issuance.completeIntent as Record<string, unknown>;
-  return typeof issuance.requestId === "string" &&
+  return (
+    typeof issuance.requestId === "string" &&
     typeof intent.fingerprint === "string" &&
     /^[a-f0-9]{64}$/.test(intent.fingerprint) &&
     typeof intent.initialSupply === "string" &&
     validateInitialSupply(intent.initialSupply).valid &&
     validateInitialSupply(amount).valid &&
-    (validateInitialSupply(intent.initialSupply) as { valid: true; stroops: bigint }).stroops ===
-    (validateInitialSupply(amount) as { valid: true; stroops: bigint }).stroops;
+    (
+      validateInitialSupply(intent.initialSupply) as {
+        valid: true;
+        stroops: bigint;
+      }
+    ).stroops ===
+      (validateInitialSupply(amount) as { valid: true; stroops: bigint })
+        .stroops
+  );
 }

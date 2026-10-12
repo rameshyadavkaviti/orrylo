@@ -127,7 +127,11 @@ export async function handleRequestIssuance(
 
 function parseRequest(
   body: unknown,
-): { idempotencyKey: string; expectedAssetCode: string; initialSupply: string } | null {
+): {
+  idempotencyKey: string;
+  expectedAssetCode: string;
+  initialSupply: string;
+} | null {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const fields = body as Record<string, unknown>;
   if (

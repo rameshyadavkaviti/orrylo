@@ -54,7 +54,11 @@ function request(body: unknown, origin = "https://orrylo.com") {
     },
   );
 }
-const VALID = { idempotencyKey: KEY, expectedAssetCode: "NOVA", initialSupply: "2.5000000" };
+const VALID = {
+  idempotencyKey: KEY,
+  expectedAssetCode: "NOVA",
+  initialSupply: "2.5000000",
+};
 
 test("unauthenticated requests cannot see or create issuance intents", async () => {
   const deps = dependencies();
@@ -206,17 +210,23 @@ test("unavailable reviewed Stellar execution adapter rejects signing, submission
 test("API denies malformed supply, missing amount, and browser-chosen destination", async () => {
   let called = false;
   const deps = dependencies();
-  deps.requestIssuance = async () => { called = true; throw new Error("must not run"); };
+  deps.requestIssuance = async () => {
+    called = true;
+    throw new Error("must not run");
+  };
   for (const payload of [
-    {idempotencyKey:KEY,expectedAssetCode:"NOVA"},
-    {...VALID,initialSupply:100},
-    {...VALID,initialSupply:"1".repeat(41)},
-    {...VALID,destinationPublicKey:OWNER},
-    {...VALID,issuerPublicKey:OWNER},
-    {...VALID,ownerPublicKey:OWNER},
-    {...VALID,network:"public"},
+    { idempotencyKey: KEY, expectedAssetCode: "NOVA" },
+    { ...VALID, initialSupply: 100 },
+    { ...VALID, initialSupply: "1".repeat(41) },
+    { ...VALID, destinationPublicKey: OWNER },
+    { ...VALID, issuerPublicKey: OWNER },
+    { ...VALID, ownerPublicKey: OWNER },
+    { ...VALID, network: "public" },
   ]) {
-    assert.equal((await handleRequestIssuance(request(payload), CONTEXT, deps)).status, 400);
+    assert.equal(
+      (await handleRequestIssuance(request(payload), CONTEXT, deps)).status,
+      400,
+    );
   }
-  assert.equal(called,false);
+  assert.equal(called, false);
 });

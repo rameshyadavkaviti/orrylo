@@ -45,7 +45,12 @@ export interface TestnetIssuanceRecord {
   ledgerSequence: number | null;
   failureCode: string | null;
   /** Present only when a complete immutable full intent actually exists. */
-  completeIntent?: { fingerprint: string; destinationPublicKey: string; initialSupply: string; amountStroops: string };
+  completeIntent?: {
+    fingerprint: string;
+    destinationPublicKey: string;
+    initialSupply: string;
+    amountStroops: string;
+  };
 }
 
 export type TestnetIssuanceErrorCode =
@@ -131,7 +136,9 @@ function fingerprint(
 }
 
 function mapRow(row: IssuanceRow): TestnetIssuanceRecord {
-  const fullAmount = row.full_amount ? validateInitialSupply(row.full_amount) : null;
+  const fullAmount = row.full_amount
+    ? validateInitialSupply(row.full_amount)
+    : null;
   if (row.full_amount && (!fullAmount || !fullAmount.valid)) {
     throw new TestnetIssuanceError("database_invariant");
   }
@@ -147,14 +154,16 @@ function mapRow(row: IssuanceRow): TestnetIssuanceRecord {
     transactionHash: null,
     ledgerSequence: null,
     failureCode: row.failure_code,
-    ...(row.full_fingerprint && row.destination_public_key && fullAmount?.valid ? {
-      completeIntent: {
-        fingerprint: row.full_fingerprint.trim(),
-        destinationPublicKey: row.destination_public_key.trim(),
-        initialSupply: fullAmount.normalized,
-        amountStroops: fullAmount.stroops.toString(),
-      },
-    } : {}),
+    ...(row.full_fingerprint && row.destination_public_key && fullAmount?.valid
+      ? {
+          completeIntent: {
+            fingerprint: row.full_fingerprint.trim(),
+            destinationPublicKey: row.destination_public_key.trim(),
+            initialSupply: fullAmount.normalized,
+            amountStroops: fullAmount.stroops.toString(),
+          },
+        }
+      : {}),
   };
 }
 
@@ -189,23 +198,40 @@ export function prepareReservedSharedIssuerPlan(
   });
 }
 
-
 const TESTNET_PASSPHRASE_HASH = createHash("sha256")
   .update(SHARED_ISSUER_TESTNET_PASSPHRASE, "utf8")
   .digest("hex");
 
 function fullIdentity(
-  projectId: string, owner: string, issuer: string, assetCode: string, stroops: bigint,
+  projectId: string,
+  owner: string,
+  issuer: string,
+  assetCode: string,
+  stroops: bigint,
 ) {
   const amount = `${stroops / 10_000_000n}.${(stroops % 10_000_000n).toString().padStart(7, "0")}`;
   // Identical fingerprint tuple and canonical amount as PR #27's hashIntent.
-  const fingerprint = createHash("sha256").update(JSON.stringify([
-    SHARED_ISSUANCE_POLICY_VERSION, projectId, "testnet", assetCode, issuer, owner, amount,
-  ]), "utf8").digest("hex");
+  const fingerprint = createHash("sha256")
+    .update(
+      JSON.stringify([
+        SHARED_ISSUANCE_POLICY_VERSION,
+        projectId,
+        "testnet",
+        assetCode,
+        issuer,
+        owner,
+        amount,
+      ]),
+      "utf8",
+    )
+    .digest("hex");
   return { amount, fingerprint };
 }
 
-async function loadIssuance(sql: DatabaseClient, requestId: string): Promise<TestnetIssuanceRecord> {
+async function loadIssuance(
+  sql: DatabaseClient,
+  requestId: string,
+): Promise<TestnetIssuanceRecord> {
   const [row] = await sql<IssuanceRow[]>`
     SELECT i.*, f.issuance_intent_fingerprint AS full_fingerprint,
       f.destination_public_key, f.amount::text AS full_amount
@@ -221,12 +247,25 @@ async function loadIssuance(sql: DatabaseClient, requestId: string): Promise<Tes
  * Must only run inside the caller's existing project-row locked transaction.
  * The full intent and audit append are atomic with the initial reservation.
  */
-async function appendFullIntent(sql: DatabaseClient, input: {
-  requestId: string; reservationFingerprint: string; projectId: string;
-  owner: string; issuer: string; assetCode: string; amountStroops: bigint; now: number;
-}) {
+async function appendFullIntent(
+  sql: DatabaseClient,
+  input: {
+    requestId: string;
+    reservationFingerprint: string;
+    projectId: string;
+    owner: string;
+    issuer: string;
+    assetCode: string;
+    amountStroops: bigint;
+    now: number;
+  },
+) {
   const identity = fullIdentity(
-    input.projectId, input.owner, input.issuer, input.assetCode, input.amountStroops,
+    input.projectId,
+    input.owner,
+    input.issuer,
+    input.assetCode,
+    input.amountStroops,
   );
   await sql`
     INSERT INTO project_issuance_full_intents (
@@ -249,9 +288,12 @@ async function appendFullIntent(sql: DatabaseClient, input: {
     policyVersion: SHARED_ISSUANCE_POLICY_VERSION,
     occurredAt: input.now,
     metadata: {
-      projectId: input.projectId, network: "testnet",
-      issuerPublicKey: input.issuer, destinationPublicKey: input.owner,
-      assetCode: input.assetCode, amount: identity.amount,
+      projectId: input.projectId,
+      network: "testnet",
+      issuerPublicKey: input.issuer,
+      destinationPublicKey: input.owner,
+      assetCode: input.assetCode,
+      amount: identity.amount,
       amountStroops: input.amountStroops.toString(),
       reservationFingerprint: input.reservationFingerprint,
       issuanceIntentFingerprint: identity.fingerprint,
@@ -325,9 +367,10 @@ export class TestnetIssuanceService {
       throw new TestnetIssuanceError("issuer_integration_unavailable");
     }
 
-    const amount = input.initialSupply === undefined
-      ? null
-      : validateInitialSupply(input.initialSupply);
+    const amount =
+      input.initialSupply === undefined
+        ? null
+        : validateInitialSupply(input.initialSupply);
     if (amount !== null && !amount.valid) {
       throw new TestnetIssuanceError("invalid_initial_supply");
     }
@@ -410,13 +453,21 @@ export class TestnetIssuanceService {
             throw new TestnetIssuanceError("database_invariant");
           }
           if (amount?.valid) {
-            const intent = fullIdentity(input.projectId, owner, issuer, payload.assetCode, amount.stroops);
+            const intent = fullIdentity(
+              input.projectId,
+              owner,
+              issuer,
+              payload.assetCode,
+              amount.stroops,
+            );
             if (existing.full_fingerprint) {
-              if (existing.full_fingerprint.trim() !== intent.fingerprint ||
-                  existing.destination_public_key?.trim() !== owner ||
-                  !existing.full_amount ||
-                  !validateInitialSupply(existing.full_amount).valid ||
-                  existing.full_amount !== intent.amount) {
+              if (
+                existing.full_fingerprint.trim() !== intent.fingerprint ||
+                existing.destination_public_key?.trim() !== owner ||
+                !existing.full_amount ||
+                !validateInitialSupply(existing.full_amount).valid ||
+                existing.full_amount !== intent.amount
+              ) {
                 throw new TestnetIssuanceError("idempotency_conflict");
               }
             } else {
@@ -425,12 +476,22 @@ export class TestnetIssuanceService {
               await appendFullIntent(transaction as unknown as DatabaseClient, {
                 requestId: workflow.request_id,
                 reservationFingerprint: expectedFingerprint,
-                projectId: input.projectId, owner, issuer, assetCode: payload.assetCode,
-                amountStroops: amount.stroops, now,
+                projectId: input.projectId,
+                owner,
+                issuer,
+                assetCode: payload.assetCode,
+                amountStroops: amount.stroops,
+                now,
               });
             }
           }
-          return { created: false, issuance: (await loadIssuance(transaction as unknown as DatabaseClient, workflow.request_id)) };
+          return {
+            created: false,
+            issuance: await loadIssuance(
+              transaction as unknown as DatabaseClient,
+              workflow.request_id,
+            ),
+          };
         }
 
         const [existing] = await transaction<IssuanceRow[]>`
@@ -506,12 +567,23 @@ export class TestnetIssuanceService {
         );
         if (amount?.valid) {
           await appendFullIntent(transaction as unknown as DatabaseClient, {
-            requestId, reservationFingerprint: expectedFingerprint,
-            projectId: input.projectId, owner, issuer, assetCode: payload.assetCode,
-            amountStroops: amount.stroops, now,
+            requestId,
+            reservationFingerprint: expectedFingerprint,
+            projectId: input.projectId,
+            owner,
+            issuer,
+            assetCode: payload.assetCode,
+            amountStroops: amount.stroops,
+            now,
           });
         }
-        return { created: true, issuance: (await loadIssuance(transaction as unknown as DatabaseClient, requestId)) };
+        return {
+          created: true,
+          issuance: await loadIssuance(
+            transaction as unknown as DatabaseClient,
+            requestId,
+          ),
+        };
       });
     } catch (error) {
       if (error instanceof TestnetIssuanceError) throw error;
