@@ -31,6 +31,29 @@ Still open:
 - exact service prices denominated in RYLO;
 - whether additional non-launch reward programs are introduced later.
 
+## Mainnet infrastructure account topology
+
+Decided:
+
+- The initial Orrylo-operated Mainnet infrastructure has **five distinct Stellar account roles**: **RYLO ISSUER (ORRYLO)**, **SHARED ISSUER (ASSETS)**, **TREASURY**, **OPERATIONS**, and **LIQUIDITY**.
+- RYLO ISSUER authorizes/controls RYLO issuance and is separate from the customer Shared Issuer.
+- SHARED ISSUER issues customer Shared Issuer-tier assets only, not RYLO.
+- TREASURY holds RYLO inventory, XLM reserves and realized service revenue, and supplies policy-approved distributions.
+- OPERATIONS is a limited-exposure operational funding/fee account, not the principal reserve or issuer account.
+- LIQUIDITY holds Orrylo-managed liquidity allocation/pool positions and conducts only policy-approved liquidity operations.
+- Signer A/B/C are key authorities, not automatically three additional Stellar accounts; confirmation services and DB roles are not Stellar accounts; customer wallets and Dedicated Issuer accounts are outside the five-account count.
+- The Mainnet account-role decision does **not** approve a specific public key, imply any Mainnet deployment or funding, or change existing RYLO Treasury-first, sale, mint or liquidity economics.
+- The owner must explicitly approve each future account/key/funding/authority/finance activation step and securely retain secrets, hardware/offline backups, custody and recovery information outside GitHub and chat. At each owner-action gate, execution runbooks must clearly identify the exact manual action, public information to verify and secret material to safeguard.
+
+Still open:
+
+- Whether direct-purchase XLM goes straight to TREASURY or first to OPERATIONS followed by controlled settlement, and how payment and RYLO delivery are coupled and recovered safely.
+- Actual Mainnet public keys, activation/funding amount and order for each role. The two branded issuer addresses remain reserved candidates only.
+- Concrete account thresholds, signers, master-key handling, flags, independent custody, and recovery for roles without separately approved policies.
+- Operational XLM limits, transfers/approvals and fee payment/sponsorship rules.
+- Treasury/LIQUIDITY movement permissions and exact custody/pool-position handling.
+- Security-reviewed Mainnet setup, audit and emergency runbooks; no Mainnet actions are authorized by the architecture decision.
+
 ## RYLO eligibility and authorization
 
 Decided:
