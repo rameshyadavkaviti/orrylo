@@ -125,6 +125,26 @@ Still open:
 - detailed lifecycle rules;
 - exact metadata schema.
 
+### Shared Issuer creation/reservation policy — approved boundary and remaining decisions
+
+Decided:
+
+- public Testnet creation is available to any authenticated supported wallet, without a preapproved wallet allowlist;
+- asset-code reservation is an internal part of a confirmed real creation order, not a standalone user-facing feature;
+- issuer-scoped atomic uniqueness and owner-scoped idempotency are mandatory;
+- abandoned/cancelled/failed orders can release reservations only after authoritative proof that no issuance was submitted or could have succeeded;
+- ambiguous or potentially successful submitted transactions must remain reserved until conclusive ledger reconciliation; confirmed issuance must never be released as if the asset identity were unused;
+- release/cancellation and rejected/limited attempts require auditable, server-authorized controls; multi-wallet abuse must be addressed beyond per-wallet quotas;
+- full immutable issuance intent and fingerprint are a separate future execution gate, not invented from reservation data.
+
+Still open (must not be silently selected by implementation):
+
+- exact automatic-expiry duration, if automatic expiry is adopted;
+- concrete server-side rate limits, quotas, and multi-wallet abuse mitigation;
+- reviewed reclamation mechanism, cancellation authority, and ledger-evidence requirements for release;
+- policy for reservation handling on project ownership transfer;
+- final Shared Issuer account identity, flags, and execution/signing/ledger-confirmation policy.
+
 ## Dedicated Issuer templates
 
 The Contract-Controlled Issuer model is selected.

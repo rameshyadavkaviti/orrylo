@@ -94,6 +94,20 @@ Rules:
 
 The Shared Issuer may use a branded vanity address if convenient, but a random Stellar address is technically acceptable.
 
+### 3.1.1 Approved Shared Issuer creation/reservation lifecycle (Testnet)
+
+- Public Testnet token creation is open to any authenticated supported Stellar wallet; no preapproved wallet allowlist is required.
+- Asset-code reservation is an internal, issuer-scoped step of a genuine token-creation order, **not** a standalone user-facing reservation product. The user experiences one continuous Create flow.
+- Create a reservation only when the user explicitly confirms a real token-creation request, not merely when viewing a form, entering an asset code, connecting a wallet, or saving an editable draft.
+- Use durable, atomic issuer-scoped uniqueness and owner-scoped idempotency. Concurrent requests for the same issuer + asset code must not create competing issuance rights.
+- Pending, abandoned, cancelled, or failed orders may release an asset code **only after authoritative evidence proves no issuance transaction was submitted or could have succeeded**. Application failure status alone is not sufficient proof.
+- Once any transaction may have been submitted, including unknown/timeout outcomes, hold the reservation until authoritative ledger reconciliation resolves the outcome. Never automatically release an ambiguous, potentially successful, or confirmed on-chain issuance. Releasing an application reservation must never imply that an issued Stellar asset ceased to exist.
+- Reservation cancellation/release must be an auditable, concurrency-safe, ownership-authorized server operation. Retain historical reservation and audit evidence; prevent stale requests or replays from reviving released authority.
+- Apply server-side abuse controls to creation attempts and outstanding incomplete orders; one-outstanding-order-per-wallet is not sufficient against multi-wallet squatting. Log rejected/limited attempts for security monitoring without allowing them to mutate issuance authority.
+- A release must not enable another order until all submission/ledger uncertainty has been conclusively excluded. Full immutable issuance intent (including destination and amount) must be durably committed and verified before any future signing/submission is enabled; a reservation fingerprint is not a transaction fingerprint.
+- **No automatic expiry duration, specific rate-limit quota, mandatory payment/deposit, identity verification, or anti-Sybil requirement is approved by this decision.** These parameters and a safe operational reclamation mechanism require separate review. Do not invent them in PR #28.
+- This is approved product policy, not evidence that the current application implements safe release, signing, submission, or ledger confirmation. PR #28 remains blocked pending Security review and PR #19 combined integration verification.
+
 ### 3.2 Dedicated Issuer
 
 The premium tier provides dedicated asset infrastructure per customer/project.
