@@ -1,0 +1,37 @@
+name: Temporary PR32 DB hardening formatter
+on:
+  push:
+    branches:
+      - feat/testnet-activation-gate-a
+permissions:
+  contents: write
+jobs:
+  format:
+    if: ${{ !contains(github.event.head_commit.message, '[autoformat]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/testnet-activation-gate-a
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Format narrow DB hardening files
+        working-directory: web
+        run: |
+          npm ci --no-audit --no-fund
+          npx prettier --write scripts/verify-schema.ts tests/db/migration-reconciliation.test.ts
+          npm run format:check
+      - name: Commit formatter output only
+        run: |
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/scripts/verify-schema.ts web/tests/db/migration-reconciliation.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m 'style: format migration 010 verification [autoformat]'
+            git push origin HEAD:refs/heads/feat/testnet-activation-gate-a
+          fi
