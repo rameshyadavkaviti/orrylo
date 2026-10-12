@@ -290,6 +290,42 @@ Albedo wallet
 
 Testnet bootstrap/deployment should be reproducible because Testnet state may be reset.
 
+### Immediate Testnet proof objective
+
+The current execution priority before the broader final Testnet acceptance flow is to obtain real Testnet evidence for three foundational capabilities:
+
+1. Orrylo can create a real customer token on Stellar Testnet through the intended application/Shared Issuer path.
+2. Orrylo can publish the corresponding managed `stellar.toml` metadata and verify that it is reachable and correctly linked to the created asset.
+3. RYLO itself can be created/configured on Testnet according to the approved RYLO issuer policy and then proceed through its required metadata, authorization, reward, SAC, liquidity, and final acceptance gates.
+
+This is an execution priority, not evidence that any of these three capabilities already works. The repository and on-chain state must continue to distinguish preparation from verified Testnet execution.
+
+### Final Testnet acceptance flow
+
+Before Orrylo is considered ready to proceed from Testnet acceptance into Mainnet readiness, the final end-to-end acceptance run must preserve this approved operation order:
+
+```text
+new wallet
+→ Albedo login
+→ project creation
+→ token creation
+→ TOML / explorer verification
+→ eligibility
+→ RYLO trustline
+→ issuer authorization
+→ 150 RYLO reward
+→ visible RYLO balance
+→ RYLO/XLM liquidity pool
+→ successful swap
+→ project management
+→ logout
+→ login again
+```
+
+After the clean-path run passes, repeat the flow with controlled failure/retry conditions at security- and financial-sensitive points. Acceptance requires reproducible recovery without duplicate issuance, duplicate eligibility/reward, double mint, inconsistent database/on-chain state, or undocumented manual repair.
+
+The order above is an approved release gate. Do not remove or reorder a step without an explicit product decision and corresponding canonical documentation update.
+
 ### RYLO Stellar Asset Contract visibility
 
 For RYLO, deployment acceptance includes the Stellar Asset Contract (SAC) representation of the Classic Stellar asset.
@@ -598,8 +634,23 @@ issuer ceremony, SAC deployment, or mainnet deployment should be inferred
 merely from the presence of the contract/application workspace or the partial
 Testnet account setup.
 
-## 18. Canonical companion documents
+## 18. Continuity checkpoint protocol
 
+The keyword **`CHECKPOINT`** means: reconcile current GitHub `main`, canonical documents, and verified developments from the active Orrylo conversation; persist material facts, approved decisions, blockers, and next gates so a replacement agent can continue without relying on chat memory.
+
+Checkpoint rules:
+
+- this file remains the highest-level product source of truth; a checkpoint must never create a competing SOT;
+- verified implementation/deployment facts may be recorded as operational evidence;
+- explicitly approved product decisions may be promoted into the appropriate canonical document;
+- unresolved items remain unresolved and must not be silently decided;
+- recommendations or agent ideas are not policy unless explicitly approved;
+- repository state must be reconciled before checkpoint documentation is written;
+- [`CONTINUITY.md`](CONTINUITY.md) records the latest operational handoff snapshot and does not override canonical product/policy documents.
+
+## 19. Canonical companion documents
+
+- [CONTINUITY.md](CONTINUITY.md) — latest operational checkpoint / replacement-agent handoff
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system architecture and boundaries
 - [RYLO_POLICY.md](RYLO_POLICY.md) — RYLO-specific rules
 - [OPEN_DECISIONS.md](OPEN_DECISIONS.md) — decisions intentionally left unresolved
