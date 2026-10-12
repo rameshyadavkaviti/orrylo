@@ -13,6 +13,7 @@ import {
   withWalletContinuityAssertion,
 } from "../lib/projects/pending-managed-project";
 import { SHARED_ASSET_DOMAIN } from "../lib/product/constants";
+import { validateInitialSupply } from "../lib/validation/initial-supply";
 import {
   type SharedAssetDraft,
   type SharedAssetDraftErrors,
@@ -40,6 +41,8 @@ type SaveState =
 export function CreateSharedTokenForm() {
   const [draft, setDraft] = useState<SharedAssetDraft>(INITIAL_DRAFT);
   const [errors, setErrors] = useState<SharedAssetDraftErrors>({});
+  const [initialSupply, setInitialSupply] = useState("");
+  const [initialSupplyError, setInitialSupplyError] = useState<string | null>(null);
   const [configurationReady, setConfigurationReady] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoName, setLogoName] = useState<string | null>(null);
@@ -55,6 +58,13 @@ export function CreateSharedTokenForm() {
     setSaveState({ status: "idle" });
     idempotencyKeyRef.current = null;
     pendingSaveRef.current = null;
+  }
+
+  function updateInitialSupply(value: string) {
+    setInitialSupply(value);
+    setInitialSupplyError(null);
+    setConfigurationReady(false);
+    setSaveState({ status: "idle" });
   }
 
   function handleLogoChange(event: ChangeEvent<HTMLInputElement>) {
@@ -102,9 +112,11 @@ export function CreateSharedTokenForm() {
     const result = validateSharedAssetDraft(draft);
     setDraft(result.normalized);
     setErrors(result.errors);
-    setConfigurationReady(result.valid);
+    const amount = validateInitialSupply(initialSupply);
+    setInitialSupplyError(amount.valid ? null : amount.error);
+    setConfigurationReady(result.valid && amount.valid);
 
-    return result.valid ? result.normalized : null;
+    return result.valid && amount.valid ? result.normalized : null;
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -113,6 +125,16 @@ export function CreateSharedTokenForm() {
   }
 
   async function handleSaveProject() {
+    const amount = validateInitialSupply(initialSupply);
+    if (!amount.valid) {
+      setInitialSupplyError(amount.error);
+      setSaveState({
+        status: "failure",
+        message: "Review the initial supply before continuing.",
+      });
+      return;
+    }
+
     if (!idempotencyKeyRef.current) {
       idempotencyKeyRef.current = crypto.randomUUID();
     }
@@ -208,6 +230,7 @@ export function CreateSharedTokenForm() {
     await persistProject(withWalletContinuityAssertion(pendingSave, publicKey));
   }
 
+  const amountPreview = validateInitialSupply(initialSupply);
   const previewCode = draft.code.trim().toUpperCase() || "TOKEN";
   const previewName = draft.displayName.trim() || "Your token";
   const previewDescription =
@@ -317,9 +340,42 @@ export function CreateSharedTokenForm() {
             </label>
           </section>
 
-          <section className="draft-step" aria-labelledby="brand-step">
+          <section className="draft-step" aria-labelledby="supply-step">
             <div className="step-heading">
               <span className="step-number">2</span>
+              <div>
+                <h3 id="supply-step">Initial token supply</h3>
+                <p>Choose the amount intended for the first issuance. This is not a fixed lifetime cap.</p>
+              </div>
+            </div>
+            <label className="field">
+              <span>Initial supply (token units)</span>
+              <input
+                name="initialSupply"
+                type="text"
+                inputMode="decimal"
+                value={initialSupply}
+                onChange={(event) => updateInitialSupply(event.target.value)}
+                placeholder="1000000"
+                autoComplete="off"
+                aria-describedby={initialSupplyError ? "supply-error" : "supply-help"}
+              />
+              {initialSupplyError ? (
+                <small id="supply-error" className="field-error" role="alert">{initialSupplyError}</small>
+              ) : (
+                <small id="supply-help">Positive amount, up to seven decimal places. No tokens are minted here.</small>
+              )}
+            </label>
+            <p className="builder-boundary-note">
+              Preview only: this amount is not yet saved with the Project Profile,
+              included in an immutable issuance order, or issued on Stellar.
+              Real issuance stays unavailable until the backend supports it safely.
+            </p>
+          </section>
+
+          <section className="draft-step" aria-labelledby="brand-step">
+            <div className="step-heading">
+              <span className="step-number">3</span>
               <div>
                 <h3 id="brand-step">Logo &amp; presentation</h3>
                 <p>
@@ -353,7 +409,7 @@ export function CreateSharedTokenForm() {
 
           <section className="draft-step" aria-labelledby="infrastructure-step">
             <div className="step-heading">
-              <span className="step-number">3</span>
+              <span className="step-number">4</span>
               <div>
                 <h3 id="infrastructure-step">Infrastructure</h3>
                 <p>
@@ -394,7 +450,7 @@ export function CreateSharedTokenForm() {
 
           <section className="draft-step" aria-labelledby="metadata-step">
             <div className="step-heading">
-              <span className="step-number">4</span>
+              <span className="step-number">5</span>
               <div>
                 <h3 id="metadata-step">Metadata preview</h3>
                 <p>
@@ -462,6 +518,14 @@ export function CreateSharedTokenForm() {
               <dd>Stellar</dd>
             </div>
             <div>
+              <dt>Initial supply (preview only)</dt>
+              <dd>{amountPreview.valid ? amountPreview.normalized : "Not set"}</dd>
+            </div>
+            <div>
+              <dt>Supply authority</dt>
+              <dd>Orrylo Shared Issuer — no fixed cap guaranteed</dd>
+            </div>
+            <div>
               <dt>Issuer model</dt>
               <dd>Orrylo Shared Issuer</dd>
             </div>
@@ -477,7 +541,8 @@ export function CreateSharedTokenForm() {
             <p>
               Your wallet is used here only to prove who owns the Project
               Profile. Saving does not create a Stellar asset, sign a
-              transaction, or publish TOML metadata.
+              transaction, or publish TOML metadata. Your previewed initial
+              supply is not yet stored with the managed project.
             </p>
             <button
               className="button button-primary"
