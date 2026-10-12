@@ -179,10 +179,17 @@ Stellar asset creation = separate state
 ```
 
 Shared Issuer readiness continues to use the canonical
-`assets.orrylo.com` metadata-home context. The reserved Shared Issuer
-candidate is not assigned to projects and no issuer/home_domain mutation is
-performed. Dedicated Issuer metadata remains future-facing when no real issuer
-or host exists.
+`assets.orrylo.com` metadata-home context. Real publication additionally
+requires independently authenticated, immutable ledger confirmation matching
+the exact project owner, Testnet network/passphrase, asset code, configured
+issuer, destination, amount, full issuance-intent fingerprint, transaction
+hash, successful result, source identities, operation set, sequence, and
+ledger. A checksum-valid issuer, mutable Project Profile value, reservation
+audit, or database status is never sufficient. The production confirmation
+reader is intentionally unavailable in this branch, so publication fails
+closed. The reserved Shared Issuer candidate is not selected or assigned by
+this metadata slice. Dedicated Issuer metadata remains future-facing when no
+real issuer or host exists.
 
 ## Workflow and idempotency foundation
 
@@ -276,10 +283,13 @@ secondary utility/diagnostic routes rather than primary customer navigation.
 Wallet authentication and its database state are real application behavior.
 Managed Project Profile creation, wallet ownership association, owner-scoped
 management reads/metadata edits, application-side metadata readiness/TOML
-preview generation, and Orrylo landing-page publication are real application
-behavior. Public project lookup reads the same persisted Project Profile only
-after its `public_status` is `published`. TOML hosting/reachability and
-explorer verification are not implemented.
+preview generation, Orrylo landing-page publication, and the durable Shared
+Issuer TOML publication/verification foundation are real application behavior.
+Public project lookup reads the same persisted Project Profile only after its
+`public_status` is `published`. Metadata publication remains fail-closed
+until the reviewed issuance boundary supplies ledger-confirmed provenance for
+the exact asset identity. Canonical domain routing/reachability and explorer
+verification remain deployment/integration gates.
 
 Trusted first-token eligibility/reward preparation is real server-only database
 behavior, but it has no event producer or public mutation route. Stellar asset
@@ -298,6 +308,58 @@ only:
 - `state() -> Result<FoundationState, Error>`
 
 No live contract ID is committed and no contract mutation is implemented.
+
+## Testnet issuance and confirmation integration foundation (draft only)
+
+This integration supersedes the isolated implementation work in PR #19 and PR
+#28 without rewriting either branch. It prepares an authenticated, owner-scoped
+application reservation for **Testnet Shared Issuer** projects. A request is
+durable, project-unique, and idempotent in PostgreSQL. The shared asset code is
+reserved once per approved issuer identity.
+The initial state is `awaiting_issuer_integration`; neither the request nor
+the project's saved profile is a Stellar-issued asset.
+
+The issuance status is read from `project_issuance_intents` and presented on
+the managed project page. The read-only UI does **not** enable token issuance.
+The database contract separates the reservation from an immutable full
+issuance intent, append-only transaction attempts, and an immutable ledger
+confirmation. The confirmation binds the request and full-intent fingerprint
+to the exact Testnet passphrase hash, envelope/result hashes, successful result,
+transaction and operation sources, single payment operation, configured issuer,
+asset, destination, amount, source sequence, transaction hash, and ledger. Only
+the distinct non-login PostgreSQL role `orrylo_confirmation_writer` may append
+a confirmation, and the migration grants that role to no application user.
+Status fields and application audit events cannot authorize publication.
+
+Confirmed issuer keys, transaction hashes, ledger confirmations, and explorer
+verification remain unavailable to the application until genuine evidence is
+produced by a reviewed Stellar service. The server-only
+`SharedIssuerExecutionAdapter` and `SharedAssetConfirmationReader` both have
+explicit unavailable implementations. POST reservation creation requires an
+authenticated wallet, the owned project, a UUID idempotency key and a matching
+asset-code assertion; browser-provided issuer, network and wallet authority
+are rejected. No route signs or submits transactions, and no route transitions
+an intent to pending, submitted, confirmed, failed, or reconciliation-required.
+
+This foundation is **not merged or deployed** until independently approved.
+Migration 007 follows PR #19 migration 006 and upgrades legacy 006 publication
+rows by retaining them but marking them unreachable until exact immutable
+confirmation provenance is attached.
+The API fails closed with HTTP 503 until the reviewed issuer identity is explicitly
+provided as server-only `ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY`.
+The reserved candidate is never automatically selected. The database enforces
+uniqueness for each `(network, reservation_issuer_public_key, asset_code)`. A reservation identity
+is immutable, and its audit events commit atomically with its durable
+`workflow_intents` record. Requests do not contain destination/amount and
+therefore do **not** claim PR #27's complete issuance-intent fingerprint.
+
+The Stellar owner must provide the final issuer identity, explicit approved
+destination and amount, ledger preconditions, trusted-writer deployment, and a
+reviewed submission/confirmation reader before application execution is
+activated.
+The distinct pure `prepareReservedSharedIssuerPlan` entrypoint accepts PR #27
+types but is not exposed by any public API and cannot sign or submit.
+Project publication and PR #19 metadata hosting remain separate. The issuance UI is in an additive managed-project layout, not PR #19's page or view.
 
 ## Remaining production gates
 

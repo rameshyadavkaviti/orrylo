@@ -1,4 +1,7 @@
-import { SHARED_ASSET_DOMAIN } from "../product/constants";
+import {
+  SHARED_METADATA_TOML_ENDPOINT,
+  type MetadataPublicationState,
+} from "./metadata-publication";
 import type { ManagedProjectProfile } from "./project-profile";
 import { projectPublicPath } from "./project-profile";
 import { safeHttpsUrl } from "./project-metadata";
@@ -6,12 +9,15 @@ import {
   generateProjectCurrencyToml,
   hasValidStellarIssuer,
 } from "./stellar-toml";
+import { SHARED_ASSET_DOMAIN } from "../product/constants";
 
 export type ReadinessState =
   | "ready"
   | "configured"
   | "missing"
   | "unverified"
+  | "outdated"
+  | "unsupported"
   | "not_published"
   | "not_reachable"
   | "not_applicable";
@@ -24,6 +30,8 @@ export type MetadataReadinessKey =
   | "image_reference"
   | "image_reachability"
   | "metadata_home"
+  | "issuer_model"
+  | "network"
   | "issuer_linkage"
   | "toml_generated"
   | "toml_published"
@@ -49,8 +57,11 @@ export interface MetadataReadinessResult {
   toml: {
     generatable: boolean;
     generated: boolean;
-    published: false;
-    reachable: false;
+    published: boolean;
+    reachable: boolean;
+    verifiedAt: string | null;
+    publishedContentCurrent: boolean;
+    endpoint: string;
     content: string | null;
   };
   publicLanding: {
@@ -68,6 +79,7 @@ export interface MetadataReadinessResult {
 
 export function buildMetadataReadiness(
   project: ManagedProjectProfile,
+  publication: MetadataPublicationState | null = null,
 ): MetadataReadinessResult {
   const assetCodeValid = /^[A-Z0-9]{1,12}$/.test(project.assetCode);
   const displayNameConfigured = project.displayName.trim().length > 0;
@@ -77,17 +89,31 @@ export function buildMetadataReadiness(
   const sharedHostCompatible =
     project.issuerModel !== "shared" ||
     project.metadataHome === SHARED_ASSET_DOMAIN;
+  const sharedIssuerSupported = project.issuerModel === "shared";
+  const testnetSupported = project.network === "testnet";
   const issuerLinked = hasValidStellarIssuer(project.issuerPublicKey);
   const generatedToml = generateProjectCurrencyToml(project);
   const metadataConfigured =
     displayNameConfigured && metadataHomeConfigured && sharedHostCompatible;
-  const publicationReady = metadataConfigured && assetCodeValid && issuerLinked;
+  const publicationReady =
+    metadataConfigured &&
+    assetCodeValid &&
+    issuerLinked &&
+    sharedIssuerSupported &&
+    testnetSupported;
+  const publishedContentCurrent = Boolean(
+    publication &&
+    generatedToml &&
+    publication.currencyToml === generatedToml.content,
+  );
   const blockers: MetadataReadinessKey[] = [];
 
   if (!assetCodeValid) blockers.push("asset_code");
   if (!displayNameConfigured) blockers.push("display_name");
   if (!metadataHomeConfigured || !sharedHostCompatible)
     blockers.push("metadata_home");
+  if (!sharedIssuerSupported) blockers.push("issuer_model");
+  if (!testnetSupported) blockers.push("network");
   if (!issuerLinked) blockers.push("issuer_linkage");
 
   const items: MetadataReadinessItem[] = [
@@ -98,7 +124,7 @@ export function buildMetadataReadiness(
       value: metadataConfigured ? "Configured" : "Needs attention",
       detail: metadataConfigured
         ? "The baseline Project Profile metadata context is configured; optional presentation fields may still be missing."
-        : "Complete the missing required Project Profile fields shown below before publication infrastructure is added.",
+        : "Complete the missing required Project Profile fields shown below before publication.",
     },
     {
       key: "asset_code",
@@ -124,7 +150,7 @@ export function buildMetadataReadiness(
       value: descriptionConfigured ? "Configured" : "Missing",
       detail: descriptionConfigured
         ? "A project description is stored in the Project Profile."
-        : "Add a short project description.",
+        : "Description remains optional for this publication foundation.",
     },
     {
       key: "image_reference",
@@ -133,7 +159,7 @@ export function buildMetadataReadiness(
       value: durableImage ? "HTTPS URL configured" : "Missing",
       detail: durableImage
         ? "A durable HTTPS image reference is configured."
-        : "Builder-local images are not persistent. Add a durable HTTPS image URL when one exists.",
+        : "Builder-local images are not persistent. A durable image remains optional here.",
     },
     {
       key: "image_reachability",
@@ -141,7 +167,7 @@ export function buildMetadataReadiness(
       state: durableImage ? "unverified" : "not_applicable",
       value: durableImage ? "Not yet verified" : "No durable image",
       detail:
-        "This slice does not fetch or externally verify image availability.",
+        "This publication slice does not fetch arbitrary project image URLs.",
     },
     {
       key: "metadata_home",
@@ -157,37 +183,72 @@ export function buildMetadataReadiness(
           : "Dedicated Issuer metadata hosting remains a separate future infrastructure concern.",
     },
     {
+      key: "issuer_model",
+      label: "Issuer model",
+      state: sharedIssuerSupported ? "ready" : "unsupported",
+      value: sharedIssuerSupported
+        ? "Shared Issuer"
+        : "Dedicated publication unavailable",
+      detail: sharedIssuerSupported
+        ? "This Testnet publication path aggregates Shared Issuer metadata."
+        : "Dedicated Issuer metadata is not routed through Shared Issuer hosting.",
+    },
+    {
+      key: "network",
+      label: "Publication network",
+      state: testnetSupported ? "ready" : "unsupported",
+      value: testnetSupported ? "Testnet" : "Not supported",
+      detail: testnetSupported
+        ? "This bounded publication path is Testnet-only."
+        : "Mainnet publication is intentionally unavailable in this slice.",
+    },
+    {
       key: "issuer_linkage",
       label: "Issuer linkage",
       state: issuerLinked ? "configured" : "missing",
       value: issuerLinked ? "Issuer recorded" : "Not linked",
       detail: issuerLinked
         ? "A checksum-valid Stellar issuer public key is stored for this project."
-        : "No verified Stellar issuer public key is linked yet, so publication is not ready.",
+        : "No verified Stellar issuer public key is linked yet, so publication is blocked.",
     },
     {
       key: "toml_generated",
-      label: "stellar.toml preview",
+      label: "stellar.toml generated",
       state: generatedToml ? "ready" : "missing",
-      value: generatedToml ? "Generated locally" : "Not generatable",
+      value: generatedToml ? "Yes" : "No",
       detail: generatedToml
-        ? "A deterministic application-side [[CURRENCIES]] preview can be generated from the Project Profile."
-        : "The current Project Profile cannot generate a metadata preview.",
+        ? "A deterministic [[CURRENCIES]] representation is generated from the current Project Profile."
+        : "The current Project Profile cannot generate a metadata representation.",
     },
     {
       key: "toml_published",
       label: "stellar.toml published",
-      state: "not_published",
-      value: "No",
-      detail: "No TOML publication mechanism is activated by this feature.",
+      state: !publication
+        ? "not_published"
+        : publishedContentCurrent
+          ? "ready"
+          : "outdated",
+      value: !publication
+        ? "No"
+        : publishedContentCurrent
+          ? "Yes"
+          : "Yes · update available",
+      detail: !publication
+        ? "No metadata snapshot has been published."
+        : publishedContentCurrent
+          ? `Revision ${publication.revision} matches the current Project Profile.`
+          : `Revision ${publication.revision} is still published, but the Project Profile has changed since that snapshot.`,
     },
     {
       key: "toml_reachable",
       label: "stellar.toml reachable",
-      state: "not_reachable",
-      value: "No",
-      detail:
-        "Orrylo has not published or externally verified a reachable stellar.toml for this project.",
+      state: publication?.reachable ? "ready" : "not_reachable",
+      value: publication?.reachable ? "Yes" : "No",
+      detail: publication?.reachable
+        ? `Canonical HTTPS content was verified at ${publication.verifiedAt ?? "an unknown time"}.`
+        : publication
+          ? `The snapshot is published in Orrylo, but canonical HTTPS verification has not succeeded${publication.verificationErrorCode ? ` (${publication.verificationErrorCode})` : ""}.`
+          : "Nothing has been published to verify yet.",
     },
     {
       key: "public_landing",
@@ -204,9 +265,9 @@ export function buildMetadataReadiness(
       key: "explorer_visibility",
       label: "Explorer visibility",
       state: "unverified",
-      value: "No verified evidence",
+      value: "Not verified",
       detail:
-        "Generation or landing-page publication does not imply explorer visibility.",
+        "TOML publication and reachability do not prove that an external explorer has indexed the project.",
     },
     {
       key: "sac_visibility",
@@ -214,14 +275,14 @@ export function buildMetadataReadiness(
       state: "not_applicable",
       value: "Not verified",
       detail:
-        "No SAC visibility claim is made because this managed project has no verified on-chain asset state in this slice.",
+        "No SAC visibility claim is made because this slice performs no on-chain asset or contract operation.",
     },
     {
       key: "stellar_asset",
       label: "Stellar asset",
       state: "not_applicable",
       value: "Not created",
-      detail: "Metadata readiness does not issue or mutate a Stellar asset.",
+      detail: "Metadata publication is separate from Stellar asset creation.",
     },
   ];
 
@@ -233,8 +294,11 @@ export function buildMetadataReadiness(
     toml: {
       generatable: Boolean(generatedToml),
       generated: Boolean(generatedToml),
-      published: false,
-      reachable: false,
+      published: Boolean(publication),
+      reachable: publication?.reachable ?? false,
+      verifiedAt: publication?.verifiedAt ?? null,
+      publishedContentCurrent,
+      endpoint: SHARED_METADATA_TOML_ENDPOINT,
       content: generatedToml?.content ?? null,
     },
     publicLanding: {
