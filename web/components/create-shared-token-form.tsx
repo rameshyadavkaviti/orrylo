@@ -42,7 +42,9 @@ export function CreateSharedTokenForm() {
   const [draft, setDraft] = useState<SharedAssetDraft>(INITIAL_DRAFT);
   const [errors, setErrors] = useState<SharedAssetDraftErrors>({});
   const [initialSupply, setInitialSupply] = useState("");
-  const [initialSupplyError, setInitialSupplyError] = useState<string | null>(null);
+  const [initialSupplyError, setInitialSupplyError] = useState<string | null>(
+    null,
+  );
   const [configurationReady, setConfigurationReady] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoName, setLogoName] = useState<string | null>(null);
@@ -346,8 +348,8 @@ export function CreateSharedTokenForm() {
               <div>
                 <h3 id="supply-step">Initial token supply</h3>
                 <p>
-                  Choose the amount intended for the first issuance. This is
-                  not a fixed lifetime cap.
+                  Choose the amount intended for the first issuance. This is not
+                  a fixed lifetime cap.
                 </p>
               </div>
             </div>
@@ -377,10 +379,10 @@ export function CreateSharedTokenForm() {
               )}
             </label>
             <p className="builder-boundary-note">
-              Preview only: this amount is not yet saved with the Project Profile,
-              included in an immutable issuance order, or issued on Stellar.
-              Real issuance stays unavailable until the backend supports it
-              safely.
+              Preview only: this amount is not yet saved with the Project
+              Profile, included in an immutable issuance order, or issued on
+              Stellar. Real issuance stays unavailable until the backend
+              supports it safely.
             </p>
           </section>
 
