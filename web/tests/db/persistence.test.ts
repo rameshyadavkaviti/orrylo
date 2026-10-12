@@ -80,6 +80,7 @@ if (!TEST_DATABASE_URL) {
       "005_project_profile_ownership.sql",
       "006_project_metadata_publications.sql",
       "007_testnet_project_issuance.sql",
+      "008_gate_a_confirmation_provenance.sql",
     ]);
 
     const [{ count }] = await sql<{ count: string }[]>`

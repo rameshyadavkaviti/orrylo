@@ -210,7 +210,7 @@ if (!TEST_DATABASE_URL) {
       const after = await sql<{ name: string; checksum: string }[]>`
         SELECT name, checksum FROM schema_migrations ORDER BY name
       `;
-      assert.deepEqual(after.slice(0, 7), before);
+      assert.deepEqual(after.slice(0, 7), [...before]);
     } finally {
       await rm(temporary, { recursive: true, force: true });
     }
@@ -405,6 +405,6 @@ if (!TEST_DATABASE_URL) {
     const [{ count }] = await sql<{ count: string }[]>`
       SELECT count(*)::text AS count FROM schema_migrations
     `;
-    assert.equal(count, "7");
+    assert.equal(count, String(ALL_MIGRATIONS.length));
   });
 }
