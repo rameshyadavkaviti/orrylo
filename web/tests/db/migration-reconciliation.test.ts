@@ -119,7 +119,10 @@ if (!TEST_DATABASE_URL) {
     assert.equal(sessionCount, "1");
 
     const [projectTables] = await sql<
-      { project_profiles: string | null; project_profile_owners: string | null }[]
+      {
+        project_profiles: string | null;
+        project_profile_owners: string | null;
+      }[]
     >`
       SELECT
         to_regclass('public.project_profiles')::text AS project_profiles,
