@@ -108,6 +108,10 @@ function describeFailure(result: PublishMetadataResponse | null): string {
       return "This publication flow is Testnet-only.";
     case "not_ready":
       return "The project is missing required metadata or a verified issuer link.";
+    case "issuer_provenance_unavailable":
+      return "Trusted Testnet issuance provenance is not available. Metadata publication cannot proceed.";
+    case "issuer_provenance_mismatch":
+      return "The project's asset identity conflicts with the trusted issuance record.";
     case "asset_identity_conflict":
       return "Another published project already uses this asset code and issuer identity.";
     case "publication_superseded":
