@@ -15,6 +15,7 @@ Decided:
 - direct sale price: 1 RYLO = 0.1 XLM;
 - service-spent RYLO returns to Treasury and is not burned;
 - Treasury-first direct-sale distribution;
+- XLM payments for direct Orrylo sales of RYLO are received by the separately approved Mainnet TREASURY account, not OPERATIONS; delivery remains gated on verified, order-bound payment evidence;
 - 150 RYLO first-successful-token launch reward;
 - 50 RYLO-equivalent non-tradable Free Build Credit;
 - 60-day reward window from a fixed official launch timestamp;
@@ -47,7 +48,7 @@ Decided:
 
 Still open:
 
-- Whether direct-purchase XLM goes straight to TREASURY or first to OPERATIONS followed by controlled settlement, and how payment and RYLO delivery are coupled and recovered safely.
+- Exact secure settlement coupling between confirmed XLM receipt at TREASURY and RYLO delivery, including payment verification, order-bound idempotency, failed/partial payments, delayed delivery, refunds and recovery.
 - Actual Mainnet public keys, activation/funding amount and order for each role. The two branded issuer addresses remain reserved candidates only.
 - Concrete account thresholds, signers, master-key handling, flags, independent custody, and recovery for roles without separately approved policies.
 - Operational XLM limits, transfers/approvals and fee payment/sponsorship rules.
