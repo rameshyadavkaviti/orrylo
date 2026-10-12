@@ -26,6 +26,8 @@ const ISSUANCE = {
   assetCode: "NOVA",
   network: "testnet" as const,
   status: "awaiting_issuer_integration" as const,
+  reservationIssuerPublicKey: OWNER,
+  reservationFingerprint: "1".repeat(64),
   issuerPublicKey: null,
   transactionHash: null,
   ledgerSequence: null,
@@ -143,6 +145,9 @@ test("service authorization and state errors map to actionable HTTP statuses", a
     ["unsupported_network", 403],
     ["ineligible_project", 409],
     ["asset_code_reserved", 409],
+    ["reservation_limit_reached", 409],
+    ["issuer_configuration_mismatch", 409],
+    ["issuer_integration_unavailable", 503],
     ["issuance_already_requested", 409],
     ["idempotency_conflict", 409],
     ["invalid_asset_configuration", 400],
@@ -171,23 +176,25 @@ test("owner sees only recorded issuance evidence or not_started", async () => {
   assert.deepEqual((await awaiting.json()).issuance, ISSUANCE);
 });
 
-test("unavailable Stellar adapter rejects both execution and lookup without side effects", async () => {
+test("unavailable reviewed Stellar execution adapter rejects signing, submission and lookup", async () => {
   const adapter = new UnavailableSharedIssuerExecutionAdapter();
   await assert.rejects(
-    adapter.submit({
-      requestId: ISSUANCE.requestId,
-      projectId: PROJECT_ID,
+    adapter.signCanonicalEnvelope({
+      policyVersion: "shared-issuer-testnet-v1",
+      issuerPublicKey: OWNER,
       network: "testnet",
-      assetCode: "NOVA",
+      networkPassphrase: "Test SDF Network ; September 2015",
+      transactionHash: "0".repeat(64),
+      unsignedEnvelopeXdr: "unused",
     }),
     SharedIssuerUnavailableError,
   );
   await assert.rejects(
-    adapter.lookup({
-      requestId: ISSUANCE.requestId,
-      transactionHash: "0".repeat(64),
-      network: "testnet",
-    }),
+    adapter.submitSignedEnvelope("unused"),
+    SharedIssuerUnavailableError,
+  );
+  await assert.rejects(
+    adapter.lookupTransaction("0".repeat(64)),
     SharedIssuerUnavailableError,
   );
 });

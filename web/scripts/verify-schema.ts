@@ -29,6 +29,7 @@ const EXPECTED_CONSTRAINTS = [
   "project_issuance_confirmed_evidence_check",
   "project_issuance_unique_asset_code",
   "project_issuance_unavailable_evidence_check",
+  "project_issuance_issuer_evidence_matches",
   "project_issuance_submitted_hash_check",
 ] as const;
 

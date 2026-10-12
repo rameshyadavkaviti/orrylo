@@ -1,62 +1,57 @@
+import type {
+  SharedIssuerIssuancePlan,
+  SharedIssuerSigner,
+  SharedIssuerSigningRequest,
+  SharedIssuerSubmissionAdapter,
+  SharedIssuerSubmissionResult,
+  SharedIssuerTransactionLookup,
+} from "./shared-issuer-issuance";
+
 /**
- * Future server-only secure Shared Issuer integration boundary.
- * This contract does NOT provide issuer signing, custody or transaction construction.
- * The reviewed Stellar Agent interface must replace the unavailable implementation.
+ * Typed future integration with the Security-reviewed PR #27 Stellar boundary.
+ * Preparation is pure and requires explicit ledger/issuer inputs; signing,
+ * submission and lookup are separate facilities and currently unavailable.
  */
-export interface SharedIssuerSubmission {
-  requestId: string;
-  projectId: string;
-  network: "testnet";
-  assetCode: string;
-}
-
-export type SharedIssuerSubmissionResult =
-  | { status: "submitted"; transactionHash: string }
-  | { status: "reconciliation_required"; transactionHash: string | null };
-
-export interface SharedIssuerLookup {
-  requestId: string;
-  transactionHash: string;
-  network: "testnet";
-}
-
-export type SharedIssuerLookupResult =
-  | { status: "pending" }
-  | { status: "failed"; failureCode: string }
-  | {
-      status: "confirmed";
-      issuerPublicKey: string;
-      transactionHash: string;
-      ledgerSequence: number;
-    };
-
-export interface SharedIssuerExecutionAdapter {
-  submit(
-    request: SharedIssuerSubmission,
-  ): Promise<SharedIssuerSubmissionResult>;
-  lookup(request: SharedIssuerLookup): Promise<SharedIssuerLookupResult>;
+export interface SharedIssuerExecutionAdapter
+  extends SharedIssuerSubmissionAdapter,
+    SharedIssuerSigner {
+  lookupTransaction(transactionHash: string): Promise<SharedIssuerTransactionLookup>;
 }
 
 export class SharedIssuerUnavailableError extends Error {
   readonly code = "issuer_integration_unavailable";
-
   constructor() {
-    super("The reviewed Testnet Shared Issuer integration is not available.");
+    super("The reviewed Testnet Shared Issuer execution service is unavailable.");
     this.name = "SharedIssuerUnavailableError";
   }
 }
 
-/** Deliberately no network access, signing, or transaction side effects. */
-export class UnavailableSharedIssuerExecutionAdapter implements SharedIssuerExecutionAdapter {
-  async submit(
-    _request: SharedIssuerSubmission,
+/** No signing, Horizon requests, account mutation, or network side effects. */
+export class UnavailableSharedIssuerExecutionAdapter
+  implements SharedIssuerExecutionAdapter
+{
+  async signCanonicalEnvelope(
+    _request: SharedIssuerSigningRequest,
+  ): Promise<{ signedEnvelopeXdr: string }> {
+    throw new SharedIssuerUnavailableError();
+  }
+
+  async submitSignedEnvelope(
+    _signedEnvelopeXdr: string,
   ): Promise<SharedIssuerSubmissionResult> {
     throw new SharedIssuerUnavailableError();
   }
 
-  async lookup(
-    _request: SharedIssuerLookup,
-  ): Promise<SharedIssuerLookupResult> {
+  async lookupTransaction(
+    _transactionHash: string,
+  ): Promise<SharedIssuerTransactionLookup> {
     throw new SharedIssuerUnavailableError();
   }
 }
+
+/** Explicit compile-time compatibility check with PR #27's immutable plan. */
+export type PreparedSharedIssuerOperation = {
+  plan: SharedIssuerIssuancePlan;
+  signer: SharedIssuerSigner;
+  submission: SharedIssuerSubmissionAdapter;
+};

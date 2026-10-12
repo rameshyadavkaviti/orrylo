@@ -35,6 +35,16 @@ export class PostgresAuditRepository {
   constructor(private readonly sql: DatabaseClient) {}
 
   async append(input: AppendAuditEventInput): Promise<AuditEventRecord> {
+    return this.sql.begin(async (transaction) =>
+      this.appendInTransaction(transaction as unknown as DatabaseClient, input),
+    );
+  }
+
+  /** Append within an existing caller-owned SQL transaction; no nested COMMIT. */
+  async appendInTransaction(
+    transaction: DatabaseClient,
+    input: AppendAuditEventInput,
+  ): Promise<AuditEventRecord> {
     assertAuditMetadataSafe(input.metadata);
 
     const targetPublicKey = input.targetPublicKey
@@ -43,7 +53,6 @@ export class PostgresAuditRepository {
     const occurredAt = input.occurredAt ?? Date.now();
     const eventId = randomUUID();
 
-    return this.sql.begin(async (transaction) => {
       const [head] = await transaction<
         { last_sequence: string; last_event_hash: string | null }[]
       >`
@@ -125,7 +134,6 @@ export class PostgresAuditRepository {
       }
 
       return mapAuditRow(row);
-    });
   }
 
   async list(): Promise<AuditEventRecord[]> {

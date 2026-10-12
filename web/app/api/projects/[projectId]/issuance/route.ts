@@ -40,6 +40,7 @@ function dependencies(): IssuanceRouteDependencies {
   const config = readServerAuthConfig();
   const service = new TestnetIssuanceService(getDatabaseClient(), {
     network: config.network,
+    approvedIssuerPublicKey: process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY,
   });
   return {
     authDomain: config.domain,
@@ -158,11 +159,14 @@ function mapError(error: unknown) {
     )
       return failure(code, 400);
     if (code === "unsupported_network") return failure(code, 403);
+    if (code === "issuer_integration_unavailable") return failure(code, 503);
     if (
       code === "ineligible_project" ||
       code === "idempotency_conflict" ||
       code === "issuance_already_requested" ||
-      code === "asset_code_reserved"
+      code === "asset_code_reserved" ||
+      code === "reservation_limit_reached" ||
+      code === "issuer_configuration_mismatch"
     ) {
       return failure(code, 409);
     }
