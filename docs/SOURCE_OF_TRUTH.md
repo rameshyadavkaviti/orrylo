@@ -261,6 +261,37 @@ No manual/admin/marketing/emergency/developer mint path is approved for v1.
 
 The direct sale price must not be described as intrinsic value, guaranteed market value, guaranteed resale value, or guaranteed future value.
 
+### 10.1 Approved five-account Mainnet infrastructure model
+
+The product owner approved **exactly five persistent Orrylo-operated Stellar account roles** for the initial Mainnet architecture. This is a **role/topology decision**, not evidence that five accounts have been created, funded, deployed, assigned signer keys, or authorized on Mainnet.
+
+| Role | Primary responsibility | Authority boundary |
+| --- | --- | --- |
+| **RYLO ISSUER (ORRYLO)** | Issuer and on-chain authorization policy for RYLO only. | Separate from all customer issuers; follows the separately approved protected RYLO signer/2-of-3 policy. Not the day-to-day revenue or liquidity wallet. |
+| **SHARED ISSUER (ASSETS)** | Issue Shared Issuer-tier customer assets under one explicitly approved issuer identity. | Never issues RYLO; separate signing/custody from the ordinary web application. Exact account identity, flags and signer thresholds still require approval. |
+| **TREASURY** | Hold RYLO inventory, XLM reserves and realized service revenue; make policy-approved RYLO transfers and treasury allocations. | No independent RYLO mint authority; no unrestricted application-initiated withdrawals. |
+| **OPERATIONS** | Limited working XLM for ordinary network fees and explicitly approved day-to-day operational funding/transactions. | Small capped exposure and scoped transaction permissions; no issuer keys or custody of primary treasury reserves. Exact limits still require approval. |
+| **LIQUIDITY** | Custody Orrylo-managed liquidity allocations and any relevant pool positions/share balances; coordinate approved RYLO/XLM liquidity operations. | No issuer or treasury mint authority; no automatic funding from Treasury; each liquidity operation remains protected, manual/staged and auditable under section 10. |
+
+**Scope/counting rules:**
+
+- These five roles are five distinct **Orrylo infrastructure Stellar accounts** for Mainnet; a single account must not silently serve multiple roles.
+- **Signer A / B / C are signing keys/authorities, not automatically three additional Stellar accounts.** Their independent custody and authorization still matter.
+- The ledger confirmation verifier and database confirmation-writer are **off-chain services and separate database identities**, not Stellar accounts.
+- Customer wallets, per-project Dedicated Issuer accounts, pools and network contracts are outside the five Orrylo infrastructure-account count.
+- The previously reserved public-key candidates for ORRYLO and ASSETS remain **candidates, not approved or deployed Mainnet accounts**. Do not hardcode, fund or activate a candidate merely because its role is approved.
+- Existing RYLO Treasury-first distribution, service-spend recycling, and protected liquidity policy remain authoritative; five-account separation does not change mint, supply, sale-price or liquidity rules.
+
+**Not yet decided:** Whether a customer's direct-purchase XLM payment is received by TREASURY or first by OPERATIONS and swept to TREASURY; exact payment/RYLO-delivery settlement mechanism and failure recovery; fee-funding/sponsorship flow; exact signing/threshold/custody policies for SHARED ISSUER, TREASURY, OPERATIONS and LIQUIDITY; operational balance caps and transfer permissions; final public keys and Mainnet deployment sequence. In particular **Treasury-first RYLO distribution does not imply an approved XLM payment destination**. No real-payment flow should activate until these decisions and settlement security are approved.
+
+**Owner-managed manual setup and secure-record obligations (mandatory checkpoints before Mainnet activation):**
+
+1. **Identity and funding checkpoint — owner action required.** Review and explicitly approve the intended public key, network, purpose, initial funding source and funding amount for each account before account creation/funding. Verify each account independently on the correct Stellar network. Never confuse a Testnet address/state with proof of Mainnet funding.
+2. **Key-generation and custody checkpoint — owner action required.** Generate/import each required signer key using a reviewed, isolated mechanism. Keep secret seeds, recovery material and backups in a secure offline/hardware-backed location under owner control. **Never place secrets in GitHub, SOT, chat, tickets, screenshots, browser client code, app databases, build logs or environment examples.** Only public keys, non-secret configuration and independent validation evidence belong in repository documentation.
+3. **Signer/authority checkpoint — owner explicit approval required.** Record the proposed signer public keys, weights, thresholds, account flags, master-key treatment, custody operators and recovery plan **without secrets**. Independently verify successful authorized signing/recovery paths before any irreversible master-key reduction or authority removal. The existing RYLO 2-of-3 policy is not automatically extended to other accounts without a decision.
+4. **Finance/operations checkpoint — owner approval required.** Approve transfer limits, XLM payment destination, RYLO delivery/failure handling, Treasury/Operations/Liquidity movement policy, monitoring and emergency response before enabling purchase, payout or liquidity operations. Keep personal secure records of account-to-role mapping, signing-device locations, recovery custodians and protected ceremony instructions.
+5. **Activation checkpoint — separate authorization required.** A reviewed runbook must remind the owner at the exact point of each manual action, what to verify, and what confidential data to safeguard. Require explicit approval before any Mainnet account mutation, funding, key/threshold/flag change, signing, transfer, pool operation or deployment. Documentation approval does **not** authorize those operations.
+
 ## 11. No investment section for v1
 
 The first version must not introduce an official investment program such as:
