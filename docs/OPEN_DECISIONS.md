@@ -133,6 +133,19 @@ Still open:
 - exact definition/evidence event for “successful token creation” before the reward is released;
 - exact on-chain transaction construction and submission implementation.
 
+## Immediate Testnet MVP Lite — execution decisions and sequencing
+
+**Approved 2026-10-12:** First delivery milestone is one real end-to-end customer Shared Issuer asset issuance on Testnet, *not* the entire RYLO economy/reward/liquidity demonstration. This does not alter approved RYLO eligibility, 150 RYLO reward, timing, issuer control, mint/supply economics, or any Mainnet rules. Mainnet and full RYLO ecosystem demonstrations remain separate later work.
+
+**Execution-critical decisions still open — obtain explicit owner/Stellar/Security approval before signing or funding:**
+- exact Testnet Shared Issuer account identity, readiness, signer/custody and applicable account flags;
+- receiving wallet, trustline setup and authorization behavior, including transaction-fee/funding responsibility (do not invent automatic funding);
+- safe bounded test-activation procedure and evidence required before allowing broad public creation;
+- remaining PR #32 proof/reconciliation blockers, any required intent persistence and database authority split;
+- practical server-side rate limiting and abuse controls for broad public creation, without an unapproved wallet allowlist.
+
+**Minimal delivery gates:** Full-stack owns app UI/server intent flow; Stellar/Contract owns issuer account/configuration, transaction construction/signing/trustline boundaries; Security/Enablement owns adversarial verification, proof/unknown-outcome/DB privilege gates; Product Architect coordinates critical path and obtains owner decisions. No agent may treat a draft PR, UI preview, Project Profile save or Testnet preparation as completed issuance. Detailed bounded work belongs to agent PRs/issues; do not open unrelated features before the first real Testnet issuance evidence.
+
 ## Shared Issuer
 
 Decided:
@@ -162,7 +175,7 @@ Decided:
 - abandoned/cancelled/failed orders can release reservations only after authoritative proof that no issuance was submitted or could have succeeded;
 - ambiguous or potentially successful submitted transactions must remain reserved until conclusive ledger reconciliation; confirmed issuance must never be released as if the asset identity were unused;
 - release/cancellation and rejected/limited attempts require auditable, server-authorized controls; multi-wallet abuse must be addressed beyond per-wallet quotas;
-- full immutable issuance intent and fingerprint are a separate future execution gate, not invented from reservation data.
+- full immutable issuance intent and fingerprint are an **immediate P0 Testnet MVP Lite pre-signing gate**, not inferred from reservation data; no signing or submission is allowed until that complete intent is durably committed and independently reviewed.
 
 Still open (must not be silently selected by implementation):
 
@@ -223,7 +236,7 @@ Approved first-prototype application baseline:
 - Neon Free for PostgreSQL;
 - Cloudflare Free for DNS/CDN.
 
-Stellar Testnet remains the currently recorded engineering/deployment-evidence environment and must stay reproducibly bootstrappable. The immediate execution direction is Mainnet preparation, but Mainnet deployment remains unproven until explicit repository/on-chain deployment evidence exists.
+Stellar Testnet remains the currently recorded engineering/deployment-evidence environment and must stay reproducibly bootstrappable. The immediate delivery priority is Testnet MVP Lite customer Shared Issuer issuance. Mainnet preparation is separate and Mainnet deployment remains unproven until explicit repository/on-chain deployment evidence exists.
 
 These are prototype choices, not permanent production-provider commitments.
 

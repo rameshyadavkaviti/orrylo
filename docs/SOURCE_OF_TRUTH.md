@@ -338,14 +338,45 @@ The approved first-prototype infrastructure baseline is intentionally low-cost a
 - PostgreSQL: **Neon Free** initially;
 - DNS/CDN: **Cloudflare Free**;
 - Stellar engineering/deployment baseline: **Testnet** for the currently recorded issuer and contract preparation evidence;
-- immediate execution direction: **Mainnet preparation**, without treating any issuer, asset, SAC, or application flow as Mainnet-deployed until explicit deployment evidence is recorded;
+- immediate execution direction: **Testnet MVP Lite customer Shared Issuer issuance**; Mainnet preparation remains a separate workstream, without treating any issuer, asset, SAC, or application flow as Mainnet-deployed until explicit deployment evidence is recorded;
 - existing Orrylo domain: reused with no new prototype-domain purchase.
 
 This is a **prototype deployment baseline**, not a permanent production-provider commitment.
 
 The application must remain portable enough to move away from Railway, Neon, or Cloudflare if pricing, availability, sanctions/access, scale, security, or operational requirements change.
 
-The first Testnet prototype is considered complete when the real end-to-end path demonstrates:
+### 12.1 Immediate delivery milestone — Testnet MVP Lite (owner approved 2026-10-12)
+
+**Priority P0: first real customer Shared Issuer token issuance on Stellar Testnet.** This is the next delivery milestone, not proof of a production-ready service or an instruction to bypass existing security gates. It is intentionally smaller than the RYLO ecosystem demonstration below.
+
+The minimum end-to-end acceptance path is:
+
+```
+Authenticated Albedo wallet
+→ project / asset identity and user-selected exact initial supply
+→ owner-visible configuration and Shared Issuer authority review
+→ explicit confirmed issuance request
+→ immutable server-authoritative issuance intent and safe asset-code reservation
+→ receiving account trustline / authorization readiness
+→ authorized Testnet issuer signing and submission
+→ authoritative ledger confirmation of correct issuer, asset, destination and amount
+→ explorer-verifiable result and truthful persistent project status
+```
+
+- A genuine Stellar Testnet-issued customer asset must be visible through authoritative network evidence. A saved Project Profile, browser draft, simulated result or transaction hash alone is **not** acceptance.
+- Scope is **Shared Issuer, Testnet, one minimal creation path only**. No Dedicated Issuer, production-grade token governance, RYLO liquidity/swap path, Mainnet funding, or five-account Mainnet execution is required for this milestone.
+- Preserve the approved first-success eligibility / 150 RYLO reward policy and its financial/authorization/launch rules **unchanged**. Executing the reward, RYLO trustline/issuer ceremony and market liquidity is not a prerequisite for the *Lite customer asset issuance demonstration*. Do not falsely mark rewards as granted or silently change when eligibility legally/product-wise applies. Implementing deferred reward delivery requires separately reviewed policy-consistent evidence and scheduling; do not claim its live execution.
+- Limit launch access to appropriately gated, explicitly authorized Testnet demonstration until the owner approves public availability and concrete abuse controls. This gate is **not** a wallet allowlist or new eligibility policy: approved public Testnet creation remains open to any authenticated supported wallet once safely launched.
+- The receiving wallet must be technically able to hold the issued asset: explicit account / trustline and applicable authorization readiness, with no unapproved automatic account funding or invented default destination.
+- Security minimums are mandatory: server-side auth and ownership, exact 7-decimal amount/int64 validation, immutable full intent before signing, issuer-scoped uniqueness, idempotent submission, forged-proof resistance, safe retry/unknown-outcome reconciliation, trusted independent ledger confirmation, protected signing/secrets, and honest status. PR #32's unresolved security blockers cannot be waived by a smaller MVP.
+- No new pricing, signer identity, Shared Issuer account, flags, supply-control promise, rate limit, payment step or expiry rule is approved by this milestone. Resolve execution-critical open decisions with the appropriate owner before live actions.
+- First prove a repeatable, authorized Testnet demonstration and record exact transaction/asset/network evidence; broader publicly available Testnet release remains subject to security, abuse and deployment gates.
+
+**Delivery order:** (1) confirm minimum issuer / destination / trustline / signer decisions; (2) close issuance-proof blockers and persist immutable issuance intent; (3) connect the existing reviewed builder to one safe Testnet execution path; (4) demonstrate and independently verify a real result. Keep parallel Mainnet/RYLO economy, growth features and styling work outside the Lite critical path.
+
+### 12.2 Later milestone — complete RYLO Testnet ecosystem demonstration
+
+The **later RYLO ecosystem Testnet milestone** is considered complete when the real end-to-end path demonstrates:
 
 ```
 Albedo wallet
