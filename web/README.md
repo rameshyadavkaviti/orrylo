@@ -109,13 +109,13 @@ issuer key, or wallet signing key is stored.
 
 ## Managed Project Profile bridge
 
-The anonymous token builder remains usable before authentication. When a visitor
-chooses **Save & manage project**, the application uses the existing Albedo
-session only as an ownership boundary:
+The current public prototype requires Albedo wallet authentication before the
+interactive token/project builder flow. The authenticated wallet is the
+application identity and ownership boundary from the beginning of that flow:
 
 ```text
-anonymous builder state
-→ authenticated wallet session
+authenticated wallet session
+→ token/project builder state
 → idempotent managed-project creation
 → Project Profile + owner association
 → /my-assets/<project_id>
