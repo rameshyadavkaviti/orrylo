@@ -73,7 +73,10 @@ test("builds one canonical Testnet payment envelope for an approved issuance", (
     assert.equal(operation.asset.toString(), `NOVA:${ISSUER}`);
   }
 
-  assert.equal(Buffer.from(transaction.hash()).toString("hex"), plan.transactionHash);
+  assert.equal(
+    Buffer.from(transaction.hash()).toString("hex"),
+    plan.transactionHash,
+  );
 });
 
 test("canonical intent fingerprint is stable across sequence, fee, and timebound rebuilds", () => {
