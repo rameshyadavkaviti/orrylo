@@ -24,6 +24,8 @@ const EXPECTED_CONSTRAINTS = [
   "project_metadata_publications_reachable_verified",
   "project_metadata_publications_verified_attempted",
   "project_metadata_publications_asset_identity_unique",
+  "project_metadata_publications_issuance_request_fk",
+  "project_metadata_publications_issuance_request_unique",
   "eligibility_records_first_token_event_required",
   "eligibility_records_qualifying_event_fk",
   "reward_records_first_token_amount_check",
