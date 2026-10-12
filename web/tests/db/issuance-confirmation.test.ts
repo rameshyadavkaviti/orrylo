@@ -45,7 +45,7 @@ if (!TEST_DATABASE_URL) {
     `);
     await sql.unsafe("GRANT USAGE ON SCHEMA public TO orrylo_untrusted_test");
     await sql.unsafe(
-      "GRANT INSERT ON project_issuance_ledger_confirmations TO orrylo_untrusted_test",
+      "GRANT INSERT, SELECT ON project_issuance_ledger_confirmations TO orrylo_untrusted_test",
     );
   });
 
