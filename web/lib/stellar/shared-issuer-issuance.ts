@@ -40,10 +40,7 @@ export type SharedIssuerIssuanceErrorCode =
   | "sequence_conflict";
 
 export class SharedIssuerIssuanceError extends Error {
-  constructor(
-    readonly code: SharedIssuerIssuanceErrorCode,
-    message: string,
-  ) {
+  constructor(readonly code: SharedIssuerIssuanceErrorCode, message: string) {
     super(message);
     this.name = "SharedIssuerIssuanceError";
   }
@@ -432,10 +429,7 @@ function parseSequence(value: string): string {
   return sequence.toString();
 }
 
-function parsePositiveInteger(
-  value: string,
-  code: "invalid_fee",
-): bigint {
+function parsePositiveInteger(value: string, code: "invalid_fee"): bigint {
   const parsed = parseNonNegativeInteger(value, code);
   if (parsed <= 0n) {
     throw new SharedIssuerIssuanceError(code, "Expected a positive integer.");

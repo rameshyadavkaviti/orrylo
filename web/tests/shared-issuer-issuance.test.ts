@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  Keypair,
-  Networks,
-  TransactionBuilder,
-} from "@stellar/stellar-sdk";
+import { Keypair, Networks, TransactionBuilder } from "@stellar/stellar-sdk";
 
 import {
   SHARED_ISSUER_TESTNET_PASSPHRASE,
@@ -75,10 +71,7 @@ test("builds one canonical Testnet payment envelope for an approved issuance", (
     assert.equal(operation.asset.toString(), `NOVA:${ISSUER}`);
   }
 
-  assert.equal(
-    transaction.hash().toString("hex"),
-    plan.transactionHash,
-  );
+  assert.equal(transaction.hash().toString("hex"), plan.transactionHash);
 });
 
 test("canonical intent fingerprint is stable across sequence, fee, and timebound rebuilds", () => {
@@ -240,9 +233,7 @@ test("signer boundary accepts only the exact reviewed canonical plan", () => {
   const plan = buildSharedIssuerIssuancePlan(REQUEST, PRECONDITIONS);
   const signingRequest = createSharedIssuerSigningRequest(plan);
 
-  assert.doesNotThrow(() =>
-    assertSigningRequestMatchesPlan(signingRequest, plan),
-  );
+  assert.doesNotThrow(() => assertSigningRequestMatchesPlan(signingRequest, plan));
 
   assert.throws(
     () =>
@@ -287,11 +278,7 @@ test("submission response must match the precomputed canonical transaction hash"
   );
 
   assert.throws(
-    () =>
-      assertSubmissionHashMatchesPlan(
-        { hash: "f".repeat(64) },
-        plan,
-      ),
+    () => assertSubmissionHashMatchesPlan({ hash: "f".repeat(64) }, plan),
     (error) => errorCode(error) === "submission_hash_mismatch",
   );
 });
