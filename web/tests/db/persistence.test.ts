@@ -77,7 +77,7 @@ if (!TEST_DATABASE_URL) {
       "003_eligibility_reward_workflow.sql",
       "004_project_profiles.sql",
       "005_project_profile_ownership.sql",
-      "006_testnet_project_issuance.sql",
+      "007_testnet_project_issuance.sql",
     ]);
 
     const [{ count }] = await sql<{ count: string }[]>`

@@ -319,8 +319,8 @@ asset-code assertion; browser-provided issuer, network and wallet authority
 are rejected. No route signs or submits transactions, and no route transitions
 an intent to pending, submitted, confirmed, failed, or reconciliation-required.
 
-This foundation is **not merged or deployed** until approved. Migration 006
-must be reviewed against the real production database before any rollout.
+This foundation is **not merged or deployed** until approved. Migration 007
+must be reviewed after PR #19 migration 006 and against the real production database before any rollout.
 The Stellar Agent must provide the final issuer identity and a reviewed
 submission/confirmation interface before application execution is activated.
 Project publication and PR #19 metadata hosting remain separate.

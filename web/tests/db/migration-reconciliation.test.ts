@@ -16,7 +16,7 @@ const ALL_MIGRATIONS = [
   "003_eligibility_reward_workflow.sql",
   "004_project_profiles.sql",
   "005_project_profile_ownership.sql",
-  "006_testnet_project_issuance.sql",
+  "007_testnet_project_issuance.sql",
 ];
 
 if (!TEST_DATABASE_URL) {
