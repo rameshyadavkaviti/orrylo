@@ -42,6 +42,7 @@ jobs:
 
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/orrylo_test
+      MIGRATION_DATABASE_URL: postgres://postgres:postgres@localhost:5432/orrylo_test
       TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/orrylo_test
 
     defaults:

@@ -50,13 +50,18 @@ const EXPECTED_CONSTRAINTS = [
   "project_issuance_confirmation_provenance_unique",
   "project_issuance_confirmation_request_unique",
   "project_issuance_confirmation_transaction_unique",
+  "project_issuance_confirmation_publication_identity_unique",
+  "project_metadata_publications_confirmation_scope_fk",
+  "project_metadata_publications_owner_required",
 ] as const;
 
 async function main() {
-  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const databaseUrl = process.env.MIGRATION_DATABASE_URL?.trim();
 
   if (!databaseUrl) {
-    throw new Error("DATABASE_URL is required.");
+    throw new Error(
+      "MIGRATION_DATABASE_URL is required and must use the non-runtime schema owner.",
+    );
   }
 
   const sql = createDatabaseClient(databaseUrl);
@@ -102,6 +107,45 @@ async function main() {
     `;
     if (!writerRole?.exists) {
       throw new Error("Missing non-login trusted confirmation writer role.");
+    }
+
+    const ownershipRows = await sql<
+      { object_name: string; owner_name: string }[]
+    >`
+      SELECT relation.relname AS object_name,
+        pg_get_userbyid(relation.relowner) AS owner_name
+      FROM pg_catalog.pg_class AS relation
+      JOIN pg_catalog.pg_namespace AS namespace
+        ON namespace.oid = relation.relnamespace
+      WHERE namespace.nspname = current_schema()
+        AND relation.relname IN (
+          'project_issuance_full_intents',
+          'project_issuance_transaction_attempts',
+          'project_issuance_ledger_confirmations'
+        )
+      UNION ALL
+      SELECT procedure.proname AS object_name,
+        pg_get_userbyid(procedure.proowner) AS owner_name
+      FROM pg_catalog.pg_proc AS procedure
+      JOIN pg_catalog.pg_namespace AS namespace
+        ON namespace.oid = procedure.pronamespace
+      WHERE namespace.nspname = current_schema()
+        AND procedure.proname IN (
+          'assert_issuance_attempt_matches_intent',
+          'assert_trusted_confirmation_writer',
+          'prevent_issuance_evidence_mutation'
+        )
+    `;
+    const [migrationIdentity] = await sql<{ role_name: string }[]>`
+      SELECT current_user AS role_name
+    `;
+    const wrongOwners = ownershipRows.filter(
+      (row) => row.owner_name !== migrationIdentity?.role_name,
+    );
+    if (ownershipRows.length !== 6 || wrongOwners.length > 0) {
+      throw new Error(
+        "Sensitive issuance tables and enforcement functions must be owned by the migration identity.",
+      );
     }
 
     process.stdout.write("Database schema verified.\n");

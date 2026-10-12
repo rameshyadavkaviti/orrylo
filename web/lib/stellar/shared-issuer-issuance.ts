@@ -323,7 +323,7 @@ export function buildSharedIssuerIssuancePlan(
 
   return {
     intent,
-    intentFingerprint: hashIntent(intent),
+    intentFingerprint: hashSharedIssuerIssuanceIntent(intent),
     sourceSequence,
     validFrom: request.validFrom,
     validUntil: request.validUntil,
@@ -705,7 +705,9 @@ function formatAssetUnits(units: bigint): string {
   return `${whole}.${fractional}`;
 }
 
-function hashIntent(intent: SharedIssuerIssuanceIntent): string {
+export function hashSharedIssuerIssuanceIntent(
+  intent: SharedIssuerIssuanceIntent,
+): string {
   return createHash("sha256")
     .update(
       JSON.stringify([

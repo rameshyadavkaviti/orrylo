@@ -4,10 +4,12 @@ import { createDatabaseClient } from "../lib/server/persistence/database";
 import { migrateDatabase } from "../lib/server/persistence/migrations";
 
 async function main() {
-  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const databaseUrl = process.env.MIGRATION_DATABASE_URL?.trim();
 
   if (!databaseUrl) {
-    throw new Error("DATABASE_URL is required.");
+    throw new Error(
+      "MIGRATION_DATABASE_URL is required and must use the non-runtime schema owner.",
+    );
   }
 
   const sql = createDatabaseClient(databaseUrl);

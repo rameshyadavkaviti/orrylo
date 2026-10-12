@@ -34,18 +34,21 @@ export class UnavailableSharedIssuerExecutionAdapter implements SharedIssuerExec
   async signCanonicalEnvelope(
     _request: SharedIssuerSigningRequest,
   ): Promise<{ signedEnvelopeXdr: string }> {
+    void _request;
     throw new SharedIssuerUnavailableError();
   }
 
   async submitSignedEnvelope(
     _signedEnvelopeXdr: string,
   ): Promise<SharedIssuerSubmissionResult> {
+    void _signedEnvelopeXdr;
     throw new SharedIssuerUnavailableError();
   }
 
   async lookupTransaction(
     _transactionHash: string,
   ): Promise<SharedIssuerTransactionLookup> {
+    void _transactionHash;
     throw new SharedIssuerUnavailableError();
   }
 }

@@ -26,6 +26,13 @@ if (!TEST_DATABASE_URL) {
   test("metadata publication PostgreSQL suite", { skip: true }, () => {});
 } else {
   const sql = createDatabaseClient(TEST_DATABASE_URL);
+  const writerSql = createDatabaseClient(
+    roleUrl(
+      TEST_DATABASE_URL,
+      "orrylo_metadata_writer_test",
+      "metadata-writer-test",
+    ),
+  );
   const OWNER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 81)).publicKey();
   const OTHER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 82)).publicKey();
   const ISSUER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 83)).publicKey();
@@ -43,6 +50,7 @@ if (!TEST_DATABASE_URL) {
   class FixtureConfirmationReader implements SharedAssetConfirmationReader {
     readonly records = new Map<string, VerifiedSharedAssetProvenance>();
     available = true;
+    enforceOwnerLookup = true;
     remainingReads: number | null = null;
 
     async findConfirmed(projectId: string, ownerPublicKey: string) {
@@ -52,7 +60,11 @@ if (!TEST_DATABASE_URL) {
         this.remainingReads -= 1;
       }
       const record = this.records.get(projectId) ?? null;
-      return record?.ownerPublicKey === ownerPublicKey ? record : null;
+      if (!record) return null;
+      if (this.enforceOwnerLookup && record.ownerPublicKey !== ownerPublicKey) {
+        return null;
+      }
+      return record;
     }
   }
 
@@ -71,6 +83,17 @@ if (!TEST_DATABASE_URL) {
     await sql.unsafe("DROP SCHEMA public CASCADE");
     await sql.unsafe("CREATE SCHEMA public");
     await migrateDatabase(sql, resolve(process.cwd(), "db/migrations"));
+    await sql.unsafe(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_metadata_writer_test') THEN
+          CREATE ROLE orrylo_metadata_writer_test LOGIN PASSWORD 'metadata-writer-test';
+        END IF;
+      END;
+      $$;
+      ALTER ROLE orrylo_metadata_writer_test PASSWORD 'metadata-writer-test';
+      GRANT orrylo_confirmation_writer TO orrylo_metadata_writer_test;
+    `);
   });
 
   beforeEach(async () => {
@@ -84,7 +107,7 @@ if (!TEST_DATABASE_URL) {
   });
 
   after(async () => {
-    await sql.end({ timeout: 5 });
+    await Promise.all([writerSql.end({ timeout: 5 }), sql.end({ timeout: 5 })]);
   });
 
   function repository() {
@@ -161,7 +184,7 @@ if (!TEST_DATABASE_URL) {
         100.0000000, ${new Date(clock)}
       )
     `;
-    await sql`
+    await writerSql`
       INSERT INTO project_issuance_ledger_confirmations (
         confirmation_id, issuance_request_id, issuance_intent_fingerprint,
         attempt_id, project_id, owner_public_key, network,
@@ -268,6 +291,32 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
+  test("stale confirmation provenance for another project or owner is rejected", async () => {
+    const { project, provenance } = await createConfirmedProject();
+    reader.records.set(project.projectId, {
+      ...provenance,
+      projectId: randomUUID(),
+    });
+    await assert.rejects(
+      service().publishOwnedProject(project.projectId, OWNER),
+      (error: unknown) =>
+        error instanceof MetadataPublicationError &&
+        error.code === "issuer_provenance_mismatch",
+    );
+
+    reader.records.set(project.projectId, {
+      ...provenance,
+      ownerPublicKey: OTHER,
+    });
+    reader.enforceOwnerLookup = false;
+    await assert.rejects(
+      service().publishOwnedProject(project.projectId, OWNER),
+      (error: unknown) =>
+        error instanceof MetadataPublicationError &&
+        error.code === "issuer_provenance_mismatch",
+    );
+  });
+
   test("concurrent identical publication is idempotent at revision one", async () => {
     const { project } = await createConfirmedProject();
     const results = await Promise.all(
@@ -328,4 +377,11 @@ if (!TEST_DATABASE_URL) {
     );
     assert.deepEqual(await repository().listSharedTestnetPublications(), []);
   });
+}
+
+function roleUrl(source: string, username: string, password: string): string {
+  const url = new URL(source);
+  url.username = username;
+  url.password = password;
+  return url.toString();
 }

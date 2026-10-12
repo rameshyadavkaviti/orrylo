@@ -38,7 +38,8 @@ In another shell, set server-only connection URLs. The test database name must
 contain `test` because the integration suite resets its schema:
 
 ```sh
-export DATABASE_URL='postgres://postgres:orrylo-dev@localhost:5432/orrylo'
+export MIGRATION_DATABASE_URL='postgres://MIGRATION_OWNER:PASSWORD@localhost:5432/orrylo'
+export DATABASE_URL='postgres://APPLICATION_USER:PASSWORD@localhost:5432/orrylo'
 docker exec orrylo-postgres createdb -U postgres orrylo_test
 export TEST_DATABASE_URL='postgres://postgres:orrylo-dev@localhost:5432/orrylo_test'
 ```
@@ -73,9 +74,13 @@ Orrylo uses a provider-neutral PostgreSQL persistence layer configured only by
 the server-side `DATABASE_URL`. No hosted database vendor is considered
 selected by this repository.
 
-Schema migrations are source-controlled under `db/migrations/`. The migration
-runner records SHA-256 checksums in `schema_migrations`, rejects modified
-already-applied migrations, and can bootstrap a fresh database from zero.
+Schema migrations are source-controlled under `db/migrations/`. Migration and
+schema-verification commands require `MIGRATION_DATABASE_URL`; they do not use
+the ordinary application `DATABASE_URL`. The migration identity must own the
+sensitive issuance tables and enforcement functions, while runtime application
+and confirmation-writer logins must not. The runner records SHA-256 checksums in
+`schema_migrations`, rejects modified already-applied migrations, and can
+bootstrap a fresh database from zero.
 
 Database-facing code is isolated under `lib/server/persistence/`. Browser UI
 does not import database clients or connection strings.
@@ -309,10 +314,10 @@ only:
 
 No live contract ID is committed and no contract mutation is implemented.
 
-## Testnet issuance and confirmation integration foundation (draft only)
+## Testnet issuance and confirmation Gate A (code only)
 
-This integration supersedes the isolated implementation work in PR #19 and PR
-#28 without rewriting either branch. It prepares an authenticated, owner-scoped
+The merged PR #31 integration supersedes the isolated implementation work in PR
+#19 and PR #28 without rewriting either branch. It prepares an authenticated, owner-scoped
 application reservation for **Testnet Shared Issuer** projects. A request is
 durable, project-unique, and idempotent in PostgreSQL. The shared asset code is
 reserved once per approved issuer identity.
@@ -321,30 +326,44 @@ the project's saved profile is a Stellar-issued asset.
 
 The issuance status is read from `project_issuance_intents` and presented on
 the managed project page. The read-only UI does **not** enable token issuance.
-The database contract separates the reservation from an immutable full
-issuance intent, append-only transaction attempts, and an immutable ledger
-confirmation. The confirmation binds the request and full-intent fingerprint
+The database contract and Gate A repositories separate the reservation from an
+immutable full issuance intent, append-only transaction attempts, and an
+immutable ledger confirmation. Exact replay is idempotent; conflicting replay
+fails closed. The confirmation binds the request and full-intent fingerprint
 to the exact Testnet passphrase hash, envelope/result hashes, successful result,
 transaction and operation sources, single payment operation, configured issuer,
 asset, destination, amount, source sequence, transaction hash, and ledger. Only
 the distinct non-login PostgreSQL role `orrylo_confirmation_writer` may append
-a confirmation, and the migration grants that role to no application user.
+a confirmation, and the migrations grant that role to no application login.
+Gate A additionally rejects schema owners, superusers, role switching, and
+ordinary application identities at the confirmation-writer boundary.
 Status fields and application audit events cannot authorize publication.
 
-Confirmed issuer keys, transaction hashes, ledger confirmations, and explorer
-verification remain unavailable to the application until genuine evidence is
-produced by a reviewed Stellar service. The server-only
+Gate A includes a typed Testnet ledger-reader contract and a raw-XDR validator.
+The validator recomputes transaction/envelope/result binding and validates the
+exact immutable issuer, asset, destination, amount, sequence, operation,
+network, successful result, ledger, project, and owner before creating a
+runtime-only validated confirmation value. Reconciliation cannot permit a
+replacement unless an authoritative expired not-found observation and a
+non-stale unchanged issuer sequence agree. Confirmed issuer keys, transaction
+hashes, ledger confirmations, and explorer verification remain unavailable to
+the application until genuine evidence is produced by a reviewed Stellar
+service. The server-only
 `SharedIssuerExecutionAdapter` and `SharedAssetConfirmationReader` both have
-explicit unavailable implementations. POST reservation creation requires an
+explicit unavailable implementations, as does the production Testnet ledger
+reader. POST reservation creation requires an
 authenticated wallet, the owned project, a UUID idempotency key and a matching
 asset-code assertion; browser-provided issuer, network and wallet authority
 are rejected. No route signs or submits transactions, and no route transitions
 an intent to pending, submitted, confirmed, failed, or reconciliation-required.
 
-This foundation is **not merged or deployed** until independently approved.
+This Gate A foundation is code-only and **not deployed or activated** until
+independently approved.
 Migration 007 follows PR #19 migration 006 and upgrades legacy 006 publication
 rows by retaining them but marking them unreachable until exact immutable
-confirmation provenance is attached.
+confirmation provenance is attached. Migration 008 upgrades 001–007 databases
+without rewriting their checksums, binds metadata to confirmation project and
+owner scope, and hardens the dedicated-writer login check.
 The API fails closed with HTTP 503 until the reviewed issuer identity is explicitly
 provided as server-only `ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY`.
 The reserved candidate is never automatically selected. The database enforces
@@ -353,10 +372,11 @@ is immutable, and its audit events commit atomically with its durable
 `workflow_intents` record. Requests do not contain destination/amount and
 therefore do **not** claim PR #27's complete issuance-intent fingerprint.
 
-The Stellar owner must provide the final issuer identity, explicit approved
-destination and amount, ledger preconditions, trusted-writer deployment, and a
-reviewed submission/confirmation reader before application execution is
-activated.
+Before application execution is activated, the Stellar owner must still provide
+the final issuer identity, explicit approved destination and amount, ledger
+preconditions, separately owned migration/application/confirmation database
+logins and least-privilege grants, a reviewed authenticated ledger-reader
+adapter, signer custody, and a reviewed submission adapter.
 The distinct pure `prepareReservedSharedIssuerPlan` entrypoint accepts PR #27
 types but is not exposed by any public API and cannot sign or submit.
 Project publication and PR #19 metadata hosting remain separate. The issuance UI is in an additive managed-project layout, not PR #19's page or view.

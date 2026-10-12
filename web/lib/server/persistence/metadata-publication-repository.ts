@@ -13,6 +13,7 @@ export interface MetadataPublicationRow {
   network: "testnet" | "public";
   asset_code: string;
   issuer_public_key: string;
+  owner_public_key: string | null;
   issuance_request_id: string;
   issuance_fingerprint: string;
   confirmation_id: string | null;
@@ -61,7 +62,11 @@ export class PostgresMetadataPublicationRepository {
     );
     return Boolean(
       source &&
+      row.owner_public_key !== null &&
       source.confirmationId === row.confirmation_id &&
+      source.projectId === row.project_id &&
+      source.ownerPublicKey === ownerPublicKey &&
+      source.ownerPublicKey === row.owner_public_key.trim() &&
       source.network === row.network &&
       source.assetCode === row.asset_code &&
       source.issuerPublicKey === this.approvedIssuerPublicKey &&
@@ -75,9 +80,9 @@ export class PostgresMetadataPublicationRepository {
     projectId: string,
   ): Promise<MetadataPublicationState | null> {
     const [row] = await this.sql<
-      (MetadataPublicationRow & { owner_public_key: string })[]
+      (MetadataPublicationRow & { current_owner_public_key: string })[]
     >`
-      SELECT pub.*, owner.owner_public_key
+      SELECT pub.*, owner.owner_public_key AS current_owner_public_key
       FROM project_metadata_publications AS pub
       JOIN project_profile_owners AS owner ON owner.project_id = pub.project_id
       JOIN project_profiles AS project ON project.project_id = pub.project_id
@@ -85,13 +90,14 @@ export class PostgresMetadataPublicationRepository {
         AND project.network = pub.network
         AND project.asset_code = pub.asset_code
         AND project.issuer_model = 'shared'
+        AND pub.owner_public_key = owner.owner_public_key
         AND (project.issuer_public_key IS NULL
           OR project.issuer_public_key = pub.issuer_public_key)
       LIMIT 1
     `;
     if (
       !row ||
-      !(await this.hasValidProvenance(row, row.owner_public_key.trim()))
+      !(await this.hasValidProvenance(row, row.current_owner_public_key.trim()))
     ) {
       return null;
     }
@@ -100,9 +106,9 @@ export class PostgresMetadataPublicationRepository {
 
   async listSharedTestnetPublications(): Promise<MetadataPublicationState[]> {
     const rows = await this.sql<
-      (MetadataPublicationRow & { owner_public_key: string })[]
+      (MetadataPublicationRow & { current_owner_public_key: string })[]
     >`
-      SELECT pub.*, owner.owner_public_key
+      SELECT pub.*, owner.owner_public_key AS current_owner_public_key
       FROM project_metadata_publications AS pub
       JOIN project_profile_owners AS owner ON owner.project_id = pub.project_id
       JOIN project_profiles AS project ON project.project_id = pub.project_id
@@ -111,13 +117,16 @@ export class PostgresMetadataPublicationRepository {
         AND project.network = pub.network
         AND project.asset_code = pub.asset_code
         AND project.issuer_model = 'shared'
+        AND pub.owner_public_key = owner.owner_public_key
         AND (project.issuer_public_key IS NULL
           OR project.issuer_public_key = pub.issuer_public_key)
       ORDER BY pub.asset_code, pub.issuer_public_key, pub.project_id
     `;
     const valid: MetadataPublicationState[] = [];
     for (const row of rows) {
-      if (await this.hasValidProvenance(row, row.owner_public_key.trim())) {
+      if (
+        await this.hasValidProvenance(row, row.current_owner_public_key.trim())
+      ) {
         valid.push(mapMetadataPublication(row));
       }
     }

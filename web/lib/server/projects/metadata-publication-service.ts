@@ -163,6 +163,8 @@ export class MetadataPublicationService {
         }
         if (
           !approvedIssuer ||
+          provenance.projectId !== project.projectId ||
+          provenance.ownerPublicKey !== ownerPublicKey ||
           project.network !== provenance.network ||
           project.assetCode !== provenance.assetCode ||
           provenance.issuerPublicKey !== approvedIssuer ||
@@ -245,6 +247,7 @@ export class MetadataPublicationService {
             network,
             asset_code,
             issuer_public_key,
+            owner_public_key,
             issuance_request_id,
             issuance_fingerprint,
             confirmation_id,
@@ -264,6 +267,7 @@ export class MetadataPublicationService {
             'testnet',
             ${project.assetCode},
             ${generated.issuerPublicKey},
+            ${ownerPublicKey},
             ${provenance.issuanceRequestId},
             ${provenance.issuanceIntentFingerprint},
             ${provenance.confirmationId},
@@ -283,6 +287,7 @@ export class MetadataPublicationService {
             network = EXCLUDED.network,
             asset_code = EXCLUDED.asset_code,
             issuer_public_key = EXCLUDED.issuer_public_key,
+            owner_public_key = EXCLUDED.owner_public_key,
             issuance_request_id = EXCLUDED.issuance_request_id,
             issuance_fingerprint = EXCLUDED.issuance_fingerprint,
             confirmation_id = EXCLUDED.confirmation_id,

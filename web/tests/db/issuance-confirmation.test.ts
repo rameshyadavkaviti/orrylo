@@ -16,6 +16,16 @@ if (!TEST_DATABASE_URL) {
   test("issuance confirmation PostgreSQL suite", { skip: true }, () => {});
 } else {
   const sql = createDatabaseClient(TEST_DATABASE_URL);
+  const untrustedSql = createDatabaseClient(
+    roleUrl(TEST_DATABASE_URL, "orrylo_untrusted_test", "untrusted-test"),
+  );
+  const writerSql = createDatabaseClient(
+    roleUrl(
+      TEST_DATABASE_URL,
+      "orrylo_confirmation_writer_test",
+      "writer-test",
+    ),
+  );
   const OWNER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 101)).publicKey();
   const ISSUER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 102)).publicKey();
   const DESTINATION = Keypair.fromRawEd25519Seed(
@@ -38,14 +48,26 @@ if (!TEST_DATABASE_URL) {
       DO $$
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_untrusted_test') THEN
-          CREATE ROLE orrylo_untrusted_test NOLOGIN;
+          CREATE ROLE orrylo_untrusted_test LOGIN PASSWORD 'untrusted-test';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_confirmation_writer_test') THEN
+          CREATE ROLE orrylo_confirmation_writer_test LOGIN PASSWORD 'writer-test';
         END IF;
       END;
       $$
     `);
+    await sql.unsafe(
+      "ALTER ROLE orrylo_untrusted_test PASSWORD 'untrusted-test'",
+    );
+    await sql.unsafe(
+      "ALTER ROLE orrylo_confirmation_writer_test PASSWORD 'writer-test'",
+    );
     await sql.unsafe("GRANT USAGE ON SCHEMA public TO orrylo_untrusted_test");
     await sql.unsafe(
       "GRANT INSERT, SELECT ON project_issuance_ledger_confirmations TO orrylo_untrusted_test",
+    );
+    await sql.unsafe(
+      "GRANT orrylo_confirmation_writer TO orrylo_confirmation_writer_test",
     );
   });
 
@@ -58,7 +80,11 @@ if (!TEST_DATABASE_URL) {
   });
 
   after(async () => {
-    await sql.end({ timeout: 5 });
+    await Promise.all([
+      untrustedSql.end({ timeout: 5 }),
+      writerSql.end({ timeout: 5 }),
+      sql.end({ timeout: 5 }),
+    ]);
   });
 
   async function createContractFixture() {
@@ -130,9 +156,9 @@ if (!TEST_DATABASE_URL) {
     fixture: Awaited<ReturnType<typeof createContractFixture>>,
     assetCode = "NOVA",
   ) {
-    return sql.begin(async (transaction) => {
-      await transaction.unsafe(`SET LOCAL ROLE ${role}`);
-      return transaction`
+    const client =
+      role === "orrylo_confirmation_writer" ? writerSql : untrustedSql;
+    return client`
         INSERT INTO project_issuance_ledger_confirmations (
           confirmation_id, issuance_request_id, issuance_intent_fingerprint,
           attempt_id, project_id, owner_public_key, network,
@@ -154,14 +180,13 @@ if (!TEST_DATABASE_URL) {
           ${new Date(NOW)}, ${new Date(NOW)}
         ) RETURNING confirmation_id
       `;
-    });
   }
 
   test("only the trusted writer can append an exact immutable confirmation", async () => {
     const fixture = await createContractFixture();
     await assert.rejects(
       insertConfirmation("orrylo_untrusted_test", fixture),
-      /trusted confirmation writer role required/,
+      /permission denied|dedicated trusted confirmation writer login required/,
     );
     await assert.rejects(
       insertConfirmation("orrylo_confirmation_writer", fixture, "FAKE"),
@@ -220,4 +245,11 @@ if (!TEST_DATABASE_URL) {
       )
     `);
   });
+}
+
+function roleUrl(source: string, username: string, password: string): string {
+  const url = new URL(source);
+  url.username = username;
+  url.password = password;
+  return url.toString();
 }
