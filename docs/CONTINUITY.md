@@ -8,13 +8,17 @@ This file is a continuity aid for replacement agents. It does **not** override `
 
 ## Repository baseline
 
-At this checkpoint, GitHub `main` is at commit:
+At the latest handoff update, GitHub `main` is at commit:
 
 ```text
-533e89b3b844f11d95dff78db016aa91b7366c5f
+c314b57926493769804f82abe1111c62856eb670
 ```
 
-That commit is the merge of PR #24, **DB: reconcile legacy migration ledger drift safely**.
+That commit is the merge of PR #27, **STELLAR: add Shared Issuer Testnet issuance boundary**.
+
+PR #27 merged the reviewed Testnet-only Shared Issuer issuance preparation boundary after independent Security remediation. It does not select or activate the reserved Shared Issuer candidate and does not constitute live Testnet issuance or deployment evidence.
+
+Earlier in this checkpoint history, PR #24, **DB: reconcile legacy migration ledger drift safely**, was also merged.
 
 PR #24 is merged. Its reviewed repair preserves migrations 001–005 and adds narrowly scoped migration-002 reconciliation for the verified legacy partial state. The implementation verifies the exact existing PostgreSQL UNIQUE constraint/backing index and original migration checksum under serialized migration execution before recording migration 002. Conflicting states fail closed.
 
@@ -78,11 +82,49 @@ The latest canonical repository state still describes the issuer ceremony as inc
 
 The deterministic SAC address is not deployment evidence by itself. SAC deployment and StellarExpert visibility must be verified separately.
 
+## Shared Issuer issuance boundary after PR #27
+
+PR #27 is merged on `main`.
+
+Implemented and reviewed boundary:
+
+- Testnet-only Stellar network/passphrase enforcement;
+- exact Classic Stellar payment-envelope construction;
+- immutable logical issuance-intent fingerprint;
+- destination trustline snapshots bound to network, destination, asset code, issuer, and observed ledger;
+- trustline capacity validation including buying liabilities;
+- cryptographic validation of signatures against an injected approved signer/weight configuration;
+- duplicate/lost-response recovery rules that evaluate issuer-sequence advancement before expiry;
+- expired ambiguous outcomes block replacement until authoritative ledger reconciliation;
+- replacement envelopes must preserve the immutable logical issuance intent.
+
+PR #27 intentionally does **not** provide:
+
+- a final Shared Issuer account identity;
+- final Shared Issuer flags/lifecycle policy;
+- signer custody or a production signing service;
+- Horizon submission wiring;
+- database/API/UI integration;
+- live customer issuance;
+- Mainnet behavior.
+
+Remaining Shared Issuer integration requirements:
+
+1. canonically approve the real Testnet Shared Issuer identity and account configuration;
+2. define/approve the Shared Issuer flags and detailed lifecycle still listed in `OPEN_DECISIONS.md`;
+3. establish reviewed signer custody and obtain current on-chain signer/threshold evidence before using the injected signer configuration;
+4. Full-stack must atomically reserve `asset_code + issuer`, bind the durable workflow/idempotency record to the immutable issuance intent, and persist preparation/submission/confirmation evidence;
+5. the ledger adapter must define what constitutes an authoritative not-found/reconciliation observation before replacement hashes are permitted;
+6. Full-stack must supply explicit approved issuance amount and customer destination and obtain a matching destination trustline snapshot;
+7. integrate confirmed `asset_code + issuer_public_key` identity with PR #19 metadata publication while keeping issuance and metadata completion states independent;
+8. perform a separate Security review of the integrated signer/submission/database path before any real Testnet transaction.
+
 ## Open work streams
 
 - PR #23: RYLO `home_domain` documentation decision; reconcile with current `main` before merge.
 - PR #19: Shared Issuer managed metadata publication on Testnet; remains a separate work stream and must not be conflated with RYLO TOML publication.
-- PR #24: merged; production rollout verification is the immediate database/application gate.
+- PR #27: merged; Stellar-specific preparation/security boundary is now on `main`, but live Shared Issuer issuance remains blocked by the requirements above.
+- PR #24: merged; production rollout verification remains a bounded database/application evidence item.
 
 ## Immediate execution priority
 
@@ -90,9 +132,10 @@ The current practical challenge is no longer to treat the prior production migra
 
 The immediate Testnet proof objective is now:
 
-1. prove a real customer token can be created on Stellar Testnet through Orrylo;
-2. prove Orrylo can publish and verify the token's managed `stellar.toml` metadata;
-3. create/configure and verify RYLO on Testnet according to the canonical issuer policy.
+1. integrate the merged PR #27 issuance boundary with durable Full-stack workflow state without weakening its idempotency/reconciliation/signature checks;
+2. after the remaining Shared Issuer policy and signer-custody decisions are explicitly resolved and independently reviewed, prove a real customer token can be created on Stellar Testnet through Orrylo;
+3. prove Orrylo can publish and verify the token's managed `stellar.toml` metadata;
+4. create/configure and verify RYLO on Testnet according to the canonical issuer policy.
 
 These are prerequisites toward the already-approved final Testnet acceptance flow. Do not claim them complete until repository, deployment, and on-chain evidence exists.
 
