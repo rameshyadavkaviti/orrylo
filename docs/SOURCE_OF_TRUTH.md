@@ -290,6 +290,32 @@ Albedo wallet
 
 Testnet bootstrap/deployment should be reproducible because Testnet state may be reset.
 
+### Final Testnet acceptance flow
+
+Before Orrylo is considered ready to proceed from Testnet acceptance into Mainnet readiness, the final end-to-end acceptance run must preserve this approved operation order:
+
+```text
+new wallet
+→ Albedo login
+→ project creation
+→ token creation
+→ TOML / explorer verification
+→ eligibility
+→ RYLO trustline
+→ issuer authorization
+→ 150 RYLO reward
+→ visible RYLO balance
+→ RYLO/XLM liquidity pool
+→ successful swap
+→ project management
+→ logout
+→ login again
+```
+
+After the clean-path run passes, repeat the flow with controlled failure/retry conditions at security- and financial-sensitive points. Acceptance requires reproducible recovery without duplicate issuance, duplicate eligibility/reward, double mint, inconsistent database/on-chain state, or undocumented manual repair.
+
+The order above is an approved release gate. Do not remove or reorder a step without an explicit product decision and corresponding canonical documentation update.
+
 ### RYLO Stellar Asset Contract visibility
 
 For RYLO, deployment acceptance includes the Stellar Asset Contract (SAC) representation of the Classic Stellar asset.
