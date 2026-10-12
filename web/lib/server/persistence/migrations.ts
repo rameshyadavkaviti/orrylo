@@ -64,10 +64,12 @@ export async function migrateDatabase(
       }
 
       if (name === REWARD_UNIQUENESS_MIGRATION) {
-        const [state] = await transaction<{
-          matches: boolean;
-          relation_exists: boolean;
-        }[]>`
+        const [state] = await transaction<
+          {
+            matches: boolean;
+            relation_exists: boolean;
+          }[]
+        >`
           SELECT
             EXISTS (
               SELECT 1
