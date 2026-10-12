@@ -182,7 +182,7 @@ function signedFixture() {
       ...base.lookup,
       envelopeXdr: signedEnvelopeXdr,
       resultTransactionHash: base.attempt.transactionHash,
-    } as StellarTestnetTransactionLookup,
+    } as Extract<StellarTestnetTransactionLookup, { status: "confirmed" }>,
     signedEnvelopeXdr,
     signedEnvelopeXdrSha256,
   };
