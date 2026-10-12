@@ -109,10 +109,12 @@ if (!TEST_DATABASE_URL) {
     assert.deepEqual(result.reconciled, [migration002]);
     assert.deepEqual(result.applied, ALL_MIGRATIONS.slice(2));
 
-    const [ledger] = await sql<{
-      checksum: string;
-      applied_at: Date;
-    }[]>`
+    const [ledger] = await sql<
+      {
+        checksum: string;
+        applied_at: Date;
+      }[]
+    >`
       SELECT checksum, applied_at
       FROM schema_migrations
       WHERE name = ${migration002}
@@ -124,10 +126,12 @@ if (!TEST_DATABASE_URL) {
     );
     assert.ok(ledger?.applied_at instanceof Date);
 
-    const [afterState] = await sql<{
-      constraint_oid: string;
-      index_oid: string;
-    }[]>`
+    const [afterState] = await sql<
+      {
+        constraint_oid: string;
+        index_oid: string;
+      }[]
+    >`
       SELECT c.oid::text AS constraint_oid, c.conindid::text AS index_oid
       FROM pg_constraint AS c
       WHERE c.conname = 'reward_records_wallet_reward_type_unique'
