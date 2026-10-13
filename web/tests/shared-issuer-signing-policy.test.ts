@@ -195,8 +195,7 @@ test("mutated network, issuer, hash, or empty envelope request is rejected befor
   const mutations = [
     {
       ...request,
-      networkPassphrase:
-        Networks.PUBLIC as typeof request.networkPassphrase,
+      networkPassphrase: Networks.PUBLIC as typeof request.networkPassphrase,
     },
     { ...request, issuerPublicKey: DESTINATION },
     { ...request, transactionHash: "A".repeat(64) },
