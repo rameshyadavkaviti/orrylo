@@ -1,5 +1,6 @@
 import { Keypair, Transaction, TransactionBuilder } from "@stellar/stellar-sdk";
 
+import { isKnownRyloIssuerPublicKey } from "../product/constants";
 import {
   signPersistedSharedIssuerEnvelope,
   type SharedIssuerDurableExecutionReader,
@@ -207,14 +208,24 @@ function assertPrimitiveOutput(
 }
 
 function normalizePublicKey(value: string): string {
+  let normalized: string;
   try {
-    return Keypair.fromPublicKey(value.trim().toUpperCase()).publicKey();
+    normalized = Keypair.fromPublicKey(value.trim().toUpperCase()).publicKey();
   } catch {
     throw new SharedIssuerSigningPolicyError(
       "invalid_signing_policy",
       "Expected a checksum-valid Shared Issuer public key.",
     );
   }
+
+  if (isKnownRyloIssuerPublicKey(normalized)) {
+    throw new SharedIssuerSigningPolicyError(
+      "invalid_signing_policy",
+      "Known RYLO issuer identities cannot be configured as the customer Shared Issuer.",
+    );
+  }
+
+  return normalized;
 }
 
 function invalidSigningRequest(): SharedIssuerSigningPolicyError {
