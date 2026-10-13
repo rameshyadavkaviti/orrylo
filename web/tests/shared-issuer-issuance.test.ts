@@ -9,6 +9,7 @@ import {
   Networks,
   Operation,
   TransactionBuilder,
+  xdr,
 } from "@stellar/stellar-sdk";
 
 import type {
@@ -979,6 +980,36 @@ test("submission authorization requires valid approved signatures meeting config
       SIGNER_AUTHORIZATION,
     ),
     plan.transactionHash,
+  );
+
+  const corruptedHint = TransactionBuilder.fromXDR(
+    plan.unsignedEnvelopeXdr,
+    Networks.TESTNET,
+  );
+  corruptedHint.sign(ISSUER_KEYPAIR);
+  const wrongHint = TransactionBuilder.fromXDR(
+    plan.unsignedEnvelopeXdr,
+    Networks.TESTNET,
+  );
+  wrongHint.sign(UNKNOWN_SIGNER_KEYPAIR);
+  corruptedHint.signatures[0] = new xdr.DecoratedSignature({
+    hint: wrongHint.signatures[0].hint,
+    signature: corruptedHint.signatures[0].signature,
+  });
+  assert.throws(
+    () =>
+      assertSignedEnvelopeAuthorizedForSubmission(
+        corruptedHint.toXDR(),
+        plan,
+        {
+          network: "testnet",
+          networkPassphrase: SHARED_ISSUER_TESTNET_PASSPHRASE,
+          issuerPublicKey: ISSUER,
+          requiredWeight: 1,
+          signers: [{ publicKey: ISSUER, weight: 1 }],
+        },
+      ),
+    (error) => errorCode(error) === "invalid_signature",
   );
 });
 

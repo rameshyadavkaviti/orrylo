@@ -551,6 +551,9 @@ export function assertSignedEnvelopeAuthorizedForSubmission(
     for (const [publicKey, signer] of approvedSigners) {
       if (
         !matchedSignerKeys.has(publicKey) &&
+        Buffer.from(signature.hint.toBytes()).equals(
+          Buffer.from(signer.keypair.signatureHint()),
+        ) &&
         signer.keypair.verify(transactionHashBytes, signature.signature)
       ) {
         matchedPublicKey = publicKey;
