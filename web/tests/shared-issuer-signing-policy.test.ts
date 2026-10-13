@@ -311,6 +311,55 @@ test("unsigned or empty primitive output never escapes the isolated policy shell
   }
 });
 
+test("resolver failures are sanitized and never reach the signing primitive", async () => {
+  const plan = createPlan();
+  let primitiveCalls = 0;
+  const signer = new PolicyBoundSharedIssuerTestnetSigner(
+    { issuerPublicKey: ISSUER },
+    {
+      async resolveActiveCanonicalPlan() {
+        throw new Error("postgres://secret-internal-detail");
+      },
+    },
+    {
+      async signCanonicalEnvelope() {
+        primitiveCalls += 1;
+        return { signedEnvelopeXdr: "" };
+      },
+    },
+  );
+
+  await assert.rejects(
+    signer.signCanonicalEnvelope(createSharedIssuerSigningRequest(plan)),
+    (error: unknown) =>
+      errorCode(error) === "signing_policy_unavailable" &&
+      error instanceof Error &&
+      !error.message.includes("secret-internal-detail"),
+  );
+  assert.equal(primitiveCalls, 0);
+});
+
+test("signing primitive failures are sanitized after exact canonical authorization", async () => {
+  const plan = createPlan();
+  const signer = new PolicyBoundSharedIssuerTestnetSigner(
+    { issuerPublicKey: ISSUER },
+    resolverFor(plan),
+    {
+      async signCanonicalEnvelope() {
+        throw new Error("hsm-secret-provider-detail");
+      },
+    },
+  );
+
+  await assert.rejects(
+    signer.signCanonicalEnvelope(createSharedIssuerSigningRequest(plan)),
+    (error: unknown) =>
+      errorCode(error) === "signing_primitive_unavailable" &&
+      error instanceof Error &&
+      !error.message.includes("hsm-secret-provider-detail"),
+  );
+});
+
 test("constructor rejects an invalid local issuer policy before any request can be processed", () => {
   assert.throws(
     () =>
