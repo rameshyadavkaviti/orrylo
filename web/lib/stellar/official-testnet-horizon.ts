@@ -98,13 +98,13 @@ export class OfficialStellarTestnetHorizonReader implements StellarTestnetLedger
     transactionHash: string,
   ): Promise<StellarTestnetTransactionLookup> {
     const normalizedHash = normalizeTransactionHash(transactionHash);
+    let observation = await this.readLatestLedgerObservation();
     const response = await this.request(
       `/transactions/${normalizedHash}`,
       "GET",
     );
 
     if (response.status === 404) {
-      const observation = await this.readLatestLedgerObservation();
       return {
         status: "not_found",
         network: "testnet",
@@ -126,13 +126,15 @@ export class OfficialStellarTestnetHorizonReader implements StellarTestnetLedger
     const record = await parseJson<HorizonTransactionRecord>(response);
     assertTransactionRecord(record, normalizedHash);
 
-    const observation = await this.readLatestLedgerObservation();
     if (observation.observedLedger < record.ledger) {
-      throw new OfficialTestnetHorizonError(
-        "malformed_horizon_response",
-        "Official Horizon returned a transaction newer than its latest ledger checkpoint.",
-        normalizedHash,
-      );
+      observation = await this.readLatestLedgerObservation();
+      if (observation.observedLedger < record.ledger) {
+        throw new OfficialTestnetHorizonError(
+          "malformed_horizon_response",
+          "Official Horizon returned a transaction newer than its latest ledger checkpoint.",
+          normalizedHash,
+        );
+      }
     }
 
     if (!record.successful) {
@@ -177,6 +179,7 @@ export class OfficialStellarTestnetHorizonReader implements StellarTestnetLedger
     accountPublicKey: string,
   ): Promise<StellarTestnetAccountSequenceEvidence> {
     const normalizedAccount = normalizeAccountPublicKey(accountPublicKey);
+    const observation = await this.readLatestLedgerObservation();
     const response = await this.request(
       `/accounts/${normalizedAccount}`,
       "GET",
@@ -210,7 +213,6 @@ export class OfficialStellarTestnetHorizonReader implements StellarTestnetLedger
       );
     }
 
-    const observation = await this.readLatestLedgerObservation();
     return {
       network: "testnet",
       networkPassphrase: Networks.TESTNET,
