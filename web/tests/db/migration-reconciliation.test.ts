@@ -422,7 +422,7 @@ if (!TEST_DATABASE_URL) {
       const afterMigrations = await sql<{ name: string; checksum: string }[]>`
         SELECT name, checksum FROM schema_migrations ORDER BY name
       `;
-      assert.deepEqual(afterMigrations.slice(0, 9), beforeMigrations);
+      assert.deepEqual(afterMigrations.slice(0, 9), [...beforeMigrations]);
       const historicalAfter = await sql<
         {
           attempt_id: string;
