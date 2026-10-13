@@ -440,6 +440,54 @@ The first public-facing experience should:
 
 Prototype speed should come from constrained scope and clear UX, not from weakening security, data integrity, deployment evidence, or canonical policy.
 
+
+### 14.1 Approved Orrylo visual direction
+
+The owner-approved Orrylo product UI direction is a **dark, premium, space/Stellar-inspired interface**, not a generic light SaaS dashboard.
+
+The canonical visual language is:
+
+- deep navy / near-black application background;
+- electric blue, cyan, indigo, violet and purple as the primary accent spectrum;
+- restrained luminous gradients, orbital light trails, stellar/planetary motifs and subtle cosmic texture;
+- dark elevated cards/panels with thin cool-blue borders, soft inner glow and selective glass-like translucency;
+- bright, high-contrast typography with blue/purple gradient emphasis used sparingly for major headlines;
+- rounded modern controls and cards, with crisp spacing and a polished premium feel;
+- iconography based on thin geometric line icons with cool luminous accents;
+- status states that remain immediately legible: cyan/blue for active/network context, green for confirmed/success, amber for pending/warning, muted blue/gray for inactive/draft;
+- a persistent dark navigation shell suitable for Dashboard, Create Token/Project, My Projects/Assets, Issuance, Metadata and later product areas;
+- data-heavy screens may be information-rich, but hierarchy must remain obvious and must not feel like an unfinished admin panel;
+- orbital/planet imagery is a recurring Orrylo brand motif and should be used as product identity, not as decorative noise.
+
+The approved visual reference is the owner-reviewed dark Orrylo dashboard mockup showing:
+
+- a dark left navigation rail with luminous Orrylo branding;
+- a large project/dashboard workspace;
+- blue-to-violet headline and CTA accents;
+- a central orbital/planet visual;
+- dark metric and project cards;
+- luminous blue/violet borders and charts;
+- clear Testnet/network status treatment;
+- polished responsive product-dashboard composition.
+
+This reference supersedes any previously inferred light-theme or generic SaaS interpretation of the Orrylo product UI.
+
+Visual design must remain subordinate to truthful product state. A visually complete screen must not imply that an on-chain action, issuance, metadata publication, reward, trade, liquidity action or other capability is live unless the corresponding implementation and evidence are actually available.
+
+For the current Testnet MVP Fast Track, the approved visual system should be applied around the single customer-facing creation journey rather than exposing internal engineering stages as separate products:
+
+```text
+Connect Wallet
+→ Enter Token Details
+→ Review
+→ Create Token
+→ Creating / Confirming
+→ Confirmed
+```
+
+Internal persistence, signing, submission and confirmation stages may be shown as progress/status feedback, but the customer should experience one continuous Create flow.
+
+
 ## 15. Domain and publication architecture
 
 Approved prototype public structure:
