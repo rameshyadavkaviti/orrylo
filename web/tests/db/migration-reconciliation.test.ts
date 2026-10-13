@@ -390,13 +390,15 @@ if (!TEST_DATABASE_URL) {
         )
       `;
 
-      const historicalBefore = await sql<{
-        attempt_id: string;
-        attempt_number: number;
-        transaction_hash: string;
-        envelope_xdr_sha256: string;
-        source_sequence: string;
-      }[]>`
+      const historicalBefore = await sql<
+        {
+          attempt_id: string;
+          attempt_number: number;
+          transaction_hash: string;
+          envelope_xdr_sha256: string;
+          source_sequence: string;
+        }[]
+      >`
         SELECT attempt_id::text, attempt_number, transaction_hash,
           envelope_xdr_sha256, source_sequence::text
         FROM project_issuance_transaction_attempts
@@ -421,13 +423,15 @@ if (!TEST_DATABASE_URL) {
         SELECT name, checksum FROM schema_migrations ORDER BY name
       `;
       assert.deepEqual(afterMigrations.slice(0, 9), beforeMigrations);
-      const historicalAfter = await sql<{
-        attempt_id: string;
-        attempt_number: number;
-        transaction_hash: string;
-        envelope_xdr_sha256: string;
-        source_sequence: string;
-      }[]>`
+      const historicalAfter = await sql<
+        {
+          attempt_id: string;
+          attempt_number: number;
+          transaction_hash: string;
+          envelope_xdr_sha256: string;
+          source_sequence: string;
+        }[]
+      >`
         SELECT attempt_id::text, attempt_number, transaction_hash,
           envelope_xdr_sha256, source_sequence::text
         FROM project_issuance_transaction_attempts
@@ -436,16 +440,21 @@ if (!TEST_DATABASE_URL) {
       `;
       assert.deepEqual(historicalAfter, historicalBefore);
 
-      const [constraint] = await sql<{
-        definition: string;
-        validated: boolean;
-      }[]>`
+      const [constraint] = await sql<
+        {
+          definition: string;
+          validated: boolean;
+        }[]
+      >`
         SELECT pg_get_constraintdef(oid) AS definition,
           convalidated AS validated
         FROM pg_constraint
         WHERE conname = 'project_issuance_attempt_number_mvp_lite'
       `;
-      assert.equal(constraint.definition, "CHECK ((attempt_number = 1)) NOT VALID");
+      assert.equal(
+        constraint.definition,
+        "CHECK ((attempt_number = 1)) NOT VALID",
+      );
       assert.equal(constraint.validated, false);
 
       await sql.unsafe(`
