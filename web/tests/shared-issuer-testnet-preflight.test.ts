@@ -202,10 +202,7 @@ test("reads one stable official Testnet preflight snapshot and computes issuer s
   assert.equal(result.baseFeeStroops, "100");
   assert.equal(result.baseReserveStroops, "5000000");
   assert.equal(result.preconditions.issuerSequence, "123456");
-  assert.equal(
-    result.preconditions.issuerSpendableNativeStroops,
-    "80000000",
-  );
+  assert.equal(result.preconditions.issuerSpendableNativeStroops, "80000000");
   assert.deepEqual(result.preconditions.destinationTrustline, {
     network: "testnet",
     networkPassphrase: SHARED_ISSUER_TESTNET_PASSPHRASE,
@@ -235,16 +232,15 @@ test("reads one stable official Testnet preflight snapshot and computes issuer s
 
 test("preflight output feeds the existing canonical builder without browser-supplied Stellar authority", async () => {
   const { fetchImpl } = createStableFetch();
-  const result =
-    await new OfficialStellarTestnetIssuancePreflightReader(
-      fetchImpl,
-    ).readIssuancePreconditions({
-      issuerPublicKey: ISSUER,
-      destinationPublicKey: DESTINATION,
-      assetCode: "NOVA",
-      assetCodeReservedForProject: true,
-      feeStroops: "100",
-    });
+  const result = await new OfficialStellarTestnetIssuancePreflightReader(
+    fetchImpl,
+  ).readIssuancePreconditions({
+    issuerPublicKey: ISSUER,
+    destinationPublicKey: DESTINATION,
+    assetCode: "NOVA",
+    assetCodeReservedForProject: true,
+    feeStroops: "100",
+  });
 
   const plan = buildSharedIssuerIssuancePlan(
     {
@@ -283,7 +279,8 @@ test("fails closed if the Testnet ledger advances while account preflight reads 
       assetCodeReservedForProject: true,
       feeStroops: "100",
     }),
-    (error: unknown) => preflightErrorCode(error) === "preflight_ledger_advanced",
+    (error: unknown) =>
+      preflightErrorCode(error) === "preflight_ledger_advanced",
   );
 });
 
@@ -324,16 +321,15 @@ test("represents a missing exact destination trustline truthfully so constructio
     ]),
   });
 
-  const result =
-    await new OfficialStellarTestnetIssuancePreflightReader(
-      fetchImpl,
-    ).readIssuancePreconditions({
-      issuerPublicKey: ISSUER,
-      destinationPublicKey: DESTINATION,
-      assetCode: "NOVA",
-      assetCodeReservedForProject: true,
-      feeStroops: "100",
-    });
+  const result = await new OfficialStellarTestnetIssuancePreflightReader(
+    fetchImpl,
+  ).readIssuancePreconditions({
+    issuerPublicKey: ISSUER,
+    destinationPublicKey: DESTINATION,
+    assetCode: "NOVA",
+    assetCodeReservedForProject: true,
+    feeStroops: "100",
+  });
 
   assert.equal(result.preconditions.destinationTrustline.exists, false);
   assert.equal(result.preconditions.destinationTrustline.authorized, false);

@@ -215,8 +215,7 @@ export class OfficialStellarTestnetIssuancePreflightReader {
       preconditions: {
         assetCodeReservedForProject: request.assetCodeReservedForProject,
         issuerSequence: normalizeSequence(issuer.sequence),
-        issuerSpendableNativeStroops:
-          issuerSpendableNativeStroops.toString(),
+        issuerSpendableNativeStroops: issuerSpendableNativeStroops.toString(),
         feeStroops: feeStroops.toString(),
         destinationTrustline,
       },
@@ -246,7 +245,9 @@ export class OfficialStellarTestnetIssuancePreflightReader {
       !Number.isSafeInteger(record.base_reserve_in_stroops) ||
       record.base_reserve_in_stroops <= 0
     ) {
-      throw malformed("Official Horizon returned malformed ledger preflight data.");
+      throw malformed(
+        "Official Horizon returned malformed ledger preflight data.",
+      );
     }
 
     return {
@@ -443,7 +444,9 @@ function assertAccountShape(
     !Array.isArray(account.signers) ||
     !Array.isArray(account.balances)
   ) {
-    throw malformed("Official Horizon returned malformed account preflight data.");
+    throw malformed(
+      "Official Horizon returned malformed account preflight data.",
+    );
   }
 }
 
@@ -470,10 +473,7 @@ function normalizeSequence(value: string): string {
   return BigInt(value).toString();
 }
 
-function parsePositiveInteger(
-  value: string,
-  code: "invalid_fee",
-): bigint {
+function parsePositiveInteger(value: string, code: "invalid_fee"): bigint {
   if (!INTEGER_PATTERN.test(value)) {
     throw new SharedIssuerTestnetPreflightError(
       code,
