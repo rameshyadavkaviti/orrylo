@@ -148,7 +148,7 @@ Documentation describing a target is not implementation evidence.
 
 An agent must be able to recover normal Orrylo quality in a new conversation from the repository name and its assigned role alone.
 
-Before meaningful work, follow the bootstrap and role-recovery procedure in section 19 of `docs/SOURCE_OF_TRUTH.md`. In particular:
+Before meaningful work, follow the bootstrap and role-recovery procedure in section 18 of `docs/SOURCE_OF_TRUTH.md`. In particular:
 
 - reconcile current GitHub state instead of trusting chat memory;
 - inspect role-relevant open PRs/issues, latest exact HEADs, review findings, and CI;
