@@ -157,6 +157,8 @@ async function main() {
       {
         attempt_constraint: string | null;
         attempt_constraint_validated: boolean | null;
+        trusted_writer_function_security_definer: boolean;
+        trusted_writer_function_search_path: string[] | null;
         reachability_trigger: boolean;
         reachability_function_security_definer: boolean;
         reachability_function_search_path: string[] | null;
@@ -180,6 +182,24 @@ async function main() {
             AND constraint_row.conrelid =
               'project_issuance_transaction_attempts'::regclass
         ) AS attempt_constraint_validated,
+        COALESCE((
+          SELECT procedure.prosecdef
+          FROM pg_catalog.pg_proc AS procedure
+          JOIN pg_catalog.pg_namespace AS namespace
+            ON namespace.oid = procedure.pronamespace
+          WHERE namespace.nspname = 'public'
+            AND procedure.proname = 'assert_trusted_confirmation_writer'
+          LIMIT 1
+        ), true) AS trusted_writer_function_security_definer,
+        (
+          SELECT procedure.proconfig
+          FROM pg_catalog.pg_proc AS procedure
+          JOIN pg_catalog.pg_namespace AS namespace
+            ON namespace.oid = procedure.pronamespace
+          WHERE namespace.nspname = 'public'
+            AND procedure.proname = 'assert_trusted_confirmation_writer'
+          LIMIT 1
+        ) AS trusted_writer_function_search_path,
         EXISTS (
           SELECT 1
           FROM pg_catalog.pg_trigger AS trigger_row
@@ -232,6 +252,10 @@ async function main() {
       hardening?.attempt_constraint !==
         "CHECK ((attempt_number = 1)) NOT VALID" ||
       hardening.attempt_constraint_validated !== false ||
+      hardening.trusted_writer_function_security_definer ||
+      !hardening.trusted_writer_function_search_path?.includes(
+        "search_path=pg_catalog, public, pg_temp",
+      ) ||
       !hardening.reachability_trigger ||
       !hardening.reachability_function_security_definer ||
       !hardening.reachability_function_search_path?.includes(
@@ -240,7 +264,7 @@ async function main() {
       hardening.reachability_function_public_execute
     ) {
       throw new Error(
-        "Missing or unsafe MVP Lite database hardening for attempt count or metadata reachability.",
+        "Missing or unsafe MVP Lite database hardening for attempt count, trusted confirmation writing, or metadata reachability.",
       );
     }
     process.stdout.write("Database schema verified.\n");
