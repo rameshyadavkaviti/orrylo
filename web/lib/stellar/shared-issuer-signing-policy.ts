@@ -20,14 +20,18 @@ import {
 } from "./shared-issuer-issuance";
 
 const HASH_PATTERN = /^[0-9a-f]{64}$/;
+const ASSET_CODE_PATTERN = /^[A-Z0-9]{1,12}$/;
+const CANONICAL_AMOUNT_PATTERN = /^(?:0|[1-9][0-9]*)\.[0-9]{7}$/;
 const NON_NEGATIVE_INTEGER_PATTERN = /^[0-9]+$/;
 const POSITIVE_INTEGER_PATTERN = /^[1-9][0-9]*$/;
 
 export type SharedIssuerSigningPolicyErrorCode =
   | "invalid_signing_policy"
   | "invalid_signing_request"
+  | "signing_policy_unavailable"
   | "canonical_plan_not_found"
   | "canonical_plan_mismatch"
+  | "signing_primitive_unavailable"
   | "signing_primitive_mismatch";
 
 export class SharedIssuerSigningPolicyError extends Error {
@@ -88,7 +92,14 @@ export class PolicyBoundSharedIssuerTestnetSigner implements SharedIssuerSigner 
     private readonly resolver: SharedIssuerCanonicalSigningPlanResolver,
     private readonly primitive: SharedIssuerSigningPrimitive,
   ) {
-    this.issuerPublicKey = normalizePublicKey(policy.issuerPublicKey);
+    try {
+      this.issuerPublicKey = normalizePublicKey(policy.issuerPublicKey);
+    } catch {
+      throw new SharedIssuerSigningPolicyError(
+        "invalid_signing_policy",
+        "Local signing policy requires one checksum-valid Shared Issuer public key.",
+      );
+    }
   }
 
   async signCanonicalEnvelope(
@@ -96,9 +107,17 @@ export class PolicyBoundSharedIssuerTestnetSigner implements SharedIssuerSigner 
   ): Promise<{ signedEnvelopeXdr: string }> {
     assertRequestBoundary(request, this.issuerPublicKey);
 
-    const plan = await this.resolver.resolveActiveCanonicalPlan(
-      request.transactionHash,
-    );
+    let plan: SharedIssuerIssuancePlan | null;
+    try {
+      plan = await this.resolver.resolveActiveCanonicalPlan(
+        request.transactionHash,
+      );
+    } catch {
+      throw new SharedIssuerSigningPolicyError(
+        "signing_policy_unavailable",
+        "The trusted canonical signing-policy resolver is unavailable.",
+      );
+    }
     if (!plan) {
       throw new SharedIssuerSigningPolicyError(
         "canonical_plan_not_found",
@@ -117,10 +136,18 @@ export class PolicyBoundSharedIssuerTestnetSigner implements SharedIssuerSigner 
       );
     }
 
-    const signed = await this.primitive.signCanonicalEnvelope({
-      transactionHash: plan.transactionHash,
-      unsignedEnvelopeXdr: plan.unsignedEnvelopeXdr,
-    });
+    let signed: { signedEnvelopeXdr: string };
+    try {
+      signed = await this.primitive.signCanonicalEnvelope({
+        transactionHash: plan.transactionHash,
+        unsignedEnvelopeXdr: plan.unsignedEnvelopeXdr,
+      });
+    } catch {
+      throw new SharedIssuerSigningPolicyError(
+        "signing_primitive_unavailable",
+        "The isolated signing primitive could not complete the authorized request.",
+      );
+    }
 
     if (
       !signed ||
@@ -192,10 +219,27 @@ function assertCanonicalPlan(
   issuerPublicKey: string,
 ): void {
   try {
+    const destinationPublicKey = normalizePublicKey(
+      plan.intent.destinationPublicKey,
+    );
+    const canonicalAmountMatch = CANONICAL_AMOUNT_PATTERN.exec(
+      plan.intent.amount,
+    );
+    const amountUnits = canonicalAmountMatch
+      ? BigInt(canonicalAmountMatch[0].replace(".", ""))
+      : 0n;
+
     if (
       plan.intent.policyVersion !== SHARED_ISSUANCE_POLICY_VERSION ||
       plan.intent.network !== SHARED_ISSUER_TESTNET_NETWORK ||
+      typeof plan.intent.projectId !== "string" ||
+      !plan.intent.projectId ||
+      plan.intent.projectId.trim() !== plan.intent.projectId ||
       normalizePublicKey(plan.intent.issuerPublicKey) !== issuerPublicKey ||
+      destinationPublicKey === issuerPublicKey ||
+      !ASSET_CODE_PATTERN.test(plan.intent.assetCode) ||
+      !canonicalAmountMatch ||
+      amountUnits <= 0n ||
       !HASH_PATTERN.test(plan.transactionHash) ||
       !NON_NEGATIVE_INTEGER_PATTERN.test(plan.sourceSequence) ||
       !POSITIVE_INTEGER_PATTERN.test(plan.feeStroops) ||
@@ -217,7 +261,7 @@ function assertCanonicalPlan(
     )
       .addOperation(
         Operation.payment({
-          destination: normalizePublicKey(plan.intent.destinationPublicKey),
+          destination: destinationPublicKey,
           asset: new Asset(plan.intent.assetCode, issuerPublicKey),
           amount: plan.intent.amount,
         }),
