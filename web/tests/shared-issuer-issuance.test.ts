@@ -998,17 +998,13 @@ test("submission authorization requires valid approved signatures meeting config
   });
   assert.throws(
     () =>
-      assertSignedEnvelopeAuthorizedForSubmission(
-        corruptedHint.toXDR(),
-        plan,
-        {
-          network: "testnet",
-          networkPassphrase: SHARED_ISSUER_TESTNET_PASSPHRASE,
-          issuerPublicKey: ISSUER,
-          requiredWeight: 1,
-          signers: [{ publicKey: ISSUER, weight: 1 }],
-        },
-      ),
+      assertSignedEnvelopeAuthorizedForSubmission(corruptedHint.toXDR(), plan, {
+        network: "testnet",
+        networkPassphrase: SHARED_ISSUER_TESTNET_PASSPHRASE,
+        issuerPublicKey: ISSUER,
+        requiredWeight: 1,
+        signers: [{ publicKey: ISSUER, weight: 1 }],
+      }),
     (error) => errorCode(error) === "invalid_signature",
   );
 });

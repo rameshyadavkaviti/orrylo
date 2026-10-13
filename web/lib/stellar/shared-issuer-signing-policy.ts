@@ -1,8 +1,4 @@
-import {
-  Keypair,
-  Transaction,
-  TransactionBuilder,
-} from "@stellar/stellar-sdk";
+import { Keypair, Transaction, TransactionBuilder } from "@stellar/stellar-sdk";
 
 import {
   signPersistedSharedIssuerEnvelope,

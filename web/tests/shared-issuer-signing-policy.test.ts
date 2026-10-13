@@ -180,7 +180,10 @@ test("durable #32 binding gates the only Testnet signing entry before the primit
   });
   assert.equal(
     Buffer.from(
-      TransactionBuilder.fromXDR(signed.signedEnvelopeXdr, Networks.TESTNET).hash(),
+      TransactionBuilder.fromXDR(
+        signed.signedEnvelopeXdr,
+        Networks.TESTNET,
+      ).hash(),
     ).toString("hex"),
     plan.transactionHash,
   );
