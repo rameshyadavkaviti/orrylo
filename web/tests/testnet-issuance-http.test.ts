@@ -10,6 +10,10 @@ import {
   type IssuanceRouteDependencies,
 } from "../app/api/projects/[projectId]/issuance/route";
 import {
+  handleStartOrResumeIssuance,
+  type IssuanceExecutionRouteDependencies,
+} from "../app/api/projects/[projectId]/issuance/execution/route";
+import {
   SharedIssuerUnavailableError,
   UnavailableSharedIssuerExecutionAdapter,
 } from "../lib/stellar/shared-issuer-execution";
@@ -54,7 +58,11 @@ function request(body: unknown, origin = "https://orrylo.com") {
     },
   );
 }
-const VALID = { idempotencyKey: KEY, expectedAssetCode: "NOVA" };
+const VALID = {
+  idempotencyKey: KEY,
+  expectedAssetCode: "NOVA",
+  initialSupply: "2.5000000",
+};
 
 test("unauthenticated requests cannot see or create issuance intents", async () => {
   const deps = dependencies();
@@ -81,6 +89,7 @@ test("request boundary binds owner to session, not browser body", async () => {
   deps.requestIssuance = async (input) => {
     subject = input.ownerPublicKey;
     assert.equal(input.projectId, PROJECT_ID);
+    assert.equal(input.initialSupply, "2.5000000");
     return { created: true, issuance: ISSUANCE };
   };
   const accepted = await handleRequestIssuance(request(VALID), CONTEXT, deps);
@@ -89,6 +98,8 @@ test("request boundary binds owner to session, not browser body", async () => {
 
   for (const added of [
     { ownerPublicKey: OWNER },
+    { destinationPublicKey: OWNER },
+    { initialSupplyStroops: "25000000" },
     { network: "public" },
     { issuerPublicKey: OWNER },
     { transactionHash: "0".repeat(64) },
@@ -152,6 +163,7 @@ test("service authorization and state errors map to actionable HTTP statuses", a
     ["idempotency_conflict", 409],
     ["invalid_asset_configuration", 400],
     ["asset_code_mismatch", 400],
+    ["invalid_initial_supply", 400],
   ] as const) {
     const deps = dependencies();
     deps.requestIssuance = async () => {
@@ -176,6 +188,58 @@ test("owner sees only recorded issuance evidence or not_started", async () => {
   assert.deepEqual((await awaiting.json()).issuance, ISSUANCE);
 });
 
+test("execution boundary derives owner and project from authenticated server context", async () => {
+  let received: unknown;
+  const deps: IssuanceExecutionRouteDependencies = {
+    authDomain: "orrylo.com",
+    getSession: async () => SESSION,
+    startOrResume: async (input) => {
+      received = input;
+      return { status: "confirming", transactionHash: "a".repeat(64) };
+    },
+  };
+  const response = await handleStartOrResumeIssuance(
+    request({ requestId: ISSUANCE.requestId }),
+    CONTEXT,
+    deps,
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(received, {
+    requestId: ISSUANCE.requestId,
+    projectId: PROJECT_ID,
+    ownerPublicKey: OWNER,
+  });
+});
+
+test("execution boundary rejects browser authority and unavailable runtime fails closed", async () => {
+  const deps: IssuanceExecutionRouteDependencies = {
+    authDomain: "orrylo.com",
+    getSession: async () => SESSION,
+    startOrResume: async () => {
+      const error = new Error("unavailable") as Error & { code: string };
+      error.code = "issuer_integration_unavailable";
+      throw error;
+    },
+  };
+  const override = await handleStartOrResumeIssuance(
+    request({ requestId: ISSUANCE.requestId, ownerPublicKey: OWNER }),
+    CONTEXT,
+    deps,
+  );
+  assert.equal(override.status, 400);
+
+  const unavailable = await handleStartOrResumeIssuance(
+    request({ requestId: ISSUANCE.requestId }),
+    CONTEXT,
+    deps,
+  );
+  assert.equal(unavailable.status, 503);
+  assert.equal(
+    (await unavailable.json()).code,
+    "issuer_integration_unavailable",
+  );
+});
+
 test("unavailable reviewed Stellar execution adapter rejects signing, submission and lookup", async () => {
   const adapter = new UnavailableSharedIssuerExecutionAdapter();
   await assert.rejects(
@@ -197,4 +261,28 @@ test("unavailable reviewed Stellar execution adapter rejects signing, submission
     adapter.lookupTransaction("0".repeat(64)),
     SharedIssuerUnavailableError,
   );
+});
+
+test("API denies malformed supply, missing amount, and browser-chosen destination", async () => {
+  let called = false;
+  const deps = dependencies();
+  deps.requestIssuance = async () => {
+    called = true;
+    throw new Error("must not run");
+  };
+  for (const payload of [
+    { idempotencyKey: KEY, expectedAssetCode: "NOVA" },
+    { ...VALID, initialSupply: 100 },
+    { ...VALID, initialSupply: "1".repeat(41) },
+    { ...VALID, destinationPublicKey: OWNER },
+    { ...VALID, issuerPublicKey: OWNER },
+    { ...VALID, ownerPublicKey: OWNER },
+    { ...VALID, network: "public" },
+  ]) {
+    assert.equal(
+      (await handleRequestIssuance(request(payload), CONTEXT, deps)).status,
+      400,
+    );
+  }
+  assert.equal(called, false);
 });

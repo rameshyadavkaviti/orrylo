@@ -359,8 +359,32 @@ explicit unavailable implementations, as does the production Testnet ledger
 reader. POST reservation creation requires an
 authenticated wallet, the owned project, a UUID idempotency key and a matching
 asset-code assertion; browser-provided issuer, network and wallet authority
-are rejected. No route signs or submits transactions, and no route transitions
-an intent to pending, submitted, confirmed, failed, or reconciliation-required.
+are rejected. The owner-authenticated execution route delegates only to the
+server orchestration boundary described below; the default runtime fails closed
+before preflight or attempt creation because no operational signing primitive is
+installed.
+
+## Testnet MVP issuance orchestration
+
+`SharedIssuanceOrchestrator.startOrResume(...)` is the single application entry
+point joining the immutable owner-bound intent to the reviewed Testnet stack. It
+runs official-Horizon preflight, builds the canonical one-payment envelope,
+persists exactly attempt 1, invokes the injected secretless signing primitive,
+persists signed-envelope provenance before one-shot submission, validates the
+exact hash through the authoritative reader, and writes confirmation only
+through the dedicated trusted writer.
+
+Reload/replay reads durable server state. An existing attempt is never submitted
+again and never replaced; it can proceed only through exact-hash authoritative
+reconciliation. Ambiguous submission becomes `reconciliation_required` and no
+browser response can create `confirmed` state. The builder treats Project
+Profile persistence, immutable intent creation, and execution start as one
+Create Token journey while retaining those server-side boundaries.
+
+Production activation still requires an independently approved secretless
+`SharedIssuerSigningPrimitive`, the explicitly approved Shared Issuer public
+key and fee, and a separately credentialed `orrylo_confirmation_writer`
+connection. No signer seed or credential belongs in application source.
 
 This Gate A foundation is code-only and **not deployed or activated** until
 independently approved.

@@ -137,12 +137,22 @@ Still open:
 
 **Approved 2026-10-12:** First delivery milestone is one real end-to-end customer Shared Issuer asset issuance on Testnet, *not* the entire RYLO economy/reward/liquidity demonstration. This does not alter approved RYLO eligibility, 150 RYLO reward, timing, issuer control, mint/supply economics, or any Mainnet rules. Mainnet and full RYLO ecosystem demonstrations remain separate later work.
 
-**Execution-critical decisions still open — obtain explicit owner/Stellar/Security approval before signing or funding:**
-- exact Testnet Shared Issuer account identity, readiness, signer/custody and applicable account flags;
-- receiving wallet, trustline setup and authorization behavior, including transaction-fee/funding responsibility (do not invent automatic funding);
-- safe bounded test-activation procedure and evidence required before allowing broad public creation;
-- remaining PR #32 proof/reconciliation blockers, any required intent persistence and database authority split;
-- practical server-side rate limiting and abuse controls for broad public creation, without an unapproved wallet allowlist.
+**Owner-approved bounded Testnet MVP Lite execution decisions (Issue #43, 2026-10-12):**
+- create one new random dedicated **Testnet Shared Issuer** for the demonstration; never reuse the RYLO issuer and do not implicitly activate the reserved `GBR7...ASSETS` candidate;
+- bounded Testnet issuer flags: `AUTH_REQUIRED=OFF`, `AUTH_REVOCABLE=OFF`, `AUTH_CLAWBACK=OFF`, `AUTH_IMMUTABLE=OFF`;
+- one isolated Testnet signer with Master weight 1 and low/medium/high thresholds `1/1/1`; no multisig requirement for this bounded demonstration;
+- issuance destination must equal the authenticated Albedo owner's Stellar account;
+- issuer funding is manual; the customer brings a funded Testnet wallet and pays its own trustline reserve/fee; no sponsorship or automatic XLM funding;
+- authoritative confirmation uses direct official Stellar Testnet Horizon exact-transaction-hash lookup behind the reviewed reader abstraction.
+
+These decisions approve policy only. They do **not** authorize account creation/funding, secret generation/import/storage, signer deployment, account mutation, trustline creation, transaction signing/submission, or Mainnet action.
+
+**Still open / owner-gated before live activation:**
+- exact public key of the newly created Testnet Shared Issuer and evidence that the approved flags/thresholds are actually configured;
+- concrete signer custody/deployment technology and secret-handling procedure;
+- the actual authenticated customer wallet selected for the first issuance and its existing exact trustline readiness;
+- safe bounded activation procedure and Security approval for the real demonstration;
+- practical server-side rate limiting and abuse controls for broader public creation, without an unapproved wallet allowlist.
 
 **Minimal delivery gates:** Full-stack owns app UI/server intent flow; Stellar/Contract owns issuer account/configuration, transaction construction/signing/trustline boundaries; Security/Enablement owns adversarial verification, proof/unknown-outcome/DB privilege gates; Product Architect coordinates critical path and obtains owner decisions. No agent may treat a draft PR, UI preview, Project Profile save or Testnet preparation as completed issuance. Detailed bounded work belongs to agent PRs/issues; do not open unrelated features before the first real Testnet issuance evidence.
 
@@ -160,9 +170,9 @@ This remains a reserved candidate only, not deployment evidence.
 
 Still open:
 
-- whether the reserved candidate becomes the final Shared Issuer public key;
-- final account authorization flags;
-- detailed lifecycle rules;
+- whether the reserved candidate becomes the final **Mainnet/production** Shared Issuer public key;
+- final Mainnet/production account authorization flags and custody;
+- detailed lifecycle rules beyond the bounded Testnet MVP Lite policy above;
 - exact metadata schema.
 
 ### Shared Issuer creation/reservation policy — approved boundary and remaining decisions
@@ -183,7 +193,7 @@ Still open (must not be silently selected by implementation):
 - concrete server-side rate limits, quotas, and multi-wallet abuse mitigation;
 - reviewed reclamation mechanism, cancellation authority, and ledger-evidence requirements for release;
 - policy for reservation handling on project ownership transfer;
-- final Shared Issuer account identity, flags, and execution/signing/ledger-confirmation policy.
+- final Mainnet/production Shared Issuer identity, flags, custody and execution policy; the bounded Testnet MVP Lite A–F decisions above are already approved.
 
 ## Dedicated Issuer templates
 

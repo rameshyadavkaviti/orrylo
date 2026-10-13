@@ -114,17 +114,20 @@ test("project save deliberately excludes browser-reviewed supply and logo", () =
   );
 });
 
-test("builder marks a supply as browser-only and gates saving behind review", () => {
+test("builder gates the continuous Create Token journey behind exact review", () => {
   const html = renderToStaticMarkup(<CreateSharedTokenForm />);
   assert.match(html, /Initial supply \(token units\)/);
   assert.match(html, /Review configuration/);
   assert.match(html, /Browser draft only/);
-  assert.match(html, /Save Project Profile only/);
-  assert.match(html, /not token supply/);
+  assert.match(html, /Create Token/);
+  assert.match(html, /becomes immutable only after the final review/);
   assert.match(html, /fixed lifetime supply/i);
   assert.match(html, /Shared Issuer/);
   assert.match(html, /Orrylo-operated/);
-  assert.match(html, /Not selected/);
+  assert.match(html, /Authenticated owner wallet|Not selected/);
   assert.match(html, /disabled=""/);
-  assert.doesNotMatch(html, /Confirm issuance|Token issued|Fixed Supply mode/);
+  assert.doesNotMatch(
+    html,
+    /Save Project Profile only|Token issued|Fixed Supply mode/,
+  );
 });

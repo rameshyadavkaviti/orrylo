@@ -107,6 +107,9 @@ export interface SharedIssuancePersistenceRepository {
   listAttempts(
     issuanceRequestId: string,
   ): Promise<ImmutableSharedIssuanceTransactionAttempt[]>;
+  getConfirmation(
+    issuanceRequestId: string,
+  ): Promise<ImmutableSharedIssuanceLedgerConfirmation | null>;
 }
 
 export type SharedIssuancePersistenceWriter =
@@ -344,6 +347,17 @@ export class PostgresSharedIssuancePersistenceRepository implements SharedIssuan
     `;
     return rows.map(mapAttempt);
   }
+
+  async getConfirmation(
+    issuanceRequestId: string,
+  ): Promise<ImmutableSharedIssuanceLedgerConfirmation | null> {
+    if (!UUID_PATTERN.test(issuanceRequestId)) return null;
+    const [row] = await this.boundary.sql<ConfirmationRow[]>`
+      SELECT * FROM project_issuance_ledger_confirmations
+      WHERE issuance_request_id = ${issuanceRequestId}
+    `;
+    return row ? mapConfirmation(row) : null;
+  }
 }
 
 export class PostgresTrustedLedgerConfirmationWriter implements TrustedLedgerConfirmationWriter {
@@ -433,6 +447,11 @@ export class UnavailableSharedIssuancePersistenceWriter implements SharedIssuanc
   }
 
   async listAttempts(_issuanceRequestId: string): Promise<never> {
+    void _issuanceRequestId;
+    throw new SharedIssuancePersistenceUnavailableError();
+  }
+
+  async getConfirmation(_issuanceRequestId: string): Promise<never> {
     void _issuanceRequestId;
     throw new SharedIssuancePersistenceUnavailableError();
   }

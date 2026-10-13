@@ -38,7 +38,13 @@ export default async function ManagedAssetIssuanceLayout({
     <>
       {children}
       <div className="page-stack" style={{ marginTop: "1.5rem" }}>
-        <TestnetIssuanceSection project={project} issuance={issuance} />
+        <TestnetIssuanceSection
+          project={project}
+          issuance={issuance}
+          intentConfigurationAvailable={Boolean(
+            process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY,
+          )}
+        />
       </div>
     </>
   );

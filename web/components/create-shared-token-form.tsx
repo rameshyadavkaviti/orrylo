@@ -39,6 +39,11 @@ const LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 type SaveState =
   | { status: "idle" }
   | { status: "saving" }
+  | { status: "persisting_intent" }
+  | { status: "preparing_issuance" }
+  | { status: "confirming" }
+  | { status: "confirmed"; transactionHash: string }
+  | { status: "reconciliation_required"; managePath: string }
   | { status: "needs_wallet" }
   | { status: "wallet_session_changed" }
   | { status: "failure"; message: string };
@@ -51,13 +56,12 @@ export function CreateSharedTokenForm() {
     null,
   );
   const [review, setReview] = useState<TokenBuilderReview | null>(null);
-  const [acknowledgedProfileOnlySave, setAcknowledgedProfileOnlySave] =
-    useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoName, setLogoName] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
   const idempotencyKeyRef = useRef<string | null>(null);
+  const issuanceIdempotencyKeyRef = useRef<string | null>(null);
   const pendingSaveRef = useRef<PendingManagedProjectSave | null>(null);
   const revisionRef = useRef(0);
   const savingRef = useRef(false);
@@ -66,9 +70,9 @@ export function CreateSharedTokenForm() {
   function invalidateReview() {
     revisionRef.current += 1;
     setReview(null);
-    setAcknowledgedProfileOnlySave(false);
     setSaveState({ status: "idle" });
     idempotencyKeyRef.current = null;
+    issuanceIdempotencyKeyRef.current = null;
     pendingSaveRef.current = null;
   }
 
@@ -137,26 +141,22 @@ export function CreateSharedTokenForm() {
     setInitialSupplyError(checked.valid ? null : checked.supplyError);
     if (!checked.valid || logoError) {
       setReview(null);
-      setAcknowledgedProfileOnlySave(false);
       return;
     }
     setDraft(project.normalized);
     setReview(checked.review);
-    setAcknowledgedProfileOnlySave(false);
     setSaveState({ status: "idle" });
   }
 
   async function handleSaveProject() {
     if (
       !review ||
-      !acknowledgedProfileOnlySave ||
       !matchesCurrentBuilderReview(review, draft, initialSupply, logoName) ||
       logoError
     ) {
       setSaveState({
         status: "failure",
-        message:
-          "Review the configuration and acknowledge that the supply is not saved.",
+        message: "Review the exact token configuration before creating it.",
       });
       return;
     }
@@ -171,7 +171,6 @@ export function CreateSharedTokenForm() {
     setErrors(prepared.errors);
     if (!prepared.ok) {
       setReview(null);
-      setAcknowledgedProfileOnlySave(false);
       setSaveState({
         status: "failure",
         message: "Review the highlighted token details before saving.",
@@ -232,7 +231,19 @@ export function CreateSharedTokenForm() {
         return;
       }
 
-      window.location.assign(result.managePath);
+      if (
+        !review ||
+        !matchesCurrentBuilderReview(review, draft, initialSupply, logoName)
+      ) {
+        window.location.assign(result.managePath);
+        return;
+      }
+      await persistIntentAndExecute(
+        result.projectId,
+        result.managePath,
+        review.assetCode,
+        review.initialSupply,
+      );
     } catch {
       if (submittedRevision === revisionRef.current) {
         setSaveState({
@@ -246,13 +257,100 @@ export function CreateSharedTokenForm() {
     }
   }
 
+  async function persistIntentAndExecute(
+    projectId: string,
+    managePath: string,
+    assetCode: string,
+    supply: string,
+  ) {
+    issuanceIdempotencyKeyRef.current ??= crypto.randomUUID();
+    setSaveState({ status: "persisting_intent" });
+    try {
+      const intentResponse = await fetch(
+        `/api/projects/${projectId}/issuance`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            idempotencyKey: issuanceIdempotencyKeyRef.current,
+            expectedAssetCode: assetCode,
+            initialSupply: supply,
+          }),
+        },
+      );
+      const intentResult = await readJson<{
+        ok: true;
+        issuance: { requestId: string };
+      }>(intentResponse);
+      if (!intentResponse.ok || !intentResult?.ok) {
+        setSaveState({
+          status: "failure",
+          message:
+            "The Project Profile was saved, but the immutable token intent was not confirmed. Open the project to recover from server state.",
+        });
+        return;
+      }
+
+      setSaveState({ status: "preparing_issuance" });
+      const executionResponse = await fetch(
+        `/api/projects/${projectId}/issuance/execution`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ requestId: intentResult.issuance.requestId }),
+        },
+      );
+      const executionResult = await readJson<{
+        ok: true;
+        execution:
+          | { status: "confirmed"; transactionHash: string }
+          | { status: "preparing_issuance" }
+          | { status: "confirming"; transactionHash: string }
+          | { status: "reconciliation_required"; transactionHash: string }
+          | { status: "failed_before_submission"; failureCode: string };
+      }>(executionResponse);
+      if (!executionResponse.ok || !executionResult?.ok) {
+        window.location.assign(managePath);
+        return;
+      }
+      if (executionResult.execution.status === "confirmed") {
+        setSaveState({
+          status: "confirmed",
+          transactionHash: executionResult.execution.transactionHash,
+        });
+        return;
+      }
+      if (executionResult.execution.status === "preparing_issuance") {
+        setSaveState({ status: "preparing_issuance" });
+        window.location.assign(managePath);
+        return;
+      }
+      if (executionResult.execution.status === "reconciliation_required") {
+        setSaveState({ status: "reconciliation_required", managePath });
+        return;
+      }
+      if (executionResult.execution.status === "confirming") {
+        setSaveState({ status: "confirming" });
+        window.location.assign(managePath);
+        return;
+      }
+      setSaveState({
+        status: "failure",
+        message: `Token creation stopped before submission (${executionResult.execution.failureCode}). No automatic retry was attempted.`,
+      });
+    } catch {
+      window.location.assign(managePath);
+    }
+  }
+
   async function continueAfterAuthentication(publicKey: string) {
     const pendingSave = pendingSaveRef.current;
 
     if (
       !pendingSave ||
       !review ||
-      !acknowledgedProfileOnlySave ||
       !matchesCurrentBuilderReview(review, draft, initialSupply, logoName)
     ) {
       setSaveState({
@@ -266,11 +364,16 @@ export function CreateSharedTokenForm() {
   }
 
   const amountPreview = validateInitialSupply(initialSupply);
-  const canSaveReviewedProfile =
+  const canCreateToken =
     review !== null &&
-    acknowledgedProfileOnlySave &&
     matchesCurrentBuilderReview(review, draft, initialSupply, logoName) &&
     !logoError;
+  const isWorking = [
+    "saving",
+    "persisting_intent",
+    "preparing_issuance",
+    "confirming",
+  ].includes(saveState.status);
   const previewCode = draft.code.trim().toUpperCase() || "TOKEN";
   const previewName = draft.displayName.trim() || "Your token";
   const previewDescription =
@@ -313,7 +416,7 @@ export function CreateSharedTokenForm() {
                 <input
                   name="code"
                   value={draft.code}
-                  disabled={saveState.status === "saving"}
+                  disabled={isWorking}
                   aria-invalid={Boolean(errors.code)}
                   onChange={(event) => updateField("code", event.target.value)}
                   placeholder="MYTOKEN"
@@ -337,7 +440,7 @@ export function CreateSharedTokenForm() {
                 <input
                   name="displayName"
                   value={draft.displayName}
-                  disabled={saveState.status === "saving"}
+                  disabled={isWorking}
                   aria-invalid={Boolean(errors.displayName)}
                   onChange={(event) =>
                     updateField("displayName", event.target.value)
@@ -363,7 +466,7 @@ export function CreateSharedTokenForm() {
               <textarea
                 name="description"
                 value={draft.description}
-                disabled={saveState.status === "saving"}
+                disabled={isWorking}
                 aria-invalid={Boolean(errors.description)}
                 onChange={(event) =>
                   updateField("description", event.target.value)
@@ -406,7 +509,7 @@ export function CreateSharedTokenForm() {
                 type="text"
                 inputMode="decimal"
                 value={initialSupply}
-                disabled={saveState.status === "saving"}
+                disabled={isWorking}
                 aria-invalid={Boolean(initialSupplyError)}
                 onChange={(event) => updateInitialSupply(event.target.value)}
                 placeholder="Example: 2500.5"
@@ -427,10 +530,8 @@ export function CreateSharedTokenForm() {
               )}
             </label>
             <p className="builder-boundary-note">
-              Preview only: this amount is not yet saved with the Project
-              Profile, included in an immutable issuance order, or issued on
-              Stellar. Real issuance stays unavailable until the backend
-              supports it safely.
+              This amount becomes immutable only after the final review and
+              Create Token action. It is never inferred from browser state.
             </p>
           </section>
 
@@ -453,7 +554,7 @@ export function CreateSharedTokenForm() {
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
                 onChange={handleLogoChange}
-                disabled={saveState.status === "saving"}
+                disabled={isWorking}
                 aria-invalid={Boolean(logoError)}
                 aria-describedby={logoError ? "logo-error" : "logo-help"}
               />
@@ -537,7 +638,7 @@ export function CreateSharedTokenForm() {
             <button
               type="submit"
               className="button button-secondary"
-              disabled={saveState.status === "saving"}
+              disabled={isWorking}
             >
               Review configuration
             </button>
@@ -553,8 +654,7 @@ export function CreateSharedTokenForm() {
                 <div>
                   <h3 id="final-review-title">Final draft review</h3>
                   <p>
-                    Review the exact configuration before saving project
-                    details.
+                    Review the exact configuration before creating the token.
                   </p>
                 </div>
               </div>
@@ -583,7 +683,7 @@ export function CreateSharedTokenForm() {
                   </dd>
                 </div>
                 <div>
-                  <dt>Selected initial supply (preview only)</dt>
+                  <dt>Exact initial supply</dt>
                   <dd>{review.initialSupply} tokens</dd>
                 </div>
                 <div>
@@ -592,47 +692,30 @@ export function CreateSharedTokenForm() {
                 </div>
                 <div>
                   <dt>Target network</dt>
-                  <dd>Stellar Testnet; no on-chain submission</dd>
+                  <dd>Stellar Testnet only</dd>
                 </div>
                 <div>
                   <dt>Issuer authority</dt>
                   <dd>
-                    Orrylo-operated Shared Issuer, not customer-owned; account
-                    not yet approved
+                    Server-approved Orrylo Shared Issuer; not customer-owned
                   </dd>
                 </div>
                 <div>
                   <dt>Distribution destination</dt>
-                  <dd>Not selected or approved</dd>
+                  <dd>Authenticated owner wallet</dd>
                 </div>
                 <div>
                   <dt>Fees</dt>
-                  <dd>Not configured</dd>
+                  <dd>Server-authoritative Testnet fee</dd>
                 </div>
                 <div>
                   <dt>On-chain status</dt>
                   <dd>Not started; no transaction or confirmation</dd>
                 </div>
               </dl>
-              <label className="field">
-                <span>
-                  <input
-                    type="checkbox"
-                    checked={acknowledgedProfileOnlySave}
-                    disabled={saveState.status === "saving"}
-                    onChange={(event) =>
-                      setAcknowledgedProfileOnlySave(event.target.checked)
-                    }
-                  />{" "}
-                  I understand that saving creates only a managed Project
-                  Profile. The selected initial supply and browser logo are NOT
-                  saved, and no token is issued. Supply must be selected again
-                  once secure issuance becomes available.
-                </span>
-              </label>
               <p className="builder-boundary-note" role="status">
-                Reviewed browser draft. Saving a Project Profile is the only
-                available next action; token issuance is disabled.
+                Create Token saves the Project Profile and immutable issuance
+                intent as one journey, then starts the reviewed Testnet path.
               </p>
             </section>
           ) : (
@@ -674,10 +757,10 @@ export function CreateSharedTokenForm() {
           <dl className="preview-facts">
             <div>
               <dt>Target network</dt>
-              <dd>Stellar Testnet preview · issuance unavailable</dd>
+              <dd>Stellar Testnet</dd>
             </div>
             <div>
-              <dt>Initial supply (preview only)</dt>
+              <dt>Initial supply</dt>
               <dd>
                 {amountPreview.valid
                   ? amountPreview.normalized
@@ -704,25 +787,28 @@ export function CreateSharedTokenForm() {
           </dl>
 
           <div className="execution-boundary">
-            <span className="eyebrow">Project Profile only</span>
-            <strong>Save name, code and description — not token supply.</strong>
+            <span className="eyebrow">Create Token</span>
+            <strong>One reviewed Project Profile + issuance journey.</strong>
             <p>
-              Your wallet is used here only to prove who owns the Project
-              Profile. Saving does not create a Stellar asset, sign a
-              transaction, or publish TOML metadata. Your previewed initial
-              supply is not yet stored with the managed project.
+              Your Albedo-authenticated wallet becomes the owner and receiving
+              destination. Issuer, network, fee and ledger status remain
+              server-authoritative.
             </p>
             <button
               className="button button-primary"
               type="button"
-              disabled={
-                saveState.status === "saving" || !canSaveReviewedProfile
-              }
+              disabled={isWorking || !canCreateToken}
               onClick={() => void handleSaveProject()}
             >
               {saveState.status === "saving"
-                ? "Saving project…"
-                : "Save Project Profile only"}
+                ? "Validating / saving…"
+                : saveState.status === "persisting_intent"
+                  ? "Saving immutable intent…"
+                  : saveState.status === "preparing_issuance"
+                    ? "Preparing issuance…"
+                    : saveState.status === "confirming"
+                      ? "Confirming…"
+                      : "Create Token"}
             </button>
 
             {saveState.status === "needs_wallet" ||
@@ -731,10 +817,10 @@ export function CreateSharedTokenForm() {
                 <p>
                   {saveState.status === "wallet_session_changed"
                     ? "Your wallet session changed before the project could be saved. Reconnect or confirm the wallet that completed this save flow, then retry."
-                    : "Connect with Albedo to claim this Project Profile. The selected initial supply is not sent to the server."}
+                    : "Connect with Albedo to own this project and continue the reviewed Create Token request."}
                 </p>
                 <WalletAuthControl
-                  connectLabel="Connect wallet & save"
+                  connectLabel="Connect wallet & create token"
                   onAuthenticated={(publicKey) =>
                     void continueAfterAuthentication(publicKey)
                   }
@@ -748,8 +834,23 @@ export function CreateSharedTokenForm() {
               </p>
             ) : null}
 
+            {saveState.status === "confirmed" ? (
+              <p role="status">
+                Confirmed on Stellar Testnet with durable exact-hash evidence:{" "}
+                <code>{saveState.transactionHash}</code>
+              </p>
+            ) : null}
+
+            {saveState.status === "reconciliation_required" ? (
+              <p role="alert">
+                Submission outcome is ambiguous. Orrylo will not resubmit.{" "}
+                <a href={saveState.managePath}>Open the saved project</a> to
+                reconcile the exact transaction hash.
+              </p>
+            ) : null}
+
             <small className="builder-boundary-note">
-              On-chain issuance remains a separate later step.
+              Success appears only after authoritative durable confirmation.
             </small>
           </div>
         </aside>
