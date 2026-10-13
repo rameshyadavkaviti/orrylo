@@ -171,6 +171,14 @@ async function main() {
             AND constraint_row.conrelid =
               'project_issuance_transaction_attempts'::regclass
         ) AS attempt_constraint,
+        (
+          SELECT constraint_row.convalidated
+          FROM pg_catalog.pg_constraint AS constraint_row
+          WHERE constraint_row.conname =
+            'project_issuance_attempt_number_mvp_lite'
+            AND constraint_row.conrelid =
+              'project_issuance_transaction_attempts'::regclass
+        ) AS attempt_constraint_validated,
         EXISTS (
           SELECT 1
           FROM pg_catalog.pg_trigger AS trigger_row
@@ -220,7 +228,9 @@ async function main() {
         ), false) AS reachability_function_public_execute
     `;
     if (
-      hardening?.attempt_constraint !== "CHECK ((attempt_number = 1))" ||
+      hardening?.attempt_constraint !==
+        "CHECK ((attempt_number = 1)) NOT VALID" ||
+      hardening.attempt_constraint_validated !== false ||
       !hardening.reachability_trigger ||
       !hardening.reachability_function_security_definer ||
       !hardening.reachability_function_search_path?.includes(

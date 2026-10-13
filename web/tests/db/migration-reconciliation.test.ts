@@ -249,14 +249,166 @@ if (!TEST_DATABASE_URL) {
     }
   });
 
-  test("existing 001-009 database adds only MVP Lite DB hardening without rewriting history", async () => {
+  test("existing 001-009 successor attempts survive 010 while new successor writes fail closed", async () => {
     const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-db-hardening-"));
     try {
       for (const migration of ALL_MIGRATIONS.slice(0, 9)) {
         await copyFile(join(directory, migration), join(temporary, migration));
       }
       await migrateDatabase(sql, temporary);
-      const before = await sql<{ name: string; checksum: string }[]>`
+
+      const owner = "G" + "A".repeat(55);
+      const issuer = "G" + "B".repeat(55);
+      const destination = "G" + "C".repeat(55);
+      const passphraseHash =
+        "cee0302d59844d32bdca915c8203dd44b33fbb7edc19051ea37abedf28ecd472";
+      const reservationFingerprint = "a".repeat(64);
+      const historicalFingerprint = "b".repeat(64);
+      const freshFingerprint = "c".repeat(64);
+      const historicalRequest = "00000000-0000-4000-8000-000000000901";
+      const historicalProject = "00000000-0000-4000-8000-000000000902";
+      const historicalAttempt1 = "00000000-0000-4000-8000-000000000903";
+      const historicalAttempt2 = "00000000-0000-4000-8000-000000000904";
+      const freshRequest = "00000000-0000-4000-8000-000000000911";
+      const freshProject = "00000000-0000-4000-8000-000000000912";
+
+      async function seedContext(input: {
+        requestId: string;
+        projectId: string;
+        slug: string;
+        code: string;
+        fingerprint: string;
+        reservationFingerprint: string;
+      }) {
+        await sql`
+          INSERT INTO workflow_intents (
+            request_id, workflow_scope, workflow_type, subject_public_key,
+            state, idempotency_key, payload_hash, payload, created_at,
+            updated_at, policy_version
+          ) VALUES (
+            ${input.requestId}, 'asset:testnet-shared-issuance',
+            'shared_asset_issuance', ${owner}, 'created',
+            ${input.requestId}, ${input.reservationFingerprint},
+            ${sql.json({ upgrade: true })}, now(), now(), 'upgrade-fixture-v1'
+          )
+        `;
+        await sql`
+          INSERT INTO project_profiles (
+            project_id, slug, asset_code, display_name, issuer_model, network,
+            created_at, updated_at
+          ) VALUES (
+            ${input.projectId}, ${input.slug}, ${input.code},
+            ${`${input.code} Token`}, 'shared', 'testnet', now(), now()
+          )
+        `;
+        await sql`
+          INSERT INTO project_issuance_intents (
+            project_id, request_id, owner_public_key, network,
+            reservation_issuer_public_key, asset_code,
+            reservation_fingerprint, status, created_at, updated_at
+          ) VALUES (
+            ${input.projectId}, ${input.requestId}, ${owner}, 'testnet',
+            ${issuer}, ${input.code}, ${input.reservationFingerprint},
+            'awaiting_issuer_integration', now(), now()
+          )
+        `;
+        await sql`
+          INSERT INTO project_issuance_full_intents (
+            issuance_request_id, issuance_intent_fingerprint,
+            reservation_fingerprint, project_id, owner_public_key, network,
+            network_passphrase_hash, asset_code, issuer_public_key,
+            destination_public_key, amount, policy_version, created_at
+          ) VALUES (
+            ${input.requestId}, ${input.fingerprint},
+            ${input.reservationFingerprint}, ${input.projectId}, ${owner},
+            'testnet', ${passphraseHash}, ${input.code}, ${issuer},
+            ${destination}, 10.0000000, 'upgrade-fixture-v1', now()
+          )
+        `;
+      }
+
+      await seedContext({
+        requestId: historicalRequest,
+        projectId: historicalProject,
+        slug: "historical-successor",
+        code: "HIST2",
+        fingerprint: historicalFingerprint,
+        reservationFingerprint,
+      });
+      await seedContext({
+        requestId: freshRequest,
+        projectId: freshProject,
+        slug: "fresh-attempt",
+        code: "FRESH1",
+        fingerprint: freshFingerprint,
+        reservationFingerprint: "d".repeat(64),
+      });
+
+      for (const attempt of [
+        {
+          id: historicalAttempt1,
+          number: 1,
+          transactionHash: "1".repeat(64),
+          envelopeHash: "2".repeat(64),
+          sourceSequence: "100",
+        },
+        {
+          id: historicalAttempt2,
+          number: 2,
+          transactionHash: "3".repeat(64),
+          envelopeHash: "4".repeat(64),
+          sourceSequence: "101",
+        },
+      ]) {
+        await sql`
+          INSERT INTO project_issuance_transaction_attempts (
+            attempt_id, issuance_request_id, issuance_intent_fingerprint,
+            attempt_number, transaction_hash, envelope_xdr_sha256,
+            source_sequence, fee_stroops, valid_from, valid_until,
+            transaction_source_public_key, operation_count, operation_type,
+            operation_source_public_key, asset_code, issuer_public_key,
+            destination_public_key, amount, created_at
+          ) VALUES (
+            ${attempt.id}, ${historicalRequest}, ${historicalFingerprint},
+            ${attempt.number}, ${attempt.transactionHash}, ${attempt.envelopeHash},
+            ${attempt.sourceSequence}, 100, 1800000000, 1800000300,
+            ${issuer}, 1, 'payment', ${issuer}, 'HIST2', ${issuer},
+            ${destination}, 10.0000000, now()
+          )
+        `;
+      }
+
+      await sql`
+        INSERT INTO project_metadata_publications (
+          project_id, metadata_home, network, asset_code, issuer_public_key,
+          issuance_request_id, issuance_fingerprint, currency_toml,
+          content_hash, published_at, updated_at, reachable
+        ) VALUES (
+          ${historicalProject}, 'assets.orrylo.com', 'testnet', 'HIST2',
+          ${issuer}, ${historicalRequest}, ${historicalFingerprint},
+          '[[CURRENCIES]]', ${"e".repeat(64)}, now(), now(), false
+        )
+      `;
+
+      const historicalBefore = await sql<{
+        attempt_id: string;
+        attempt_number: number;
+        transaction_hash: string;
+        envelope_xdr_sha256: string;
+        source_sequence: string;
+      }[]>`
+        SELECT attempt_id::text, attempt_number, transaction_hash,
+          envelope_xdr_sha256, source_sequence::text
+        FROM project_issuance_transaction_attempts
+        WHERE issuance_request_id = ${historicalRequest}
+        ORDER BY attempt_number
+      `;
+      assert.deepEqual(
+        historicalBefore.map((row) => row.attempt_number),
+        [1, 2],
+      );
+
+      const beforeMigrations = await sql<{ name: string; checksum: string }[]>`
         SELECT name, checksum FROM schema_migrations ORDER BY name
       `;
       const upgraded = await migrateDatabase(sql, directory);
@@ -264,31 +416,123 @@ if (!TEST_DATABASE_URL) {
         "010_mvp_lite_db_security_hardening.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 9));
-      const after = await sql<{ name: string; checksum: string }[]>`
+
+      const afterMigrations = await sql<{ name: string; checksum: string }[]>`
         SELECT name, checksum FROM schema_migrations ORDER BY name
       `;
-      assert.deepEqual(after.slice(0, 9), [...before]);
-      const [attemptConstraint] = await sql<{ definition: string }[]>`
-        SELECT pg_get_constraintdef(oid) AS definition
+      assert.deepEqual(afterMigrations.slice(0, 9), beforeMigrations);
+      const historicalAfter = await sql<{
+        attempt_id: string;
+        attempt_number: number;
+        transaction_hash: string;
+        envelope_xdr_sha256: string;
+        source_sequence: string;
+      }[]>`
+        SELECT attempt_id::text, attempt_number, transaction_hash,
+          envelope_xdr_sha256, source_sequence::text
+        FROM project_issuance_transaction_attempts
+        WHERE issuance_request_id = ${historicalRequest}
+        ORDER BY attempt_number
+      `;
+      assert.deepEqual(historicalAfter, historicalBefore);
+
+      const [constraint] = await sql<{
+        definition: string;
+        validated: boolean;
+      }[]>`
+        SELECT pg_get_constraintdef(oid) AS definition,
+          convalidated AS validated
         FROM pg_constraint
         WHERE conname = 'project_issuance_attempt_number_mvp_lite'
       `;
-      assert.equal(
-        attemptConstraint.definition,
-        "CHECK ((attempt_number = 1))",
-      );
-      const [{ trigger_exists: triggerExists }] = await sql<
-        { trigger_exists: boolean }[]
-      >`
-        SELECT EXISTS (
-          SELECT 1 FROM pg_trigger
-          WHERE tgname =
-            'project_metadata_publications_signed_confirmation_guard'
-            AND tgrelid = 'project_metadata_publications'::regclass
-            AND NOT tgisinternal
-        ) AS trigger_exists
-      `;
-      assert.equal(triggerExists, true);
+      assert.equal(constraint.definition, "CHECK ((attempt_number = 1)) NOT VALID");
+      assert.equal(constraint.validated, false);
+
+      await sql.unsafe(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_gate_a_upgrade_app_test') THEN
+            CREATE ROLE orrylo_gate_a_upgrade_app_test LOGIN PASSWORD 'gate-a-upgrade-app-test';
+          END IF;
+        END;
+        $$;
+        ALTER ROLE orrylo_gate_a_upgrade_app_test PASSWORD 'gate-a-upgrade-app-test';
+        GRANT USAGE ON SCHEMA public TO orrylo_gate_a_upgrade_app_test;
+        GRANT SELECT, INSERT ON project_issuance_full_intents,
+          project_issuance_transaction_attempts TO orrylo_gate_a_upgrade_app_test;
+        GRANT UPDATE (signed_envelope_xdr_sha256)
+          ON project_issuance_transaction_attempts
+          TO orrylo_gate_a_upgrade_app_test;
+        GRANT SELECT, INSERT, UPDATE ON project_metadata_publications
+          TO orrylo_gate_a_upgrade_app_test;
+      `);
+
+      const appUrl = new URL(databaseUrl);
+      appUrl.username = "orrylo_gate_a_upgrade_app_test";
+      appUrl.password = "gate-a-upgrade-app-test";
+      const appSql = createDatabaseClient(appUrl.toString());
+      try {
+        const freshAttempt1 = "00000000-0000-4000-8000-000000000913";
+        await appSql`
+          INSERT INTO project_issuance_transaction_attempts (
+            attempt_id, issuance_request_id, issuance_intent_fingerprint,
+            attempt_number, transaction_hash, envelope_xdr_sha256,
+            source_sequence, fee_stroops, valid_from, valid_until,
+            transaction_source_public_key, operation_count, operation_type,
+            operation_source_public_key, asset_code, issuer_public_key,
+            destination_public_key, amount, created_at
+          ) VALUES (
+            ${freshAttempt1}, ${freshRequest}, ${freshFingerprint}, 1,
+            ${"5".repeat(64)}, ${"6".repeat(64)}, 200, 100,
+            1800000000, 1800000300, ${issuer}, 1, 'payment', ${issuer},
+            'FRESH1', ${issuer}, ${destination}, 10.0000000, now()
+          )
+        `;
+
+        await assert.rejects(
+          appSql`
+            INSERT INTO project_issuance_transaction_attempts (
+              attempt_id, issuance_request_id, issuance_intent_fingerprint,
+              attempt_number, transaction_hash, envelope_xdr_sha256,
+              source_sequence, fee_stroops, valid_from, valid_until,
+              transaction_source_public_key, operation_count, operation_type,
+              operation_source_public_key, asset_code, issuer_public_key,
+              destination_public_key, amount, created_at
+            ) VALUES (
+              ${"00000000-0000-4000-8000-000000000914"}, ${freshRequest},
+              ${freshFingerprint}, 2, ${"7".repeat(64)}, ${"8".repeat(64)},
+              201, 100, 1800000000, 1800000300, ${issuer}, 1, 'payment',
+              ${issuer}, 'FRESH1', ${issuer}, ${destination},
+              10.0000000, now()
+            )
+          `,
+          (error: unknown) =>
+            (error as { constraint_name?: string }).constraint_name ===
+            "project_issuance_attempt_number_mvp_lite",
+        );
+        const [{ fresh_count: freshCount }] = await appSql<
+          { fresh_count: string }[]
+        >`
+          SELECT count(*)::text AS fresh_count
+          FROM project_issuance_transaction_attempts
+          WHERE issuance_request_id = ${freshRequest}
+        `;
+        assert.equal(freshCount, "1");
+
+        await assert.rejects(
+          appSql`
+            UPDATE project_metadata_publications
+            SET reachable = true, verified_at = now(),
+                last_verification_at = now()
+            WHERE project_id = ${historicalProject}
+          `,
+          (error: unknown) =>
+            (error as { constraint_name?: string }).constraint_name ===
+            "project_metadata_publications_signed_confirmation_required",
+        );
+      } finally {
+        await appSql.end({ timeout: 5 });
+      }
     } finally {
       await rm(temporary, { recursive: true, force: true });
     }

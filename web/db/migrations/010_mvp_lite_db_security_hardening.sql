@@ -6,7 +6,7 @@
 -- validation with a direct INSERT.
 ALTER TABLE project_issuance_transaction_attempts
   ADD CONSTRAINT project_issuance_attempt_number_mvp_lite
-  CHECK (attempt_number = 1);
+  CHECK (attempt_number = 1) NOT VALID;
 
 -- Metadata may become reachable only when its exact immutable confirmation is
 -- post-009 evidence bound to a decorated signed envelope. SECURITY DEFINER is
