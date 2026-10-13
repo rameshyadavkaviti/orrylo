@@ -511,6 +511,25 @@ if (!TEST_DATABASE_URL) {
         "CHECK ((attempt_number = 1)) NOT VALID",
       );
       assert.equal(constraint.validated, false);
+      const [writerHardening] = await sql<
+        {
+          security_definer: boolean;
+          config: string[] | null;
+        }[]
+      >`
+        SELECT procedure.prosecdef AS security_definer,
+          procedure.proconfig AS config
+        FROM pg_catalog.pg_proc AS procedure
+        JOIN pg_catalog.pg_namespace AS namespace
+          ON namespace.oid = procedure.pronamespace
+        WHERE namespace.nspname = 'public'
+          AND procedure.proname = 'assert_trusted_confirmation_writer'
+        LIMIT 1
+      `;
+      assert.equal(writerHardening.security_definer, false);
+      assert.deepEqual(writerHardening.config, [
+        "search_path=pg_catalog, public, pg_temp",
+      ]);
 
       await sql.unsafe(`
         DO $$
