@@ -50,13 +50,21 @@ const EXPECTED_CONSTRAINTS = [
   "project_issuance_confirmation_provenance_unique",
   "project_issuance_confirmation_request_unique",
   "project_issuance_confirmation_transaction_unique",
+  "project_issuance_confirmation_publication_identity_unique",
+  "project_issuance_attempt_signed_envelope_hash",
+  "project_issuance_confirmation_signed_envelope_hash",
+  "project_issuance_attempt_number_mvp_lite",
+  "project_metadata_publications_confirmation_scope_fk",
+  "project_metadata_publications_owner_required",
 ] as const;
 
 async function main() {
-  const databaseUrl = process.env.DATABASE_URL?.trim();
+  const databaseUrl = process.env.MIGRATION_DATABASE_URL?.trim();
 
   if (!databaseUrl) {
-    throw new Error("DATABASE_URL is required.");
+    throw new Error(
+      "MIGRATION_DATABASE_URL is required and must use the non-runtime schema owner.",
+    );
   }
 
   const sql = createDatabaseClient(databaseUrl);
@@ -104,6 +112,161 @@ async function main() {
       throw new Error("Missing non-login trusted confirmation writer role.");
     }
 
+    const ownershipRows = await sql<
+      { object_name: string; owner_name: string }[]
+    >`
+      SELECT relation.relname AS object_name,
+        pg_get_userbyid(relation.relowner) AS owner_name
+      FROM pg_catalog.pg_class AS relation
+      JOIN pg_catalog.pg_namespace AS namespace
+        ON namespace.oid = relation.relnamespace
+      WHERE namespace.nspname = current_schema()
+        AND relation.relname IN (
+          'project_issuance_full_intents',
+          'project_issuance_transaction_attempts',
+          'project_issuance_ledger_confirmations'
+        )
+      UNION ALL
+      SELECT procedure.proname AS object_name,
+        pg_get_userbyid(procedure.proowner) AS owner_name
+      FROM pg_catalog.pg_proc AS procedure
+      JOIN pg_catalog.pg_namespace AS namespace
+        ON namespace.oid = procedure.pronamespace
+      WHERE namespace.nspname = current_schema()
+        AND procedure.proname IN (
+          'assert_issuance_attempt_matches_intent',
+          'assert_trusted_confirmation_writer',
+          'protect_issuance_transaction_attempt',
+          'prevent_issuance_evidence_mutation',
+          'assert_metadata_reachability_signed_confirmation'
+        )
+    `;
+    const [migrationIdentity] = await sql<{ role_name: string }[]>`
+      SELECT current_user AS role_name
+    `;
+    const wrongOwners = ownershipRows.filter(
+      (row) => row.owner_name !== migrationIdentity?.role_name,
+    );
+    if (ownershipRows.length !== 8 || wrongOwners.length > 0) {
+      throw new Error(
+        "Sensitive issuance tables and enforcement functions must be owned by the migration identity.",
+      );
+    }
+
+    const [hardening] = await sql<
+      {
+        attempt_constraint: string | null;
+        attempt_constraint_validated: boolean | null;
+        trusted_writer_function_security_definer: boolean;
+        trusted_writer_function_search_path: string[] | null;
+        reachability_trigger: boolean;
+        reachability_function_security_definer: boolean;
+        reachability_function_search_path: string[] | null;
+        reachability_function_public_execute: boolean;
+      }[]
+    >`
+      SELECT
+        (
+          SELECT pg_get_constraintdef(constraint_row.oid)
+          FROM pg_catalog.pg_constraint AS constraint_row
+          WHERE constraint_row.conname =
+            'project_issuance_attempt_number_mvp_lite'
+            AND constraint_row.conrelid =
+              'project_issuance_transaction_attempts'::regclass
+        ) AS attempt_constraint,
+        (
+          SELECT constraint_row.convalidated
+          FROM pg_catalog.pg_constraint AS constraint_row
+          WHERE constraint_row.conname =
+            'project_issuance_attempt_number_mvp_lite'
+            AND constraint_row.conrelid =
+              'project_issuance_transaction_attempts'::regclass
+        ) AS attempt_constraint_validated,
+        COALESCE((
+          SELECT procedure.prosecdef
+          FROM pg_catalog.pg_proc AS procedure
+          JOIN pg_catalog.pg_namespace AS namespace
+            ON namespace.oid = procedure.pronamespace
+          WHERE namespace.nspname = 'public'
+            AND procedure.proname = 'assert_trusted_confirmation_writer'
+          LIMIT 1
+        ), true) AS trusted_writer_function_security_definer,
+        (
+          SELECT procedure.proconfig
+          FROM pg_catalog.pg_proc AS procedure
+          JOIN pg_catalog.pg_namespace AS namespace
+            ON namespace.oid = procedure.pronamespace
+          WHERE namespace.nspname = 'public'
+            AND procedure.proname = 'assert_trusted_confirmation_writer'
+          LIMIT 1
+        ) AS trusted_writer_function_search_path,
+        EXISTS (
+          SELECT 1
+          FROM pg_catalog.pg_trigger AS trigger_row
+          WHERE trigger_row.tgrelid =
+              'project_metadata_publications'::regclass
+            AND trigger_row.tgname =
+              'project_metadata_publications_signed_confirmation_guard'
+            AND NOT trigger_row.tgisinternal
+        ) AS reachability_trigger,
+        COALESCE((
+          SELECT procedure.prosecdef
+          FROM pg_catalog.pg_proc AS procedure
+          JOIN pg_catalog.pg_namespace AS namespace
+            ON namespace.oid = procedure.pronamespace
+          WHERE namespace.nspname = current_schema()
+            AND procedure.proname =
+              'assert_metadata_reachability_signed_confirmation'
+          LIMIT 1
+        ), false) AS reachability_function_security_definer,
+        (
+          SELECT procedure.proconfig
+          FROM pg_catalog.pg_proc AS procedure
+          JOIN pg_catalog.pg_namespace AS namespace
+            ON namespace.oid = procedure.pronamespace
+          WHERE namespace.nspname = current_schema()
+            AND procedure.proname =
+              'assert_metadata_reachability_signed_confirmation'
+          LIMIT 1
+        ) AS reachability_function_search_path,
+        COALESCE((
+          SELECT bool_or(
+            acl.grantee = 0
+            AND acl.privilege_type = 'EXECUTE'
+          )
+          FROM pg_catalog.pg_proc AS procedure
+          JOIN pg_catalog.pg_namespace AS namespace
+            ON namespace.oid = procedure.pronamespace
+          CROSS JOIN LATERAL pg_catalog.aclexplode(
+            COALESCE(
+              procedure.proacl,
+              pg_catalog.acldefault('f', procedure.proowner)
+            )
+          ) AS acl
+          WHERE namespace.nspname = current_schema()
+            AND procedure.proname =
+              'assert_metadata_reachability_signed_confirmation'
+        ), false) AS reachability_function_public_execute
+    `;
+    if (
+      hardening?.attempt_constraint !==
+        "CHECK ((attempt_number = 1)) NOT VALID" ||
+      hardening.attempt_constraint_validated !== false ||
+      hardening.trusted_writer_function_security_definer ||
+      !hardening.trusted_writer_function_search_path?.includes(
+        "search_path=pg_catalog, public, pg_temp",
+      ) ||
+      !hardening.reachability_trigger ||
+      !hardening.reachability_function_security_definer ||
+      !hardening.reachability_function_search_path?.includes(
+        "search_path=pg_catalog, public",
+      ) ||
+      hardening.reachability_function_public_execute
+    ) {
+      throw new Error(
+        "Missing or unsafe MVP Lite database hardening for attempt count, trusted confirmation writing, or metadata reachability.",
+      );
+    }
     process.stdout.write("Database schema verified.\n");
   } finally {
     await sql.end({ timeout: 5 });
