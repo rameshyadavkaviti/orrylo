@@ -43,7 +43,10 @@ function createFetch(
   handler: (url: string, init?: RequestInit) => Response | Promise<Response>,
 ): { fetchImpl: typeof fetch; calls: FetchCall[] } {
   const calls: FetchCall[] = [];
-  const fetchImpl = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+  const fetchImpl = (async (
+    input: Parameters<typeof fetch>[0],
+    init?: RequestInit,
+  ) => {
     const url = String(input);
     calls.push({ url, init });
     return handler(url, init);
@@ -101,7 +104,9 @@ function signedEnvelopeFixture(): { signedEnvelopeXdr: string; hash: string } {
 test("official reader binds confirmed evidence to the exact transaction resource and latest ledger checkpoint", async () => {
   const hash = "a".repeat(64);
   const { fetchImpl, calls } = createFetch((url) => {
-    if (url === `${OFFICIAL_STELLAR_TESTNET_HORIZON_URL}/transactions/${hash}`) {
+    if (
+      url === `${OFFICIAL_STELLAR_TESTNET_HORIZON_URL}/transactions/${hash}`
+    ) {
       return jsonResponse({
         hash,
         ledger: 900,
@@ -304,10 +309,9 @@ test("submission adapter posts the exact signed envelope once and returns only t
     return jsonResponse({ hash: fixture.hash });
   });
 
-  const result =
-    await new OfficialStellarTestnetHorizonSubmissionAdapter(
-      fetchImpl,
-    ).submitSignedEnvelope(fixture.signedEnvelopeXdr);
+  const result = await new OfficialStellarTestnetHorizonSubmissionAdapter(
+    fetchImpl,
+  ).submitSignedEnvelope(fixture.signedEnvelopeXdr);
 
   assert.deepEqual(result, { hash: fixture.hash });
   assert.equal(calls.length, 1);

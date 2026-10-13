@@ -298,10 +298,7 @@ export class OfficialStellarTestnetHorizonSubmissionAdapter implements SharedIss
   ): Promise<SharedIssuerSubmissionResult> {
     const transaction = parseClassicTestnetTransaction(signedEnvelopeXdr);
     const transactionHash = Buffer.from(transaction.hash()).toString("hex");
-    const url = new URL(
-      "/transactions",
-      OFFICIAL_STELLAR_TESTNET_HORIZON_URL,
-    );
+    const url = new URL("/transactions", OFFICIAL_STELLAR_TESTNET_HORIZON_URL);
 
     let response: Response;
     try {
@@ -342,7 +339,9 @@ export class OfficialStellarTestnetHorizonSubmissionAdapter implements SharedIss
   }
 }
 
-function parseClassicTestnetTransaction(signedEnvelopeXdr: string): Transaction {
+function parseClassicTestnetTransaction(
+  signedEnvelopeXdr: string,
+): Transaction {
   try {
     const transaction = TransactionBuilder.fromXDR(
       signedEnvelopeXdr,
