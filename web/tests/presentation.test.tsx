@@ -37,11 +37,11 @@ test("create-token experience offers a meaningful anonymous live builder", () =>
   assert.match(html, /Initial supply \(token units\)/i);
   assert.match(html, /Review configuration/i);
   assert.match(html, /Browser draft only/i);
-  assert.match(html, /Save Project Profile only/i);
-  assert.match(html, /not token supply/i);
-  assert.match(html, /does not create a Stellar asset/i);
-  assert.match(html, /On-chain issuance remains a separate later step/i);
-  assert.doesNotMatch(html, /Confirm issuance|Token issued/i);
+  assert.match(html, /Create Token/i);
+  assert.match(html, /owner and receiving destination/i);
+  assert.match(html, /server-authoritative/i);
+  assert.match(html, /authoritative durable confirmation/i);
+  assert.doesNotMatch(html, /Save Project Profile only/i);
 });
 
 test("RYLO page presents approved membership, credit, and reward policy", () => {

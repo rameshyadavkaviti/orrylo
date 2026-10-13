@@ -10,6 +10,10 @@ import {
   type IssuanceRouteDependencies,
 } from "../app/api/projects/[projectId]/issuance/route";
 import {
+  handleStartOrResumeIssuance,
+  type IssuanceExecutionRouteDependencies,
+} from "../app/api/projects/[projectId]/issuance/execution/route";
+import {
   SharedIssuerUnavailableError,
   UnavailableSharedIssuerExecutionAdapter,
 } from "../lib/stellar/shared-issuer-execution";
@@ -182,6 +186,58 @@ test("owner sees only recorded issuance evidence or not_started", async () => {
   deps.getStatus = async () => ISSUANCE;
   const awaiting = await handleGetIssuance(request(VALID), CONTEXT, deps);
   assert.deepEqual((await awaiting.json()).issuance, ISSUANCE);
+});
+
+test("execution boundary derives owner and project from authenticated server context", async () => {
+  let received: unknown;
+  const deps: IssuanceExecutionRouteDependencies = {
+    authDomain: "orrylo.com",
+    getSession: async () => SESSION,
+    startOrResume: async (input) => {
+      received = input;
+      return { status: "confirming", transactionHash: "a".repeat(64) };
+    },
+  };
+  const response = await handleStartOrResumeIssuance(
+    request({ requestId: ISSUANCE.requestId }),
+    CONTEXT,
+    deps,
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(received, {
+    requestId: ISSUANCE.requestId,
+    projectId: PROJECT_ID,
+    ownerPublicKey: OWNER,
+  });
+});
+
+test("execution boundary rejects browser authority and unavailable runtime fails closed", async () => {
+  const deps: IssuanceExecutionRouteDependencies = {
+    authDomain: "orrylo.com",
+    getSession: async () => SESSION,
+    startOrResume: async () => {
+      const error = new Error("unavailable") as Error & { code: string };
+      error.code = "issuer_integration_unavailable";
+      throw error;
+    },
+  };
+  const override = await handleStartOrResumeIssuance(
+    request({ requestId: ISSUANCE.requestId, ownerPublicKey: OWNER }),
+    CONTEXT,
+    deps,
+  );
+  assert.equal(override.status, 400);
+
+  const unavailable = await handleStartOrResumeIssuance(
+    request({ requestId: ISSUANCE.requestId }),
+    CONTEXT,
+    deps,
+  );
+  assert.equal(unavailable.status, 503);
+  assert.equal(
+    (await unavailable.json()).code,
+    "issuer_integration_unavailable",
+  );
 });
 
 test("unavailable reviewed Stellar execution adapter rejects signing, submission and lookup", async () => {

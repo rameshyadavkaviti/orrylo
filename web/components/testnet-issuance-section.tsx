@@ -1,4 +1,5 @@
 import { ConfirmInitialSupplyIntent } from "./confirm-initial-supply-intent";
+import { IssuanceExecutionControl } from "./issuance-execution-control";
 import type { TestnetIssuanceRecord } from "../lib/server/projects/testnet-issuance-service";
 import type { ManagedProjectProfile } from "../lib/projects/project-profile";
 
@@ -51,7 +52,7 @@ export function TestnetIssuanceSection({
         </div>
         <div>
           <dt>Issuer execution</dt>
-          <dd>Not yet available</dd>
+          <dd>{issuance?.status.replaceAll("_", " ") ?? "not started"}</dd>
         </div>
       </dl>
       {!supported ? (
@@ -62,7 +63,7 @@ export function TestnetIssuanceSection({
       ) : issuance ? (
         <p role="status">
           {issuance.completeIntent
-            ? "A complete immutable intent is saved. Execution is unavailable; no Stellar transaction has been submitted."
+            ? descriptions[issuance.status]
             : descriptions[issuance.status]}
         </p>
       ) : (
@@ -72,32 +73,49 @@ export function TestnetIssuanceSection({
         </p>
       )}
       {issuance?.completeIntent ? (
-        <dl className="managed-project-facts">
-          <div>
-            <dt>Immutable initial supply</dt>
-            <dd>{issuance.completeIntent.initialSupply}</dd>
-          </div>
-          <div>
-            <dt>Amount in stroops</dt>
-            <dd>{issuance.completeIntent.amountStroops}</dd>
-          </div>
-          <div>
-            <dt>Receiving owner wallet</dt>
-            <dd>
-              <code>{issuance.completeIntent.destinationPublicKey}</code>
-            </dd>
-          </div>
-          <div>
-            <dt>Committed intent fingerprint</dt>
-            <dd>
-              <code>{issuance.completeIntent.fingerprint}</code>
-            </dd>
-          </div>
-          <div>
-            <dt>Execution state</dt>
-            <dd>Ready for integration; not signed, submitted, or confirmed</dd>
-          </div>
-        </dl>
+        <>
+          <dl className="managed-project-facts">
+            <div>
+              <dt>Immutable initial supply</dt>
+              <dd>{issuance.completeIntent.initialSupply}</dd>
+            </div>
+            <div>
+              <dt>Amount in stroops</dt>
+              <dd>{issuance.completeIntent.amountStroops}</dd>
+            </div>
+            <div>
+              <dt>Receiving owner wallet</dt>
+              <dd>
+                <code>{issuance.completeIntent.destinationPublicKey}</code>
+              </dd>
+            </div>
+            <div>
+              <dt>Committed intent fingerprint</dt>
+              <dd>
+                <code>{issuance.completeIntent.fingerprint}</code>
+              </dd>
+            </div>
+            <div>
+              <dt>Execution state</dt>
+              <dd>{descriptions[issuance.status]}</dd>
+            </div>
+          </dl>
+          <IssuanceExecutionControl
+            projectId={project.projectId}
+            requestId={issuance.requestId}
+            initialState={
+              issuance.status === "confirmed"
+                ? "confirmed"
+                : issuance.status === "reconciliation_required"
+                  ? "reconciliation_required"
+                  : issuance.status === "submitted"
+                    ? "confirming"
+                    : issuance.status === "failed"
+                      ? "failed_before_submission"
+                      : "intent_persisted"
+            }
+          />
+        </>
       ) : supported && !issuance ? (
         <ConfirmInitialSupplyIntent
           projectId={project.projectId}
@@ -133,9 +151,8 @@ export function TestnetIssuanceSection({
         <p role="alert">Failure code: {issuance.failureCode}</p>
       ) : null}
       <p className="readiness-note">
-        Issuance controls are disabled until the Stellar Agent supplies a
-        reviewed, deployed Testnet integration. This page cannot submit or sign
-        transactions.
+        Orrylo never treats browser state or a submission response as
+        confirmation. Success requires durable exact-hash ledger evidence.
       </p>
     </section>
   );

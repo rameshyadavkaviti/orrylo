@@ -97,6 +97,9 @@ interface IssuanceRow {
   full_fingerprint?: string | null;
   destination_public_key?: string | null;
   full_amount?: string | null;
+  confirmed_issuer_public_key?: string | null;
+  confirmed_transaction_hash?: string | null;
+  confirmed_ledger_sequence?: string | number | null;
 }
 
 interface WorkflowRow {
@@ -142,6 +145,15 @@ function mapRow(row: IssuanceRow): TestnetIssuanceRecord {
   if (row.full_amount && (!fullAmount || !fullAmount.valid)) {
     throw new TestnetIssuanceError("database_invariant");
   }
+  if (
+    row.status === "confirmed" &&
+    (!row.confirmed_issuer_public_key ||
+      !row.confirmed_transaction_hash ||
+      row.confirmed_ledger_sequence === null ||
+      row.confirmed_ledger_sequence === undefined)
+  ) {
+    throw new TestnetIssuanceError("database_invariant");
+  }
   return {
     requestId: row.request_id,
     projectId: row.project_id,
@@ -150,9 +162,20 @@ function mapRow(row: IssuanceRow): TestnetIssuanceRecord {
     status: row.status,
     reservationIssuerPublicKey: row.reservation_issuer_public_key.trim(),
     reservationFingerprint: row.reservation_fingerprint.trim(),
-    issuerPublicKey: null,
-    transactionHash: null,
-    ledgerSequence: null,
+    issuerPublicKey:
+      row.status === "confirmed" && row.confirmed_issuer_public_key
+        ? row.confirmed_issuer_public_key.trim()
+        : null,
+    transactionHash:
+      row.status === "confirmed" && row.confirmed_transaction_hash
+        ? row.confirmed_transaction_hash.trim()
+        : null,
+    ledgerSequence:
+      row.status === "confirmed" &&
+      row.confirmed_ledger_sequence !== null &&
+      row.confirmed_ledger_sequence !== undefined
+        ? Number(row.confirmed_ledger_sequence)
+        : null,
     failureCode: row.failure_code,
     ...(row.full_fingerprint && row.destination_public_key && fullAmount?.valid
       ? {
@@ -234,9 +257,13 @@ async function loadIssuance(
 ): Promise<TestnetIssuanceRecord> {
   const [row] = await sql<IssuanceRow[]>`
     SELECT i.*, f.issuance_intent_fingerprint AS full_fingerprint,
-      f.destination_public_key, f.amount::text AS full_amount
+      f.destination_public_key, f.amount::text AS full_amount,
+      c.issuer_public_key AS confirmed_issuer_public_key,
+      c.transaction_hash AS confirmed_transaction_hash,
+      c.ledger_sequence AS confirmed_ledger_sequence
     FROM project_issuance_intents i
     LEFT JOIN project_issuance_full_intents f ON f.issuance_request_id = i.request_id
+    LEFT JOIN project_issuance_ledger_confirmations c ON c.issuance_request_id = i.request_id
     WHERE i.request_id = ${requestId}
   `;
   if (!row) throw new TestnetIssuanceError("database_invariant");
@@ -329,9 +356,13 @@ export class TestnetIssuanceService {
     if (!project) throw new TestnetIssuanceError("project_not_found");
     const [row] = await this.sql<IssuanceRow[]>`
       SELECT i.*, f.issuance_intent_fingerprint AS full_fingerprint,
-        f.destination_public_key, f.amount::text AS full_amount
+        f.destination_public_key, f.amount::text AS full_amount,
+        c.issuer_public_key AS confirmed_issuer_public_key,
+        c.transaction_hash AS confirmed_transaction_hash,
+        c.ledger_sequence AS confirmed_ledger_sequence
       FROM project_issuance_intents i
       LEFT JOIN project_issuance_full_intents f ON f.issuance_request_id = i.request_id
+      LEFT JOIN project_issuance_ledger_confirmations c ON c.issuance_request_id = i.request_id
       WHERE i.project_id = ${projectId}
     `;
     return row ? mapRow(row) : null;
@@ -438,9 +469,13 @@ export class TestnetIssuanceService {
           }
           const [existing] = await transaction<IssuanceRow[]>`
             SELECT i.*, f.issuance_intent_fingerprint AS full_fingerprint,
-              f.destination_public_key, f.amount::text AS full_amount
+              f.destination_public_key, f.amount::text AS full_amount,
+              c.issuer_public_key AS confirmed_issuer_public_key,
+              c.transaction_hash AS confirmed_transaction_hash,
+              c.ledger_sequence AS confirmed_ledger_sequence
             FROM project_issuance_intents i
             LEFT JOIN project_issuance_full_intents f ON f.issuance_request_id = i.request_id
+            LEFT JOIN project_issuance_ledger_confirmations c ON c.issuance_request_id = i.request_id
             WHERE i.request_id = ${workflow.request_id}
           `;
           if (
