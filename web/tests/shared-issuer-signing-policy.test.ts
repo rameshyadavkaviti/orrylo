@@ -193,7 +193,11 @@ test("mutated network, issuer, hash, or empty envelope request is rejected befor
   const request = createSharedIssuerSigningRequest(plan);
 
   const mutations = [
-    { ...request, networkPassphrase: Networks.PUBLIC },
+    {
+      ...request,
+      networkPassphrase:
+        Networks.PUBLIC as typeof request.networkPassphrase,
+    },
     { ...request, issuerPublicKey: DESTINATION },
     { ...request, transactionHash: "A".repeat(64) },
     { ...request, unsignedEnvelopeXdr: "" },
