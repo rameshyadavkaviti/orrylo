@@ -3,17 +3,22 @@ import { createHash, randomUUID } from "node:crypto";
 import test from "node:test";
 
 import {
+  Account,
+  Asset,
   Keypair,
   Networks,
+  Operation,
   Transaction,
   TransactionBuilder,
   xdr,
 } from "@stellar/stellar-sdk";
 
+import { KNOWN_RYLO_ISSUER_PUBLIC_KEYS } from "../lib/product/constants";
 import type {
   ImmutableSharedIssuanceIntent,
   ImmutableSharedIssuanceTransactionAttempt,
 } from "../lib/server/projects/shared-issuance-persistence";
+import { persistAndSubmitSharedIssuerEnvelope } from "../lib/stellar/shared-issuer-execution";
 import {
   SharedIssuerSigningPolicyError,
   createSharedIssuerMvpLiteSignerAuthorization,
@@ -21,8 +26,12 @@ import {
   type SharedIssuerSigningPrimitive,
 } from "../lib/stellar/shared-issuer-signing-policy";
 import {
+  SHARED_ISSUANCE_POLICY_VERSION,
   SHARED_ISSUER_TESTNET_PASSPHRASE,
+  SharedIssuerIssuanceError,
   buildSharedIssuerIssuancePlan,
+  hashSharedIssuerIssuanceIntent,
+  type SharedIssuerIssuanceIntent,
   type SharedIssuerIssuancePlan,
   type SharedIssuerIssuancePreconditions,
 } from "../lib/stellar/shared-issuer-issuance";
@@ -69,6 +78,47 @@ function createPlan(): SharedIssuerIssuancePlan {
     },
     PRECONDITIONS,
   );
+}
+
+function canonicalPlanForIssuer(
+  issuerPublicKey: string,
+): SharedIssuerIssuancePlan {
+  const intent: SharedIssuerIssuanceIntent = {
+    policyVersion: SHARED_ISSUANCE_POLICY_VERSION,
+    projectId: "project-rylo-separation",
+    network: "testnet" as const,
+    assetCode: "NOVA",
+    issuerPublicKey,
+    destinationPublicKey: DESTINATION,
+    amount: "25.0000000",
+  };
+  const transaction = new TransactionBuilder(
+    new Account(issuerPublicKey, "123456"),
+    {
+      fee: "100",
+      networkPassphrase: Networks.TESTNET,
+    },
+  )
+    .addOperation(
+      Operation.payment({
+        destination: DESTINATION,
+        asset: new Asset("NOVA", issuerPublicKey),
+        amount: "25.0000000",
+      }),
+    )
+    .setTimebounds(1_800_000_000, 1_800_000_300)
+    .build();
+
+  return {
+    intent,
+    intentFingerprint: hashSharedIssuerIssuanceIntent(intent),
+    sourceSequence: "123456",
+    validFrom: 1_800_000_000,
+    validUntil: 1_800_000_300,
+    feeStroops: "100",
+    unsignedEnvelopeXdr: transaction.toXDR(),
+    transactionHash: Buffer.from(transaction.hash()).toString("hex"),
+  };
 }
 
 function durableRecords(plan: SharedIssuerIssuancePlan) {
@@ -157,8 +207,9 @@ function errorCode(error: unknown): string | undefined {
     : undefined;
 }
 
-test("durable #32 binding gates the only Testnet signing entry before the primitive", async () => {
+test("valid non-RYLO Shared Issuer succeeds through the deterministic durable signing path", async () => {
   const plan = createPlan();
+  assert.equal(KNOWN_RYLO_ISSUER_PUBLIC_KEYS.includes(ISSUER as never), false);
   const records = durableRecords(plan);
   const calls: Array<{
     transactionHash: string;
@@ -187,6 +238,99 @@ test("durable #32 binding gates the only Testnet signing entry before the primit
     ).toString("hex"),
     plan.transactionHash,
   );
+});
+
+test("every canonical RYLO issuer identity is rejected as Shared Issuer configuration before the primitive", async () => {
+  const plan = createPlan();
+  const records = durableRecords(plan);
+
+  for (const ryloIssuer of KNOWN_RYLO_ISSUER_PUBLIC_KEYS) {
+    let primitiveCalls = 0;
+
+    assert.throws(
+      () => createSharedIssuerMvpLiteSignerAuthorization(ryloIssuer),
+      (error: unknown) => errorCode(error) === "invalid_signing_policy",
+      ryloIssuer,
+    );
+
+    await assert.rejects(
+      signDurableSharedIssuerTestnetEnvelope({
+        reader: readerFor(records),
+        attemptId: records.attempt.attemptId,
+        plan,
+        policy: { issuerPublicKey: ryloIssuer },
+        primitive: {
+          async signCanonicalEnvelope() {
+            primitiveCalls += 1;
+            return { signedEnvelopeXdr: "" };
+          },
+        },
+      }),
+      (error: unknown) => errorCode(error) === "invalid_signing_policy",
+      ryloIssuer,
+    );
+
+    assert.equal(primitiveCalls, 0, ryloIssuer);
+  }
+});
+
+test("known RYLO issuer in durable canonical plan fails before signer, digest persistence, or submission", async () => {
+  for (const ryloIssuer of KNOWN_RYLO_ISSUER_PUBLIC_KEYS) {
+    const plan = canonicalPlanForIssuer(ryloIssuer);
+    const records = durableRecords(plan);
+    let primitiveCalls = 0;
+    let digestWrites = 0;
+    let submissions = 0;
+
+    await assert.rejects(
+      signDurableSharedIssuerTestnetEnvelope({
+        reader: readerFor(records),
+        attemptId: records.attempt.attemptId,
+        plan,
+        policy: { issuerPublicKey: ISSUER },
+        primitive: {
+          async signCanonicalEnvelope() {
+            primitiveCalls += 1;
+            return { signedEnvelopeXdr: "" };
+          },
+        },
+      }),
+      (error: unknown) =>
+        error instanceof SharedIssuerIssuanceError &&
+        error.code === "rylo_issuer_forbidden",
+      ryloIssuer,
+    );
+
+    await assert.rejects(
+      persistAndSubmitSharedIssuerEnvelope({
+        writer: {
+          ...readerFor(records),
+          async recordSignedEnvelope() {
+            digestWrites += 1;
+            return records.attempt;
+          },
+        },
+        attemptId: records.attempt.attemptId,
+        plan,
+        signedEnvelopeXdr: "",
+        authorization: createSharedIssuerMvpLiteSignerAuthorization(ISSUER),
+        submission: {
+          async submitSignedEnvelope() {
+            submissions += 1;
+            return { hash: plan.transactionHash };
+          },
+        },
+      }),
+      (error: unknown) =>
+        error instanceof SharedIssuerIssuanceError &&
+        error.code === "rylo_issuer_forbidden",
+      ryloIssuer,
+    );
+
+    assert.equal(primitiveCalls, 0, ryloIssuer);
+    assert.equal(digestWrites, 0, ryloIssuer);
+    assert.equal(submissions, 0, ryloIssuer);
+  }
 });
 
 test("canonical plan B cannot cross the signer boundary when durable intent/attempt A is stored", async () => {

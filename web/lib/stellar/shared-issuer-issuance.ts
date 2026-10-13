@@ -9,6 +9,8 @@ import {
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
 
+import { isKnownRyloIssuerPublicKey } from "../product/constants";
+
 export const SHARED_ISSUER_TESTNET_NETWORK = "testnet" as const;
 export const SHARED_ISSUER_TESTNET_PASSPHRASE = Networks.TESTNET;
 export const SHARED_ISSUANCE_POLICY_VERSION = "shared-issuer-testnet-v1";
@@ -22,6 +24,7 @@ export type SharedIssuerIssuanceErrorCode =
   | "invalid_project_id"
   | "invalid_asset_code"
   | "invalid_issuer"
+  | "rylo_issuer_forbidden"
   | "invalid_destination"
   | "issuer_destination_conflict"
   | "invalid_amount"
@@ -204,6 +207,7 @@ export function buildSharedIssuerIssuancePlan(
     request.issuerPublicKey,
     "invalid_issuer",
   );
+  assertSharedIssuerIdentitySeparated(issuerPublicKey);
   const destinationPublicKey = normalizePublicKey(
     request.destinationPublicKey,
     "invalid_destination",
@@ -337,6 +341,8 @@ export function buildSharedIssuerIssuancePlan(
 export function assertSharedIssuerIssuancePlanCanonical(
   plan: SharedIssuerIssuancePlan,
 ): void {
+  assertSharedIssuerIdentitySeparated(plan.intent.issuerPublicKey);
+
   try {
     const issuerPublicKey = normalizePublicKey(
       plan.intent.issuerPublicKey,
@@ -801,4 +807,13 @@ export function hashSharedIssuerIssuanceIntent(
       "utf8",
     )
     .digest("hex");
+}
+
+function assertSharedIssuerIdentitySeparated(issuerPublicKey: string): void {
+  if (isKnownRyloIssuerPublicKey(issuerPublicKey)) {
+    throw new SharedIssuerIssuanceError(
+      "rylo_issuer_forbidden",
+      "Known RYLO issuer identities cannot issue customer Shared Issuer assets.",
+    );
+  }
 }
