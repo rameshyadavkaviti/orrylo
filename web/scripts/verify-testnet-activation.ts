@@ -3,9 +3,7 @@ import {
   verifyTestnetActivationDatabaseBoundaries,
   verifyTestnetActivationReadiness,
 } from "../lib/server/projects/testnet-activation-verifier";
-import {
-  OFFICIAL_STELLAR_TESTNET_HORIZON_URL,
-} from "../lib/stellar/official-testnet-horizon";
+import { OFFICIAL_STELLAR_TESTNET_HORIZON_URL } from "../lib/stellar/official-testnet-horizon";
 import { OfficialStellarTestnetIssuancePreflightReader } from "../lib/stellar/shared-issuer-testnet-preflight";
 
 interface Args {
@@ -69,11 +67,12 @@ async function main() {
   const configuredNetwork =
     process.env.NEXT_PUBLIC_STELLAR_NETWORK?.trim() || "testnet";
   if (configuredNetwork !== "testnet") {
-    throw new Error("NEXT_PUBLIC_STELLAR_NETWORK must be testnet for activation.");
+    throw new Error(
+      "NEXT_PUBLIC_STELLAR_NETWORK must be testnet for activation.",
+    );
   }
 
-  const configuredHorizon =
-    process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL?.trim();
+  const configuredHorizon = process.env.NEXT_PUBLIC_STELLAR_HORIZON_URL?.trim();
   if (
     configuredHorizon &&
     configuredHorizon !== OFFICIAL_STELLAR_TESTNET_HORIZON_URL

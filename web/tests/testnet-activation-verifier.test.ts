@@ -16,7 +16,9 @@ import { SHARED_ISSUER_TESTNET_PASSPHRASE } from "../lib/stellar/shared-issuer-i
 import type { SharedIssuerTestnetPreflightResult } from "../lib/stellar/shared-issuer-testnet-preflight";
 
 const ISSUER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 131)).publicKey();
-const DESTINATION = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 132)).publicKey();
+const DESTINATION = Keypair.fromRawEd25519Seed(
+  Buffer.alloc(32, 132),
+).publicKey();
 
 const DATABASE_REPORT: TestnetActivationDatabaseReport = {
   applicationRole: "orrylo_app",
@@ -108,10 +110,7 @@ test("every known RYLO issuer fails before Horizon or database access", async ()
   for (const issuerPublicKey of KNOWN_RYLO_ISSUER_PUBLIC_KEYS) {
     const fx = dependencies();
     await assert.rejects(
-      verifyTestnetActivationReadiness(
-        { ...INPUT, issuerPublicKey },
-        fx.deps,
-      ),
+      verifyTestnetActivationReadiness({ ...INPUT, issuerPublicKey }, fx.deps),
       (error: unknown) =>
         error instanceof TestnetActivationVerificationError &&
         error.code === "known_rylo_issuer",
@@ -141,9 +140,7 @@ test("missing trustline and insufficient capacity fail before database validatio
     preflight({ limit: "20.0000000" }),
   ]) {
     const fx = dependencies(result);
-    await assert.rejects(
-      verifyTestnetActivationReadiness(INPUT, fx.deps),
-    );
+    await assert.rejects(verifyTestnetActivationReadiness(INPUT, fx.deps));
     assert.deepEqual(fx.counts(), { preflightCalls: 1, databaseCalls: 0 });
   }
 });

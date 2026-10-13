@@ -412,7 +412,6 @@ The distinct pure `prepareReservedSharedIssuerPlan` entrypoint accepts PR #27
 types but is not exposed by any public API and cannot sign or submit.
 Project publication and PR #19 metadata hosting remain separate. The issuance UI is in an additive managed-project layout, not PR #19's page or view.
 
-
 ## Testnet MVP activation readiness
 
 The complete server-authoritative Testnet issuance orchestration exists, but live
@@ -448,7 +447,6 @@ confirmations while the dedicated confirmation-writer login can.
 
 See `../docs/TESTNET_MVP_ACTIVATION_RUNBOOK.md` for the owner-gated activation
 sequence, evidence checklist, runtime inventory, and signer/custody decision.
-
 
 ## Remaining production gates
 

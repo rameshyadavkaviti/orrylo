@@ -8,9 +8,7 @@ import {
   SHARED_ISSUER_CANDIDATE,
   isKnownRyloIssuerPublicKey,
 } from "../../product/constants";
-import {
-  OFFICIAL_STELLAR_TESTNET_HORIZON_URL,
-} from "../../stellar/official-testnet-horizon";
+import { OFFICIAL_STELLAR_TESTNET_HORIZON_URL } from "../../stellar/official-testnet-horizon";
 import {
   SHARED_ISSUER_TESTNET_NETWORK,
   SHARED_ISSUER_TESTNET_PASSPHRASE,
@@ -104,9 +102,7 @@ export async function verifyTestnetActivationReadiness(
     );
   }
 
-  if (
-    input.issuerPublicKey.trim().toUpperCase() === SHARED_ISSUER_CANDIDATE
-  ) {
+  if (input.issuerPublicKey.trim().toUpperCase() === SHARED_ISSUER_CANDIDATE) {
     throw new TestnetActivationVerificationError(
       "reserved_shared_issuer_candidate",
       "The reserved Shared Issuer candidate is not approved for the bounded Testnet MVP activation.",
@@ -191,7 +187,9 @@ export async function verifyTestnetActivationDatabaseBoundaries(
   applicationDatabase: DatabaseClient,
   confirmationWriterDatabase: DatabaseClient,
 ): Promise<TestnetActivationDatabaseReport> {
-  await SharedIssuanceApplicationDatabaseBoundary.authorize(applicationDatabase);
+  await SharedIssuanceApplicationDatabaseBoundary.authorize(
+    applicationDatabase,
+  );
   await TrustedConfirmationWriterDatabaseBoundary.authorize(
     confirmationWriterDatabase,
   );
