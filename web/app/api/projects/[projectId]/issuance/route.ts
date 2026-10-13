@@ -33,6 +33,7 @@ export interface IssuanceRouteDependencies {
     ownerPublicKey: string;
     idempotencyKey: string;
     expectedAssetCode: string;
+    initialSupply: string;
   }): Promise<{ created: boolean; issuance: TestnetIssuanceRecord }>;
 }
 
@@ -124,28 +125,33 @@ export async function handleRequestIssuance(
   }
 }
 
-function parseRequest(
-  body: unknown,
-): { idempotencyKey: string; expectedAssetCode: string } | null {
+function parseRequest(body: unknown): {
+  idempotencyKey: string;
+  expectedAssetCode: string;
+  initialSupply: string;
+} | null {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const fields = body as Record<string, unknown>;
   if (
     Object.keys(fields).sort().join(",") !==
-      "expectedAssetCode,idempotencyKey" ||
+      "expectedAssetCode,idempotencyKey,initialSupply" ||
     typeof fields.idempotencyKey !== "string" ||
-    typeof fields.expectedAssetCode !== "string"
+    typeof fields.expectedAssetCode !== "string" ||
+    typeof fields.initialSupply !== "string"
   )
     return null;
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
       fields.idempotencyKey,
     ) ||
-    !/^[A-Z0-9]{1,12}$/.test(fields.expectedAssetCode)
+    !/^[A-Z0-9]{1,12}$/.test(fields.expectedAssetCode) ||
+    fields.initialSupply.length > 40
   )
     return null;
   return {
     idempotencyKey: fields.idempotencyKey,
     expectedAssetCode: fields.expectedAssetCode,
+    initialSupply: fields.initialSupply,
   };
 }
 
@@ -156,7 +162,8 @@ function mapError(error: unknown) {
     if (
       code === "invalid_request" ||
       code === "invalid_asset_configuration" ||
-      code === "asset_code_mismatch"
+      code === "asset_code_mismatch" ||
+      code === "invalid_initial_supply"
     )
       return failure(code, 400);
     if (code === "unsupported_network") return failure(code, 403);

@@ -54,7 +54,11 @@ function request(body: unknown, origin = "https://orrylo.com") {
     },
   );
 }
-const VALID = { idempotencyKey: KEY, expectedAssetCode: "NOVA" };
+const VALID = {
+  idempotencyKey: KEY,
+  expectedAssetCode: "NOVA",
+  initialSupply: "2.5000000",
+};
 
 test("unauthenticated requests cannot see or create issuance intents", async () => {
   const deps = dependencies();
@@ -81,6 +85,7 @@ test("request boundary binds owner to session, not browser body", async () => {
   deps.requestIssuance = async (input) => {
     subject = input.ownerPublicKey;
     assert.equal(input.projectId, PROJECT_ID);
+    assert.equal(input.initialSupply, "2.5000000");
     return { created: true, issuance: ISSUANCE };
   };
   const accepted = await handleRequestIssuance(request(VALID), CONTEXT, deps);
@@ -89,6 +94,8 @@ test("request boundary binds owner to session, not browser body", async () => {
 
   for (const added of [
     { ownerPublicKey: OWNER },
+    { destinationPublicKey: OWNER },
+    { initialSupplyStroops: "25000000" },
     { network: "public" },
     { issuerPublicKey: OWNER },
     { transactionHash: "0".repeat(64) },
@@ -152,6 +159,7 @@ test("service authorization and state errors map to actionable HTTP statuses", a
     ["idempotency_conflict", 409],
     ["invalid_asset_configuration", 400],
     ["asset_code_mismatch", 400],
+    ["invalid_initial_supply", 400],
   ] as const) {
     const deps = dependencies();
     deps.requestIssuance = async () => {
@@ -197,4 +205,28 @@ test("unavailable reviewed Stellar execution adapter rejects signing, submission
     adapter.lookupTransaction("0".repeat(64)),
     SharedIssuerUnavailableError,
   );
+});
+
+test("API denies malformed supply, missing amount, and browser-chosen destination", async () => {
+  let called = false;
+  const deps = dependencies();
+  deps.requestIssuance = async () => {
+    called = true;
+    throw new Error("must not run");
+  };
+  for (const payload of [
+    { idempotencyKey: KEY, expectedAssetCode: "NOVA" },
+    { ...VALID, initialSupply: 100 },
+    { ...VALID, initialSupply: "1".repeat(41) },
+    { ...VALID, destinationPublicKey: OWNER },
+    { ...VALID, issuerPublicKey: OWNER },
+    { ...VALID, ownerPublicKey: OWNER },
+    { ...VALID, network: "public" },
+  ]) {
+    assert.equal(
+      (await handleRequestIssuance(request(payload), CONTEXT, deps)).status,
+      400,
+    );
+  }
+  assert.equal(called, false);
 });
