@@ -412,16 +412,59 @@ The distinct pure `prepareReservedSharedIssuerPlan` entrypoint accepts PR #27
 types but is not exposed by any public API and cannot sign or submit.
 Project publication and PR #19 metadata hosting remain separate. The issuance UI is in an additive managed-project layout, not PR #19's page or view.
 
+
+## Testnet MVP activation readiness
+
+The complete server-authoritative Testnet issuance orchestration exists, but live
+execution remains deliberately disabled until the owner approves a concrete
+signer/custody implementation. `getServerSharedIssuanceOrchestrator()` fails
+closed before preflight or attempt creation while no operational
+`SharedIssuerSigningPrimitive` is installed.
+
+A repeatable read-only activation verifier is available for the account,
+trustline, fee, official-Horizon and database-role prerequisites. It never
+signs, submits, funds, changes account settings or creates a trustline:
+
+```sh
+export ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY='G...'
+export ORRYLO_TESTNET_SHARED_ISSUER_FEE_STROOPS='...'
+export DATABASE_URL='postgres://APPLICATION_USER:...'
+export ORRYLO_CONFIRMATION_WRITER_DATABASE_URL='postgres://CONFIRMATION_LOGIN:...'
+
+npm run activation:verify:testnet -- \
+  --destination 'G...' \
+  --asset-code 'NOVA' \
+  --amount '25.0000000'
+```
+
+The command uses only the fixed official Stellar Testnet Horizon endpoint and
+read-only PostgreSQL privilege inspection. It rejects every known RYLO issuer
+identity and the reserved `GBR7...ASSETS` candidate, requires the exact
+OFF/OFF/OFF/OFF + 1/1/1 issuer policy, checks the destination's exact trustline
+and complete-supply capacity, verifies the configured fee against the stable
+ledger base fee and spendable issuer XLM after reserve/liabilities, and proves
+that the ordinary application identity cannot insert authoritative
+confirmations while the dedicated confirmation-writer login can.
+
+See `../docs/TESTNET_MVP_ACTIVATION_RUNBOOK.md` for the owner-gated activation
+sequence, evidence checklist, runtime inventory, and signer/custody decision.
+
+
 ## Remaining production gates
 
 This phase intentionally does not add general network abuse/rate-limit
 infrastructure or proxy-level request-body limits. Those remain production gates
 before exposing authentication broadly on public infrastructure.
 
-It also does not implement:
+The reviewed Testnet code now includes canonical Shared Issuer transaction
+construction, a one-shot official-Horizon submission adapter, exact-hash
+authoritative confirmation and the server orchestration path. Those capabilities
+are **not live** because the runtime signer/custody implementation and deployment
+configuration remain owner-gated.
 
-- Stellar transaction submission;
-- Shared Issuer mutations or token issuance;
+It still does not activate or implement:
+
+- a deployed Testnet signing primitive/custody service or live Shared Issuer issuance;
 - Dedicated Issuer provisioning;
 - RYLO mint, burn, reward execution, eligibility activation, authorization, or
   payments;
