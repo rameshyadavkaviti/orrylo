@@ -152,6 +152,14 @@ test("official reader binds confirmed evidence to the exact transaction resource
     observedLedgerClosedAt: LATEST_LEDGER_CLOSED_AT,
   });
   assert.equal(calls.length, 2);
+  assert.equal(
+    calls[0]?.url,
+    `${OFFICIAL_STELLAR_TESTNET_HORIZON_URL}/ledgers?order=desc&limit=1`,
+  );
+  assert.equal(
+    calls[1]?.url,
+    `${OFFICIAL_STELLAR_TESTNET_HORIZON_URL}/transactions/${hash}`,
+  );
   assert.equal(calls[0]?.init?.method, "GET");
   assert.equal(calls[0]?.init?.redirect, "error");
 });
@@ -229,9 +237,17 @@ test("exact-hash 404 becomes not-found only with a separate official latest-ledg
     observedLedgerClosedAt: LATEST_LEDGER_CLOSED_AT,
   });
   assert.equal(calls.length, 2);
+  assert.equal(
+    calls[0]?.url,
+    `${OFFICIAL_STELLAR_TESTNET_HORIZON_URL}/ledgers?order=desc&limit=1`,
+  );
+  assert.equal(
+    calls[1]?.url,
+    `${OFFICIAL_STELLAR_TESTNET_HORIZON_URL}/transactions/${hash}`,
+  );
 });
 
-test("account sequence evidence is bound to the requested issuer and a later latest-ledger observation", async () => {
+test("account sequence evidence is bound to the requested issuer and a prior latest-ledger checkpoint", async () => {
   const { fetchImpl, calls } = createFetch((url) => {
     if (url === `${OFFICIAL_STELLAR_TESTNET_HORIZON_URL}/accounts/${ISSUER}`) {
       return jsonResponse({
@@ -260,12 +276,70 @@ test("account sequence evidence is bound to the requested issuer and a later lat
   assert.equal(evidence.sequence, "123456");
   assert.equal(evidence.observedLedger, 930);
   assert.equal(calls.length, 2);
+  assert.equal(
+    calls[0]?.url,
+    `${OFFICIAL_STELLAR_TESTNET_HORIZON_URL}/ledgers?order=desc&limit=1`,
+  );
+  assert.equal(
+    calls[1]?.url,
+    `${OFFICIAL_STELLAR_TESTNET_HORIZON_URL}/accounts/${ISSUER}`,
+  );
+});
+
+test("refreshes the official ledger checkpoint when a confirmed transaction is newer than the first checkpoint", async () => {
+  const hash = "9".repeat(64);
+  let ledgerReads = 0;
+  const { fetchImpl, calls } = createFetch((url) => {
+    if (url.includes("/ledgers?")) {
+      ledgerReads += 1;
+      return jsonResponse({
+        _embedded: {
+          records: [
+            {
+              sequence: ledgerReads === 1 ? 949 : 951,
+              closed_at: LATEST_LEDGER_CLOSED_AT,
+            },
+          ],
+        },
+      });
+    }
+    return jsonResponse({
+      hash,
+      ledger: 950,
+      created_at: TRANSACTION_LEDGER_CLOSED_AT,
+      successful: false,
+    });
+  });
+
+  const evidence = await new OfficialStellarTestnetHorizonReader(
+    fetchImpl,
+    () => NOW,
+  ).lookupTransaction(hash);
+
+  assert.equal(evidence.status, "failed");
+  assert.equal(evidence.observedLedger, 951);
+  assert.equal(calls.length, 3);
+  assert.match(calls[0]?.url ?? "", /\/ledgers\?/);
+  assert.match(calls[1]?.url ?? "", /\/transactions\//);
+  assert.match(calls[2]?.url ?? "", /\/ledgers\?/);
 });
 
 test("official reader rejects mismatched transaction records and invalid caller identities", async () => {
   let requestCount = 0;
-  const { fetchImpl } = createFetch(() => {
+  const { fetchImpl } = createFetch((url) => {
     requestCount += 1;
+    if (url.includes("/ledgers?")) {
+      return jsonResponse({
+        _embedded: {
+          records: [
+            {
+              sequence: 940,
+              closed_at: LATEST_LEDGER_CLOSED_AT,
+            },
+          ],
+        },
+      });
+    }
     return jsonResponse({
       hash: "e".repeat(64),
       ledger: 940,
@@ -283,7 +357,7 @@ test("official reader rejects mismatched transaction records and invalid caller 
       error instanceof OfficialTestnetHorizonError &&
       error.code === "malformed_horizon_response",
   );
-  assert.equal(requestCount, 1);
+  assert.equal(requestCount, 2);
 
   await assert.rejects(
     reader.lookupTransaction("not-a-hash"),
@@ -297,7 +371,7 @@ test("official reader rejects mismatched transaction records and invalid caller 
       error instanceof OfficialTestnetHorizonError &&
       error.code === "invalid_account",
   );
-  assert.equal(requestCount, 1);
+  assert.equal(requestCount, 2);
 });
 
 test("submission adapter posts the exact signed envelope once and returns only the locally matching hash", async () => {
