@@ -10,6 +10,7 @@ import type {
 } from "./shared-issuer-issuance";
 import {
   SharedIssuerIssuanceError,
+  assertSharedIssuerIssuancePlanCanonical,
   assertSignedEnvelopeAuthorizedForSubmission,
   assertSubmissionHashMatchesPlan,
   type SharedIssuerSignerAuthorization,
@@ -89,6 +90,7 @@ export async function persistAndSubmitSharedIssuerEnvelope(input: {
   authorization: SharedIssuerSignerAuthorization;
   submission: SharedIssuerSubmissionAdapter;
 }): Promise<SharedIssuerSubmissionResult> {
+  assertSharedIssuerIssuancePlanCanonical(input.plan);
   assertSignedEnvelopeAuthorizedForSubmission(
     input.signedEnvelopeXdr,
     input.plan,

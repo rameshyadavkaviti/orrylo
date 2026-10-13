@@ -2,12 +2,21 @@ import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import test from "node:test";
 
-import { Keypair, Networks, TransactionBuilder } from "@stellar/stellar-sdk";
+import {
+  Account,
+  Asset,
+  Keypair,
+  Networks,
+  Operation,
+  TransactionBuilder,
+} from "@stellar/stellar-sdk";
 
+import { persistAndSubmitSharedIssuerEnvelope } from "../lib/stellar/shared-issuer-execution";
 import {
   SHARED_ISSUER_TESTNET_PASSPHRASE,
   SharedIssuerIssuanceError,
   assertReplacementPreservesIssuanceIntent,
+  assertSharedIssuerIssuancePlanCanonical,
   assertSignedEnvelopeAuthorizedForSubmission,
   assertSignedEnvelopeMatchesPlan,
   assertSigningRequestMatchesPlan,
@@ -15,6 +24,8 @@ import {
   buildSharedIssuerIssuancePlan,
   classifySharedIssuerRecovery,
   createSharedIssuerSigningRequest,
+  hashSharedIssuerIssuanceIntent,
+  type SharedIssuerIssuancePlan,
   type SharedIssuerIssuancePreconditions,
   type SharedIssuerIssuanceRequest,
 } from "../lib/stellar/shared-issuer-issuance";
@@ -74,6 +85,76 @@ function errorCode(error: unknown): string | undefined {
   return error instanceof SharedIssuerIssuanceError ? error.code : undefined;
 }
 
+function withIntentPatch(
+  plan: SharedIssuerIssuancePlan,
+  patch: Partial<SharedIssuerIssuancePlan["intent"]>,
+): SharedIssuerIssuancePlan {
+  const intent = { ...plan.intent, ...patch };
+  return {
+    ...plan,
+    intent,
+    intentFingerprint: hashSharedIssuerIssuanceIntent(intent),
+  };
+}
+
+function buildCustomEnvelope(
+  plan: SharedIssuerIssuancePlan,
+  options: {
+    sourcePublicKey?: string;
+    operationSource?: string;
+    extraOperation?: boolean;
+    wrongOperation?: boolean;
+  } = {},
+): Pick<SharedIssuerIssuancePlan, "unsignedEnvelopeXdr" | "transactionHash"> {
+  const builder = new TransactionBuilder(
+    new Account(
+      options.sourcePublicKey ?? plan.intent.issuerPublicKey,
+      plan.sourceSequence,
+    ),
+    {
+      fee: plan.feeStroops,
+      networkPassphrase: Networks.TESTNET,
+    },
+  );
+
+  if (options.wrongOperation) {
+    builder.addOperation(
+      Operation.manageData({
+        name: "unexpected",
+        value: "1",
+      }),
+    );
+  } else {
+    builder.addOperation(
+      Operation.payment({
+        ...(options.operationSource ? { source: options.operationSource } : {}),
+        destination: plan.intent.destinationPublicKey,
+        asset: new Asset(plan.intent.assetCode, plan.intent.issuerPublicKey),
+        amount: plan.intent.amount,
+      }),
+    );
+
+    if (options.extraOperation) {
+      builder.addOperation(
+        Operation.payment({
+          destination: plan.intent.destinationPublicKey,
+          asset: new Asset(plan.intent.assetCode, plan.intent.issuerPublicKey),
+          amount: "1.0000000",
+        }),
+      );
+    }
+  }
+
+  const transaction = builder
+    .setTimebounds(plan.validFrom, plan.validUntil)
+    .build();
+
+  return {
+    unsignedEnvelopeXdr: transaction.toXDR(),
+    transactionHash: Buffer.from(transaction.hash()).toString("hex"),
+  };
+}
+
 test("builds one canonical Testnet payment envelope for an approved issuance", () => {
   const plan = buildSharedIssuerIssuancePlan(REQUEST, PRECONDITIONS);
   const transaction = TransactionBuilder.fromXDR(
@@ -101,6 +182,186 @@ test("builds one canonical Testnet payment envelope for an approved issuance", (
     Buffer.from(transaction.hash()).toString("hex"),
     plan.transactionHash,
   );
+});
+
+test("canonical plan validation rejects body substitution before signing, digest persistence, or submission", async () => {
+  const canonical = buildSharedIssuerIssuancePlan(REQUEST, PRECONDITIONS);
+  assert.doesNotThrow(() => assertSharedIssuerIssuancePlanCanonical(canonical));
+
+  const otherDestination = Keypair.fromRawEd25519Seed(
+    Buffer.alloc(32, 45),
+  ).publicKey();
+  const otherIssuer = Keypair.fromRawEd25519Seed(
+    Buffer.alloc(32, 46),
+  ).publicKey();
+
+  const transactionSourceMismatch = buildCustomEnvelope(canonical, {
+    sourcePublicKey: otherIssuer,
+  });
+  const operationSourceMismatch = buildCustomEnvelope(canonical, {
+    operationSource: otherIssuer,
+  });
+  const extraOperation = buildCustomEnvelope(canonical, {
+    extraOperation: true,
+  });
+  const wrongOperation = buildCustomEnvelope(canonical, {
+    wrongOperation: true,
+  });
+
+  const networkIntent = {
+    ...canonical.intent,
+    network: "public" as typeof canonical.intent.network,
+  };
+
+  const transactionB = buildSharedIssuerIssuancePlan(
+    {
+      ...REQUEST,
+      destinationPublicKey: otherDestination,
+    },
+    {
+      ...PRECONDITIONS,
+      destinationTrustline: {
+        ...PRECONDITIONS.destinationTrustline,
+        destinationPublicKey: otherDestination,
+      },
+    },
+  );
+
+  const cases: Array<{ name: string; plan: SharedIssuerIssuancePlan }> = [
+    {
+      name: "intent fingerprint mismatch",
+      plan: { ...canonical, intentFingerprint: "0".repeat(64) },
+    },
+    {
+      name: "destination mismatch",
+      plan: withIntentPatch(canonical, {
+        destinationPublicKey: otherDestination,
+      }),
+    },
+    {
+      name: "amount mismatch",
+      plan: withIntentPatch(canonical, { amount: "126.0000000" }),
+    },
+    {
+      name: "issuer mismatch",
+      plan: withIntentPatch(canonical, { issuerPublicKey: otherIssuer }),
+    },
+    {
+      name: "asset-code mismatch",
+      plan: withIntentPatch(canonical, { assetCode: "SOLAR" }),
+    },
+    {
+      name: "network mismatch",
+      plan: {
+        ...canonical,
+        intent: networkIntent,
+        intentFingerprint: hashSharedIssuerIssuanceIntent(networkIntent),
+      },
+    },
+    {
+      name: "transaction source mismatch",
+      plan: { ...canonical, ...transactionSourceMismatch },
+    },
+    {
+      name: "operation source mismatch",
+      plan: { ...canonical, ...operationSourceMismatch },
+    },
+    {
+      name: "sequence mismatch",
+      plan: { ...canonical, sourceSequence: "123457" },
+    },
+    {
+      name: "fee mismatch",
+      plan: { ...canonical, feeStroops: "200" },
+    },
+    {
+      name: "timebound mismatch",
+      plan: { ...canonical, validUntil: canonical.validUntil + 1 },
+    },
+    {
+      name: "extra operation",
+      plan: { ...canonical, ...extraOperation },
+    },
+    {
+      name: "wrong operation",
+      plan: { ...canonical, ...wrongOperation },
+    },
+    {
+      name: "unsigned XDR mismatch",
+      plan: {
+        ...canonical,
+        unsignedEnvelopeXdr: extraOperation.unsignedEnvelopeXdr,
+      },
+    },
+    {
+      name: "transaction hash mismatch",
+      plan: { ...canonical, transactionHash: "f".repeat(64) },
+    },
+    {
+      name: "hybrid intent A / transaction B",
+      plan: {
+        ...canonical,
+        unsignedEnvelopeXdr: transactionB.unsignedEnvelopeXdr,
+        transactionHash: transactionB.transactionHash,
+      },
+    },
+  ];
+
+  const signed = TransactionBuilder.fromXDR(
+    canonical.unsignedEnvelopeXdr,
+    Networks.TESTNET,
+  );
+  signed.sign(ISSUER_KEYPAIR, SIGNER_B_KEYPAIR);
+  const signedEnvelopeXdr = signed.toXDR();
+
+  for (const candidate of cases) {
+    let signerCalls = 0;
+    const signer = {
+      async signCanonicalEnvelope(
+        _request: ReturnType<typeof createSharedIssuerSigningRequest>,
+      ) {
+        signerCalls += 1;
+        return { signedEnvelopeXdr };
+      },
+    };
+
+    await assert.rejects(
+      async () =>
+        signer.signCanonicalEnvelope(
+          createSharedIssuerSigningRequest(candidate.plan),
+        ),
+      (error: unknown) => errorCode(error) === "canonical_plan_mismatch",
+      candidate.name,
+    );
+    assert.equal(signerCalls, 0, candidate.name);
+
+    let digestWrites = 0;
+    let submissions = 0;
+    await assert.rejects(
+      persistAndSubmitSharedIssuerEnvelope({
+        writer: {
+          async recordSignedEnvelope() {
+            digestWrites += 1;
+            return { signedEnvelopeXdrSha256: "should-not-write" };
+          },
+        },
+        attemptId: randomUUID(),
+        plan: candidate.plan,
+        signedEnvelopeXdr,
+        authorization: SIGNER_AUTHORIZATION,
+        submission: {
+          async submitSignedEnvelope() {
+            submissions += 1;
+            return { hash: candidate.plan.transactionHash };
+          },
+        },
+      }),
+      (error: unknown) => errorCode(error) === "canonical_plan_mismatch",
+      candidate.name,
+    );
+    assert.equal(digestWrites, 0, candidate.name);
+    assert.equal(submissions, 0, candidate.name);
+  }
 });
 
 test("canonical intent fingerprint is stable across sequence, fee, and timebound rebuilds", () => {
