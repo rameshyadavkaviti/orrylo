@@ -31,6 +31,7 @@ import {
   SharedIssuerIssuanceError,
   buildSharedIssuerIssuancePlan,
   hashSharedIssuerIssuanceIntent,
+  type SharedIssuerIssuanceIntent,
   type SharedIssuerIssuancePlan,
   type SharedIssuerIssuancePreconditions,
 } from "../lib/stellar/shared-issuer-issuance";
@@ -82,7 +83,7 @@ function createPlan(): SharedIssuerIssuancePlan {
 function canonicalPlanForIssuer(
   issuerPublicKey: string,
 ): SharedIssuerIssuancePlan {
-  const intent = {
+  const intent: SharedIssuerIssuanceIntent = {
     policyVersion: SHARED_ISSUANCE_POLICY_VERSION,
     projectId: "project-rylo-separation",
     network: "testnet" as const,
