@@ -723,7 +723,7 @@ Dynamic implementation state, exact PR heads, CI runs, review findings, and merg
 
 At the time this workflow was canonicalized, the active engineering sequence was centered on PR #32 (Gate A / persistence-security foundation), PR #46 (immutable issuance intent), and the Stellar execution/activation work tracked from the approved Testnet Shared Issuer decisions. Future agents must verify whether those references are still active before relying on them.
 
-## 19. Agent continuity, recovery, and autonomous workflow
+## 18. Agent continuity, recovery, and autonomous workflow
 
 This section is canonical process policy. Its purpose is to make an Orrylo agent recoverable in a fresh conversation with only:
 
@@ -732,7 +732,7 @@ This section is canonical process policy. Its purpose is to make an Orrylo agent
 
 A new conversation must not depend on hidden chat history, memory, or a copied handoff to achieve normal project quality.
 
-### 19.1 Recovery precedence
+### 18.1 Recovery precedence
 
 When recovering context, use this order:
 
@@ -749,13 +749,13 @@ When recovering context, use this order:
 
 If any lower-priority source conflicts with a higher-priority source, reconcile to the higher-priority source and current evidence rather than preserving the old handoff.
 
-### 19.2 Mandatory fresh-conversation bootstrap
+### 18.2 Mandatory fresh-conversation bootstrap
 
 Every new agent must perform the following before meaningful implementation or review:
 
 1. Fetch current `main` and record its exact commit.
 2. Read `AGENTS.md` and all canonical documents listed above.
-3. Identify the agent's role boundary from section 19.4.
+3. Identify the agent's role boundary from section 18.4.
 4. Inspect current open PRs and issues that fall inside that role.
 5. For those items, inspect the latest exact HEAD, changed files, latest review findings, unresolved review threads, and current CI status.
 6. Distinguish:
@@ -770,7 +770,7 @@ Every new agent must perform the following before meaningful implementation or r
 
 The agent should keep this reconciliation internal unless a report is useful or requested. The owner should not need to type `continue` or `next` between ordinary steps.
 
-### 19.3 Autonomous workflow rule
+### 18.3 Autonomous workflow rule
 
 Within an agent's assigned authority:
 
@@ -792,7 +792,7 @@ Ask the owner only when one of the following is genuinely required:
 
 Existing authorization gates are not removed by this workflow. Documentation approval does not itself authorize live network/account/financial operations.
 
-### 19.4 Role recovery matrix
+### 18.4 Role recovery matrix
 
 A role name is sufficient to recover its default ownership boundary:
 
@@ -823,7 +823,7 @@ A role name is sufficient to recover its default ownership boundary:
 
 If a newly assigned role is not listed here, the agent must infer the narrowest reasonable boundary from `AGENTS.md`, current canonical docs, and the owner's role description, then avoid crossing specialist ownership without an explicit handoff.
 
-### 19.5 Handoff quality contract
+### 18.5 Handoff quality contract
 
 A specialist handoff must contain enough information that the receiving agent does not need the previous conversation. Include, when applicable:
 
@@ -840,7 +840,7 @@ A specialist handoff must contain enough information that the receiving agent do
 
 Do not copy large historical narratives when current GitHub evidence can be inspected directly.
 
-### 19.6 Completion and reporting behavior
+### 18.6 Completion and reporting behavior
 
 Agents should not stop merely to announce that an intermediate step is complete when the next ordinary in-scope step is obvious and executable.
 
@@ -855,7 +855,7 @@ Continue automatically until reaching:
 
 Reports should be concise by default. Detailed explanation is provided when the owner asks for it or when risk/decision quality requires it.
 
-### 19.7 Recovery quality test
+### 18.7 Recovery quality test
 
 A fresh agent is considered successfully recovered when it can, without prior chat access:
 
@@ -869,7 +869,7 @@ A fresh agent is considered successfully recovered when it can, without prior ch
 
 If it cannot do these things, repository documentation or GitHub work-item state is insufficient and should be improved as part of enablement/documentation work.
 
-## 18. Canonical companion documents
+## 19. Canonical companion documents
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system architecture and boundaries
 - [RYLO_POLICY.md](RYLO_POLICY.md) — RYLO-specific rules
