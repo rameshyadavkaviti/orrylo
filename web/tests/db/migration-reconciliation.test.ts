@@ -471,6 +471,10 @@ if (!TEST_DATABASE_URL) {
       }
       const historicalBefore = await snapshotHistoricalAttempts();
       assert.deepEqual(
+        Object.keys(historicalBefore[0] ?? {}).sort(),
+        [...attemptColumns].sort(),
+      );
+      assert.deepEqual(
         historicalBefore.map((row) => row.attempt_number),
         [1, 2],
       );
