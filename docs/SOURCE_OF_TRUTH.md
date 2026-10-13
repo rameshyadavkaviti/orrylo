@@ -663,6 +663,27 @@ database provider. It supports multi-instance challenge/session state, atomic
 challenge consumption, database uniqueness constraints, deterministic
 migrations, and real database concurrency tests.
 
+The merged PR #31 schema and Gate A code now provide an inert Shared Issuer
+Testnet evidence chain:
+
+```
+reservation
+→ immutable full issuance intent
+→ immutable transaction attempt(s)
+→ independently validated immutable ledger confirmation
+→ metadata publication
+```
+
+Gate A implements the full-intent/attempt repositories, a typed read-only
+Testnet ledger contract, raw-XDR confirmation validation, safe ambiguity and
+sequence reconciliation, and a dedicated confirmation-writer database boundary.
+Metadata provenance is bound to the exact project and owner. Migration/schema
+ownership, ordinary application access, and the confirmation writer are
+separate runtime identities by contract; no production login membership or
+credential is granted here. The production ledger reader, signer, and
+submission adapters remain explicitly unavailable, so this is not Testnet
+activation or issuance evidence.
+
 No public workflow, eligibility, reward, or protected-operation endpoint is
 activated. Reward preparation stops at database state `approved`; it does not
 create an envelope, invoke a signer, submit a transaction, or confirm an

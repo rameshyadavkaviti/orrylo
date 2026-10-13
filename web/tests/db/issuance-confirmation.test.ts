@@ -16,6 +16,16 @@ if (!TEST_DATABASE_URL) {
   test("issuance confirmation PostgreSQL suite", { skip: true }, () => {});
 } else {
   const sql = createDatabaseClient(TEST_DATABASE_URL);
+  const untrustedSql = createDatabaseClient(
+    roleUrl(TEST_DATABASE_URL, "orrylo_untrusted_test", "untrusted-test"),
+  );
+  const writerSql = createDatabaseClient(
+    roleUrl(
+      TEST_DATABASE_URL,
+      "orrylo_confirmation_writer_test",
+      "writer-test",
+    ),
+  );
   const OWNER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 101)).publicKey();
   const ISSUER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 102)).publicKey();
   const DESTINATION = Keypair.fromRawEd25519Seed(
@@ -38,14 +48,26 @@ if (!TEST_DATABASE_URL) {
       DO $$
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_untrusted_test') THEN
-          CREATE ROLE orrylo_untrusted_test NOLOGIN;
+          CREATE ROLE orrylo_untrusted_test LOGIN PASSWORD 'untrusted-test';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_confirmation_writer_test') THEN
+          CREATE ROLE orrylo_confirmation_writer_test LOGIN PASSWORD 'writer-test';
         END IF;
       END;
       $$
     `);
+    await sql.unsafe(
+      "ALTER ROLE orrylo_untrusted_test PASSWORD 'untrusted-test'",
+    );
+    await sql.unsafe(
+      "ALTER ROLE orrylo_confirmation_writer_test PASSWORD 'writer-test'",
+    );
     await sql.unsafe("GRANT USAGE ON SCHEMA public TO orrylo_untrusted_test");
     await sql.unsafe(
       "GRANT INSERT, SELECT ON project_issuance_ledger_confirmations TO orrylo_untrusted_test",
+    );
+    await sql.unsafe(
+      "GRANT orrylo_confirmation_writer TO orrylo_confirmation_writer_test",
     );
   });
 
@@ -58,7 +80,11 @@ if (!TEST_DATABASE_URL) {
   });
 
   after(async () => {
-    await sql.end({ timeout: 5 });
+    await Promise.all([
+      untrustedSql.end({ timeout: 5 }),
+      writerSql.end({ timeout: 5 }),
+      sql.end({ timeout: 5 }),
+    ]);
   });
 
   async function createContractFixture() {
@@ -86,6 +112,7 @@ if (!TEST_DATABASE_URL) {
     const attemptId = randomUUID();
     const transactionHash = "2".repeat(64);
     const envelopeHash = "3".repeat(64);
+    const signedEnvelopeHash = "4".repeat(64);
     await sql`
       INSERT INTO project_issuance_full_intents (
         issuance_request_id, issuance_intent_fingerprint,
@@ -104,13 +131,15 @@ if (!TEST_DATABASE_URL) {
       INSERT INTO project_issuance_transaction_attempts (
         attempt_id, issuance_request_id, issuance_intent_fingerprint,
         attempt_number, transaction_hash, envelope_xdr_sha256,
+        signed_envelope_xdr_sha256,
         source_sequence, fee_stroops, valid_from, valid_until,
         transaction_source_public_key, operation_count, operation_type,
         operation_source_public_key, asset_code, issuer_public_key,
         destination_public_key, amount, created_at
       ) VALUES (
         ${attemptId}, ${reservation.issuance.requestId}, ${intentFingerprint},
-        1, ${transactionHash}, ${envelopeHash}, 123, 100, 1, 2,
+        1, ${transactionHash}, ${envelopeHash}, ${signedEnvelopeHash},
+        123, 100, 1, 2,
         ${ISSUER}, 1, 'payment', ${ISSUER}, 'NOVA', ${ISSUER},
         ${DESTINATION}, 100.0000000, ${new Date(NOW)}
       )
@@ -122,6 +151,7 @@ if (!TEST_DATABASE_URL) {
       attemptId,
       transactionHash,
       envelopeHash,
+      signedEnvelopeHash,
     };
   }
 
@@ -130,14 +160,15 @@ if (!TEST_DATABASE_URL) {
     fixture: Awaited<ReturnType<typeof createContractFixture>>,
     assetCode = "NOVA",
   ) {
-    return sql.begin(async (transaction) => {
-      await transaction.unsafe(`SET LOCAL ROLE ${role}`);
-      return transaction`
+    const client =
+      role === "orrylo_confirmation_writer" ? writerSql : untrustedSql;
+    return client`
         INSERT INTO project_issuance_ledger_confirmations (
           confirmation_id, issuance_request_id, issuance_intent_fingerprint,
           attempt_id, project_id, owner_public_key, network,
           network_passphrase_hash, transaction_hash, envelope_xdr_sha256,
-          result_xdr_sha256, result_success, ledger_sequence,
+          signed_envelope_xdr_sha256, result_xdr_sha256, result_success,
+          ledger_sequence,
           ledger_closed_at, transaction_source_public_key, operation_count,
           operation_type, operation_source_public_key, asset_code,
           issuer_public_key, destination_public_key, amount, source_sequence,
@@ -147,21 +178,21 @@ if (!TEST_DATABASE_URL) {
           ${randomUUID()}, ${fixture.requestId}, ${fixture.intentFingerprint},
           ${fixture.attemptId}, ${fixture.projectId}, ${OWNER}, 'testnet',
           ${PASSPHRASE_HASH}, ${fixture.transactionHash},
-          ${fixture.envelopeHash}, ${"4".repeat(64)}, true, 456,
+          ${fixture.envelopeHash}, ${fixture.signedEnvelopeHash},
+          ${"5".repeat(64)}, true, 456,
           ${new Date(NOW)}, ${ISSUER}, 1, 'payment', ${ISSUER}, ${assetCode},
           ${ISSUER}, ${DESTINATION}, 100.0000000, 123,
           'isolated-test-ledger-verifier', 'test-verification-v1',
           ${new Date(NOW)}, ${new Date(NOW)}
         ) RETURNING confirmation_id
       `;
-    });
   }
 
   test("only the trusted writer can append an exact immutable confirmation", async () => {
     const fixture = await createContractFixture();
     await assert.rejects(
       insertConfirmation("orrylo_untrusted_test", fixture),
-      /trusted confirmation writer role required/,
+      /permission denied|dedicated trusted confirmation writer login required/,
     );
     await assert.rejects(
       insertConfirmation("orrylo_confirmation_writer", fixture, "FAKE"),
@@ -186,6 +217,108 @@ if (!TEST_DATABASE_URL) {
     `,
       /issuance evidence is append-only/,
     );
+  });
+
+  test("trusted writer ignores TEMP-shadowed issuance evidence", async () => {
+    const fixture = await createContractFixture();
+
+    const writer = await writerSql.reserve();
+    try {
+      await writer.unsafe(`
+        CREATE TEMP TABLE project_issuance_full_intents (
+          issuance_request_id uuid,
+          issuance_intent_fingerprint char(64),
+          project_id uuid,
+          owner_public_key char(56),
+          network text,
+          network_passphrase_hash char(64),
+          asset_code varchar(12),
+          issuer_public_key char(56),
+          destination_public_key char(56),
+          amount numeric(30, 7)
+        )
+      `);
+      await writer.unsafe(`
+        CREATE TEMP TABLE project_issuance_transaction_attempts (
+          attempt_id uuid,
+          issuance_request_id uuid,
+          issuance_intent_fingerprint char(64),
+          transaction_hash char(64),
+          envelope_xdr_sha256 char(64),
+          signed_envelope_xdr_sha256 char(64),
+          source_sequence numeric(20, 0),
+          transaction_source_public_key char(56),
+          operation_count integer,
+          operation_type text,
+          operation_source_public_key char(56),
+          asset_code varchar(12),
+          issuer_public_key char(56),
+          destination_public_key char(56),
+          amount numeric(30, 7)
+        )
+      `);
+      await writer`
+        INSERT INTO project_issuance_full_intents (
+          issuance_request_id, issuance_intent_fingerprint, project_id,
+          owner_public_key, network, network_passphrase_hash, asset_code,
+          issuer_public_key, destination_public_key, amount
+        ) VALUES (
+          ${fixture.requestId}, ${fixture.intentFingerprint},
+          ${fixture.projectId}, ${OWNER}, 'testnet', ${PASSPHRASE_HASH},
+          'FAKE', ${ISSUER}, ${DESTINATION}, 100.0000000
+        )
+      `;
+      await writer`
+        INSERT INTO project_issuance_transaction_attempts (
+          attempt_id, issuance_request_id, issuance_intent_fingerprint,
+          transaction_hash, envelope_xdr_sha256,
+          signed_envelope_xdr_sha256, source_sequence,
+          transaction_source_public_key, operation_count, operation_type,
+          operation_source_public_key, asset_code, issuer_public_key,
+          destination_public_key, amount
+        ) VALUES (
+          ${fixture.attemptId}, ${fixture.requestId},
+          ${fixture.intentFingerprint}, ${fixture.transactionHash},
+          ${fixture.envelopeHash}, ${fixture.signedEnvelopeHash}, 123,
+          ${ISSUER}, 1, 'payment', ${ISSUER}, 'FAKE', ${ISSUER},
+          ${DESTINATION}, 100.0000000
+        )
+      `;
+
+      await assert.rejects(
+        writer`
+          INSERT INTO public.project_issuance_ledger_confirmations (
+            confirmation_id, issuance_request_id,
+            issuance_intent_fingerprint, attempt_id, project_id,
+            owner_public_key, network, network_passphrase_hash,
+            transaction_hash, envelope_xdr_sha256,
+            signed_envelope_xdr_sha256, result_xdr_sha256, result_success,
+            ledger_sequence, ledger_closed_at,
+            transaction_source_public_key, operation_count, operation_type,
+            operation_source_public_key, asset_code, issuer_public_key,
+            destination_public_key, amount, source_sequence,
+            verifier_identity, verification_policy_version, verified_at,
+            created_at
+          ) VALUES (
+            ${randomUUID()}, ${fixture.requestId},
+            ${fixture.intentFingerprint}, ${fixture.attemptId},
+            ${fixture.projectId}, ${OWNER}, 'testnet', ${PASSPHRASE_HASH},
+            ${fixture.transactionHash}, ${fixture.envelopeHash},
+            ${fixture.signedEnvelopeHash}, ${"5".repeat(64)}, true, 456,
+            ${new Date(NOW)}, ${ISSUER}, 1, 'payment', ${ISSUER}, 'FAKE',
+            ${ISSUER}, ${DESTINATION}, 100.0000000, 123,
+            'isolated-test-ledger-verifier', 'test-verification-v1',
+            ${new Date(NOW)}, ${new Date(NOW)}
+          )
+        `,
+        /does not match immutable intent and attempt/,
+      );
+    } finally {
+      await writer.unsafe(
+        "DROP TABLE IF EXISTS pg_temp.project_issuance_transaction_attempts, pg_temp.project_issuance_full_intents",
+      );
+      await writer.release();
+    }
   });
 
   test("full intents and attempts are immutable and exact-fingerprint bound", async () => {
@@ -220,4 +353,11 @@ if (!TEST_DATABASE_URL) {
       )
     `);
   });
+}
+
+function roleUrl(source: string, username: string, password: string): string {
+  const url = new URL(source);
+  url.username = username;
+  url.password = password;
+  return url.toString();
 }

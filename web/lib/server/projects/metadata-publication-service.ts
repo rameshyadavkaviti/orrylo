@@ -25,6 +25,7 @@ import {
 } from "./metadata-publication-verifier";
 
 const PUBLICATION_LOCK_KEY = "orrylo:metadata:testnet:assets.orrylo.com";
+const HASH_PATTERN = /^[0-9a-f]{64}$/;
 
 export type MetadataPublicationErrorCode =
   | "invalid_owner"
@@ -158,11 +159,46 @@ export class MetadataPublicationService {
           project.projectId,
           ownerPublicKey,
         );
-        if (!provenance) {
+        if (
+          !provenance ||
+          !HASH_PATTERN.test(provenance.signedEnvelopeXdrSha256)
+        ) {
+          throw new MetadataPublicationError("issuer_provenance_unavailable");
+        }
+        const [durableConfirmation] = await transaction<
+          {
+            signed_envelope_xdr_sha256: string;
+          }[]
+        >`
+          SELECT signed_envelope_xdr_sha256
+          FROM project_issuance_ledger_confirmations
+          WHERE confirmation_id = ${provenance.confirmationId}
+            AND issuance_request_id = ${provenance.issuanceRequestId}
+            AND issuance_intent_fingerprint =
+              ${provenance.issuanceIntentFingerprint}
+            AND project_id = ${provenance.projectId}
+            AND owner_public_key = ${provenance.ownerPublicKey}
+            AND network = 'testnet'
+            AND asset_code = ${provenance.assetCode}
+            AND issuer_public_key = ${provenance.issuerPublicKey}
+            AND destination_public_key = ${provenance.destinationPublicKey}
+            AND amount = ${provenance.amount}
+            AND transaction_hash = ${provenance.transactionHash}
+            AND ledger_sequence = ${provenance.ledgerSequence}
+            AND signed_envelope_xdr_sha256 IS NOT NULL
+          LIMIT 1
+        `;
+        if (
+          !durableConfirmation ||
+          durableConfirmation.signed_envelope_xdr_sha256.trim() !==
+            provenance.signedEnvelopeXdrSha256
+        ) {
           throw new MetadataPublicationError("issuer_provenance_unavailable");
         }
         if (
           !approvedIssuer ||
+          provenance.projectId !== project.projectId ||
+          provenance.ownerPublicKey !== ownerPublicKey ||
           project.network !== provenance.network ||
           project.assetCode !== provenance.assetCode ||
           provenance.issuerPublicKey !== approvedIssuer ||
@@ -245,6 +281,7 @@ export class MetadataPublicationService {
             network,
             asset_code,
             issuer_public_key,
+            owner_public_key,
             issuance_request_id,
             issuance_fingerprint,
             confirmation_id,
@@ -264,6 +301,7 @@ export class MetadataPublicationService {
             'testnet',
             ${project.assetCode},
             ${generated.issuerPublicKey},
+            ${ownerPublicKey},
             ${provenance.issuanceRequestId},
             ${provenance.issuanceIntentFingerprint},
             ${provenance.confirmationId},
@@ -283,6 +321,7 @@ export class MetadataPublicationService {
             network = EXCLUDED.network,
             asset_code = EXCLUDED.asset_code,
             issuer_public_key = EXCLUDED.issuer_public_key,
+            owner_public_key = EXCLUDED.owner_public_key,
             issuance_request_id = EXCLUDED.issuance_request_id,
             issuance_fingerprint = EXCLUDED.issuance_fingerprint,
             confirmation_id = EXCLUDED.confirmation_id,

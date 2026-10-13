@@ -1,12 +1,30 @@
 import assert from "node:assert/strict";
+import { createHash, randomUUID } from "node:crypto";
 import test from "node:test";
 
-import { Keypair, Networks, TransactionBuilder } from "@stellar/stellar-sdk";
+import {
+  Account,
+  Asset,
+  Keypair,
+  Networks,
+  Operation,
+  TransactionBuilder,
+} from "@stellar/stellar-sdk";
 
+import type {
+  ImmutableSharedIssuanceIntent,
+  ImmutableSharedIssuanceTransactionAttempt,
+} from "../lib/server/projects/shared-issuance-persistence";
+import {
+  persistAndSubmitSharedIssuerEnvelope,
+  signPersistedSharedIssuerEnvelope,
+  type SignedEnvelopeAttemptWriter,
+} from "../lib/stellar/shared-issuer-execution";
 import {
   SHARED_ISSUER_TESTNET_PASSPHRASE,
   SharedIssuerIssuanceError,
   assertReplacementPreservesIssuanceIntent,
+  assertSharedIssuerIssuancePlanCanonical,
   assertSignedEnvelopeAuthorizedForSubmission,
   assertSignedEnvelopeMatchesPlan,
   assertSigningRequestMatchesPlan,
@@ -14,6 +32,8 @@ import {
   buildSharedIssuerIssuancePlan,
   classifySharedIssuerRecovery,
   createSharedIssuerSigningRequest,
+  hashSharedIssuerIssuanceIntent,
+  type SharedIssuerIssuancePlan,
   type SharedIssuerIssuancePreconditions,
   type SharedIssuerIssuanceRequest,
 } from "../lib/stellar/shared-issuer-issuance";
@@ -73,6 +93,162 @@ function errorCode(error: unknown): string | undefined {
   return error instanceof SharedIssuerIssuanceError ? error.code : undefined;
 }
 
+function withIntentPatch(
+  plan: SharedIssuerIssuancePlan,
+  patch: Partial<SharedIssuerIssuancePlan["intent"]>,
+): SharedIssuerIssuancePlan {
+  const intent = { ...plan.intent, ...patch };
+  return {
+    ...plan,
+    intent,
+    intentFingerprint: hashSharedIssuerIssuanceIntent(intent),
+  };
+}
+
+function buildCustomEnvelope(
+  plan: SharedIssuerIssuancePlan,
+  options: {
+    sourcePublicKey?: string;
+    operationSource?: string;
+    extraOperation?: boolean;
+    wrongOperation?: boolean;
+  } = {},
+): Pick<SharedIssuerIssuancePlan, "unsignedEnvelopeXdr" | "transactionHash"> {
+  const builder = new TransactionBuilder(
+    new Account(
+      options.sourcePublicKey ?? plan.intent.issuerPublicKey,
+      plan.sourceSequence,
+    ),
+    {
+      fee: plan.feeStroops,
+      networkPassphrase: Networks.TESTNET,
+    },
+  );
+
+  if (options.wrongOperation) {
+    builder.addOperation(
+      Operation.manageData({
+        name: "unexpected",
+        value: "1",
+      }),
+    );
+  } else {
+    builder.addOperation(
+      Operation.payment({
+        ...(options.operationSource ? { source: options.operationSource } : {}),
+        destination: plan.intent.destinationPublicKey,
+        asset: new Asset(plan.intent.assetCode, plan.intent.issuerPublicKey),
+        amount: plan.intent.amount,
+      }),
+    );
+
+    if (options.extraOperation) {
+      builder.addOperation(
+        Operation.payment({
+          destination: plan.intent.destinationPublicKey,
+          asset: new Asset(plan.intent.assetCode, plan.intent.issuerPublicKey),
+          amount: "1.0000000",
+        }),
+      );
+    }
+  }
+
+  const transaction = builder
+    .setTimebounds(plan.validFrom, plan.validUntil)
+    .build();
+
+  return {
+    unsignedEnvelopeXdr: transaction.toXDR(),
+    transactionHash: Buffer.from(transaction.hash()).toString("hex"),
+  };
+}
+
+function createDurableExecutionRecords(
+  plan: SharedIssuerIssuancePlan,
+  attemptId = randomUUID(),
+): {
+  intent: ImmutableSharedIssuanceIntent;
+  attempt: ImmutableSharedIssuanceTransactionAttempt;
+} {
+  const issuanceRequestId = randomUUID();
+  const createdAt = "2027-01-15T08:00:00.000Z";
+  const intent: ImmutableSharedIssuanceIntent = {
+    issuanceRequestId,
+    issuanceIntentFingerprint: plan.intentFingerprint,
+    reservationFingerprint: "a".repeat(64),
+    projectId: plan.intent.projectId,
+    ownerPublicKey: plan.intent.destinationPublicKey,
+    network: "testnet",
+    networkPassphraseHash: createHash("sha256")
+      .update(SHARED_ISSUER_TESTNET_PASSPHRASE)
+      .digest("hex"),
+    assetCode: plan.intent.assetCode,
+    issuerPublicKey: plan.intent.issuerPublicKey,
+    destinationPublicKey: plan.intent.destinationPublicKey,
+    amount: plan.intent.amount,
+    policyVersion: plan.intent.policyVersion,
+    createdAt,
+  };
+  const attempt: ImmutableSharedIssuanceTransactionAttempt = {
+    attemptId,
+    issuanceRequestId,
+    issuanceIntentFingerprint: plan.intentFingerprint,
+    attemptNumber: 1,
+    transactionHash: plan.transactionHash,
+    envelopeXdrSha256: createHash("sha256")
+      .update(plan.unsignedEnvelopeXdr)
+      .digest("hex"),
+    sourceSequence: plan.sourceSequence,
+    feeStroops: plan.feeStroops,
+    validFrom: plan.validFrom,
+    validUntil: plan.validUntil,
+    transactionSourcePublicKey: plan.intent.issuerPublicKey,
+    operationCount: 1,
+    operationType: "payment",
+    operationSourcePublicKey: plan.intent.issuerPublicKey,
+    assetCode: plan.intent.assetCode,
+    issuerPublicKey: plan.intent.issuerPublicKey,
+    destinationPublicKey: plan.intent.destinationPublicKey,
+    amount: plan.intent.amount,
+    createdAt,
+  };
+  return { intent, attempt };
+}
+
+function createDurableExecutionWriter(
+  records: {
+    intent: ImmutableSharedIssuanceIntent;
+    attempt: ImmutableSharedIssuanceTransactionAttempt;
+  },
+  counters: { digestWrites: number },
+): SignedEnvelopeAttemptWriter {
+  let storedAttempt = records.attempt;
+  return {
+    async getAttempt(attemptId) {
+      return attemptId === storedAttempt.attemptId ? storedAttempt : null;
+    },
+    async getIntent(issuanceRequestId) {
+      return issuanceRequestId === records.intent.issuanceRequestId
+        ? records.intent
+        : null;
+    },
+    async recordSignedEnvelope(input) {
+      counters.digestWrites += 1;
+      if (
+        input.attemptId !== storedAttempt.attemptId ||
+        input.transactionHash !== storedAttempt.transactionHash
+      ) {
+        return storedAttempt;
+      }
+      storedAttempt = {
+        ...storedAttempt,
+        signedEnvelopeXdrSha256: input.signedEnvelopeXdrSha256,
+      };
+      return storedAttempt;
+    },
+  };
+}
+
 test("builds one canonical Testnet payment envelope for an approved issuance", () => {
   const plan = buildSharedIssuerIssuancePlan(REQUEST, PRECONDITIONS);
   const transaction = TransactionBuilder.fromXDR(
@@ -100,6 +276,392 @@ test("builds one canonical Testnet payment envelope for an approved issuance", (
     Buffer.from(transaction.hash()).toString("hex"),
     plan.transactionHash,
   );
+});
+
+test("canonical plan validation rejects body substitution before signing, digest persistence, or submission", async () => {
+  const canonical = buildSharedIssuerIssuancePlan(REQUEST, PRECONDITIONS);
+  assert.doesNotThrow(() => assertSharedIssuerIssuancePlanCanonical(canonical));
+
+  const otherDestination = Keypair.fromRawEd25519Seed(
+    Buffer.alloc(32, 45),
+  ).publicKey();
+  const otherIssuer = Keypair.fromRawEd25519Seed(
+    Buffer.alloc(32, 46),
+  ).publicKey();
+
+  const transactionSourceMismatch = buildCustomEnvelope(canonical, {
+    sourcePublicKey: otherIssuer,
+  });
+  const operationSourceMismatch = buildCustomEnvelope(canonical, {
+    operationSource: otherIssuer,
+  });
+  const extraOperation = buildCustomEnvelope(canonical, {
+    extraOperation: true,
+  });
+  const wrongOperation = buildCustomEnvelope(canonical, {
+    wrongOperation: true,
+  });
+
+  const networkIntent = {
+    ...canonical.intent,
+    network: "public" as typeof canonical.intent.network,
+  };
+
+  const transactionB = buildSharedIssuerIssuancePlan(
+    {
+      ...REQUEST,
+      destinationPublicKey: otherDestination,
+    },
+    {
+      ...PRECONDITIONS,
+      destinationTrustline: {
+        ...PRECONDITIONS.destinationTrustline,
+        destinationPublicKey: otherDestination,
+      },
+    },
+  );
+
+  const cases: Array<{ name: string; plan: SharedIssuerIssuancePlan }> = [
+    {
+      name: "intent fingerprint mismatch",
+      plan: { ...canonical, intentFingerprint: "0".repeat(64) },
+    },
+    {
+      name: "destination mismatch",
+      plan: withIntentPatch(canonical, {
+        destinationPublicKey: otherDestination,
+      }),
+    },
+    {
+      name: "amount mismatch",
+      plan: withIntentPatch(canonical, { amount: "126.0000000" }),
+    },
+    {
+      name: "issuer mismatch",
+      plan: withIntentPatch(canonical, { issuerPublicKey: otherIssuer }),
+    },
+    {
+      name: "asset-code mismatch",
+      plan: withIntentPatch(canonical, { assetCode: "SOLAR" }),
+    },
+    {
+      name: "network mismatch",
+      plan: {
+        ...canonical,
+        intent: networkIntent,
+        intentFingerprint: hashSharedIssuerIssuanceIntent(networkIntent),
+      },
+    },
+    {
+      name: "transaction source mismatch",
+      plan: { ...canonical, ...transactionSourceMismatch },
+    },
+    {
+      name: "operation source mismatch",
+      plan: { ...canonical, ...operationSourceMismatch },
+    },
+    {
+      name: "sequence mismatch",
+      plan: { ...canonical, sourceSequence: "123457" },
+    },
+    {
+      name: "fee mismatch",
+      plan: { ...canonical, feeStroops: "200" },
+    },
+    {
+      name: "timebound mismatch",
+      plan: { ...canonical, validUntil: canonical.validUntil + 1 },
+    },
+    {
+      name: "extra operation",
+      plan: { ...canonical, ...extraOperation },
+    },
+    {
+      name: "wrong operation",
+      plan: { ...canonical, ...wrongOperation },
+    },
+    {
+      name: "unsigned XDR mismatch",
+      plan: {
+        ...canonical,
+        unsignedEnvelopeXdr: extraOperation.unsignedEnvelopeXdr,
+      },
+    },
+    {
+      name: "transaction hash mismatch",
+      plan: { ...canonical, transactionHash: "f".repeat(64) },
+    },
+    {
+      name: "hybrid intent A / transaction B",
+      plan: {
+        ...canonical,
+        unsignedEnvelopeXdr: transactionB.unsignedEnvelopeXdr,
+        transactionHash: transactionB.transactionHash,
+      },
+    },
+  ];
+
+  const signed = TransactionBuilder.fromXDR(
+    canonical.unsignedEnvelopeXdr,
+    Networks.TESTNET,
+  );
+  signed.sign(ISSUER_KEYPAIR, SIGNER_B_KEYPAIR);
+  const signedEnvelopeXdr = signed.toXDR();
+
+  for (const candidate of cases) {
+    let signerCalls = 0;
+    const signer = {
+      async signCanonicalEnvelope(
+        _request: ReturnType<typeof createSharedIssuerSigningRequest>,
+      ) {
+        signerCalls += 1;
+        return { signedEnvelopeXdr };
+      },
+    };
+
+    await assert.rejects(
+      async () =>
+        signer.signCanonicalEnvelope(
+          createSharedIssuerSigningRequest(candidate.plan),
+        ),
+      (error: unknown) => errorCode(error) === "canonical_plan_mismatch",
+      candidate.name,
+    );
+    assert.equal(signerCalls, 0, candidate.name);
+
+    const counters = { digestWrites: 0 };
+    let submissions = 0;
+    const attemptId = randomUUID();
+    const durableWriter = createDurableExecutionWriter(
+      createDurableExecutionRecords(canonical, attemptId),
+      counters,
+    );
+    await assert.rejects(
+      persistAndSubmitSharedIssuerEnvelope({
+        writer: durableWriter,
+        attemptId,
+        plan: candidate.plan,
+        signedEnvelopeXdr,
+        authorization: SIGNER_AUTHORIZATION,
+        submission: {
+          async submitSignedEnvelope() {
+            submissions += 1;
+            return { hash: candidate.plan.transactionHash };
+          },
+        },
+      }),
+      (error: unknown) => errorCode(error) === "canonical_plan_mismatch",
+      candidate.name,
+    );
+    assert.equal(counters.digestWrites, 0, candidate.name);
+    assert.equal(submissions, 0, candidate.name);
+  }
+});
+
+test("durable intent and attempt must match the canonical plan before signing, digest persistence, or submission", async () => {
+  const planB = buildSharedIssuerIssuancePlan(REQUEST, PRECONDITIONS);
+  const otherDestination = Keypair.fromRawEd25519Seed(
+    Buffer.alloc(32, 47),
+  ).publicKey();
+  const otherIssuer = Keypair.fromRawEd25519Seed(
+    Buffer.alloc(32, 48),
+  ).publicKey();
+
+  const fullPlanA = buildSharedIssuerIssuancePlan(
+    {
+      ...REQUEST,
+      destinationPublicKey: otherDestination,
+      amount: "126",
+    },
+    {
+      ...PRECONDITIONS,
+      destinationTrustline: {
+        ...PRECONDITIONS.destinationTrustline,
+        destinationPublicKey: otherDestination,
+      },
+    },
+  );
+  const destinationPlanA = buildSharedIssuerIssuancePlan(
+    { ...REQUEST, destinationPublicKey: otherDestination },
+    {
+      ...PRECONDITIONS,
+      destinationTrustline: {
+        ...PRECONDITIONS.destinationTrustline,
+        destinationPublicKey: otherDestination,
+      },
+    },
+  );
+  const amountPlanA = buildSharedIssuerIssuancePlan(
+    { ...REQUEST, amount: "126" },
+    PRECONDITIONS,
+  );
+  const issuerPlanA = buildSharedIssuerIssuancePlan(
+    { ...REQUEST, issuerPublicKey: otherIssuer },
+    {
+      ...PRECONDITIONS,
+      destinationTrustline: {
+        ...PRECONDITIONS.destinationTrustline,
+        issuerPublicKey: otherIssuer,
+      },
+    },
+  );
+  const codePlanA = buildSharedIssuerIssuancePlan(
+    { ...REQUEST, assetCode: "SOLAR" },
+    {
+      ...PRECONDITIONS,
+      destinationTrustline: {
+        ...PRECONDITIONS.destinationTrustline,
+        assetCode: "SOLAR",
+      },
+    },
+  );
+  const sequencePlanA = buildSharedIssuerIssuancePlan(REQUEST, {
+    ...PRECONDITIONS,
+    issuerSequence: "123457",
+  });
+  const feePlanA = buildSharedIssuerIssuancePlan(REQUEST, {
+    ...PRECONDITIONS,
+    feeStroops: "200",
+  });
+  const timeboundPlanA = buildSharedIssuerIssuancePlan(
+    {
+      ...REQUEST,
+      validFrom: REQUEST.validFrom + 60,
+      validUntil: REQUEST.validUntil + 60,
+    },
+    PRECONDITIONS,
+  );
+
+  const fingerprintMismatch = createDurableExecutionRecords(planB);
+  fingerprintMismatch.intent = {
+    ...fingerprintMismatch.intent,
+    issuanceIntentFingerprint: "f".repeat(64),
+  };
+  fingerprintMismatch.attempt = {
+    ...fingerprintMismatch.attempt,
+    issuanceIntentFingerprint: "f".repeat(64),
+  };
+
+  const hashMismatch = createDurableExecutionRecords(planB);
+  hashMismatch.attempt = {
+    ...hashMismatch.attempt,
+    transactionHash: "e".repeat(64),
+  };
+
+  const ownerMismatch = createDurableExecutionRecords(planB);
+  ownerMismatch.intent = {
+    ...ownerMismatch.intent,
+    ownerPublicKey: otherDestination,
+  };
+
+  const networkMismatch = createDurableExecutionRecords(planB);
+  networkMismatch.intent = {
+    ...networkMismatch.intent,
+    networkPassphraseHash: "d".repeat(64),
+  };
+
+  const cases = [
+    {
+      name: "persisted intent A plus canonical plan B",
+      records: createDurableExecutionRecords(fullPlanA),
+    },
+    {
+      name: "persisted destination A plus plan destination B",
+      records: createDurableExecutionRecords(destinationPlanA),
+    },
+    {
+      name: "persisted amount A plus plan amount B",
+      records: createDurableExecutionRecords(amountPlanA),
+    },
+    {
+      name: "persisted issuer mismatch",
+      records: createDurableExecutionRecords(issuerPlanA),
+    },
+    {
+      name: "persisted asset-code mismatch",
+      records: createDurableExecutionRecords(codePlanA),
+    },
+    {
+      name: "persisted fingerprint mismatch",
+      records: fingerprintMismatch,
+    },
+    {
+      name: "persisted transaction-hash mismatch",
+      records: hashMismatch,
+    },
+    {
+      name: "persisted sequence mismatch",
+      records: createDurableExecutionRecords(sequencePlanA),
+    },
+    {
+      name: "persisted fee mismatch",
+      records: createDurableExecutionRecords(feePlanA),
+    },
+    {
+      name: "persisted timebound mismatch",
+      records: createDurableExecutionRecords(timeboundPlanA),
+    },
+    {
+      name: "persisted authenticated-owner mismatch",
+      records: ownerMismatch,
+    },
+    {
+      name: "persisted Testnet passphrase mismatch",
+      records: networkMismatch,
+    },
+  ];
+
+  const signed = TransactionBuilder.fromXDR(
+    planB.unsignedEnvelopeXdr,
+    Networks.TESTNET,
+  );
+  signed.sign(ISSUER_KEYPAIR, SIGNER_B_KEYPAIR);
+  const signedEnvelopeXdr = signed.toXDR();
+
+  for (const candidate of cases) {
+    let signerCalls = 0;
+    const counters = { digestWrites: 0 };
+    let submissions = 0;
+    const writer = createDurableExecutionWriter(candidate.records, counters);
+
+    await assert.rejects(
+      signPersistedSharedIssuerEnvelope({
+        reader: writer,
+        attemptId: candidate.records.attempt.attemptId,
+        plan: planB,
+        signer: {
+          async signCanonicalEnvelope() {
+            signerCalls += 1;
+            return { signedEnvelopeXdr };
+          },
+        },
+      }),
+      (error: unknown) => errorCode(error) === "canonical_plan_mismatch",
+      candidate.name,
+    );
+
+    await assert.rejects(
+      persistAndSubmitSharedIssuerEnvelope({
+        writer,
+        attemptId: candidate.records.attempt.attemptId,
+        plan: planB,
+        signedEnvelopeXdr,
+        authorization: SIGNER_AUTHORIZATION,
+        submission: {
+          async submitSignedEnvelope() {
+            submissions += 1;
+            return { hash: planB.transactionHash };
+          },
+        },
+      }),
+      (error: unknown) => errorCode(error) === "canonical_plan_mismatch",
+      candidate.name,
+    );
+
+    assert.equal(signerCalls, 0, candidate.name);
+    assert.equal(counters.digestWrites, 0, candidate.name);
+    assert.equal(submissions, 0, candidate.name);
+  }
 });
 
 test("canonical intent fingerprint is stable across sequence, fee, and timebound rebuilds", () => {
@@ -418,6 +980,43 @@ test("submission authorization requires valid approved signatures meeting config
     ),
     plan.transactionHash,
   );
+});
+
+test("signed-envelope digest is persisted immutably before submission", async () => {
+  const plan = buildSharedIssuerIssuancePlan(REQUEST, PRECONDITIONS);
+  const transaction = TransactionBuilder.fromXDR(
+    plan.unsignedEnvelopeXdr,
+    Networks.TESTNET,
+  );
+  transaction.sign(ISSUER_KEYPAIR, SIGNER_B_KEYPAIR);
+  const signedEnvelopeXdr = transaction.toXDR();
+  const attemptId = randomUUID();
+  const counters = { digestWrites: 0 };
+  let submissions = 0;
+  const writer = createDurableExecutionWriter(
+    createDurableExecutionRecords(plan, attemptId),
+    counters,
+  );
+
+  const result = await persistAndSubmitSharedIssuerEnvelope({
+    writer,
+    attemptId,
+    plan,
+    signedEnvelopeXdr,
+    authorization: SIGNER_AUTHORIZATION,
+    submission: {
+      async submitSignedEnvelope(value) {
+        submissions += 1;
+        assert.equal(value, signedEnvelopeXdr);
+        assert.equal(counters.digestWrites, 1);
+        return { hash: plan.transactionHash };
+      },
+    },
+  });
+
+  assert.equal(result.hash, plan.transactionHash);
+  assert.equal(counters.digestWrites, 1);
+  assert.equal(submissions, 1);
 });
 
 test("replacement transactions must preserve the immutable logical issuance intent", () => {

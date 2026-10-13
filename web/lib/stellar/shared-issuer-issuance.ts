@@ -35,6 +35,7 @@ export type SharedIssuerIssuanceErrorCode =
   | "invalid_fee"
   | "insufficient_fee_balance"
   | "invalid_timebounds"
+  | "canonical_plan_mismatch"
   | "signed_envelope_invalid"
   | "signed_envelope_mismatch"
   | "unauthorized_signing_request"
@@ -323,7 +324,7 @@ export function buildSharedIssuerIssuancePlan(
 
   return {
     intent,
-    intentFingerprint: hashIntent(intent),
+    intentFingerprint: hashSharedIssuerIssuanceIntent(intent),
     sourceSequence,
     validFrom: request.validFrom,
     validUntil: request.validUntil,
@@ -333,9 +334,80 @@ export function buildSharedIssuerIssuancePlan(
   };
 }
 
+export function assertSharedIssuerIssuancePlanCanonical(
+  plan: SharedIssuerIssuancePlan,
+): void {
+  try {
+    const issuerPublicKey = normalizePublicKey(
+      plan.intent.issuerPublicKey,
+      "invalid_issuer",
+    );
+    const destinationPublicKey = normalizePublicKey(
+      plan.intent.destinationPublicKey,
+      "invalid_destination",
+    );
+    const amountUnits = parseAssetUnits(plan.intent.amount, false);
+    const sourceSequence = parseSequence(plan.sourceSequence);
+    const feeStroops = parsePositiveInteger(plan.feeStroops, "invalid_fee");
+
+    if (
+      plan.intent.policyVersion !== SHARED_ISSUANCE_POLICY_VERSION ||
+      plan.intent.network !== SHARED_ISSUER_TESTNET_NETWORK ||
+      typeof plan.intent.projectId !== "string" ||
+      !plan.intent.projectId ||
+      plan.intent.projectId.trim() !== plan.intent.projectId ||
+      issuerPublicKey !== plan.intent.issuerPublicKey ||
+      destinationPublicKey !== plan.intent.destinationPublicKey ||
+      destinationPublicKey === issuerPublicKey ||
+      !ASSET_CODE_PATTERN.test(plan.intent.assetCode) ||
+      formatAssetUnits(amountUnits) !== plan.intent.amount ||
+      sourceSequence !== plan.sourceSequence ||
+      feeStroops.toString() !== plan.feeStroops ||
+      !Number.isSafeInteger(plan.validFrom) ||
+      !Number.isSafeInteger(plan.validUntil) ||
+      plan.validFrom < 0 ||
+      plan.validUntil <= plan.validFrom ||
+      plan.intentFingerprint !== hashSharedIssuerIssuanceIntent(plan.intent)
+    ) {
+      throw new Error("invalid canonical plan metadata");
+    }
+
+    const rebuilt = new TransactionBuilder(
+      new Account(issuerPublicKey, sourceSequence),
+      {
+        fee: feeStroops.toString(),
+        networkPassphrase: SHARED_ISSUER_TESTNET_PASSPHRASE,
+      },
+    )
+      .addOperation(
+        Operation.payment({
+          destination: destinationPublicKey,
+          asset: new Asset(plan.intent.assetCode, issuerPublicKey),
+          amount: plan.intent.amount,
+        }),
+      )
+      .setTimebounds(plan.validFrom, plan.validUntil)
+      .build();
+
+    if (
+      rebuilt.toXDR() !== plan.unsignedEnvelopeXdr ||
+      Buffer.from(rebuilt.hash()).toString("hex") !== plan.transactionHash
+    ) {
+      throw new Error("canonical transaction body mismatch");
+    }
+  } catch {
+    throw new SharedIssuerIssuanceError(
+      "canonical_plan_mismatch",
+      "Issuance plan is not the exact one-payment Testnet transaction authorized by its immutable intent.",
+    );
+  }
+}
+
 export function createSharedIssuerSigningRequest(
   plan: SharedIssuerIssuancePlan,
 ): SharedIssuerSigningRequest {
+  assertSharedIssuerIssuancePlanCanonical(plan);
+
   return {
     policyVersion: SHARED_ISSUANCE_POLICY_VERSION,
     issuerPublicKey: plan.intent.issuerPublicKey,
@@ -350,6 +422,8 @@ export function assertSigningRequestMatchesPlan(
   request: SharedIssuerSigningRequest,
   plan: SharedIssuerIssuancePlan,
 ): void {
+  assertSharedIssuerIssuancePlanCanonical(plan);
+
   if (
     request.policyVersion !== SHARED_ISSUANCE_POLICY_VERSION ||
     request.issuerPublicKey !== plan.intent.issuerPublicKey ||
@@ -369,6 +443,8 @@ export function assertSignedEnvelopeMatchesPlan(
   signedEnvelopeXdr: string,
   plan: SharedIssuerIssuancePlan,
 ): string {
+  assertSharedIssuerIssuancePlanCanonical(plan);
+
   let transactionHash: string;
 
   try {
@@ -705,7 +781,9 @@ function formatAssetUnits(units: bigint): string {
   return `${whole}.${fractional}`;
 }
 
-function hashIntent(intent: SharedIssuerIssuanceIntent): string {
+export function hashSharedIssuerIssuanceIntent(
+  intent: SharedIssuerIssuanceIntent,
+): string {
   return createHash("sha256")
     .update(
       JSON.stringify([

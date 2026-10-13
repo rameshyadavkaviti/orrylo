@@ -26,6 +26,16 @@ if (!TEST_DATABASE_URL) {
   test("metadata publication PostgreSQL suite", { skip: true }, () => {});
 } else {
   const sql = createDatabaseClient(TEST_DATABASE_URL);
+  const writerSql = createDatabaseClient(
+    roleUrl(
+      TEST_DATABASE_URL,
+      "orrylo_metadata_writer_test",
+      "metadata-writer-test",
+    ),
+  );
+  const appSql = createDatabaseClient(
+    roleUrl(TEST_DATABASE_URL, "orrylo_metadata_app_test", "metadata-app-test"),
+  );
   const OWNER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 81)).publicKey();
   const OTHER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 82)).publicKey();
   const ISSUER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 83)).publicKey();
@@ -43,6 +53,7 @@ if (!TEST_DATABASE_URL) {
   class FixtureConfirmationReader implements SharedAssetConfirmationReader {
     readonly records = new Map<string, VerifiedSharedAssetProvenance>();
     available = true;
+    enforceOwnerLookup = true;
     remainingReads: number | null = null;
 
     async findConfirmed(projectId: string, ownerPublicKey: string) {
@@ -52,7 +63,11 @@ if (!TEST_DATABASE_URL) {
         this.remainingReads -= 1;
       }
       const record = this.records.get(projectId) ?? null;
-      return record?.ownerPublicKey === ownerPublicKey ? record : null;
+      if (!record) return null;
+      if (this.enforceOwnerLookup && record.ownerPublicKey !== ownerPublicKey) {
+        return null;
+      }
+      return record;
     }
   }
 
@@ -71,6 +86,24 @@ if (!TEST_DATABASE_URL) {
     await sql.unsafe("DROP SCHEMA public CASCADE");
     await sql.unsafe("CREATE SCHEMA public");
     await migrateDatabase(sql, resolve(process.cwd(), "db/migrations"));
+    await sql.unsafe(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_metadata_writer_test') THEN
+          CREATE ROLE orrylo_metadata_writer_test LOGIN PASSWORD 'metadata-writer-test';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_metadata_app_test') THEN
+          CREATE ROLE orrylo_metadata_app_test LOGIN PASSWORD 'metadata-app-test';
+        END IF;
+      END;
+      $$;
+      ALTER ROLE orrylo_metadata_writer_test PASSWORD 'metadata-writer-test';
+      ALTER ROLE orrylo_metadata_app_test PASSWORD 'metadata-app-test';
+      GRANT orrylo_confirmation_writer TO orrylo_metadata_writer_test;
+      GRANT USAGE ON SCHEMA public TO orrylo_metadata_app_test;
+      GRANT SELECT, INSERT, UPDATE ON project_metadata_publications
+        TO orrylo_metadata_app_test;
+    `);
   });
 
   beforeEach(async () => {
@@ -84,7 +117,11 @@ if (!TEST_DATABASE_URL) {
   });
 
   after(async () => {
-    await sql.end({ timeout: 5 });
+    await Promise.all([
+      appSql.end({ timeout: 5 }),
+      writerSql.end({ timeout: 5 }),
+      sql.end({ timeout: 5 }),
+    ]);
   });
 
   function repository() {
@@ -132,6 +169,7 @@ if (!TEST_DATABASE_URL) {
     const confirmationId = randomUUID();
     const transactionHash = "a".repeat(64);
     const envelopeHash = "b".repeat(64);
+    const signedEnvelopeHash = "d".repeat(64);
     await sql`
       INSERT INTO project_issuance_full_intents (
         issuance_request_id, issuance_intent_fingerprint,
@@ -150,23 +188,26 @@ if (!TEST_DATABASE_URL) {
       INSERT INTO project_issuance_transaction_attempts (
         attempt_id, issuance_request_id, issuance_intent_fingerprint,
         attempt_number, transaction_hash, envelope_xdr_sha256,
+        signed_envelope_xdr_sha256,
         source_sequence, fee_stroops, valid_from, valid_until,
         transaction_source_public_key, operation_count, operation_type,
         operation_source_public_key, asset_code, issuer_public_key,
         destination_public_key, amount, created_at
       ) VALUES (
         ${attemptId}, ${reservation.issuance.requestId}, ${intentFingerprint},
-        1, ${transactionHash}, ${envelopeHash}, 123, 100, 1, 2, ${ISSUER},
+        1, ${transactionHash}, ${envelopeHash}, ${signedEnvelopeHash},
+        123, 100, 1, 2, ${ISSUER},
         1, 'payment', ${ISSUER}, ${code}, ${ISSUER}, ${DESTINATION},
         100.0000000, ${new Date(clock)}
       )
     `;
-    await sql`
+    await writerSql`
       INSERT INTO project_issuance_ledger_confirmations (
         confirmation_id, issuance_request_id, issuance_intent_fingerprint,
         attempt_id, project_id, owner_public_key, network,
         network_passphrase_hash, transaction_hash, envelope_xdr_sha256,
-        result_xdr_sha256, result_success, ledger_sequence, ledger_closed_at,
+        signed_envelope_xdr_sha256, result_xdr_sha256, result_success,
+        ledger_sequence, ledger_closed_at,
         transaction_source_public_key, operation_count, operation_type,
         operation_source_public_key, asset_code, issuer_public_key,
         destination_public_key, amount, source_sequence, verifier_identity,
@@ -175,7 +216,8 @@ if (!TEST_DATABASE_URL) {
         ${confirmationId}, ${reservation.issuance.requestId},
         ${intentFingerprint}, ${attemptId}, ${project.project.projectId},
         ${OWNER}, 'testnet', ${PASSPHRASE_HASH}, ${transactionHash},
-        ${envelopeHash}, ${"c".repeat(64)}, true, 456, ${new Date(clock)},
+        ${envelopeHash}, ${signedEnvelopeHash}, ${"c".repeat(64)}, true, 456,
+        ${new Date(clock)},
         ${ISSUER}, 1, 'payment', ${ISSUER}, ${code}, ${ISSUER}, ${DESTINATION},
         100.0000000, 123, 'isolated-test-ledger-verifier',
         'test-verification-v1', ${new Date(clock)}, ${new Date(clock)}
@@ -193,6 +235,7 @@ if (!TEST_DATABASE_URL) {
       issuanceRequestId: reservation.issuance.requestId,
       issuanceIntentFingerprint: intentFingerprint,
       transactionHash,
+      signedEnvelopeXdrSha256: signedEnvelopeHash,
       ledgerSequence: 456,
     };
     reader.records.set(project.project.projectId, provenance);
@@ -244,6 +287,85 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
+  test("legacy NULL-digest confirmation can never reactivate publication", async () => {
+    const { project, provenance } = await createConfirmedProject();
+    const first = await service().publishOwnedProject(project.projectId, OWNER);
+    assert.equal(first.publication.reachable, true);
+
+    // Simulate a pre-009 row after upgrade. Constraints intentionally permit
+    // NULL for historical rows; production append-only triggers prevent this
+    // mutation, so the isolated test owner temporarily disables only them.
+    await sql.unsafe(
+      "ALTER TABLE project_issuance_transaction_attempts DISABLE TRIGGER project_issuance_transaction_attempts_append_only",
+    );
+    await sql.unsafe(
+      "ALTER TABLE project_issuance_ledger_confirmations DISABLE TRIGGER project_issuance_ledger_confirmations_append_only",
+    );
+    try {
+      await sql`UPDATE project_issuance_transaction_attempts
+        SET signed_envelope_xdr_sha256 = NULL
+        WHERE issuance_request_id = ${provenance.issuanceRequestId}`;
+      await sql`UPDATE project_issuance_ledger_confirmations
+        SET signed_envelope_xdr_sha256 = NULL
+        WHERE confirmation_id = ${provenance.confirmationId}`;
+    } finally {
+      await sql.unsafe(
+        "ALTER TABLE project_issuance_transaction_attempts ENABLE TRIGGER project_issuance_transaction_attempts_append_only",
+      );
+      await sql.unsafe(
+        "ALTER TABLE project_issuance_ledger_confirmations ENABLE TRIGGER project_issuance_ledger_confirmations_append_only",
+      );
+    }
+    await sql`UPDATE project_metadata_publications
+      SET reachable = false, verified_at = NULL,
+          verification_error_code = 'signed_envelope_provenance_required'
+      WHERE project_id = ${project.projectId}`;
+
+    // The reader still replays the old confirmation and even claims a digest.
+    // Durable confirmation provenance must override that claim.
+    assert.equal(await repository().getByProjectId(project.projectId), null);
+    assert.deepEqual(await repository().listSharedTestnetPublications(), []);
+    for (let directReplay = 0; directReplay < 2; directReplay++) {
+      await assert.rejects(
+        appSql`
+          UPDATE project_metadata_publications
+          SET reachable = true,
+              verified_at = ${new Date(clock + directReplay + 1)},
+              last_verification_at = ${new Date(clock + directReplay + 1)}
+          WHERE project_id = ${project.projectId}
+        `,
+        (error: unknown) =>
+          (error as { constraint_name?: string }).constraint_name ===
+          "project_metadata_publications_signed_confirmation_required",
+      );
+    }
+    const [row] = await sql<{ content_hash: string }[]>`
+      SELECT content_hash FROM project_metadata_publications
+      WHERE project_id = ${project.projectId}
+    `;
+    assert.equal(
+      await repository().markVerifiedIfCurrent({
+        projectId: project.projectId,
+        contentHash: row.content_hash.trim(),
+        now: clock + 1,
+      }),
+      null,
+    );
+    for (let replay = 0; replay < 2; replay++) {
+      await assert.rejects(
+        service().publishOwnedProject(project.projectId, OWNER),
+        (error: unknown) =>
+          error instanceof MetadataPublicationError &&
+          error.code === "issuer_provenance_unavailable",
+      );
+    }
+    const [stored] = await sql<{ reachable: boolean }[]>`
+      SELECT reachable FROM project_metadata_publications
+      WHERE project_id = ${project.projectId}
+    `;
+    assert.equal(stored.reachable, false);
+  });
+
   test("owner authorization and approved issuer matching remain fail closed", async () => {
     const { project } = await createConfirmedProject();
     await assert.rejects(
@@ -265,6 +387,32 @@ if (!TEST_DATABASE_URL) {
       (error: unknown) =>
         error instanceof MetadataPublicationError &&
         error.code === "issuer_provenance_mismatch",
+    );
+  });
+
+  test("stale confirmation provenance for another project or owner is rejected", async () => {
+    const { project, provenance } = await createConfirmedProject();
+    reader.records.set(project.projectId, {
+      ...provenance,
+      projectId: randomUUID(),
+    });
+    await assert.rejects(
+      service().publishOwnedProject(project.projectId, OWNER),
+      (error: unknown) =>
+        error instanceof MetadataPublicationError &&
+        error.code === "issuer_provenance_unavailable",
+    );
+
+    reader.records.set(project.projectId, {
+      ...provenance,
+      ownerPublicKey: OTHER,
+    });
+    reader.enforceOwnerLookup = false;
+    await assert.rejects(
+      service().publishOwnedProject(project.projectId, OWNER),
+      (error: unknown) =>
+        error instanceof MetadataPublicationError &&
+        error.code === "issuer_provenance_unavailable",
     );
   });
 
@@ -328,4 +476,11 @@ if (!TEST_DATABASE_URL) {
     );
     assert.deepEqual(await repository().listSharedTestnetPublications(), []);
   });
+}
+
+function roleUrl(source: string, username: string, password: string): string {
+  const url = new URL(source);
+  url.username = username;
+  url.password = password;
+  return url.toString();
 }

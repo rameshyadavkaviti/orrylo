@@ -7,12 +7,15 @@ import {
   UnavailableSharedAssetConfirmationReader,
 } from "../projects/shared-asset-provenance";
 
+const HASH_PATTERN = /^[0-9a-f]{64}$/;
+
 export interface MetadataPublicationRow {
   project_id: string;
   metadata_home: string;
   network: "testnet" | "public";
   asset_code: string;
   issuer_public_key: string;
+  owner_public_key: string | null;
   issuance_request_id: string;
   issuance_fingerprint: string;
   confirmation_id: string | null;
@@ -59,9 +62,41 @@ export class PostgresMetadataPublicationRepository {
       row.project_id,
       ownerPublicKey,
     );
+    if (!source || !HASH_PATTERN.test(source.signedEnvelopeXdrSha256)) {
+      return false;
+    }
+    const [durable] = await this.sql<
+      {
+        signed_envelope_xdr_sha256: string;
+      }[]
+    >`
+      SELECT signed_envelope_xdr_sha256
+      FROM project_issuance_ledger_confirmations
+      WHERE confirmation_id = ${source.confirmationId}
+        AND issuance_request_id = ${source.issuanceRequestId}
+        AND issuance_intent_fingerprint = ${source.issuanceIntentFingerprint}
+        AND project_id = ${source.projectId}
+        AND owner_public_key = ${source.ownerPublicKey}
+        AND network = 'testnet'
+        AND asset_code = ${source.assetCode}
+        AND issuer_public_key = ${source.issuerPublicKey}
+        AND destination_public_key = ${source.destinationPublicKey}
+        AND amount = ${source.amount}
+        AND transaction_hash = ${source.transactionHash}
+        AND ledger_sequence = ${source.ledgerSequence}
+        AND signed_envelope_xdr_sha256 IS NOT NULL
+      LIMIT 1
+    `;
     return Boolean(
+      durable &&
+      durable.signed_envelope_xdr_sha256.trim() ===
+        source.signedEnvelopeXdrSha256 &&
       source &&
+      row.owner_public_key !== null &&
       source.confirmationId === row.confirmation_id &&
+      source.projectId === row.project_id &&
+      source.ownerPublicKey === ownerPublicKey &&
+      source.ownerPublicKey === row.owner_public_key.trim() &&
       source.network === row.network &&
       source.assetCode === row.asset_code &&
       source.issuerPublicKey === this.approvedIssuerPublicKey &&
@@ -75,9 +110,9 @@ export class PostgresMetadataPublicationRepository {
     projectId: string,
   ): Promise<MetadataPublicationState | null> {
     const [row] = await this.sql<
-      (MetadataPublicationRow & { owner_public_key: string })[]
+      (MetadataPublicationRow & { current_owner_public_key: string })[]
     >`
-      SELECT pub.*, owner.owner_public_key
+      SELECT pub.*, owner.owner_public_key AS current_owner_public_key
       FROM project_metadata_publications AS pub
       JOIN project_profile_owners AS owner ON owner.project_id = pub.project_id
       JOIN project_profiles AS project ON project.project_id = pub.project_id
@@ -85,13 +120,14 @@ export class PostgresMetadataPublicationRepository {
         AND project.network = pub.network
         AND project.asset_code = pub.asset_code
         AND project.issuer_model = 'shared'
+        AND pub.owner_public_key = owner.owner_public_key
         AND (project.issuer_public_key IS NULL
           OR project.issuer_public_key = pub.issuer_public_key)
       LIMIT 1
     `;
     if (
       !row ||
-      !(await this.hasValidProvenance(row, row.owner_public_key.trim()))
+      !(await this.hasValidProvenance(row, row.current_owner_public_key.trim()))
     ) {
       return null;
     }
@@ -100,9 +136,9 @@ export class PostgresMetadataPublicationRepository {
 
   async listSharedTestnetPublications(): Promise<MetadataPublicationState[]> {
     const rows = await this.sql<
-      (MetadataPublicationRow & { owner_public_key: string })[]
+      (MetadataPublicationRow & { current_owner_public_key: string })[]
     >`
-      SELECT pub.*, owner.owner_public_key
+      SELECT pub.*, owner.owner_public_key AS current_owner_public_key
       FROM project_metadata_publications AS pub
       JOIN project_profile_owners AS owner ON owner.project_id = pub.project_id
       JOIN project_profiles AS project ON project.project_id = pub.project_id
@@ -111,13 +147,16 @@ export class PostgresMetadataPublicationRepository {
         AND project.network = pub.network
         AND project.asset_code = pub.asset_code
         AND project.issuer_model = 'shared'
+        AND pub.owner_public_key = owner.owner_public_key
         AND (project.issuer_public_key IS NULL
           OR project.issuer_public_key = pub.issuer_public_key)
       ORDER BY pub.asset_code, pub.issuer_public_key, pub.project_id
     `;
     const valid: MetadataPublicationState[] = [];
     for (const row of rows) {
-      if (await this.hasValidProvenance(row, row.owner_public_key.trim())) {
+      if (
+        await this.hasValidProvenance(row, row.current_owner_public_key.trim())
+      ) {
         valid.push(mapMetadataPublication(row));
       }
     }
@@ -139,6 +178,26 @@ export class PostgresMetadataPublicationRepository {
         updated_at = ${new Date(input.now)}
       WHERE project_id = ${input.projectId}
         AND content_hash = ${input.contentHash}
+        AND EXISTS (
+          SELECT 1
+          FROM project_issuance_ledger_confirmations AS confirmation
+          WHERE confirmation.confirmation_id =
+              project_metadata_publications.confirmation_id
+            AND confirmation.issuance_request_id =
+              project_metadata_publications.issuance_request_id
+            AND confirmation.issuance_intent_fingerprint =
+              project_metadata_publications.issuance_fingerprint
+            AND confirmation.project_id =
+              project_metadata_publications.project_id
+            AND confirmation.owner_public_key =
+              project_metadata_publications.owner_public_key
+            AND confirmation.network = project_metadata_publications.network
+            AND confirmation.asset_code =
+              project_metadata_publications.asset_code
+            AND confirmation.issuer_public_key =
+              project_metadata_publications.issuer_public_key
+            AND confirmation.signed_envelope_xdr_sha256 IS NOT NULL
+        )
       RETURNING *
     `;
 

@@ -1,6 +1,6 @@
 # Shared Issuer Testnet Issuance Boundary
 
-Status: **Implemented preparation boundary / live issuance blocked by open policy and operational authorization**
+Status: **Gate A code-only persistence and validation foundation / live issuance blocked**
 
 This document describes the bounded Stellar-specific integration surface for
 creating customer Classic Stellar assets through Orrylo's Shared Issuer on
@@ -59,6 +59,29 @@ verification boundary. It:
 The module contains **no secret-key loading**, Horizon credentials, environment
 issuer selection, database writes, HTTP routes, or automatic signer invocation.
 
+Gate A also implements, without activating production network access:
+
+- immutable PostgreSQL repositories for full issuance intents and transaction
+  attempts, with a one-time immutable signed-envelope digest transition, exact
+  idempotent replay, and conflicting-replay rejection;
+- a typed Testnet ledger-reader interface whose production implementation is
+  explicitly unavailable;
+- an authoritative confirmation validator that parses raw envelope and result
+  XDR, requires one successful Classic payment result, and matches the
+  requested, returned, result-associated, recomputed, and persisted transaction
+  hashes before producing a runtime-only validated confirmation value;
+- a dedicated confirmation-writer persistence boundary that rejects an ordinary
+  application identity, schema owner, superuser, or `SET ROLE` substitution;
+- read-only ambiguity reconciliation that permits a replacement decision only
+  when exact-hash not-found and unchanged issuer-sequence checkpoints both
+  represent ledgers closed strictly after expiry;
+- metadata provenance binding to the exact project and owner as well as the
+  existing confirmation/request/fingerprint identity.
+
+These adapters contain no Horizon/RPC client, signer, submitter, issuer secret,
+or account mutation. Database role membership and production credentials are
+not provisioned by this repository phase.
+
 ## Full-stack integration contract
 
 The Full-stack boundary remains responsible for durable application state and
@@ -106,6 +129,8 @@ For each request it must independently verify at minimum:
 - exact amount;
 - explicit time bounds;
 - transaction hash matches the reviewed unsigned envelope;
+- decorated signed-envelope digest is persisted before submission and matches
+  independently returned ledger evidence;
 - returned envelope contains only valid signatures from the injected approved
   issuer signer configuration and meets its required weight;
 - request/policy identity has not been superseded.
@@ -154,6 +179,7 @@ Covered by deterministic tests in this slice:
 - invalid sequence/time bounds/amount;
 - unauthorized signer request mutation;
 - signed-envelope mutation detection;
+- exact four-way transaction-hash and successful payment-result binding;
 - missing/invalid/insufficient approved signer signatures;
 - submission-hash mismatch;
 - immutable logical-intent preservation across replacement envelopes;
@@ -163,12 +189,17 @@ Covered by deterministic tests in this slice:
 - authoritative expired rebuild classification;
 - sequence advancement taking precedence over expiry.
 
-Still requires Full-stack/database integration tests:
+Covered by Full-stack/database integration tests:
 
 - concurrent asset-code reservation across projects;
 - durable duplicate request replay through `workflow_intents`;
-- application database/on-chain disagreement reconciliation;
-- durable partial-failure state transitions and audit events.
+- immutable full-intent and attempt persistence, concurrent exact replay, and
+  conflicting replay rejection;
+- dedicated writer versus ordinary application database-role isolation;
+- forged confirmation writes, immutable evidence, confirmation replay, and
+  exact project/owner provenance scope;
+- ambiguous lookup, stale evidence, and conflicting sequence rejection;
+- immutable one-time signed-envelope persistence and conflicting replay rejection.
 
 Still requires real Testnet acceptance after policy/operations are authorized:
 
@@ -188,6 +219,7 @@ This branch does not:
 - configure a Stellar account;
 - create a trustline;
 - sign or submit any transaction;
+- query Horizon or Stellar RPC;
 - issue any asset;
 - touch RYLO;
 - modify Mainnet;
