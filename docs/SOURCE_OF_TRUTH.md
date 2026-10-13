@@ -869,6 +869,24 @@ A fresh agent is considered successfully recovered when it can, without prior ch
 
 If it cannot do these things, repository documentation or GitHub work-item state is insufficient and should be improved as part of enablement/documentation work.
 
+
+### 18.8 Cost discipline and external-service usage
+
+Cost discipline is a canonical operating rule for Orrylo.
+
+- Prefer free, local, cached, existing, or already-provisioned capabilities when they provide equivalent evidence.
+- Do not create deployments, hosted databases, preview environments, paid jobs, external API calls, infrastructure resources, domains, storage, monitoring, or other metered resources merely for convenience or exploration.
+- Any action that can create monetary cost must have a clear current milestone purpose, a concrete expected benefit, and no reasonably equivalent lower-cost or free alternative.
+- Reuse existing environments and resources before creating new ones. Avoid duplicate services, speculative environments, unnecessary replicas, repeated builds, redundant CI, and repeated external verification when existing exact-head evidence is sufficient.
+- Configure providers conservatively when access permits, including disabling unnecessary preview deployments or optional metered features, using sleep/scale-to-zero/resource caps where they do not violate product requirements, and removing temporary resources after their purpose is complete.
+- Cost-saving configuration must not silently weaken security, availability, correctness, auditability, or required Testnet/Mainnet evidence. If saving cost would materially change product behavior or security, treat it as a real tradeoff and return it to the owner/Product Architect.
+- Before a paid deployment or external mutation, verify that the product/integration state is mature enough for the deployment to answer a specific question or satisfy a specific acceptance criterion.
+- Agents with provider access should inspect and directly apply clearly safe, reversible, behavior-neutral cost controls within their authority rather than merely recommending them.
+- The owner must not be asked to approve routine zero-cost or reversible cost-saving housekeeping, but explicit owner gates for live Stellar actions, secrets, irreversible actions, and material product/security tradeoffs remain unchanged.
+- Record material paid infrastructure choices and recurring-cost assumptions in repository documentation so fresh agents do not recreate or duplicate them.
+
+This policy applies across Railway, hosting, databases, CI, APIs, domains, storage, observability, third-party SaaS, blockchain/network fees, and future providers. A small available credit or free tier is a budget constraint, not permission to spend it.
+
 ## 19. Canonical companion documents
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system architecture and boundaries
