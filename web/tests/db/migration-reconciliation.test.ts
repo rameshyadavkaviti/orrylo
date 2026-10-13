@@ -367,13 +367,15 @@ if (!TEST_DATABASE_URL) {
             source_sequence, fee_stroops, valid_from, valid_until,
             transaction_source_public_key, operation_count, operation_type,
             operation_source_public_key, asset_code, issuer_public_key,
-            destination_public_key, amount, created_at
+            destination_public_key, amount, created_at,
+            signed_envelope_xdr_sha256
           ) VALUES (
             ${attempt.id}, ${historicalRequest}, ${historicalFingerprint},
             ${attempt.number}, ${attempt.transactionHash}, ${attempt.envelopeHash},
             ${attempt.sourceSequence}, 100, 1800000000, 1800000300,
             ${issuer}, 1, 'payment', ${issuer}, 'HIST2', ${issuer},
-            ${destination}, 10.0000000, now()
+            ${destination}, 10.0000000, now(),
+            ${attempt.number === 2 ? "9".repeat(64) : null}
           )
         `;
       }
@@ -390,21 +392,84 @@ if (!TEST_DATABASE_URL) {
         )
       `;
 
-      const historicalBefore = await sql<
-        {
-          attempt_id: string;
-          attempt_number: number;
-          transaction_hash: string;
-          envelope_xdr_sha256: string;
-          source_sequence: string;
-        }[]
-      >`
-        SELECT attempt_id::text, attempt_number, transaction_hash,
-          envelope_xdr_sha256, source_sequence::text
-        FROM project_issuance_transaction_attempts
-        WHERE issuance_request_id = ${historicalRequest}
-        ORDER BY attempt_number
+      // Keep this explicit snapshot in sync with every persisted migration-009 column.
+      // An added column must fail the catalog assertion rather than go untested.
+      const attemptColumns = [
+        "attempt_id",
+        "issuance_request_id",
+        "issuance_intent_fingerprint",
+        "attempt_number",
+        "transaction_hash",
+        "envelope_xdr_sha256",
+        "source_sequence",
+        "fee_stroops",
+        "valid_from",
+        "valid_until",
+        "transaction_source_public_key",
+        "operation_count",
+        "operation_type",
+        "operation_source_public_key",
+        "asset_code",
+        "issuer_public_key",
+        "destination_public_key",
+        "amount",
+        "created_at",
+        "signed_envelope_xdr_sha256",
+      ];
+      const schemaColumns = await sql<{ column_name: string }[]>`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'project_issuance_transaction_attempts'
+        ORDER BY ordinal_position
       `;
+      assert.deepEqual(
+        schemaColumns.map(({ column_name }) => column_name),
+        attemptColumns,
+      );
+
+      async function snapshotHistoricalAttempts() {
+        return sql<
+          {
+            attempt_id: string;
+            issuance_request_id: string;
+            issuance_intent_fingerprint: string;
+            attempt_number: number;
+            transaction_hash: string;
+            envelope_xdr_sha256: string;
+            source_sequence: string;
+            fee_stroops: string;
+            valid_from: string;
+            valid_until: string;
+            transaction_source_public_key: string;
+            operation_count: number;
+            operation_type: string;
+            operation_source_public_key: string;
+            asset_code: string;
+            issuer_public_key: string;
+            destination_public_key: string;
+            amount: string;
+            created_at: string;
+            signed_envelope_xdr_sha256: string | null;
+          }[]
+        >`
+          SELECT attempt_id::text AS attempt_id,
+            issuance_request_id::text AS issuance_request_id,
+            issuance_intent_fingerprint, attempt_number, transaction_hash,
+            envelope_xdr_sha256, source_sequence::text AS source_sequence,
+            fee_stroops::text AS fee_stroops,
+            valid_from::text AS valid_from,
+            valid_until::text AS valid_until,
+            transaction_source_public_key, operation_count, operation_type,
+            operation_source_public_key, asset_code, issuer_public_key,
+            destination_public_key, amount::text AS amount,
+            created_at::text AS created_at, signed_envelope_xdr_sha256
+          FROM project_issuance_transaction_attempts
+          WHERE issuance_request_id = ${historicalRequest}
+          ORDER BY attempt_number
+        `;
+      }
+      const historicalBefore = await snapshotHistoricalAttempts();
       assert.deepEqual(
         historicalBefore.map((row) => row.attempt_number),
         [1, 2],
@@ -423,21 +488,7 @@ if (!TEST_DATABASE_URL) {
         SELECT name, checksum FROM schema_migrations ORDER BY name
       `;
       assert.deepEqual(afterMigrations.slice(0, 9), [...beforeMigrations]);
-      const historicalAfter = await sql<
-        {
-          attempt_id: string;
-          attempt_number: number;
-          transaction_hash: string;
-          envelope_xdr_sha256: string;
-          source_sequence: string;
-        }[]
-      >`
-        SELECT attempt_id::text, attempt_number, transaction_hash,
-          envelope_xdr_sha256, source_sequence::text
-        FROM project_issuance_transaction_attempts
-        WHERE issuance_request_id = ${historicalRequest}
-        ORDER BY attempt_number
-      `;
+      const historicalAfter = await snapshotHistoricalAttempts();
       assert.deepEqual(historicalAfter, historicalBefore);
 
       const [constraint] = await sql<
