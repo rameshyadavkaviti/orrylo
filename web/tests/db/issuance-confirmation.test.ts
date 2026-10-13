@@ -222,7 +222,8 @@ if (!TEST_DATABASE_URL) {
   test("trusted writer ignores TEMP-shadowed issuance evidence", async () => {
     const fixture = await createContractFixture();
 
-    await writerSql.begin(async (writer) => {
+    const writer = await writerSql.reserve();
+    try {
       await writer.unsafe(`
         CREATE TEMP TABLE project_issuance_full_intents (
           issuance_request_id uuid,
@@ -312,7 +313,12 @@ if (!TEST_DATABASE_URL) {
         `,
         /does not match immutable intent and attempt/,
       );
-    });
+    } finally {
+      await writer.unsafe(
+        "DROP TABLE IF EXISTS pg_temp.project_issuance_transaction_attempts, pg_temp.project_issuance_full_intents",
+      );
+      await writer.release();
+    }
   });
 
   test("full intents and attempts are immutable and exact-fingerprint bound", async () => {
