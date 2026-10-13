@@ -156,6 +156,7 @@ async function main() {
     const [hardening] = await sql<
       {
         attempt_constraint: string | null;
+        attempt_constraint_validated: boolean | null;
         reachability_trigger: boolean;
         reachability_function_security_definer: boolean;
         reachability_function_search_path: string[] | null;
