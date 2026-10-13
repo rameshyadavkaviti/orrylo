@@ -142,3 +142,36 @@ A feature is complete only when supported by appropriate evidence, such as:
 - reproducible verification.
 
 Documentation describing a target is not implementation evidence.
+
+
+## 13. Fresh-conversation recovery and autonomous continuation
+
+An agent must be able to recover normal Orrylo quality in a new conversation from the repository name and its assigned role alone.
+
+Before meaningful work, follow the bootstrap and role-recovery procedure in section 18 of `docs/SOURCE_OF_TRUTH.md`. In particular:
+
+- reconcile current GitHub state instead of trusting chat memory;
+- inspect role-relevant open PRs/issues, latest exact HEADs, review findings, and CI;
+- recover the current critical path from repository evidence;
+- continue from the first unresolved in-scope gate rather than restarting prior work;
+- do not require the owner to say `continue` or `next` for routine progress;
+- perform reversible in-scope work directly;
+- hand specialist-owned work to the correct role with a self-contained prompt;
+- ask the owner only for genuine unresolved decisions, owner-only manual actions, secret/custody steps, live network/financial mutations, or other explicitly owner-gated actions.
+
+Conversation history and model memory may accelerate navigation, but successful recovery must not depend on them.
+
+## 14. Handoff and state hygiene
+
+Keep dynamic implementation state in GitHub work items and evidence, not as unsupported chat-only knowledge.
+
+When opening or materially advancing a PR/issue:
+
+- make objective, scope, acceptance criteria, and non-goals discoverable;
+- leave exact-head review requests when independent review is required;
+- record blocking findings in the PR/issue rather than only in chat;
+- keep CI/test evidence attached to the relevant work item;
+- retract or supersede stale instructions clearly;
+- avoid duplicating canonical policy into temporary work-item text when a stable link/reference is sufficient.
+
+This discipline is what allows another agent to resume the same workflow after a conversation becomes slow, long, or unavailable.
