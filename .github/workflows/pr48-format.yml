@@ -1,0 +1,39 @@
+name: PR48 formatting
+
+on:
+  push:
+    branches:
+      - feat/testnet-horizon-execution-adapters
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/testnet-horizon-execution-adapters
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npx prettier --write lib/stellar/official-testnet-horizon.ts tests/official-testnet-horizon.test.ts
+      - name: Commit canonical formatting
+        working-directory: .
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/lib/stellar/official-testnet-horizon.ts web/tests/official-testnet-horizon.test.ts
+          git commit -m "style: format Testnet Horizon adapters"
+          git push origin HEAD:feat/testnet-horizon-execution-adapters
