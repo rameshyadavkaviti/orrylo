@@ -809,7 +809,6 @@ export function hashSharedIssuerIssuanceIntent(
     .digest("hex");
 }
 
-
 function assertSharedIssuerIdentitySeparated(issuerPublicKey: string): void {
   if (isKnownRyloIssuerPublicKey(issuerPublicKey)) {
     throw new SharedIssuerIssuanceError(
