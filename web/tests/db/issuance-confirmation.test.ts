@@ -219,6 +219,102 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
+  test("trusted writer ignores TEMP-shadowed issuance evidence", async () => {
+    const fixture = await createContractFixture();
+
+    await writerSql.begin(async (writer) => {
+      await writer.unsafe(`
+        CREATE TEMP TABLE project_issuance_full_intents (
+          issuance_request_id uuid,
+          issuance_intent_fingerprint char(64),
+          project_id uuid,
+          owner_public_key char(56),
+          network text,
+          network_passphrase_hash char(64),
+          asset_code varchar(12),
+          issuer_public_key char(56),
+          destination_public_key char(56),
+          amount numeric(30, 7)
+        )
+      `);
+      await writer.unsafe(`
+        CREATE TEMP TABLE project_issuance_transaction_attempts (
+          attempt_id uuid,
+          issuance_request_id uuid,
+          issuance_intent_fingerprint char(64),
+          transaction_hash char(64),
+          envelope_xdr_sha256 char(64),
+          signed_envelope_xdr_sha256 char(64),
+          source_sequence numeric(20, 0),
+          transaction_source_public_key char(56),
+          operation_count integer,
+          operation_type text,
+          operation_source_public_key char(56),
+          asset_code varchar(12),
+          issuer_public_key char(56),
+          destination_public_key char(56),
+          amount numeric(30, 7)
+        )
+      `);
+      await writer`
+        INSERT INTO project_issuance_full_intents (
+          issuance_request_id, issuance_intent_fingerprint, project_id,
+          owner_public_key, network, network_passphrase_hash, asset_code,
+          issuer_public_key, destination_public_key, amount
+        ) VALUES (
+          ${fixture.requestId}, ${fixture.intentFingerprint},
+          ${fixture.projectId}, ${OWNER}, 'testnet', ${PASSPHRASE_HASH},
+          'FAKE', ${ISSUER}, ${DESTINATION}, 100.0000000
+        )
+      `;
+      await writer`
+        INSERT INTO project_issuance_transaction_attempts (
+          attempt_id, issuance_request_id, issuance_intent_fingerprint,
+          transaction_hash, envelope_xdr_sha256,
+          signed_envelope_xdr_sha256, source_sequence,
+          transaction_source_public_key, operation_count, operation_type,
+          operation_source_public_key, asset_code, issuer_public_key,
+          destination_public_key, amount
+        ) VALUES (
+          ${fixture.attemptId}, ${fixture.requestId},
+          ${fixture.intentFingerprint}, ${fixture.transactionHash},
+          ${fixture.envelopeHash}, ${fixture.signedEnvelopeHash}, 123,
+          ${ISSUER}, 1, 'payment', ${ISSUER}, 'FAKE', ${ISSUER},
+          ${DESTINATION}, 100.0000000
+        )
+      `;
+
+      await assert.rejects(
+        writer`
+          INSERT INTO public.project_issuance_ledger_confirmations (
+            confirmation_id, issuance_request_id,
+            issuance_intent_fingerprint, attempt_id, project_id,
+            owner_public_key, network, network_passphrase_hash,
+            transaction_hash, envelope_xdr_sha256,
+            signed_envelope_xdr_sha256, result_xdr_sha256, result_success,
+            ledger_sequence, ledger_closed_at,
+            transaction_source_public_key, operation_count, operation_type,
+            operation_source_public_key, asset_code, issuer_public_key,
+            destination_public_key, amount, source_sequence,
+            verifier_identity, verification_policy_version, verified_at,
+            created_at
+          ) VALUES (
+            ${randomUUID()}, ${fixture.requestId},
+            ${fixture.intentFingerprint}, ${fixture.attemptId},
+            ${fixture.projectId}, ${OWNER}, 'testnet', ${PASSPHRASE_HASH},
+            ${fixture.transactionHash}, ${fixture.envelopeHash},
+            ${fixture.signedEnvelopeHash}, ${"5".repeat(64)}, true, 456,
+            ${new Date(NOW)}, ${ISSUER}, 1, 'payment', ${ISSUER}, 'FAKE',
+            ${ISSUER}, ${DESTINATION}, 100.0000000, 123,
+            'isolated-test-ledger-verifier', 'test-verification-v1',
+            ${new Date(NOW)}, ${new Date(NOW)}
+          )
+        `,
+        /does not match immutable intent and attempt/,
+      );
+    });
+  });
+
   test("full intents and attempts are immutable and exact-fingerprint bound", async () => {
     const fixture = await createContractFixture();
     await assert.rejects(
