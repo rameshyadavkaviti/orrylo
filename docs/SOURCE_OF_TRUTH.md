@@ -607,7 +607,7 @@ deployment evidence.
 
 ## 17. Implementation status
 
-Current phase: **Eligibility + Reward Workflow Foundation**.
+Current phase: **Immediate Testnet MVP Lite — first real customer Shared Issuer issuance**.
 
 The repository contains a minimal Soroban workspace and a policy-neutral foundation contract with:
 
@@ -700,7 +700,176 @@ issuer ceremony, SAC deployment, or mainnet deployment should be inferred
 merely from the presence of the contract/application workspace or the partial
 Testnet account setup.
 
-## 18. Canonical companion documents
+## 17.1 Immediate Testnet MVP Lite operational priority
+
+The immediate delivery target is one real end-to-end customer Shared Issuer asset issuance on Stellar Testnet with truthful application state and authoritative ledger evidence.
+
+The active critical-path order is:
+
+```text
+security/persistence foundation
+→ immutable issuance intent
+→ reviewed Stellar execution adapters
+→ owner-approved Testnet issuer activation
+→ receiving-wallet trustline readiness
+→ one explicitly authorized real Testnet issuance
+→ exact-hash authoritative confirmation
+→ truthful UI/explorer evidence
+```
+
+This priority supersedes older sequencing that treated the full RYLO eligibility/reward/liquidity demonstration as the next delivery milestone. It does **not** change approved RYLO economics or later product scope.
+
+Dynamic implementation state, exact PR heads, CI runs, review findings, and merge readiness are intentionally **not** frozen into this document. They must be recovered from current GitHub state using the recovery workflow below. A stale SHA in chat, memory, or an old handoff must never override GitHub.
+
+At the time this workflow was canonicalized, the active engineering sequence was centered on PR #32 (Gate A / persistence-security foundation), PR #46 (immutable issuance intent), and the Stellar execution/activation work tracked from the approved Testnet Shared Issuer decisions. Future agents must verify whether those references are still active before relying on them.
+
+## 18. Agent continuity, recovery, and autonomous workflow
+
+This section is canonical process policy. Its purpose is to make an Orrylo agent recoverable in a fresh conversation with only:
+
+1. repository: `rameshyadavkaviti/orrylo`;
+2. assigned role.
+
+A new conversation must not depend on hidden chat history, memory, or a copied handoff to achieve normal project quality.
+
+### 18.1 Recovery precedence
+
+When recovering context, use this order:
+
+1. current GitHub `main`;
+2. `AGENTS.md`;
+3. this `SOURCE_OF_TRUTH.md`;
+4. `ARCHITECTURE.md`;
+5. `RYLO_POLICY.md`;
+6. `OPEN_DECISIONS.md`;
+7. role-relevant interface/runbook/readme documents;
+8. current open PRs/issues, their latest commits, review threads, and CI;
+9. deployment/on-chain evidence where relevant;
+10. chat history, memory, and prior-agent summaries only as navigation aids.
+
+If any lower-priority source conflicts with a higher-priority source, reconcile to the higher-priority source and current evidence rather than preserving the old handoff.
+
+### 18.2 Mandatory fresh-conversation bootstrap
+
+Every new agent must perform the following before meaningful implementation or review:
+
+1. Fetch current `main` and record its exact commit.
+2. Read `AGENTS.md` and all canonical documents listed above.
+3. Identify the agent's role boundary from section 18.4.
+4. Inspect current open PRs and issues that fall inside that role.
+5. For those items, inspect the latest exact HEAD, changed files, latest review findings, unresolved review threads, and current CI status.
+6. Distinguish:
+   - approved policy;
+   - target architecture;
+   - code currently on `main`;
+   - draft/unmerged implementation;
+   - tested behavior;
+   - deployed Testnet/Mainnet evidence.
+7. Reconstruct the current critical path from repository evidence.
+8. Continue from the first unresolved in-scope gate; do not restart completed work merely because the conversation is new.
+
+The agent should keep this reconciliation internal unless a report is useful or requested. The owner should not need to type `continue` or `next` between ordinary steps.
+
+### 18.3 Autonomous workflow rule
+
+Within an agent's assigned authority:
+
+- perform repository inspection, reconciliation, tests, reviews, documentation maintenance, and other reversible in-scope work without asking the owner to advance each step;
+- when another specialist owns the next task, produce a complete ready-to-run handoff prompt directly for that specialist;
+- after receiving that specialist's report, reconcile it against GitHub and determine the next step automatically;
+- do not make the owner act as a message router or repeatedly ask for permission to continue routine work;
+- keep scope narrow and preserve existing approved architecture unless a real unresolved decision is encountered.
+
+Ask the owner only when one of the following is genuinely required:
+
+- a product/policy choice not already canonicalized;
+- acceptance of a tradeoff with materially different product/security behavior;
+- a manual action that only the owner can perform;
+- use or custody of secret material;
+- funding/account-creation/key/threshold/flag changes;
+- live Stellar signing/submission or other explicitly gated Testnet/Mainnet mutation;
+- an irreversible external action or another step explicitly marked owner-authorized in canonical policy.
+
+Existing authorization gates are not removed by this workflow. Documentation approval does not itself authorize live network/account/financial operations.
+
+### 18.4 Role recovery matrix
+
+A role name is sufficient to recover its default ownership boundary:
+
+**Product Architect**
+- Owns product architecture, critical-path sequencing, canonical product/process documentation, cross-agent coordination, scope control, decision identification, and final reconciliation of agent reports.
+- Must not silently implement specialist-owned Stellar/security/full-stack work merely to avoid a handoff.
+- Advances the process automatically and asks the owner only at genuine decision/manual-action gates.
+
+**Full-stack Product Engineer**
+- Owns web UI/UX implementation, backend application logic/APIs, authentication/session/product flows, application persistence, project/profile/metadata interfaces, intent orchestration, error handling, application tests, and integration with approved Stellar interfaces.
+- Does not own issuer custody, on-chain signer policy, Stellar account authority, or independent security approval.
+
+**Stellar / Contract Engineer**
+- Owns Stellar account/asset/Soroban architecture and implementation, transaction construction, issuer/trustline/authorization rules, approved signer interfaces, ledger/Horizon integration, deployment preparation, and on-chain verification.
+- Must stop at owner/security gates before live account mutation, secret generation/custody, funding, signing, submission, or Mainnet actions unless separately authorized.
+
+**Security / Enablement Engineer**
+- Owns independent security review, adversarial tests, repository/branch/PR reconciliation, migration and DB privilege review, replay/idempotency/race/unknown-outcome analysis, CI/tooling friction, deployment-readiness evidence, and precise remediation boundaries.
+- Must review independently rather than treating implementation-agent claims as proof.
+
+**UI/UX Design Engineer**
+- Owns the approved visual system, interaction design, component/page UX specifications, design consistency, responsive/accessibility review, and handoff-ready visual guidance.
+- Must distinguish design approval from implemented/deployed behavior and preserve canonical wallet-first/product-flow constraints.
+
+**Marketing / Positioning Adviser**
+- Owns positioning, messaging, acquisition, pricing discussion, market research, and go-to-market proposals.
+- Proposals do not become product policy until canonicalized by the Product Architect/owner.
+
+If a newly assigned role is not listed here, the agent must infer the narrowest reasonable boundary from `AGENTS.md`, current canonical docs, and the owner's role description, then avoid crossing specialist ownership without an explicit handoff.
+
+### 18.5 Handoff quality contract
+
+A specialist handoff must contain enough information that the receiving agent does not need the previous conversation. Include, when applicable:
+
+- repository and exact target PR/issue/branch;
+- current exact HEAD/base after verification;
+- objective and acceptance criteria;
+- known findings and which are already closed/open;
+- strict files/scope boundaries;
+- canonical decisions that must be preserved;
+- explicit non-goals;
+- required tests/CI/evidence;
+- whether live execution is forbidden;
+- expected report format.
+
+Do not copy large historical narratives when current GitHub evidence can be inspected directly.
+
+### 18.6 Completion and reporting behavior
+
+Agents should not stop merely to announce that an intermediate step is complete when the next ordinary in-scope step is obvious and executable.
+
+Continue automatically until reaching:
+
+- an unresolved owner decision;
+- a manual owner-only action;
+- an explicit authorization gate;
+- a specialist boundary requiring a handoff;
+- a failed verification that needs a new decision;
+- or the assigned objective being fully complete.
+
+Reports should be concise by default. Detailed explanation is provided when the owner asks for it or when risk/decision quality requires it.
+
+### 18.7 Recovery quality test
+
+A fresh agent is considered successfully recovered when it can, without prior chat access:
+
+- state the current milestone;
+- identify what is canonical versus draft;
+- identify its own ownership boundary;
+- locate its active PRs/issues;
+- name the first unresolved in-scope gate;
+- preserve all existing security/authorization boundaries;
+- continue the established workflow without asking the owner for `next`.
+
+If it cannot do these things, repository documentation or GitHub work-item state is insufficient and should be improved as part of enablement/documentation work.
+
+## 19. Canonical companion documents
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system architecture and boundaries
 - [RYLO_POLICY.md](RYLO_POLICY.md) — RYLO-specific rules
