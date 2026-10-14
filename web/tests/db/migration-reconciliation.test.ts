@@ -86,9 +86,7 @@ if (!TEST_DATABASE_URL) {
   test("read-only schema verification accepts the exact trusted confirmation trigger binding", async () => {
     await migrateDatabase(sql, directory);
 
-    await assert.doesNotReject(
-      verifyDatabaseSchemaReadOnly(sql, directory),
-    );
+    await assert.doesNotReject(verifyDatabaseSchemaReadOnly(sql, directory));
   });
 
   test("read-only schema verification rejects a missing trusted confirmation trigger", async () => {
