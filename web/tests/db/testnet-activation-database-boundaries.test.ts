@@ -187,6 +187,82 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
+  test("application login with inherited schema-owner authority and no SET access fails closed", async () => {
+    await admin.unsafe(`
+      GRANT ${SCHEMA_OWNER_ROLE} TO ${APP_ROLE}
+        WITH ADMIN FALSE, INHERIT TRUE, SET FALSE;
+    `);
+
+    const [
+      {
+        can_use_schema_owner: canUseSchemaOwner,
+        can_set_schema_owner: canSetSchemaOwner,
+      },
+    ] = await app<
+      {
+        can_use_schema_owner: boolean;
+        can_set_schema_owner: boolean;
+      }[]
+    >`
+        SELECT
+          pg_catalog.pg_has_role(
+            session_user,
+            ${SCHEMA_OWNER_ROLE},
+            'USAGE'
+          ) AS can_use_schema_owner,
+          pg_catalog.pg_has_role(
+            session_user,
+            ${SCHEMA_OWNER_ROLE},
+            'SET'
+          ) AS can_set_schema_owner
+      `;
+    assert.equal(canUseSchemaOwner, true);
+    assert.equal(canSetSchemaOwner, false);
+
+    await assert.rejects(
+      verifyTestnetActivationDatabaseBoundaries(app, writer),
+      IssuanceDatabaseIdentityError,
+    );
+  });
+
+  test("confirmation-writer login with administrable schema-owner membership and no SET access fails closed", async () => {
+    await admin.unsafe(`
+      GRANT ${SCHEMA_OWNER_ROLE} TO ${WRITER_ROLE}
+        WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
+    `);
+
+    const [
+      {
+        can_administer_schema_owner: canAdministerSchemaOwner,
+        can_set_schema_owner: canSetSchemaOwner,
+      },
+    ] = await writer<
+      {
+        can_administer_schema_owner: boolean;
+        can_set_schema_owner: boolean;
+      }[]
+    >`
+        SELECT
+          pg_catalog.pg_has_role(
+            session_user,
+            ${SCHEMA_OWNER_ROLE},
+            'MEMBER WITH ADMIN OPTION'
+          ) AS can_administer_schema_owner,
+          pg_catalog.pg_has_role(
+            session_user,
+            ${SCHEMA_OWNER_ROLE},
+            'SET'
+          ) AS can_set_schema_owner
+      `;
+    assert.equal(canAdministerSchemaOwner, true);
+    assert.equal(canSetSchemaOwner, false);
+
+    await assert.rejects(
+      verifyTestnetActivationDatabaseBoundaries(app, writer),
+      IssuanceDatabaseIdentityError,
+    );
+  });
+
   test("nested SET TRUE membership path to the schema owner fails closed", async () => {
     await admin.unsafe(`
       GRANT ${SCHEMA_OWNER_ROLE} TO ${BRIDGE_ROLE}

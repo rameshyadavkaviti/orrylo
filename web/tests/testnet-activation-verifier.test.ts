@@ -230,6 +230,8 @@ function activationDatabase(input: {
           owns_sensitive_table: false,
           owns_sensitive_function: false,
           can_set_role_to_sensitive_owner: false,
+          can_use_sensitive_owner: false,
+          can_administer_sensitive_owner: false,
         },
       ];
     }

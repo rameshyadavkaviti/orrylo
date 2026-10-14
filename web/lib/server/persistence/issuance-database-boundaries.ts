@@ -15,6 +15,8 @@ interface DatabaseIdentityRow {
   owns_sensitive_table: boolean;
   owns_sensitive_function: boolean;
   can_set_role_to_sensitive_owner: boolean;
+  can_use_sensitive_owner: boolean;
+  can_administer_sensitive_owner: boolean;
 }
 
 const EXPECTED_PROTECTED_TABLE_COUNT = 5;
@@ -79,10 +81,12 @@ export async function assertSharedIssuanceApplicationDatabaseIdentity(
     identity.owns_sensitive_schema ||
     identity.owns_sensitive_table ||
     identity.owns_sensitive_function ||
-    identity.can_set_role_to_sensitive_owner
+    identity.can_set_role_to_sensitive_owner ||
+    identity.can_use_sensitive_owner ||
+    identity.can_administer_sensitive_owner
   ) {
     throw new IssuanceDatabaseIdentityError(
-      "The ordinary issuance repository requires a non-owner, non-superuser application identity without confirmation-writer authority or SET ROLE access to a sensitive owner.",
+      "The ordinary issuance repository requires a non-owner, non-superuser application identity without confirmation-writer authority or inherited, SET ROLE, or administrative authority over a sensitive owner.",
     );
   }
 }
@@ -97,10 +101,12 @@ export async function assertTrustedConfirmationWriterDatabaseIdentity(
     identity.owns_sensitive_schema ||
     identity.owns_sensitive_table ||
     identity.owns_sensitive_function ||
-    identity.can_set_role_to_sensitive_owner
+    identity.can_set_role_to_sensitive_owner ||
+    identity.can_use_sensitive_owner ||
+    identity.can_administer_sensitive_owner
   ) {
     throw new IssuanceDatabaseIdentityError(
-      "The confirmation writer requires a dedicated non-owner, non-superuser identity with only trusted confirmation-writer authority and no SET ROLE access to a sensitive owner.",
+      "The confirmation writer requires a dedicated non-owner, non-superuser identity with only trusted confirmation-writer authority and no inherited, SET ROLE, or administrative authority over a sensitive owner.",
     );
   }
 }
@@ -198,7 +204,27 @@ async function readIdentity(
             sensitive_roles.role_oid,
             'SET'
           )
-      ) AS can_set_role_to_sensitive_owner
+      ) AS can_set_role_to_sensitive_owner,
+      EXISTS (
+        SELECT 1
+        FROM sensitive_roles
+        WHERE sensitive_roles.role_oid <> role.oid
+          AND pg_catalog.pg_has_role(
+            session_user,
+            sensitive_roles.role_oid,
+            'USAGE'
+          )
+      ) AS can_use_sensitive_owner,
+      EXISTS (
+        SELECT 1
+        FROM sensitive_roles
+        WHERE sensitive_roles.role_oid <> role.oid
+          AND pg_catalog.pg_has_role(
+            session_user,
+            sensitive_roles.role_oid,
+            'MEMBER WITH ADMIN OPTION'
+          )
+      ) AS can_administer_sensitive_owner
     FROM pg_catalog.pg_roles AS role
     WHERE role.rolname = session_user
   `;

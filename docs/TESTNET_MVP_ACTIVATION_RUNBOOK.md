@@ -171,9 +171,10 @@ trustline is authorized/usable and can receive the entire amount; and the
 application/confirmation database identities satisfy the split-authority
 boundary. Both database identities are inspected inside explicit PostgreSQL
 `READ ONLY` transactions. Catalog-derived protected schema/table/function
-owners and superusers must be unreachable through PostgreSQL `SET ROLE`,
-including indirect paths whose every membership edge has `SET TRUE`;
-`NOINHERIT` does not make such a path safe.
+owners and superusers must not be usable through inherited authority,
+reachable through PostgreSQL `SET ROLE`, or administrable through a role
+membership. Direct and indirect `SET TRUE` paths remain unsafe regardless of
+`NOINHERIT`.
 
 It deliberately does **not** request a signature or test the signer service.
 

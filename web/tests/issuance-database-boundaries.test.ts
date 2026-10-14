@@ -19,6 +19,8 @@ interface IdentityFixture {
   owns_sensitive_table: boolean;
   owns_sensitive_function: boolean;
   can_set_role_to_sensitive_owner: boolean;
+  can_use_sensitive_owner: boolean;
+  can_administer_sensitive_owner: boolean;
 }
 
 function identityDatabase(
@@ -35,6 +37,8 @@ function identityDatabase(
     owns_sensitive_table: false,
     owns_sensitive_function: false,
     can_set_role_to_sensitive_owner: false,
+    can_use_sensitive_owner: false,
+    can_administer_sensitive_owner: false,
     ...overrides,
   };
   const sql = async () => [identity];
@@ -66,6 +70,28 @@ test("confirmation writer rejects SET ROLE reachability to a sensitive owner", a
         role_name: "orrylo_confirmation_login",
         is_confirmation_writer: true,
         can_set_role_to_sensitive_owner: true,
+      }),
+    ),
+    IssuanceDatabaseIdentityError,
+  );
+});
+
+test("application identity rejects inherited sensitive-owner authority", async () => {
+  await assert.rejects(
+    SharedIssuanceApplicationDatabaseBoundary.authorize(
+      identityDatabase({ can_use_sensitive_owner: true }),
+    ),
+    IssuanceDatabaseIdentityError,
+  );
+});
+
+test("confirmation writer rejects administrable sensitive-owner membership", async () => {
+  await assert.rejects(
+    TrustedConfirmationWriterDatabaseBoundary.authorize(
+      identityDatabase({
+        role_name: "orrylo_confirmation_login",
+        is_confirmation_writer: true,
+        can_administer_sensitive_owner: true,
       }),
     ),
     IssuanceDatabaseIdentityError,
