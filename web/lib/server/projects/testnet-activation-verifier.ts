@@ -218,10 +218,12 @@ export async function verifyTestnetActivationDatabaseBoundaries(
 
   const applicationHasForbiddenConfirmationWriteAuthority =
     application.canInsertConfirmation ||
+    application.canInsertAnyConfirmationColumn ||
     application.canUpdateConfirmation ||
     application.canDeleteConfirmation ||
     application.canTruncateConfirmation ||
-    application.canUpdateAnyConfirmationColumn;
+    application.canUpdateAnyConfirmationColumn ||
+    application.canSetRoleToForbiddenConfirmationAuthority;
 
   if (applicationHasForbiddenConfirmationWriteAuthority) {
     throw new TestnetActivationVerificationError(
@@ -281,11 +283,13 @@ export async function verifyTestnetActivationDatabaseBoundaries(
 interface ActivationPrivileges {
   roleName: string;
   canInsertConfirmation: boolean;
+  canInsertAnyConfirmationColumn: boolean;
   canReadConfirmation: boolean;
   canUpdateConfirmation: boolean;
   canDeleteConfirmation: boolean;
   canTruncateConfirmation: boolean;
   canUpdateAnyConfirmationColumn: boolean;
+  canSetRoleToForbiddenConfirmationAuthority: boolean;
   canReadFullIntent: boolean;
   canReadAttempt: boolean;
   canInsertFullIntent: boolean;
@@ -310,11 +314,13 @@ async function readActivationPrivileges(
     {
       role_name: string;
       can_insert_confirmation: boolean;
+      can_insert_any_confirmation_column: boolean;
       can_read_confirmation: boolean;
       can_update_confirmation: boolean;
       can_delete_confirmation: boolean;
       can_truncate_confirmation: boolean;
       can_update_any_confirmation_column: boolean;
+      can_set_role_to_forbidden_confirmation_authority: boolean;
       can_read_full_intent: boolean;
       can_read_attempt: boolean;
       can_insert_full_intent: boolean;
@@ -339,6 +345,11 @@ async function readActivationPrivileges(
         'public.project_issuance_ledger_confirmations',
         'INSERT'
       ) AS can_insert_confirmation,
+      pg_catalog.has_any_column_privilege(
+        current_user,
+        'public.project_issuance_ledger_confirmations',
+        'INSERT'
+      ) AS can_insert_any_confirmation_column,
       pg_catalog.has_table_privilege(
         current_user,
         'public.project_issuance_ledger_confirmations',
@@ -364,6 +375,48 @@ async function readActivationPrivileges(
         'public.project_issuance_ledger_confirmations',
         'UPDATE'
       ) AS can_update_any_confirmation_column,
+      EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_roles AS candidate_role
+        WHERE candidate_role.rolname <> session_user
+          AND pg_catalog.pg_has_role(
+            session_user,
+            candidate_role.oid,
+            'SET'
+          )
+          AND (
+            pg_catalog.has_table_privilege(
+              candidate_role.oid,
+              'public.project_issuance_ledger_confirmations',
+              'INSERT'
+            )
+            OR pg_catalog.has_table_privilege(
+              candidate_role.oid,
+              'public.project_issuance_ledger_confirmations',
+              'UPDATE'
+            )
+            OR pg_catalog.has_table_privilege(
+              candidate_role.oid,
+              'public.project_issuance_ledger_confirmations',
+              'DELETE'
+            )
+            OR pg_catalog.has_table_privilege(
+              candidate_role.oid,
+              'public.project_issuance_ledger_confirmations',
+              'TRUNCATE'
+            )
+            OR pg_catalog.has_any_column_privilege(
+              candidate_role.oid,
+              'public.project_issuance_ledger_confirmations',
+              'INSERT'
+            )
+            OR pg_catalog.has_any_column_privilege(
+              candidate_role.oid,
+              'public.project_issuance_ledger_confirmations',
+              'UPDATE'
+            )
+          )
+      ) AS can_set_role_to_forbidden_confirmation_authority,
       pg_catalog.has_table_privilege(
         current_user,
         'public.project_issuance_full_intents',
@@ -448,11 +501,14 @@ async function readActivationPrivileges(
   return {
     roleName: row.role_name,
     canInsertConfirmation: row.can_insert_confirmation,
+    canInsertAnyConfirmationColumn: row.can_insert_any_confirmation_column,
     canReadConfirmation: row.can_read_confirmation,
     canUpdateConfirmation: row.can_update_confirmation,
     canDeleteConfirmation: row.can_delete_confirmation,
     canTruncateConfirmation: row.can_truncate_confirmation,
     canUpdateAnyConfirmationColumn: row.can_update_any_confirmation_column,
+    canSetRoleToForbiddenConfirmationAuthority:
+      row.can_set_role_to_forbidden_confirmation_authority,
     canReadFullIntent: row.can_read_full_intent,
     canReadAttempt: row.can_read_attempt,
     canInsertFullIntent: row.can_insert_full_intent,
