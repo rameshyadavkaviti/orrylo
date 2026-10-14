@@ -86,12 +86,19 @@ if (!TEST_DATABASE_URL) {
     await admin.unsafe(`
       REVOKE ${SCHEMA_OWNER_ROLE} FROM ${APP_ROLE}, ${WRITER_ROLE}, ${BRIDGE_ROLE};
       REVOKE ${BRIDGE_ROLE} FROM ${APP_ROLE}, ${WRITER_ROLE};
+      REVOKE ${HARMLESS_ROLE} FROM ${WRITER_ROLE}, ${BRIDGE_ROLE};
       REVOKE ADMIN OPTION FOR orrylo_confirmation_writer FROM ${WRITER_ROLE};
       GRANT orrylo_confirmation_writer TO ${WRITER_ROLE}
         WITH ADMIN FALSE, INHERIT TRUE, SET TRUE;
       REVOKE INSERT, UPDATE, DELETE, TRUNCATE
         ON project_issuance_full_intents,
           project_issuance_transaction_attempts
+        FROM ${WRITER_ROLE}, ${BRIDGE_ROLE}, ${HARMLESS_ROLE};
+      REVOKE INSERT (issuance_request_id)
+        ON project_issuance_full_intents
+        FROM ${WRITER_ROLE};
+      REVOKE INSERT (signed_envelope_xdr_sha256)
+        ON project_issuance_transaction_attempts
         FROM ${WRITER_ROLE};
       REVOKE UPDATE (signed_envelope_xdr_sha256)
         ON project_issuance_transaction_attempts
@@ -136,6 +143,15 @@ if (!TEST_DATABASE_URL) {
         ) AS writer_can_admin_confirmation_role
       `;
     assert.equal(writerCanAdminConfirmationRole, false);
+    const [{ writer_can_set_confirmation_role: writerCanSetConfirmationRole }] =
+      await writer<{ writer_can_set_confirmation_role: boolean }[]>`
+        SELECT pg_catalog.pg_has_role(
+          session_user,
+          'orrylo_confirmation_writer',
+          'SET'
+        ) AS writer_can_set_confirmation_role
+      `;
+    assert.equal(writerCanSetConfirmationRole, true);
 
     const report = await verifyTestnetActivationDatabaseBoundaries(app, writer);
 
@@ -411,6 +427,126 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
+  test("confirmation writer rejects a harmless unexpected SET-reachable helper role", async () => {
+    await admin.unsafe(`
+      GRANT ${HARMLESS_ROLE} TO ${WRITER_ROLE}
+        WITH ADMIN FALSE, INHERIT FALSE, SET TRUE;
+    `);
+
+    const [{ can_set_harmless_role: canSetHarmlessRole }] = await writer<
+      { can_set_harmless_role: boolean }[]
+    >`
+      SELECT pg_catalog.pg_has_role(
+        session_user,
+        ${HARMLESS_ROLE},
+        'SET'
+      ) AS can_set_harmless_role
+    `;
+    assert.equal(canSetHarmlessRole, true);
+
+    await assert.rejects(
+      verifyTestnetActivationDatabaseBoundaries(app, writer),
+      IssuanceDatabaseIdentityError,
+    );
+  });
+
+  test("confirmation writer rejects a SET-reachable helper carrying evidence INSERT", async () => {
+    await admin.unsafe(`
+      GRANT INSERT ON project_issuance_transaction_attempts
+        TO ${HARMLESS_ROLE};
+      GRANT ${HARMLESS_ROLE} TO ${WRITER_ROLE}
+        WITH ADMIN FALSE, INHERIT FALSE, SET TRUE;
+    `);
+
+    const [
+      {
+        writer_can_insert_attempt: writerCanInsertAttempt,
+        helper_can_insert_attempt: helperCanInsertAttempt,
+        writer_can_set_helper: writerCanSetHelper,
+      },
+    ] = await writer<
+      {
+        writer_can_insert_attempt: boolean;
+        helper_can_insert_attempt: boolean;
+        writer_can_set_helper: boolean;
+      }[]
+    >`
+      SELECT
+        pg_catalog.has_table_privilege(
+          current_user,
+          'public.project_issuance_transaction_attempts',
+          'INSERT'
+        ) AS writer_can_insert_attempt,
+        pg_catalog.has_table_privilege(
+          ${HARMLESS_ROLE},
+          'public.project_issuance_transaction_attempts',
+          'INSERT'
+        ) AS helper_can_insert_attempt,
+        pg_catalog.pg_has_role(
+          session_user,
+          ${HARMLESS_ROLE},
+          'SET'
+        ) AS writer_can_set_helper
+    `;
+    assert.deepEqual(
+      {
+        writerCanInsertAttempt,
+        helperCanInsertAttempt,
+        writerCanSetHelper,
+      },
+      {
+        writerCanInsertAttempt: false,
+        helperCanInsertAttempt: true,
+        writerCanSetHelper: true,
+      },
+    );
+
+    await assert.rejects(
+      verifyTestnetActivationDatabaseBoundaries(app, writer),
+      IssuanceDatabaseIdentityError,
+    );
+  });
+
+  test("confirmation writer rejects a nested unexpected SET-reachable role chain", async () => {
+    await admin.unsafe(`
+      GRANT ${HARMLESS_ROLE} TO ${BRIDGE_ROLE}
+        WITH ADMIN FALSE, INHERIT FALSE, SET TRUE;
+      GRANT ${BRIDGE_ROLE} TO ${WRITER_ROLE}
+        WITH ADMIN FALSE, INHERIT FALSE, SET TRUE;
+    `);
+
+    const [
+      {
+        can_set_bridge_role: canSetBridgeRole,
+        can_set_nested_harmless_role: canSetNestedHarmlessRole,
+      },
+    ] = await writer<
+      {
+        can_set_bridge_role: boolean;
+        can_set_nested_harmless_role: boolean;
+      }[]
+    >`
+      SELECT
+        pg_catalog.pg_has_role(
+          session_user,
+          ${BRIDGE_ROLE},
+          'SET'
+        ) AS can_set_bridge_role,
+        pg_catalog.pg_has_role(
+          session_user,
+          ${HARMLESS_ROLE},
+          'SET'
+        ) AS can_set_nested_harmless_role
+    `;
+    assert.equal(canSetBridgeRole, true);
+    assert.equal(canSetNestedHarmlessRole, true);
+
+    await assert.rejects(
+      verifyTestnetActivationDatabaseBoundaries(app, writer),
+      IssuanceDatabaseIdentityError,
+    );
+  });
+
   test("nested SET TRUE membership path to the schema owner fails closed", async () => {
     await admin.unsafe(`
       GRANT ${SCHEMA_OWNER_ROLE} TO ${BRIDGE_ROLE}
@@ -466,6 +602,106 @@ if (!TEST_DATABASE_URL) {
           );
         }
       });
+    }
+  });
+
+  test("confirmation writer rejects column-only INSERT on full intent evidence", async () => {
+    await admin.unsafe(`
+      GRANT INSERT (issuance_request_id)
+        ON project_issuance_full_intents
+        TO ${WRITER_ROLE};
+    `);
+
+    try {
+      const [
+        {
+          can_insert_full_intent_table: canInsertFullIntentTable,
+          can_insert_full_intent_column: canInsertFullIntentColumn,
+        },
+      ] = await writer<
+        {
+          can_insert_full_intent_table: boolean;
+          can_insert_full_intent_column: boolean;
+        }[]
+      >`
+        SELECT
+          pg_catalog.has_table_privilege(
+            current_user,
+            'public.project_issuance_full_intents',
+            'INSERT'
+          ) AS can_insert_full_intent_table,
+          pg_catalog.has_column_privilege(
+            current_user,
+            'public.project_issuance_full_intents',
+            'issuance_request_id',
+            'INSERT'
+          ) AS can_insert_full_intent_column
+      `;
+      assert.equal(canInsertFullIntentTable, false);
+      assert.equal(canInsertFullIntentColumn, true);
+
+      await assert.rejects(
+        verifyTestnetActivationDatabaseBoundaries(app, writer),
+        (error: unknown) =>
+          error instanceof TestnetActivationVerificationError &&
+          error.code === "database_privilege_mismatch",
+      );
+    } finally {
+      await admin.unsafe(`
+        REVOKE INSERT (issuance_request_id)
+          ON project_issuance_full_intents
+          FROM ${WRITER_ROLE};
+      `);
+    }
+  });
+
+  test("confirmation writer rejects column-only INSERT on signed-envelope attempt evidence", async () => {
+    await admin.unsafe(`
+      GRANT INSERT (signed_envelope_xdr_sha256)
+        ON project_issuance_transaction_attempts
+        TO ${WRITER_ROLE};
+    `);
+
+    try {
+      const [
+        {
+          can_insert_attempt_table: canInsertAttemptTable,
+          can_insert_attempt_column: canInsertAttemptColumn,
+        },
+      ] = await writer<
+        {
+          can_insert_attempt_table: boolean;
+          can_insert_attempt_column: boolean;
+        }[]
+      >`
+        SELECT
+          pg_catalog.has_table_privilege(
+            current_user,
+            'public.project_issuance_transaction_attempts',
+            'INSERT'
+          ) AS can_insert_attempt_table,
+          pg_catalog.has_column_privilege(
+            current_user,
+            'public.project_issuance_transaction_attempts',
+            'signed_envelope_xdr_sha256',
+            'INSERT'
+          ) AS can_insert_attempt_column
+      `;
+      assert.equal(canInsertAttemptTable, false);
+      assert.equal(canInsertAttemptColumn, true);
+
+      await assert.rejects(
+        verifyTestnetActivationDatabaseBoundaries(app, writer),
+        (error: unknown) =>
+          error instanceof TestnetActivationVerificationError &&
+          error.code === "database_privilege_mismatch",
+      );
+    } finally {
+      await admin.unsafe(`
+        REVOKE INSERT (signed_envelope_xdr_sha256)
+          ON project_issuance_transaction_attempts
+          FROM ${WRITER_ROLE};
+      `);
     }
   });
 
