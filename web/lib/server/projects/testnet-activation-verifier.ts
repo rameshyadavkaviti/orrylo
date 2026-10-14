@@ -225,11 +225,13 @@ export async function verifyTestnetActivationDatabaseBoundaries(
 
   const writerHasForbiddenEvidenceWriteAuthority =
     writer.canInsertFullIntent ||
+    writer.canInsertAnyFullIntentColumn ||
     writer.canUpdateFullIntent ||
     writer.canDeleteFullIntent ||
     writer.canTruncateFullIntent ||
     writer.canUpdateAnyFullIntentColumn ||
     writer.canInsertAttempt ||
+    writer.canInsertAnyAttemptColumn ||
     writer.canUpdateAttempt ||
     writer.canDeleteAttempt ||
     writer.canTruncateAttempt ||
@@ -269,11 +271,13 @@ interface ActivationPrivileges {
   canReadFullIntent: boolean;
   canReadAttempt: boolean;
   canInsertFullIntent: boolean;
+  canInsertAnyFullIntentColumn: boolean;
   canUpdateFullIntent: boolean;
   canDeleteFullIntent: boolean;
   canTruncateFullIntent: boolean;
   canUpdateAnyFullIntentColumn: boolean;
   canInsertAttempt: boolean;
+  canInsertAnyAttemptColumn: boolean;
   canUpdateAttempt: boolean;
   canDeleteAttempt: boolean;
   canTruncateAttempt: boolean;
@@ -292,11 +296,13 @@ async function readActivationPrivileges(
       can_read_full_intent: boolean;
       can_read_attempt: boolean;
       can_insert_full_intent: boolean;
+      can_insert_any_full_intent_column: boolean;
       can_update_full_intent: boolean;
       can_delete_full_intent: boolean;
       can_truncate_full_intent: boolean;
       can_update_any_full_intent_column: boolean;
       can_insert_attempt: boolean;
+      can_insert_any_attempt_column: boolean;
       can_update_attempt: boolean;
       can_delete_attempt: boolean;
       can_truncate_attempt: boolean;
@@ -331,6 +337,11 @@ async function readActivationPrivileges(
         'public.project_issuance_full_intents',
         'INSERT'
       ) AS can_insert_full_intent,
+      pg_catalog.has_any_column_privilege(
+        current_user,
+        'public.project_issuance_full_intents',
+        'INSERT'
+      ) AS can_insert_any_full_intent_column,
       pg_catalog.has_table_privilege(
         current_user,
         'public.project_issuance_full_intents',
@@ -356,6 +367,11 @@ async function readActivationPrivileges(
         'public.project_issuance_transaction_attempts',
         'INSERT'
       ) AS can_insert_attempt,
+      pg_catalog.has_any_column_privilege(
+        current_user,
+        'public.project_issuance_transaction_attempts',
+        'INSERT'
+      ) AS can_insert_any_attempt_column,
       pg_catalog.has_table_privilege(
         current_user,
         'public.project_issuance_transaction_attempts',
@@ -394,11 +410,13 @@ async function readActivationPrivileges(
     canReadFullIntent: row.can_read_full_intent,
     canReadAttempt: row.can_read_attempt,
     canInsertFullIntent: row.can_insert_full_intent,
+    canInsertAnyFullIntentColumn: row.can_insert_any_full_intent_column,
     canUpdateFullIntent: row.can_update_full_intent,
     canDeleteFullIntent: row.can_delete_full_intent,
     canTruncateFullIntent: row.can_truncate_full_intent,
     canUpdateAnyFullIntentColumn: row.can_update_any_full_intent_column,
     canInsertAttempt: row.can_insert_attempt,
+    canInsertAnyAttemptColumn: row.can_insert_any_attempt_column,
     canUpdateAttempt: row.can_update_attempt,
     canDeleteAttempt: row.can_delete_attempt,
     canTruncateAttempt: row.can_truncate_attempt,
