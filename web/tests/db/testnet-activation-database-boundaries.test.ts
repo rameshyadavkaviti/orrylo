@@ -588,7 +588,9 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
-  test("ordinary application rejects column-only INSERT on confirmation evidence", async () => {
+  test(
+    "ordinary application rejects column-only INSERT on confirmation evidence",
+    async () => {
     await admin.unsafe(`
       GRANT INSERT (result_xdr_sha256)
         ON project_issuance_ledger_confirmations
@@ -636,9 +638,12 @@ if (!TEST_DATABASE_URL) {
           FROM ${APP_ROLE};
       `);
     }
-  });
+    },
+  );
 
-  test("ordinary application rejects SET-reachable helper confirmation INSERT while current app INSERT remains false", async () => {
+  test(
+    "ordinary application rejects SET-reachable helper confirmation INSERT while current app INSERT remains false",
+    async () => {
     await admin.unsafe(`
       GRANT INSERT ON project_issuance_ledger_confirmations
         TO ${HARMLESS_ROLE};
@@ -700,9 +705,12 @@ if (!TEST_DATABASE_URL) {
           FROM ${HARMLESS_ROLE};
       `);
     }
-  });
+    },
+  );
 
-  test("ordinary application rejects SET-reachable helper confirmation TRUNCATE", async () => {
+  test(
+    "ordinary application rejects SET-reachable helper confirmation TRUNCATE",
+    async () => {
     await admin.unsafe(`
       GRANT TRUNCATE ON project_issuance_ledger_confirmations
         TO ${HARMLESS_ROLE};
@@ -721,9 +729,12 @@ if (!TEST_DATABASE_URL) {
           FROM ${HARMLESS_ROLE};
       `);
     }
-  });
+    },
+  );
 
-  test("ordinary application rejects SET-reachable helper column-only confirmation INSERT", async () => {
+  test(
+    "ordinary application rejects SET-reachable helper column-only confirmation INSERT",
+    async () => {
     await admin.unsafe(`
       GRANT INSERT (result_xdr_sha256)
         ON project_issuance_ledger_confirmations
@@ -733,7 +744,8 @@ if (!TEST_DATABASE_URL) {
     try {
       const [
         {
-          helper_can_insert_confirmation_table: helperCanInsertConfirmationTable,
+          helper_can_insert_confirmation_table:
+            helperCanInsertConfirmationTable,
           helper_can_insert_confirmation_column:
             helperCanInsertConfirmationColumn,
         },
@@ -772,9 +784,12 @@ if (!TEST_DATABASE_URL) {
           FROM ${HARMLESS_ROLE};
       `);
     }
-  });
+    },
+  );
 
-  test("ordinary application rejects nested SET-reachable helper confirmation authority", async () => {
+  test(
+    "ordinary application rejects nested SET-reachable helper confirmation authority",
+    async () => {
     await admin.unsafe(`
       REVOKE ${HARMLESS_ROLE} FROM ${APP_ROLE};
       GRANT DELETE ON project_issuance_ledger_confirmations
@@ -828,7 +843,8 @@ if (!TEST_DATABASE_URL) {
           WITH ADMIN FALSE, INHERIT FALSE, SET TRUE;
       `);
     }
-  });
+    },
+  );
 
   test("ordinary application rejects all confirmation table writes", async (t) => {
     for (const privilege of [
