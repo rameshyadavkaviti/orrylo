@@ -134,20 +134,19 @@ function fixture(
   const store = new MemoryStore();
   const calls: string[] = [];
   let submissions = 0;
-  const primitive: SharedIssuerSigningPrimitive =
-    options.primitive ?? {
-      async signCanonicalEnvelope(input) {
-        calls.push("sign");
-        if (options.signerFails) throw new Error("signer unavailable");
-        const transaction = TransactionBuilder.fromXDR(
-          input.unsignedEnvelopeXdr,
-          Networks.TESTNET,
-        );
-        assert.ok(transaction instanceof Transaction);
-        transaction.sign(ISSUER_KEYPAIR);
-        return { signedEnvelopeXdr: transaction.toXDR() };
-      },
-    };
+  const primitive: SharedIssuerSigningPrimitive = options.primitive ?? {
+    async signCanonicalEnvelope(input) {
+      calls.push("sign");
+      if (options.signerFails) throw new Error("signer unavailable");
+      const transaction = TransactionBuilder.fromXDR(
+        input.unsignedEnvelopeXdr,
+        Networks.TESTNET,
+      );
+      assert.ok(transaction instanceof Transaction);
+      transaction.sign(ISSUER_KEYPAIR);
+      return { signedEnvelopeXdr: transaction.toXDR() };
+    },
+  };
   const orchestrator = new SharedIssuanceOrchestrator({
     store,
     preflight: {
@@ -275,8 +274,7 @@ test("private Railway primitive reaches the existing one-shot issuance path", as
   });
   const primitive = new PrivateRailwaySharedIssuerSigningPrimitive(
     {
-      privateBaseUrl:
-        "http://orrylo-testnet-signer.railway.internal:8080",
+      privateBaseUrl: "http://orrylo-testnet-signer.railway.internal:8080",
       requestAuthSecret,
       issuerPublicKey: ISSUER,
     },
@@ -308,8 +306,7 @@ test("private Railway signer failure causes zero submissions", async () => {
   let signerCalls = 0;
   const primitive = new PrivateRailwaySharedIssuerSigningPrimitive(
     {
-      privateBaseUrl:
-        "http://orrylo-testnet-signer.railway.internal:8080",
+      privateBaseUrl: "http://orrylo-testnet-signer.railway.internal:8080",
       requestAuthSecret: "e".repeat(48),
       issuerPublicKey: ISSUER,
     },

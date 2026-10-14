@@ -1,8 +1,4 @@
-import {
-  Keypair,
-  Transaction,
-  TransactionBuilder,
-} from "@stellar/stellar-sdk";
+import { Keypair, Transaction, TransactionBuilder } from "@stellar/stellar-sdk";
 
 import { isForbiddenTestnetSharedIssuerPublicKey } from "../product/constants";
 import { SHARED_ISSUER_TESTNET_PASSPHRASE } from "./shared-issuer-issuance";
@@ -12,9 +8,7 @@ const HASH_PATTERN = /^[0-9a-f]{64}$/;
 const MIN_AUTH_SECRET_BYTES = 32;
 
 export type PrivateRailwaySignerPrimitiveErrorCode =
-  | "invalid_configuration"
-  | "signer_unavailable"
-  | "signer_response_mismatch";
+  "invalid_configuration" | "signer_unavailable" | "signer_response_mismatch";
 
 export class PrivateRailwaySignerPrimitiveError extends Error {
   constructor(readonly code: PrivateRailwaySignerPrimitiveErrorCode) {
@@ -23,9 +17,7 @@ export class PrivateRailwaySignerPrimitiveError extends Error {
   }
 }
 
-export class PrivateRailwaySharedIssuerSigningPrimitive
-  implements SharedIssuerSigningPrimitive
-{
+export class PrivateRailwaySharedIssuerSigningPrimitive implements SharedIssuerSigningPrimitive {
   private readonly endpoint: URL;
   private readonly issuerPublicKey: string;
   private readonly requestAuthSecret: string;
@@ -42,8 +34,7 @@ export class PrivateRailwaySharedIssuerSigningPrimitive
     this.issuerPublicKey = normalizeAllowedIssuer(input.issuerPublicKey);
 
     if (
-      Buffer.byteLength(input.requestAuthSecret, "utf8") <
-      MIN_AUTH_SECRET_BYTES
+      Buffer.byteLength(input.requestAuthSecret, "utf8") < MIN_AUTH_SECRET_BYTES
     ) {
       throw new PrivateRailwaySignerPrimitiveError("invalid_configuration");
     }
@@ -89,9 +80,7 @@ export class PrivateRailwaySharedIssuerSigningPrimitive
     try {
       value = await response.json();
     } catch {
-      throw new PrivateRailwaySignerPrimitiveError(
-        "signer_response_mismatch",
-      );
+      throw new PrivateRailwaySignerPrimitiveError("signer_response_mismatch");
     }
 
     return {

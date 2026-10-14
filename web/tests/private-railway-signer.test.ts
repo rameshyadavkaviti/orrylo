@@ -19,7 +19,9 @@ import {
 const ISSUER_KEYPAIR = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 211));
 const ISSUER = ISSUER_KEYPAIR.publicKey();
 const WRONG_KEYPAIR = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 212));
-const DESTINATION = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 213)).publicKey();
+const DESTINATION = Keypair.fromRawEd25519Seed(
+  Buffer.alloc(32, 213),
+).publicKey();
 const AUTH = "b".repeat(48);
 const PRIVATE_URL = "http://orrylo-testnet-signer.railway.internal:8080";
 

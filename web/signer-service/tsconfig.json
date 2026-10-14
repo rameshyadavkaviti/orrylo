@@ -10,11 +10,6 @@
     "rootDir": "..",
     "plugins": []
   },
-  "include": [
-    "./*.ts",
-    "../lib/product/constants.ts"
-  ],
-  "exclude": [
-    "../node_modules"
-  ]
+  "include": ["./*.ts", "../lib/product/constants.ts"],
+  "exclude": ["../node_modules"]
 }

@@ -24,7 +24,9 @@ import {
 const ISSUER_KEYPAIR = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 201));
 const ISSUER = ISSUER_KEYPAIR.publicKey();
 const OTHER_KEYPAIR = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 202));
-const DESTINATION = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 203)).publicKey();
+const DESTINATION = Keypair.fromRawEd25519Seed(
+  Buffer.alloc(32, 203),
+).publicKey();
 const AUTH = "a".repeat(48);
 
 function unsignedTransaction(
@@ -145,16 +147,16 @@ test("wrong network, wrong issuer, XDR/hash mismatch, and pre-signed envelopes f
   });
 
   const valid = unsignedTransaction();
-  const publicNetworkTransaction = unsignedTransaction(
-    ISSUER,
-    Networks.PUBLIC,
-  );
+  const publicNetworkTransaction = unsignedTransaction(ISSUER, Networks.PUBLIC);
   const wrongIssuer = unsignedTransaction(OTHER_KEYPAIR.publicKey());
   const presigned = unsignedTransaction();
   presigned.sign(ISSUER_KEYPAIR);
 
   const bodies = [
-    requestBody(valid, Buffer.from(publicNetworkTransaction.hash()).toString("hex")),
+    requestBody(
+      valid,
+      Buffer.from(publicNetworkTransaction.hash()).toString("hex"),
+    ),
     requestBody(valid, "f".repeat(64)),
     requestBody(wrongIssuer),
     requestBody(presigned),

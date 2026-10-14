@@ -101,14 +101,8 @@ export function readSharedIssuanceRuntimeConfig(
       env,
       "ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY",
     ),
-    feeStroops: required(
-      env,
-      "ORRYLO_TESTNET_SHARED_ISSUER_FEE_STROOPS",
-    ),
-    signerPrivateUrl: required(
-      env,
-      "ORRYLO_TESTNET_SIGNER_PRIVATE_URL",
-    ),
+    feeStroops: required(env, "ORRYLO_TESTNET_SHARED_ISSUER_FEE_STROOPS"),
+    signerPrivateUrl: required(env, "ORRYLO_TESTNET_SIGNER_PRIVATE_URL"),
     signerRequestAuthSecret: required(
       env,
       "ORRYLO_TESTNET_SIGNER_REQUEST_AUTH_SECRET",

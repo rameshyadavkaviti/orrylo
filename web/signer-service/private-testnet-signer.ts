@@ -134,10 +134,7 @@ export function readPrivateTestnetSignerRuntime(
     env,
     "ORRYLO_TESTNET_SIGNER_REQUEST_AUTH_SECRET",
   );
-  const signerSeed = required(
-    env,
-    "ORRYLO_TESTNET_SHARED_ISSUER_SIGNER_SEED",
-  );
+  const signerSeed = required(env, "ORRYLO_TESTNET_SHARED_ISSUER_SIGNER_SEED");
 
   let signer: Keypair;
   try {
