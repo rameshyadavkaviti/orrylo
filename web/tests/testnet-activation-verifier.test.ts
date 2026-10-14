@@ -174,6 +174,43 @@ test("database boundary failure fails the read-only activation verifier closed",
   assert.equal(databaseCalls, 1);
 });
 
+test("ordinary application confirmation write authority fails closed", async () => {
+  const forbiddenPrivileges = [
+    "canInsertConfirmation",
+    "canUpdateConfirmation",
+    "canDeleteConfirmation",
+    "canTruncateConfirmation",
+    "canUpdateAnyConfirmationColumn",
+  ] as const;
+
+  for (const forbiddenPrivilege of forbiddenPrivileges) {
+    const application = activationDatabase({
+      roleName: "orrylo_app",
+      isConfirmationWriter: false,
+      canInsertConfirmation: false,
+      transactionReadOnly: true,
+      [forbiddenPrivilege]: true,
+    });
+    const writer = activationDatabase({
+      roleName: "orrylo_confirmation_login",
+      isConfirmationWriter: true,
+      canInsertConfirmation: true,
+      transactionReadOnly: true,
+    });
+
+    await assert.rejects(
+      verifyTestnetActivationDatabaseBoundaries(
+        application.database,
+        writer.database,
+      ),
+      (error: unknown) =>
+        error instanceof TestnetActivationVerificationError &&
+        error.code === "database_privilege_mismatch",
+      forbiddenPrivilege,
+    );
+  }
+});
+
 test("confirmation writer forbidden evidence write authority fails closed", async () => {
   const forbiddenPrivileges = [
     "canUpdateConfirmation",
