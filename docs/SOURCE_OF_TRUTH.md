@@ -461,6 +461,14 @@ A separate marketing/application split may be introduced later if it becomes ope
 
 Shared assets continue to use the shared issuer home domain. Dedicated issuers may use per-project metadata domains and later custom domains according to the dedicated-issuer architecture. Public landing-page hosting and metadata hosting remain separate concerns even if a future domain happens to serve both roles.
 
+RYLO is explicitly separate from Shared Issuer metadata hosting. The approved RYLO issuer `home_domain` is:
+
+```text
+orrylo.com
+```
+
+Accordingly, the canonical RYLO metadata endpoint is `https://orrylo.com/.well-known/stellar.toml`. RYLO metadata and its public image must be reachable over HTTPS from the Orrylo root-domain publication path before the issuer `home_domain` is mutated on any network. `assets.orrylo.com` remains reserved for customer Shared Issuer metadata and must not be silently reused as the RYLO issuer `home_domain`.
+
 ### 15.1 Managed Stellar metadata
 
 High-quality Stellar metadata publication is a first-class Orrylo product capability.
