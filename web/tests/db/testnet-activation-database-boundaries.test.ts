@@ -584,7 +584,12 @@ if (!TEST_DATABASE_URL) {
   });
 
   test("ordinary application rejects all confirmation table writes", async (t) => {
-    for (const privilege of ["INSERT", "UPDATE", "DELETE", "TRUNCATE"] as const) {
+    for (const privilege of [
+      "INSERT",
+      "UPDATE",
+      "DELETE",
+      "TRUNCATE",
+    ] as const) {
       await t.test(`${privilege} on confirmations fails closed`, async () => {
         await admin.unsafe(
           `GRANT ${privilege} ON project_issuance_ledger_confirmations TO ${APP_ROLE}`,
