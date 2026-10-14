@@ -282,6 +282,7 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
           AND NOT trigger_row.tgisinternal
           AND trigger_row.tgenabled = 'O'
           AND trigger_row.tgtype = 7
+          AND trigger_row.tgqual IS NULL
           AND relation_namespace.nspname = 'public'
           AND relation.relname =
             'project_issuance_ledger_confirmations'
