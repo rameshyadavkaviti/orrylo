@@ -9,8 +9,7 @@ export const RYLO_TESTNET_NETWORK_PASSPHRASE =
   "Test SDF Network ; September 2015";
 export const ORRYLO_METADATA_LOGO_URL =
   "https://orrylo.com/brand/orrylo-logo.webp";
-export const RYLO_TESTNET_IMAGE_URL =
-  "https://orrylo.com/brand/rylo-logo.webp";
+export const RYLO_TESTNET_IMAGE_URL = "https://orrylo.com/brand/rylo-logo.webp";
 
 /**
  * Canonical repository-only RYLO Testnet metadata.
