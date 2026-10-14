@@ -44,12 +44,29 @@ docker exec orrylo-postgres createdb -U postgres orrylo_test
 export TEST_DATABASE_URL='postgres://postgres:orrylo-dev@localhost:5432/orrylo_test'
 ```
 
-Apply and verify migrations:
+Apply migrations and run the compatibility verifier:
 
 ```sh
 npm run db:migrate
 npm run db:verify
 ```
+
+Both commands above are mutating / migration-capable. In particular,
+`npm run db:verify` preserves its existing setup behavior by applying or
+reconciling missing migrations before it inspects the resulting schema. Never
+use either command during a SAFE READ-ONLY activation phase.
+
+Inspect an already-migrated database without applying or reconciling migrations:
+
+```sh
+npm run db:verify:read-only
+```
+
+`npm run db:verify:read-only` is the genuinely read-only verifier. It checks the
+exact migration names/checksums and required schema/security catalog invariants
+inside a PostgreSQL `READ ONLY` transaction. It performs no migration SQL,
+writes, DDL, or privilege changes and fails closed if the expected state is
+absent or inconsistent.
 
 Run the application:
 
@@ -74,13 +91,16 @@ Orrylo uses a provider-neutral PostgreSQL persistence layer configured only by
 the server-side `DATABASE_URL`. No hosted database vendor is considered
 selected by this repository.
 
-Schema migrations are source-controlled under `db/migrations/`. Migration and
-schema-verification commands require `MIGRATION_DATABASE_URL`; they do not use
+Schema migrations are source-controlled under `db/migrations/`. `npm run
+db:migrate` and the compatibility command `npm run db:verify` are mutating /
+migration-capable. `npm run db:verify:read-only` never invokes the migration
+runner and inspects the already-applied state in a database-enforced read-only
+transaction. These commands require `MIGRATION_DATABASE_URL`; they do not use
 the ordinary application `DATABASE_URL`. The migration identity must own the
 sensitive issuance tables and enforcement functions, while runtime application
-and confirmation-writer logins must not. The runner records SHA-256 checksums in
-`schema_migrations`, rejects modified already-applied migrations, and can
-bootstrap a fresh database from zero.
+and confirmation-writer logins must not. The migration runner records SHA-256
+checksums in `schema_migrations`, rejects modified already-applied migrations,
+and can bootstrap a fresh database from zero.
 
 Database-facing code is isolated under `lib/server/persistence/`. Browser UI
 does not import database clients or connection strings.
