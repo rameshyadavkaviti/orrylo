@@ -27,6 +27,7 @@ const DATABASE_REPORT: TestnetActivationDatabaseReport = {
   confirmationWriterRole: "orrylo_confirmation_login",
   applicationCanInsertConfirmation: false,
   confirmationWriterCanInsertConfirmation: true,
+  confirmationWriterCanReadConfirmation: true,
   confirmationWriterCanReadIntentAndAttempt: true,
   applicationCanSetRoleToSensitiveOwner: false,
   confirmationWriterCanSetRoleToSensitiveOwner: false,
@@ -173,6 +174,74 @@ test("database boundary failure fails the read-only activation verifier closed",
   assert.equal(databaseCalls, 1);
 });
 
+test("confirmation writer forbidden evidence write authority fails closed", async () => {
+  const forbiddenPrivileges = [
+    "canInsertFullIntent",
+    "canUpdateFullIntent",
+    "canDeleteFullIntent",
+    "canTruncateFullIntent",
+    "canUpdateAnyFullIntentColumn",
+    "canInsertAttempt",
+    "canUpdateAttempt",
+    "canDeleteAttempt",
+    "canTruncateAttempt",
+    "canUpdateAnyAttemptColumn",
+  ] as const;
+
+  for (const forbiddenPrivilege of forbiddenPrivileges) {
+    const application = activationDatabase({
+      roleName: "orrylo_app",
+      isConfirmationWriter: false,
+      canInsertConfirmation: false,
+      transactionReadOnly: true,
+    });
+    const writer = activationDatabase({
+      roleName: "orrylo_confirmation_login",
+      isConfirmationWriter: true,
+      canInsertConfirmation: true,
+      transactionReadOnly: true,
+      [forbiddenPrivilege]: true,
+    });
+
+    await assert.rejects(
+      verifyTestnetActivationDatabaseBoundaries(
+        application.database,
+        writer.database,
+      ),
+      (error: unknown) =>
+        error instanceof TestnetActivationVerificationError &&
+        error.code === "database_privilege_mismatch",
+      forbiddenPrivilege,
+    );
+  }
+});
+
+test("confirmation writer must retain confirmation SELECT authority", async () => {
+  const application = activationDatabase({
+    roleName: "orrylo_app",
+    isConfirmationWriter: false,
+    canInsertConfirmation: false,
+    transactionReadOnly: true,
+  });
+  const writer = activationDatabase({
+    roleName: "orrylo_confirmation_login",
+    isConfirmationWriter: true,
+    canInsertConfirmation: true,
+    canReadConfirmation: false,
+    transactionReadOnly: true,
+  });
+
+  await assert.rejects(
+    verifyTestnetActivationDatabaseBoundaries(
+      application.database,
+      writer.database,
+    ),
+    (error: unknown) =>
+      error instanceof TestnetActivationVerificationError &&
+      error.code === "database_privilege_mismatch",
+  );
+});
+
 test("database boundary inspection requires PostgreSQL to confirm READ ONLY transactions", async () => {
   const application = activationDatabase({
     roleName: "orrylo_app",
@@ -210,6 +279,17 @@ function activationDatabase(input: {
   roleName: string;
   isConfirmationWriter: boolean;
   canInsertConfirmation: boolean;
+  canReadConfirmation?: boolean;
+  canInsertFullIntent?: boolean;
+  canUpdateFullIntent?: boolean;
+  canDeleteFullIntent?: boolean;
+  canTruncateFullIntent?: boolean;
+  canUpdateAnyFullIntentColumn?: boolean;
+  canInsertAttempt?: boolean;
+  canUpdateAttempt?: boolean;
+  canDeleteAttempt?: boolean;
+  canTruncateAttempt?: boolean;
+  canUpdateAnyAttemptColumn?: boolean;
   transactionReadOnly: boolean;
 }) {
   const transactionModes: string[] = [];
@@ -232,6 +312,7 @@ function activationDatabase(input: {
           can_set_role_to_sensitive_owner: false,
           can_use_sensitive_owner: false,
           can_administer_sensitive_owner: false,
+          can_administer_any_role: false,
         },
       ];
     }
@@ -240,8 +321,22 @@ function activationDatabase(input: {
         {
           role_name: input.roleName,
           can_insert_confirmation: input.canInsertConfirmation,
+          can_read_confirmation:
+            input.canReadConfirmation ?? input.isConfirmationWriter,
           can_read_full_intent: input.isConfirmationWriter,
           can_read_attempt: input.isConfirmationWriter,
+          can_insert_full_intent: input.canInsertFullIntent ?? false,
+          can_update_full_intent: input.canUpdateFullIntent ?? false,
+          can_delete_full_intent: input.canDeleteFullIntent ?? false,
+          can_truncate_full_intent: input.canTruncateFullIntent ?? false,
+          can_update_any_full_intent_column:
+            input.canUpdateAnyFullIntentColumn ?? false,
+          can_insert_attempt: input.canInsertAttempt ?? false,
+          can_update_attempt: input.canUpdateAttempt ?? false,
+          can_delete_attempt: input.canDeleteAttempt ?? false,
+          can_truncate_attempt: input.canTruncateAttempt ?? false,
+          can_update_any_attempt_column:
+            input.canUpdateAnyAttemptColumn ?? false,
           transaction_read_only: input.transactionReadOnly,
         },
       ];
