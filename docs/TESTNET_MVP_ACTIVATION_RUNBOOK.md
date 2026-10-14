@@ -20,7 +20,7 @@ transaction signing/submission, or Mainnet activity.
 | `ORRYLO_AUTH_DOMAIN` | Implemented / operational config required | Exact deployed hostname; production fails if absent. |
 | `DATABASE_URL` | Implemented / operational config required | Dedicated ordinary application login. It must not be superuser, schema/sensitive-table owner, or member of `orrylo_confirmation_writer`. |
 | `MIGRATION_DATABASE_URL` | Implemented / setup-only | Schema-owner login used only for `db:migrate` / `db:verify`; never use as application or confirmation-writer runtime identity. |
-| `ORRYLO_CONFIRMATION_WRITER_DATABASE_URL` | Verifier config added by this package; runtime composition already accepts a separate writer connection | Dedicated LOGIN member of the NOLOGIN `orrylo_confirmation_writer` role; non-superuser and non-owner. Final signer/runtime wiring must pass this connection to `createServerSharedIssuanceOrchestrator`. |
+| `ORRYLO_CONFIRMATION_WRITER_DATABASE_URL` | Implemented in PR #57 runtime composition / operational credential still owner-gated | Dedicated LOGIN member of the NOLOGIN `orrylo_confirmation_writer` role; non-superuser and non-owner. The implemented runtime passes this separate connection to `createServerSharedIssuanceOrchestrator`; no live credential or deployment is implied. |
 | `ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY` | Reservation/immutable-intent path already consumes it | Owner must supply the public key of one newly generated random Testnet Shared Issuer. Never use RYLO or silently use `GBR7...ASSETS`. |
 | `ORRYLO_TESTNET_SHARED_ISSUER_FEE_STROOPS` | Read-only verifier config; orchestrator already accepts `feeStroops` as an injected runtime value | Operational value must be a positive integer and at least the stable observed Testnet base fee. No arbitrary extra fee policy is introduced here. |
 | Shared Issuer account state | Code exists / live configuration missing | Account must exist on Testnet with AUTH_REQUIRED/OFF, AUTH_REVOCABLE/OFF, AUTH_CLAWBACK/OFF, AUTH_IMMUTABLE/OFF, Master weight 1, thresholds 1/1/1 and exactly the expected Master signer. |
@@ -76,10 +76,12 @@ This is intentionally **not** a Mainnet recommendation.
 Cost/complexity: lowest operational complexity for the current prototype hosting
 baseline; one small extra service.
 
-Integration change after owner approval: add one narrow private-HTTP
-`SharedIssuerSigningPrimitive` adapter plus signer-service implementation and
-tests, then replace the current fail-closed runtime stub with explicit env-based
-composition. Do not change canonical/durable/signature/submission policy.
+Implemented current state: PR #57 contains the narrow private-HTTP
+`SharedIssuerSigningPrimitive` adapter, isolated signer-service implementation,
+tests, and explicit fail-closed env-based runtime composition. These are code
+artifacts only; no signer service, secret, issuer, deployment, signing or
+submission is live. Canonical/durable/signature/submission policy remains
+unchanged.
 
 ### Scope boundary
 
