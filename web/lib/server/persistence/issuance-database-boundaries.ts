@@ -8,11 +8,17 @@ interface DatabaseIdentityRow {
   role_name: string;
   is_superuser: boolean;
   is_confirmation_writer: boolean;
+  protected_namespace_count: number;
+  protected_table_count: number;
+  protected_function_count: number;
   owns_sensitive_schema: boolean;
   owns_sensitive_table: boolean;
   owns_sensitive_function: boolean;
   can_set_role_to_sensitive_owner: boolean;
 }
+
+const EXPECTED_PROTECTED_TABLE_COUNT = 5;
+const EXPECTED_PROTECTED_FUNCTION_COUNT = 8;
 
 export class IssuanceDatabaseIdentityError extends Error {
   readonly code = "issuance_database_identity_rejected";
@@ -103,16 +109,17 @@ async function readIdentity(
   sql: DatabaseIdentityQueryClient,
 ): Promise<DatabaseIdentityRow> {
   const [identity] = await sql<DatabaseIdentityRow[]>`
-    WITH sensitive_roles AS (
-      SELECT namespace.nspowner AS role_oid
+    WITH protected_namespace AS (
+      SELECT namespace.oid, namespace.nspowner
       FROM pg_catalog.pg_namespace AS namespace
-      WHERE namespace.nspname = current_schema()
-      UNION
-      SELECT relation.relowner AS role_oid
+      WHERE namespace.nspname = 'public'
+    ),
+    protected_tables AS (
+      SELECT relation.relname, relation.relowner
       FROM pg_catalog.pg_class AS relation
-      JOIN pg_catalog.pg_namespace AS namespace
-        ON namespace.oid = relation.relnamespace
-      WHERE namespace.nspname = current_schema()
+      JOIN protected_namespace
+        ON protected_namespace.oid = relation.relnamespace
+      WHERE relation.relkind IN ('r', 'p')
         AND relation.relname IN (
           'project_metadata_publications',
           'project_issuance_intents',
@@ -120,12 +127,13 @@ async function readIdentity(
           'project_issuance_transaction_attempts',
           'project_issuance_ledger_confirmations'
         )
-      UNION
-      SELECT procedure.proowner AS role_oid
+    ),
+    protected_functions AS (
+      SELECT procedure.proname, procedure.proowner
       FROM pg_catalog.pg_proc AS procedure
-      JOIN pg_catalog.pg_namespace AS namespace
-        ON namespace.oid = procedure.pronamespace
-      WHERE namespace.nspname = current_schema()
+      JOIN protected_namespace
+        ON protected_namespace.oid = procedure.pronamespace
+      WHERE procedure.prokind = 'f'
         AND procedure.proname IN (
           'prevent_issuance_identity_mutation',
           'prevent_issuance_workflow_fingerprint_mutation',
@@ -136,6 +144,16 @@ async function readIdentity(
           'prevent_issuance_evidence_mutation',
           'assert_metadata_reachability_signed_confirmation'
         )
+    ),
+    sensitive_roles AS (
+      SELECT protected_namespace.nspowner AS role_oid
+      FROM protected_namespace
+      UNION
+      SELECT protected_tables.relowner AS role_oid
+      FROM protected_tables
+      UNION
+      SELECT protected_functions.proowner AS role_oid
+      FROM protected_functions
       UNION
       SELECT sensitive_superuser.oid AS role_oid
       FROM pg_catalog.pg_roles AS sensitive_superuser
@@ -144,53 +162,39 @@ async function readIdentity(
     SELECT
       session_user AS role_name,
       role.rolsuper AS is_superuser,
-      pg_has_role(session_user, 'orrylo_confirmation_writer', 'MEMBER')
+      pg_catalog.pg_has_role(
+        session_user,
+        'orrylo_confirmation_writer',
+        'MEMBER'
+      )
         AS is_confirmation_writer,
+      (SELECT count(*)::integer FROM protected_namespace)
+        AS protected_namespace_count,
+      (SELECT count(DISTINCT protected_tables.relname)::integer FROM protected_tables)
+        AS protected_table_count,
+      (SELECT count(DISTINCT protected_functions.proname)::integer FROM protected_functions)
+        AS protected_function_count,
       EXISTS (
         SELECT 1
-        FROM pg_catalog.pg_namespace AS namespace
-        WHERE namespace.nspname = current_schema()
-          AND namespace.nspowner = role.oid
+        FROM protected_namespace
+        WHERE protected_namespace.nspowner = role.oid
       ) AS owns_sensitive_schema,
       EXISTS (
         SELECT 1
-        FROM pg_catalog.pg_class AS relation
-        JOIN pg_catalog.pg_namespace AS namespace
-          ON namespace.oid = relation.relnamespace
-        WHERE namespace.nspname = current_schema()
-          AND relation.relname IN (
-            'project_metadata_publications',
-            'project_issuance_intents',
-            'project_issuance_full_intents',
-            'project_issuance_transaction_attempts',
-            'project_issuance_ledger_confirmations'
-          )
-          AND relation.relowner = role.oid
+        FROM protected_tables
+        WHERE protected_tables.relowner = role.oid
       ) AS owns_sensitive_table,
       EXISTS (
         SELECT 1
-        FROM pg_catalog.pg_proc AS procedure
-        JOIN pg_catalog.pg_namespace AS namespace
-          ON namespace.oid = procedure.pronamespace
-        WHERE namespace.nspname = current_schema()
-          AND procedure.proname IN (
-            'prevent_issuance_identity_mutation',
-            'prevent_issuance_workflow_fingerprint_mutation',
-            'assert_issuance_reservation_workflow_link',
-            'assert_issuance_attempt_matches_intent',
-            'assert_trusted_confirmation_writer',
-            'protect_issuance_transaction_attempt',
-            'prevent_issuance_evidence_mutation',
-            'assert_metadata_reachability_signed_confirmation'
-          )
-          AND procedure.proowner = role.oid
+        FROM protected_functions
+        WHERE protected_functions.proowner = role.oid
       ) AS owns_sensitive_function,
       EXISTS (
         SELECT 1
         FROM sensitive_roles
         WHERE sensitive_roles.role_oid <> role.oid
           AND pg_catalog.pg_has_role(
-            role.oid,
+            session_user,
             sensitive_roles.role_oid,
             'SET'
           )
@@ -202,6 +206,15 @@ async function readIdentity(
   if (!identity) {
     throw new IssuanceDatabaseIdentityError(
       "Unable to verify the database identity.",
+    );
+  }
+  if (
+    identity.protected_namespace_count !== 1 ||
+    identity.protected_table_count !== EXPECTED_PROTECTED_TABLE_COUNT ||
+    identity.protected_function_count !== EXPECTED_PROTECTED_FUNCTION_COUNT
+  ) {
+    throw new IssuanceDatabaseIdentityError(
+      "Unable to verify the complete protected public MVP schema ownership set.",
     );
   }
   return identity;

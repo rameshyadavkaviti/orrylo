@@ -60,8 +60,10 @@ if (!TEST_DATABASE_URL) {
       $$;
       ALTER ROLE ${APP_ROLE} LOGIN NOINHERIT NOSUPERUSER NOCREATEDB
         NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD 'activation-app-test';
+      ALTER ROLE ${APP_ROLE} SET search_path TO pg_catalog, public;
       ALTER ROLE ${WRITER_ROLE} LOGIN INHERIT NOSUPERUSER NOCREATEDB
         NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD 'activation-writer-test';
+      ALTER ROLE ${WRITER_ROLE} SET search_path TO pg_catalog, public;
       ALTER ROLE ${SCHEMA_OWNER_ROLE} NOLOGIN NOSUPERUSER NOCREATEDB
         NOCREATEROLE NOREPLICATION NOBYPASSRLS;
       ALTER ROLE ${BRIDGE_ROLE} NOLOGIN NOSUPERUSER NOCREATEDB
@@ -99,6 +101,19 @@ if (!TEST_DATABASE_URL) {
   });
 
   test("normal application and bounded confirmation-writer roles pass in READ ONLY transactions", async () => {
+    const [{ current_schema: applicationCurrentSchema }] = await app<
+      { current_schema: string }[]
+    >`
+      SELECT current_schema()
+    `;
+    const [{ current_schema: writerCurrentSchema }] = await writer<
+      { current_schema: string }[]
+    >`
+      SELECT current_schema()
+    `;
+    assert.equal(applicationCurrentSchema, "pg_catalog");
+    assert.equal(writerCurrentSchema, "pg_catalog");
+
     const report = await verifyTestnetActivationDatabaseBoundaries(app, writer);
 
     assert.equal(report.applicationRole, APP_ROLE);

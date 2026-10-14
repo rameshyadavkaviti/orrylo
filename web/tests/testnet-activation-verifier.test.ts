@@ -217,12 +217,15 @@ function activationDatabase(input: {
   const transaction = async (template: TemplateStringsArray) => {
     const query = template.join("?").replace(/\s+/g, " ").trim();
     queries.push(query);
-    if (query.startsWith("WITH sensitive_roles")) {
+    if (query.startsWith("WITH protected_namespace")) {
       return [
         {
           role_name: input.roleName,
           is_superuser: false,
           is_confirmation_writer: input.isConfirmationWriter,
+          protected_namespace_count: 1,
+          protected_table_count: 5,
+          protected_function_count: 8,
           owns_sensitive_schema: false,
           owns_sensitive_table: false,
           owns_sensitive_function: false,
