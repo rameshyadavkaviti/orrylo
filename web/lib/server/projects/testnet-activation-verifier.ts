@@ -223,6 +223,12 @@ export async function verifyTestnetActivationDatabaseBoundaries(
     );
   }
 
+  const writerHasForbiddenConfirmationWriteAuthority =
+    writer.canUpdateConfirmation ||
+    writer.canDeleteConfirmation ||
+    writer.canTruncateConfirmation ||
+    writer.canUpdateAnyConfirmationColumn;
+
   const writerHasForbiddenEvidenceWriteAuthority =
     writer.canInsertFullIntent ||
     writer.canInsertAnyFullIntentColumn ||
@@ -242,11 +248,12 @@ export async function verifyTestnetActivationDatabaseBoundaries(
     !writer.canReadConfirmation ||
     !writer.canReadFullIntent ||
     !writer.canReadAttempt ||
+    writerHasForbiddenConfirmationWriteAuthority ||
     writerHasForbiddenEvidenceWriteAuthority
   ) {
     throw new TestnetActivationVerificationError(
       "database_privilege_mismatch",
-      "The dedicated confirmation writer must have only its narrow confirmation INSERT/SELECT and prerequisite evidence SELECT authority, with no write authority over immutable intent or attempt evidence.",
+      "The dedicated confirmation writer must have only confirmation INSERT/SELECT and prerequisite evidence SELECT authority, with no destructive confirmation authority or write authority over immutable intent or attempt evidence.",
     );
   }
 
@@ -268,6 +275,10 @@ interface ActivationPrivileges {
   roleName: string;
   canInsertConfirmation: boolean;
   canReadConfirmation: boolean;
+  canUpdateConfirmation: boolean;
+  canDeleteConfirmation: boolean;
+  canTruncateConfirmation: boolean;
+  canUpdateAnyConfirmationColumn: boolean;
   canReadFullIntent: boolean;
   canReadAttempt: boolean;
   canInsertFullIntent: boolean;
@@ -293,6 +304,10 @@ async function readActivationPrivileges(
       role_name: string;
       can_insert_confirmation: boolean;
       can_read_confirmation: boolean;
+      can_update_confirmation: boolean;
+      can_delete_confirmation: boolean;
+      can_truncate_confirmation: boolean;
+      can_update_any_confirmation_column: boolean;
       can_read_full_intent: boolean;
       can_read_attempt: boolean;
       can_insert_full_intent: boolean;
@@ -322,6 +337,26 @@ async function readActivationPrivileges(
         'public.project_issuance_ledger_confirmations',
         'SELECT'
       ) AS can_read_confirmation,
+      pg_catalog.has_table_privilege(
+        current_user,
+        'public.project_issuance_ledger_confirmations',
+        'UPDATE'
+      ) AS can_update_confirmation,
+      pg_catalog.has_table_privilege(
+        current_user,
+        'public.project_issuance_ledger_confirmations',
+        'DELETE'
+      ) AS can_delete_confirmation,
+      pg_catalog.has_table_privilege(
+        current_user,
+        'public.project_issuance_ledger_confirmations',
+        'TRUNCATE'
+      ) AS can_truncate_confirmation,
+      pg_catalog.has_any_column_privilege(
+        current_user,
+        'public.project_issuance_ledger_confirmations',
+        'UPDATE'
+      ) AS can_update_any_confirmation_column,
       pg_catalog.has_table_privilege(
         current_user,
         'public.project_issuance_full_intents',
@@ -407,6 +442,10 @@ async function readActivationPrivileges(
     roleName: row.role_name,
     canInsertConfirmation: row.can_insert_confirmation,
     canReadConfirmation: row.can_read_confirmation,
+    canUpdateConfirmation: row.can_update_confirmation,
+    canDeleteConfirmation: row.can_delete_confirmation,
+    canTruncateConfirmation: row.can_truncate_confirmation,
+    canUpdateAnyConfirmationColumn: row.can_update_any_confirmation_column,
     canReadFullIntent: row.can_read_full_intent,
     canReadAttempt: row.can_read_attempt,
     canInsertFullIntent: row.can_insert_full_intent,
