@@ -86,7 +86,6 @@ test("public shared TOML route aggregates only canonical Testnet publications de
   assert.doesNotMatch(body, /WRONG|MAIN/);
 });
 
-
 test("root-domain TOML publishes only the canonical RYLO Testnet identity", async () => {
   let sharedReads = 0;
   const response = await handleStellarTomlRequest(
@@ -98,8 +97,7 @@ test("root-domain TOML publishes only the canonical RYLO Testnet identity", asyn
           publication({
             projectId: "00000000-0000-4000-8000-000000000099",
             assetCode: "NOVA",
-            currencyToml:
-              '[[CURRENCIES]]\ncode = "NOVA"\nname = "Nova"\n',
+            currencyToml: '[[CURRENCIES]]\ncode = "NOVA"\nname = "Nova"\n',
           }),
         ];
       },
