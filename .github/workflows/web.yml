@@ -86,8 +86,8 @@ jobs:
       - name: Apply migrations
         run: npm run db:migrate
 
-      - name: Verify schema
-        run: npm run db:verify
+      - name: Verify schema read-only
+        run: npm run db:verify:read-only
 
       - name: Database integration tests
         run: npm run test:db

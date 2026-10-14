@@ -44,12 +44,29 @@ docker exec orrylo-postgres createdb -U postgres orrylo_test
 export TEST_DATABASE_URL='postgres://postgres:orrylo-dev@localhost:5432/orrylo_test'
 ```
 
-Apply and verify migrations:
+Apply migrations and run the compatibility verifier:
 
 ```sh
 npm run db:migrate
 npm run db:verify
 ```
+
+Both commands above are mutating / migration-capable. In particular,
+`npm run db:verify` preserves its existing setup behavior by applying or
+reconciling missing migrations before it inspects the resulting schema. Never
+use either command during a SAFE READ-ONLY activation phase.
+
+Inspect an already-migrated database without applying or reconciling migrations:
+
+```sh
+npm run db:verify:read-only
+```
+
+`npm run db:verify:read-only` is the genuinely read-only verifier. It checks the
+exact migration names/checksums and required schema/security catalog invariants
+inside a PostgreSQL `READ ONLY` transaction. It performs no migration SQL,
+writes, DDL, or privilege changes and fails closed if the expected state is
+absent or inconsistent.
 
 Run the application:
 
@@ -74,13 +91,16 @@ Orrylo uses a provider-neutral PostgreSQL persistence layer configured only by
 the server-side `DATABASE_URL`. No hosted database vendor is considered
 selected by this repository.
 
-Schema migrations are source-controlled under `db/migrations/`. Migration and
-schema-verification commands require `MIGRATION_DATABASE_URL`; they do not use
+Schema migrations are source-controlled under `db/migrations/`. `npm run
+db:migrate` and the compatibility command `npm run db:verify` are mutating /
+migration-capable. `npm run db:verify:read-only` never invokes the migration
+runner and inspects the already-applied state in a database-enforced read-only
+transaction. These commands require `MIGRATION_DATABASE_URL`; they do not use
 the ordinary application `DATABASE_URL`. The migration identity must own the
 sensitive issuance tables and enforcement functions, while runtime application
-and confirmation-writer logins must not. The runner records SHA-256 checksums in
-`schema_migrations`, rejects modified already-applied migrations, and can
-bootstrap a fresh database from zero.
+and confirmation-writer logins must not. The migration runner records SHA-256
+checksums in `schema_migrations`, rejects modified already-applied migrations,
+and can bootstrap a fresh database from zero.
 
 Database-facing code is isolated under `lib/server/persistence/`. Browser UI
 does not import database clients or connection strings.
@@ -354,12 +374,12 @@ non-stale unchanged issuer sequence agree. Confirmed issuer keys, transaction
 hashes, ledger confirmations, and explorer verification remain unavailable to
 the application until genuine evidence is produced by a reviewed Stellar
 service. Older Gate A interfaces retain explicit unavailable implementations for
-pre-activation compatibility, but the bounded Testnet MVP execution path now
-uses the reviewed official Testnet Horizon adapters and PR #57's approved private
-Railway signing primitive. POST reservation creation still requires an
-authenticated wallet, the owned project, a UUID idempotency key and a matching
-asset-code assertion; browser-provided issuer, network and wallet authority are
-rejected. The owner-authenticated execution route delegates only to the server
+pre-activation compatibility, but the bounded Testnet MVP execution path uses
+the reviewed official Testnet Horizon adapters and PR #57's approved private
+Railway signing primitive. POST reservation creation requires an authenticated
+wallet, the owned project, a UUID idempotency key and a matching asset-code
+assertion; browser-provided issuer, network and wallet authority are rejected.
+The owner-authenticated execution route delegates only to the server
 orchestration boundary described below; runtime composition fails closed unless
 all approved Testnet signer/issuer/fee/confirmation-writer configuration is
 present.
@@ -410,22 +430,22 @@ therefore do **not** claim PR #27's complete issuance-intent fingerprint.
 Before application execution is activated, the Stellar owner must still provide
 the final issuer identity, explicit approved destination and amount, ledger
 preconditions, separately owned migration/application/confirmation database
-logins and least-privilege grants, and the live provisioning/deployment evidence
-for the already-approved private Railway Testnet signer. The reviewed official
-Testnet Horizon reader/submission adapters and PR #57 signer implementation are
-code artifacts only and do not prove live deployment or issuance.
+logins and least-privilege grants, and live provisioning/deployment evidence for
+the approved private Railway Testnet signer. The reviewed official Testnet
+Horizon reader/submission adapters and PR #57 signer implementation are code
+artifacts only and do not prove live deployment or issuance.
 The distinct pure `prepareReservedSharedIssuerPlan` entrypoint accepts PR #27
 types but is not exposed by any public API and cannot sign or submit.
 Project publication and PR #19 metadata hosting remain separate. The issuance UI is in an additive managed-project layout, not PR #19's page or view.
 
 ## Testnet MVP activation readiness
 
-The owner-approved bounded signer architecture is now implemented as an
-isolated private Railway Testnet signer service plus a narrow
-`SharedIssuerSigningPrimitive` HTTP adapter. Production composition still
-fails closed unless the exact Testnet issuer, fee, private signer URL,
+The owner-approved bounded signer architecture is implemented as an isolated
+private Railway Testnet signer service plus a narrow
+`SharedIssuerSigningPrimitive` HTTP adapter. Production composition fails
+closed unless the exact Testnet issuer, fee, private signer URL,
 signer-authentication secret and dedicated confirmation-writer database
-connection are all explicitly configured. The web application never loads the
+connection are explicitly configured. The web application never loads the
 Stellar signer seed.
 
 A repeatable read-only activation verifier is available for the account,
@@ -461,8 +481,7 @@ npm run signer:build
 npm run signer:start
 ```
 
-The web service receives only
-`ORRYLO_TESTNET_SIGNER_PRIVATE_URL` and
+The web service receives only `ORRYLO_TESTNET_SIGNER_PRIVATE_URL` and
 `ORRYLO_TESTNET_SIGNER_REQUEST_AUTH_SECRET`. The signer service receives the
 approved issuer public key, the same request-auth secret, Railway `PORT`, and
 its service-scoped Stellar signer secret through runtime secret configuration.
@@ -478,10 +497,12 @@ This phase intentionally does not add general network abuse/rate-limit
 infrastructure or proxy-level request-body limits. Those remain production gates
 before exposing authentication broadly on public infrastructure.
 
-The reviewed Testnet code now includes canonical Shared Issuer transaction
+The reviewed Testnet code includes canonical Shared Issuer transaction
 construction, a one-shot official-Horizon submission adapter, exact-hash
-authoritative confirmation and the server orchestration path. Those capabilities are **not live** because signer secret provisioning,
-Railway service deployment and the real issuance remain owner-gated.
+authoritative confirmation, the server orchestration path and PR #57's private
+Railway signer implementation. Those capabilities are **not live** because
+signer secret provisioning, Railway service deployment and the real issuance
+remain owner-gated.
 
 It still does not activate or implement:
 
