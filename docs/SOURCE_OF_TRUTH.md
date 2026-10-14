@@ -76,6 +76,36 @@ without recreating the project or changing its internal identity. Old public rou
 
 Changing a landing-page hostname, slug, custom domain, or hosting provider must not implicitly move or redefine Stellar metadata hosting.
 
+## 2.3 Wallet onboarding and account bootstrap
+
+Orrylo may provide a simplified onboarding path for a user who can create an Albedo keypair but whose Stellar account does not yet exist on-ledger.
+
+The approved product flow is:
+
+```
+Create Albedo keypair
+→ authenticate to Orrylo with that public key
+→ complete fiat payment through an approved on-ramp provider
+→ provider delivers purchased XLM to a dedicated Orrylo Account Bootstrap wallet
+→ Orrylo authoritatively binds and confirms that payment/deposit to the authenticated user/order
+→ the Bootstrap wallet submits exactly one Stellar CreateAccount operation for that authenticated public key
+→ the created user account receives the purchased XLM less only explicitly disclosed provider/network/platform deductions, if any
+→ authoritative ledger confirmation
+→ continue the normal Orrylo flow
+```
+
+Rules:
+
+- The **Account Bootstrap wallet is a dedicated infrastructure role** and must not silently reuse RYLO issuer, Shared Issuer, Treasury, Operations, Liquidity, or customer funds for unrelated purposes.
+- A bootstrap payment must be durably bound to the authenticated Stellar public key and an idempotent order before any `CreateAccount` action is authorized.
+- Provider payment evidence and Stellar deposit evidence must be verified server-side; a browser redirect, webhook alone, or unverified balance observation is not sufficient fulfillment authority.
+- Each successful bootstrap order may create/fund the bound Stellar account at most once. Retries, duplicate webhooks, crashes, and ambiguous transaction outcomes must fail closed and reconcile by authoritative transaction evidence rather than blindly resubmit.
+- Orrylo must never ask the user for the Albedo secret key. The customer retains custody of the newly created account keypair.
+- The preferred current provider candidate is **Transak**, because its documented partner model includes approved merchant-wallet destinations. This is a preferred candidate, **not a locked provider**.
+- Production use of Transak is conditional on formal Orrylo merchant/partner approval, KYB completion where required, explicit approval of this exact merchant-wallet-to-`CreateAccount` flow, and acceptable commercial terms.
+- Provider integration, bootstrap-wallet deployment/custody, exact fees, limits, refund/recovery behavior, compliance requirements, and production activation remain separate implementation/security decisions.
+- This product decision does **not** alter the current bounded Testnet MVP Lite requirement that the first demonstration customer wallet already be funded and trustline-ready. Bootstrap onboarding is a subsequent customer-experience capability unless separately activated.
+
 ## 3. Asset issuance tiers
 
 ### 3.1 Shared Issuer
