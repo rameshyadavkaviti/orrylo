@@ -80,6 +80,9 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Build private Testnet signer
+        run: npm run signer:build
+
       - name: Apply migrations
         run: npm run db:migrate
 
