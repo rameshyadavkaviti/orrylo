@@ -353,16 +353,16 @@ replacement unless an authoritative expired not-found observation and a
 non-stale unchanged issuer sequence agree. Confirmed issuer keys, transaction
 hashes, ledger confirmations, and explorer verification remain unavailable to
 the application until genuine evidence is produced by a reviewed Stellar
-service. The server-only
-`SharedIssuerExecutionAdapter` and `SharedAssetConfirmationReader` both have
-explicit unavailable implementations, as does the production Testnet ledger
-reader. POST reservation creation requires an
+service. Older Gate A interfaces retain explicit unavailable implementations for
+pre-activation compatibility, but the bounded Testnet MVP execution path now
+uses the reviewed official Testnet Horizon adapters and PR #57's approved private
+Railway signing primitive. POST reservation creation still requires an
 authenticated wallet, the owned project, a UUID idempotency key and a matching
-asset-code assertion; browser-provided issuer, network and wallet authority
-are rejected. The owner-authenticated execution route delegates only to the
-server orchestration boundary described below; the default runtime fails closed
-before preflight or attempt creation because no operational signing primitive is
-installed.
+asset-code assertion; browser-provided issuer, network and wallet authority are
+rejected. The owner-authenticated execution route delegates only to the server
+orchestration boundary described below; runtime composition fails closed unless
+all approved Testnet signer/issuer/fee/confirmation-writer configuration is
+present.
 
 ## Testnet MVP issuance orchestration
 
@@ -381,10 +381,14 @@ browser response can create `confirmed` state. The builder treats Project
 Profile persistence, immutable intent creation, and execution start as one
 Create Token journey while retaining those server-side boundaries.
 
-Production activation still requires an independently approved secretless
-`SharedIssuerSigningPrimitive`, the explicitly approved Shared Issuer public
-key and fee, and a separately credentialed `orrylo_confirmation_writer`
-connection. No signer seed or credential belongs in application source.
+The bounded Testnet `SharedIssuerSigningPrimitive` technology is owner-approved
+and implemented by PR #57 as a private Railway signer service plus narrow web
+adapter. Production activation still requires the real signer service to be
+provisioned/deployed, a separately owner-managed Testnet signer secret to exist
+only in that service, the exact approved Shared Issuer public key and fee, and a
+separately credentialed `orrylo_confirmation_writer` connection. Implementation
+is not deployment evidence, and no signer seed or credential belongs in
+application source.
 
 This Gate A foundation is code-only and **not deployed or activated** until
 independently approved.
@@ -406,8 +410,10 @@ therefore do **not** claim PR #27's complete issuance-intent fingerprint.
 Before application execution is activated, the Stellar owner must still provide
 the final issuer identity, explicit approved destination and amount, ledger
 preconditions, separately owned migration/application/confirmation database
-logins and least-privilege grants, a reviewed authenticated ledger-reader
-adapter, signer custody, and a reviewed submission adapter.
+logins and least-privilege grants, and the live provisioning/deployment evidence
+for the already-approved private Railway Testnet signer. The reviewed official
+Testnet Horizon reader/submission adapters and PR #57 signer implementation are
+code artifacts only and do not prove live deployment or issuance.
 The distinct pure `prepareReservedSharedIssuerPlan` entrypoint accepts PR #27
 types but is not exposed by any public API and cannot sign or submit.
 Project publication and PR #19 metadata hosting remain separate. The issuance UI is in an additive managed-project layout, not PR #19's page or view.
