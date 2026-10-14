@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "noEmit": false,
+    "incremental": false,
+    "outDir": "../.signer-dist",
+    "rootDir": "..",
+    "plugins": []
+  },
+  "include": ["./*.ts", "../lib/product/constants.ts"],
+  "exclude": ["../node_modules"]
+}

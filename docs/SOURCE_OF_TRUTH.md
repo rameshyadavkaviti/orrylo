@@ -370,7 +370,8 @@ Authenticated Albedo wallet
 - The receiving wallet must be technically able to hold the issued asset: explicit account / trustline and applicable authorization readiness, with no unapproved automatic account funding or invented default destination.
 - Security minimums are mandatory: server-side auth and ownership, exact 7-decimal amount/int64 validation, immutable full intent before signing, issuer-scoped uniqueness, one-attempt fail-closed submission, forged-proof resistance, unknown-outcome reconciliation, trusted independent ledger confirmation, protected signing/secrets, and honest status. The merged Gate A/canonical/durable-binding protections remain mandatory and must not be bypassed by a smaller MVP.
 - Owner-approved bounded Testnet execution policy from Issue #43 is: one newly created random Testnet Shared Issuer separate from RYLO; flags `AUTH_REQUIRED=OFF`, `AUTH_REVOCABLE=OFF`, `AUTH_CLAWBACK=OFF`, `AUTH_IMMUTABLE=OFF`; one isolated Master signer at weight 1 with thresholds `1/1/1`; destination equal to the authenticated Albedo owner; manual issuer funding with customer-funded wallet/trustline costs; and official Testnet Horizon exact-hash authority behind the reviewed reader abstraction.
-- That policy approval does **not** authorize the exact issuer account/key, account creation/funding, signer secret generation/import/storage, signer deployment, account mutation, trustline creation, transaction signing/submission, or any Mainnet action. Those remain explicit owner/live-action gates.
+- **Owner-approved bounded Testnet signer decision (2026-10-14):** use one separate private Railway signer service for this Testnet MVP. The web application sends only the already-authorized transaction hash and unsigned XDR through the existing `SharedIssuerSigningPrimitive`; the signer independently pins Testnet, the exact approved non-RYLO/non-reserved Shared Issuer identity and exact transaction hash, signs once, and has no database or Horizon-submission authority. PR #57 implements this architecture in code. That implementation is **not deployment evidence** and does not prove that a real signer service, real seed, real issuer, application deployment, signing or submission exists.
+- These bounded Testnet approvals do **not** authorize the exact issuer account/key, account creation/funding, signer secret generation/import/storage, signer deployment, account mutation, trustline creation, transaction signing/submission, or any Mainnet action. Those remain explicit owner/live-action gates. Mainnet signer/custody policy and the broader RYLO signer architecture remain governed by their separate canonical sections and are not changed by the Testnet MVP signer decision.
 - First prove a repeatable, authorized Testnet demonstration and record exact transaction/asset/network evidence; broader publicly available Testnet release remains subject to security, abuse and deployment gates.
 
 **Delivery order:** (1) reconcile the reviewed execution adapters onto the merged Gate A foundation; (2) obtain the separately authorized Testnet issuer/account/signer activation and verify destination trustline readiness; (3) run one explicitly authorized one-attempt issuance; (4) independently confirm the exact hash and persist truthful result evidence. Keep parallel Mainnet/RYLO economy, growth features and styling work outside the Lite critical path.
@@ -681,9 +682,12 @@ sequence reconciliation, and a dedicated confirmation-writer database boundary.
 Metadata provenance is bound to the exact project and owner. Migration/schema
 ownership, ordinary application access, and the confirmation writer are
 separate runtime identities by contract; no production login membership or
-credential is granted here. The production ledger reader, signer, and
-submission adapters remain explicitly unavailable, so this is not Testnet
-activation or issuance evidence.
+credential is granted here. The historical Gate A foundation began with ledger-reader, signer and
+submission adapters unavailable. The bounded Testnet MVP now has reviewed
+official-Horizon read/submission adapters and PR #57 implements the approved
+private Railway `SharedIssuerSigningPrimitive` plus production runtime
+composition. These are code artifacts only: no signer service, secret, issuer,
+deployment, signing, submission or completed Testnet issuance is implied.
 
 No public workflow, eligibility, reward, or protected-operation endpoint is
 activated. Reward preparation stops at database state `approved`; it does not
