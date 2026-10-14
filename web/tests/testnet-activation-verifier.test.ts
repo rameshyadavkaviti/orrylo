@@ -177,11 +177,13 @@ test("database boundary failure fails the read-only activation verifier closed",
 test("confirmation writer forbidden evidence write authority fails closed", async () => {
   const forbiddenPrivileges = [
     "canInsertFullIntent",
+    "canInsertAnyFullIntentColumn",
     "canUpdateFullIntent",
     "canDeleteFullIntent",
     "canTruncateFullIntent",
     "canUpdateAnyFullIntentColumn",
     "canInsertAttempt",
+    "canInsertAnyAttemptColumn",
     "canUpdateAttempt",
     "canDeleteAttempt",
     "canTruncateAttempt",
@@ -281,11 +283,13 @@ function activationDatabase(input: {
   canInsertConfirmation: boolean;
   canReadConfirmation?: boolean;
   canInsertFullIntent?: boolean;
+  canInsertAnyFullIntentColumn?: boolean;
   canUpdateFullIntent?: boolean;
   canDeleteFullIntent?: boolean;
   canTruncateFullIntent?: boolean;
   canUpdateAnyFullIntentColumn?: boolean;
   canInsertAttempt?: boolean;
+  canInsertAnyAttemptColumn?: boolean;
   canUpdateAttempt?: boolean;
   canDeleteAttempt?: boolean;
   canTruncateAttempt?: boolean;
@@ -313,6 +317,7 @@ function activationDatabase(input: {
           can_use_sensitive_owner: false,
           can_administer_sensitive_owner: false,
           can_administer_any_role: false,
+          can_set_role_to_unexpected_role: false,
         },
       ];
     }
@@ -326,12 +331,16 @@ function activationDatabase(input: {
           can_read_full_intent: input.isConfirmationWriter,
           can_read_attempt: input.isConfirmationWriter,
           can_insert_full_intent: input.canInsertFullIntent ?? false,
+          can_insert_any_full_intent_column:
+            input.canInsertAnyFullIntentColumn ?? false,
           can_update_full_intent: input.canUpdateFullIntent ?? false,
           can_delete_full_intent: input.canDeleteFullIntent ?? false,
           can_truncate_full_intent: input.canTruncateFullIntent ?? false,
           can_update_any_full_intent_column:
             input.canUpdateAnyFullIntentColumn ?? false,
           can_insert_attempt: input.canInsertAttempt ?? false,
+          can_insert_any_attempt_column:
+            input.canInsertAnyAttemptColumn ?? false,
           can_update_attempt: input.canUpdateAttempt ?? false,
           can_delete_attempt: input.canDeleteAttempt ?? false,
           can_truncate_attempt: input.canTruncateAttempt ?? false,
