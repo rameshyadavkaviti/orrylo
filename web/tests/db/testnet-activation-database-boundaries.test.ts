@@ -126,8 +126,9 @@ if (!TEST_DATABASE_URL) {
     `;
     assert.equal(applicationCurrentSchema, "pg_catalog");
     assert.equal(writerCurrentSchema, "pg_catalog");
-    const [{ writer_can_admin_confirmation_role: writerCanAdminConfirmationRole }] =
-      await writer<{ writer_can_admin_confirmation_role: boolean }[]>`
+    const [
+      { writer_can_admin_confirmation_role: writerCanAdminConfirmationRole },
+    ] = await writer<{ writer_can_admin_confirmation_role: boolean }[]>`
         SELECT pg_catalog.pg_has_role(
           session_user,
           'orrylo_confirmation_writer',
@@ -393,8 +394,9 @@ if (!TEST_DATABASE_URL) {
         WITH ADMIN TRUE, INHERIT TRUE, SET TRUE;
     `);
 
-    const [{ can_administer_confirmation_role: canAdministerConfirmationRole }] =
-      await writer<{ can_administer_confirmation_role: boolean }[]>`
+    const [
+      { can_administer_confirmation_role: canAdministerConfirmationRole },
+    ] = await writer<{ can_administer_confirmation_role: boolean }[]>`
         SELECT pg_catalog.pg_has_role(
           session_user,
           'orrylo_confirmation_writer',
