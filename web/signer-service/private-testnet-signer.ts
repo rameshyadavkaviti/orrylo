@@ -110,14 +110,22 @@ export function createPrivateTestnetSignerRuntime(input: {
 
       signEnvelope(transaction, input.signer);
 
-      if (transaction.signatures.length !== 1) {
+      const signedEnvelopeXdr = transaction.toXDR();
+      const signedTransaction = TransactionBuilder.fromXDR(
+        signedEnvelopeXdr,
+        Networks.TESTNET,
+      );
+      if (
+        !(signedTransaction instanceof Transaction) ||
+        signedTransaction.signatures.length !== 1
+      ) {
         throw new PrivateTestnetSignerError("transaction_mismatch");
       }
 
       return {
         network: "testnet",
         signerPublicKey: issuerPublicKey,
-        signedEnvelopeXdr: transaction.toXDR(),
+        signedEnvelopeXdr,
       };
     },
   };

@@ -12,7 +12,7 @@ import {
 const ISSUER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 221)).publicKey();
 const AUTH = "c".repeat(48);
 
-const VALID_ENV = {
+const VALID_ENV: NodeJS.ProcessEnv = {
   NEXT_PUBLIC_STELLAR_NETWORK: "testnet",
   ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY: ISSUER,
   ORRYLO_TESTNET_SHARED_ISSUER_FEE_STROOPS: "100",
