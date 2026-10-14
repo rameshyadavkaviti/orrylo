@@ -216,6 +216,8 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
       attempt_constraint_validated: boolean | null;
       trusted_writer_function_security_definer: boolean;
       trusted_writer_function_search_path: string[] | null;
+      trusted_writer_trigger_count: number;
+      trusted_writer_trigger_binding: boolean;
       reachability_trigger: boolean;
       reachability_function_security_definer: boolean;
       reachability_function_search_path: string[] | null;
@@ -257,6 +259,35 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
           AND procedure.proname = 'assert_trusted_confirmation_writer'
         LIMIT 1
       ) AS trusted_writer_function_search_path,
+      (
+        SELECT count(*)::integer
+        FROM pg_catalog.pg_trigger AS trigger_row
+        WHERE trigger_row.tgname =
+            'project_issuance_confirmation_trusted_writer'
+          AND NOT trigger_row.tgisinternal
+      ) AS trusted_writer_trigger_count,
+      EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_trigger AS trigger_row
+        JOIN pg_catalog.pg_class AS relation
+          ON relation.oid = trigger_row.tgrelid
+        JOIN pg_catalog.pg_namespace AS relation_namespace
+          ON relation_namespace.oid = relation.relnamespace
+        JOIN pg_catalog.pg_proc AS procedure
+          ON procedure.oid = trigger_row.tgfoid
+        JOIN pg_catalog.pg_namespace AS procedure_namespace
+          ON procedure_namespace.oid = procedure.pronamespace
+        WHERE trigger_row.tgname =
+            'project_issuance_confirmation_trusted_writer'
+          AND NOT trigger_row.tgisinternal
+          AND trigger_row.tgenabled = 'O'
+          AND trigger_row.tgtype = 7
+          AND relation_namespace.nspname = 'public'
+          AND relation.relname =
+            'project_issuance_ledger_confirmations'
+          AND procedure_namespace.nspname = 'public'
+          AND procedure.proname = 'assert_trusted_confirmation_writer'
+      ) AS trusted_writer_trigger_binding,
       EXISTS (
         SELECT 1
         FROM pg_catalog.pg_trigger AS trigger_row
@@ -313,6 +344,8 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
     !hardening.trusted_writer_function_search_path?.includes(
       "search_path=pg_catalog, public, pg_temp",
     ) ||
+    hardening.trusted_writer_trigger_count !== 1 ||
+    !hardening.trusted_writer_trigger_binding ||
     !hardening.reachability_trigger ||
     !hardening.reachability_function_security_definer ||
     !hardening.reachability_function_search_path?.includes(
@@ -321,7 +354,7 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
     hardening.reachability_function_public_execute
   ) {
     throw new Error(
-      "Missing or unsafe MVP Lite database hardening for attempt count, trusted confirmation writing, or metadata reachability.",
+      "Missing or unsafe MVP Lite database hardening for attempt count, trusted confirmation writing/trigger binding, or metadata reachability.",
     );
   }
 }
