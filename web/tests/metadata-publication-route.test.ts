@@ -112,9 +112,7 @@ test("root-domain TOML publishes only the canonical RYLO Testnet identity", asyn
   assert.equal(response.headers.get("x-orrylo-metadata-home"), "orrylo.com");
   assert.match(
     body,
-    new RegExp(
-      `NETWORK_PASSPHRASE = "${RYLO_TESTNET_NETWORK_PASSPHRASE}"`,
-    ),
+    new RegExp(`NETWORK_PASSPHRASE = "${RYLO_TESTNET_NETWORK_PASSPHRASE}"`),
   );
   assert.match(body, new RegExp(`ACCOUNTS = \\["${RYLO_TESTNET_ISSUER}"\\]`));
   assert.match(body, new RegExp(`issuer = "${RYLO_TESTNET_ISSUER}"`));
