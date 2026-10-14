@@ -147,9 +147,19 @@ Still open:
 
 These decisions approve policy only. They do **not** authorize account creation/funding, secret generation/import/storage, signer deployment, account mutation, trustline creation, transaction signing/submission, or Mainnet action.
 
+**Owner-approved 2026-10-14 — bounded Testnet signer implementation:**
+- use a separate private Railway signer service for the first Testnet MVP issuance;
+- the signer service has no public-domain dependency and is called only through Railway private networking;
+- the web application sends only the already-authorized transaction hash and unsigned XDR through the existing `SharedIssuerSigningPrimitive` boundary;
+- the signer independently pins Testnet, verifies the exact configured non-RYLO/non-reserved Shared Issuer, recomputes the transaction hash, requires an unsigned envelope, and signs once;
+- the Stellar signer secret is scoped only to the signer service and must never enter the web application, database, browser, GitHub, logs, or chat;
+- a distinct request-authentication secret is shared only by the web application and signer service;
+- the signer has no database authority, no Horizon submission capability, and no automatic retry;
+- this approval is Testnet-only and does not authorize deployment, real secret provisioning, real signing/submission, or any Mainnet/RYLO action.
+
 **Still open / owner-gated before live activation:**
 - exact public key of the newly created Testnet Shared Issuer and evidence that the approved flags/thresholds are actually configured;
-- concrete signer custody/deployment technology and secret-handling procedure;
+- actual provisioning/deployment of the approved private Railway signer and its service-scoped secret material;
 - the actual authenticated customer wallet selected for the first issuance and its existing exact trustline readiness;
 - safe bounded activation procedure and Security approval for the real demonstration;
 - practical server-side rate limiting and abuse controls for broader public creation, without an unapproved wallet allowlist.

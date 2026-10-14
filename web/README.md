@@ -414,11 +414,13 @@ Project publication and PR #19 metadata hosting remain separate. The issuance UI
 
 ## Testnet MVP activation readiness
 
-The complete server-authoritative Testnet issuance orchestration exists, but live
-execution remains deliberately disabled until the owner approves a concrete
-signer/custody implementation. `getServerSharedIssuanceOrchestrator()` fails
-closed before preflight or attempt creation while no operational
-`SharedIssuerSigningPrimitive` is installed.
+The owner-approved bounded signer architecture is now implemented as an
+isolated private Railway Testnet signer service plus a narrow
+`SharedIssuerSigningPrimitive` HTTP adapter. Production composition still
+fails closed unless the exact Testnet issuer, fee, private signer URL,
+signer-authentication secret and dedicated confirmation-writer database
+connection are all explicitly configured. The web application never loads the
+Stellar signer seed.
 
 A repeatable read-only activation verifier is available for the account,
 trustline, fee, official-Horizon and database-role prerequisites. It never
@@ -445,8 +447,24 @@ ledger base fee and spendable issuer XLM after reserve/liabilities, and proves
 that the ordinary application identity cannot insert authoritative
 confirmations while the dedicated confirmation-writer login can.
 
-See `../docs/TESTNET_MVP_ACTIVATION_RUNBOOK.md` for the owner-gated activation
-sequence, evidence checklist, runtime inventory, and signer/custody decision.
+The private signer is built from the same package but runs as a separate
+Railway service:
+
+```sh
+npm run signer:build
+npm run signer:start
+```
+
+The web service receives only
+`ORRYLO_TESTNET_SIGNER_PRIVATE_URL` and
+`ORRYLO_TESTNET_SIGNER_REQUEST_AUTH_SECRET`. The signer service receives the
+approved issuer public key, the same request-auth secret, Railway `PORT`, and
+its service-scoped Stellar signer secret through runtime secret configuration.
+The signer has no PostgreSQL connection and no Horizon submission adapter.
+
+See `../docs/PRIVATE_RAILWAY_TESTNET_SIGNER.md` for the exact two-service
+boundary and `../docs/TESTNET_MVP_ACTIVATION_RUNBOOK.md` for the remaining
+owner-gated activation sequence.
 
 ## Remaining production gates
 
@@ -456,13 +474,12 @@ before exposing authentication broadly on public infrastructure.
 
 The reviewed Testnet code now includes canonical Shared Issuer transaction
 construction, a one-shot official-Horizon submission adapter, exact-hash
-authoritative confirmation and the server orchestration path. Those capabilities
-are **not live** because the runtime signer/custody implementation and deployment
-configuration remain owner-gated.
+authoritative confirmation and the server orchestration path. Those capabilities are **not live** because signer secret provisioning,
+Railway service deployment and the real issuance remain owner-gated.
 
 It still does not activate or implement:
 
-- a deployed Testnet signing primitive/custody service or live Shared Issuer issuance;
+- a deployed Testnet signer service or live Shared Issuer issuance;
 - Dedicated Issuer provisioning;
 - RYLO mint, burn, reward execution, eligibility activation, authorization, or
   payments;
