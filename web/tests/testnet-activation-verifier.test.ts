@@ -176,6 +176,10 @@ test("database boundary failure fails the read-only activation verifier closed",
 
 test("confirmation writer forbidden evidence write authority fails closed", async () => {
   const forbiddenPrivileges = [
+    "canUpdateConfirmation",
+    "canDeleteConfirmation",
+    "canTruncateConfirmation",
+    "canUpdateAnyConfirmationColumn",
     "canInsertFullIntent",
     "canInsertAnyFullIntentColumn",
     "canUpdateFullIntent",
@@ -282,6 +286,10 @@ function activationDatabase(input: {
   isConfirmationWriter: boolean;
   canInsertConfirmation: boolean;
   canReadConfirmation?: boolean;
+  canUpdateConfirmation?: boolean;
+  canDeleteConfirmation?: boolean;
+  canTruncateConfirmation?: boolean;
+  canUpdateAnyConfirmationColumn?: boolean;
   canInsertFullIntent?: boolean;
   canInsertAnyFullIntentColumn?: boolean;
   canUpdateFullIntent?: boolean;
@@ -328,6 +336,11 @@ function activationDatabase(input: {
           can_insert_confirmation: input.canInsertConfirmation,
           can_read_confirmation:
             input.canReadConfirmation ?? input.isConfirmationWriter,
+          can_update_confirmation: input.canUpdateConfirmation ?? false,
+          can_delete_confirmation: input.canDeleteConfirmation ?? false,
+          can_truncate_confirmation: input.canTruncateConfirmation ?? false,
+          can_update_any_confirmation_column:
+            input.canUpdateAnyConfirmationColumn ?? false,
           can_read_full_intent: input.isConfirmationWriter,
           can_read_attempt: input.isConfirmationWriter,
           can_insert_full_intent: input.canInsertFullIntent ?? false,
