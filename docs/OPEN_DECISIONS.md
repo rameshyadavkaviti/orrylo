@@ -278,10 +278,23 @@ Still open:
 
 Albedo is the initial wallet and the authentication slice is implemented.
 
+Decided:
+
+- Orrylo may support users whose Albedo public key does not yet correspond to an on-ledger Stellar account through a dedicated **Account Bootstrap** flow;
+- the approved flow is `Albedo keypair → authenticated Orrylo order → fiat on-ramp → XLM to dedicated Orrylo Account Bootstrap wallet → authoritative payment/deposit verification → exactly-once CreateAccount to the authenticated public key → authoritative ledger confirmation`;
+- the bootstrap role must remain separate from issuer, Treasury, Operations, Liquidity, and unrelated customer-fund roles;
+- Transak is the preferred current provider candidate, but is not locked until Orrylo receives formal approval for the exact merchant-wallet bootstrap use case and acceptable commercial terms;
+- this does not replace the current first Testnet MVP Lite requirement for an already funded/trustline-ready customer wallet unless separately activated.
+
 Still open:
 
 - whether v1 supports only Albedo;
-- order and scope of additional Stellar wallet integrations.
+- order and scope of additional Stellar wallet integrations;
+- final fiat/on-ramp provider selection if Transak approval or commercial terms are unsuitable;
+- Transak merchant/KYB approval for the exact XLM-to-bootstrap-wallet use case;
+- provider setup/monthly/minimum-volume/integration fees and customer transaction economics;
+- exact bootstrap-wallet custody/signing architecture, funding/reconciliation limits, refund/recovery handling, and operational controls;
+- exact production activation milestone and whether bootstrap onboarding is included in v1 or immediately after the first bounded Testnet MVP Lite issuance.
 
 ## Anti-abuse
 
