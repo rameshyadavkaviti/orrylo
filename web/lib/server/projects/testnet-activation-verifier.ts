@@ -49,6 +49,7 @@ export interface TestnetActivationDatabaseReport {
   confirmationWriterRole: string;
   applicationCanInsertConfirmation: false;
   confirmationWriterCanInsertConfirmation: true;
+  confirmationWriterCanReadConfirmation: true;
   confirmationWriterCanReadIntentAndAttempt: true;
   applicationCanSetRoleToSensitiveOwner: false;
   confirmationWriterCanSetRoleToSensitiveOwner: false;
@@ -222,14 +223,28 @@ export async function verifyTestnetActivationDatabaseBoundaries(
     );
   }
 
+  const writerHasForbiddenEvidenceWriteAuthority =
+    writer.canInsertFullIntent ||
+    writer.canUpdateFullIntent ||
+    writer.canDeleteFullIntent ||
+    writer.canTruncateFullIntent ||
+    writer.canUpdateAnyFullIntentColumn ||
+    writer.canInsertAttempt ||
+    writer.canUpdateAttempt ||
+    writer.canDeleteAttempt ||
+    writer.canTruncateAttempt ||
+    writer.canUpdateAnyAttemptColumn;
+
   if (
     !writer.canInsertConfirmation ||
+    !writer.canReadConfirmation ||
     !writer.canReadFullIntent ||
-    !writer.canReadAttempt
+    !writer.canReadAttempt ||
+    writerHasForbiddenEvidenceWriteAuthority
   ) {
     throw new TestnetActivationVerificationError(
       "database_privilege_mismatch",
-      "The dedicated confirmation writer is missing its narrow confirmation privileges.",
+      "The dedicated confirmation writer must have only its narrow confirmation INSERT/SELECT and prerequisite evidence SELECT authority, with no write authority over immutable intent or attempt evidence.",
     );
   }
 
@@ -238,6 +253,7 @@ export async function verifyTestnetActivationDatabaseBoundaries(
     confirmationWriterRole: writer.roleName,
     applicationCanInsertConfirmation: false,
     confirmationWriterCanInsertConfirmation: true,
+    confirmationWriterCanReadConfirmation: true,
     confirmationWriterCanReadIntentAndAttempt: true,
     applicationCanSetRoleToSensitiveOwner: false,
     confirmationWriterCanSetRoleToSensitiveOwner: false,
@@ -249,8 +265,19 @@ export async function verifyTestnetActivationDatabaseBoundaries(
 interface ActivationPrivileges {
   roleName: string;
   canInsertConfirmation: boolean;
+  canReadConfirmation: boolean;
   canReadFullIntent: boolean;
   canReadAttempt: boolean;
+  canInsertFullIntent: boolean;
+  canUpdateFullIntent: boolean;
+  canDeleteFullIntent: boolean;
+  canTruncateFullIntent: boolean;
+  canUpdateAnyFullIntentColumn: boolean;
+  canInsertAttempt: boolean;
+  canUpdateAttempt: boolean;
+  canDeleteAttempt: boolean;
+  canTruncateAttempt: boolean;
+  canUpdateAnyAttemptColumn: boolean;
   transactionReadOnly: boolean;
 }
 
@@ -261,8 +288,19 @@ async function readActivationPrivileges(
     {
       role_name: string;
       can_insert_confirmation: boolean;
+      can_read_confirmation: boolean;
       can_read_full_intent: boolean;
       can_read_attempt: boolean;
+      can_insert_full_intent: boolean;
+      can_update_full_intent: boolean;
+      can_delete_full_intent: boolean;
+      can_truncate_full_intent: boolean;
+      can_update_any_full_intent_column: boolean;
+      can_insert_attempt: boolean;
+      can_update_attempt: boolean;
+      can_delete_attempt: boolean;
+      can_truncate_attempt: boolean;
+      can_update_any_attempt_column: boolean;
       transaction_read_only: boolean;
     }[]
   >`
@@ -275,6 +313,11 @@ async function readActivationPrivileges(
       ) AS can_insert_confirmation,
       pg_catalog.has_table_privilege(
         current_user,
+        'public.project_issuance_ledger_confirmations',
+        'SELECT'
+      ) AS can_read_confirmation,
+      pg_catalog.has_table_privilege(
+        current_user,
         'public.project_issuance_full_intents',
         'SELECT'
       ) AS can_read_full_intent,
@@ -283,6 +326,56 @@ async function readActivationPrivileges(
         'public.project_issuance_transaction_attempts',
         'SELECT'
       ) AS can_read_attempt,
+      pg_catalog.has_table_privilege(
+        current_user,
+        'public.project_issuance_full_intents',
+        'INSERT'
+      ) AS can_insert_full_intent,
+      pg_catalog.has_table_privilege(
+        current_user,
+        'public.project_issuance_full_intents',
+        'UPDATE'
+      ) AS can_update_full_intent,
+      pg_catalog.has_table_privilege(
+        current_user,
+        'public.project_issuance_full_intents',
+        'DELETE'
+      ) AS can_delete_full_intent,
+      pg_catalog.has_table_privilege(
+        current_user,
+        'public.project_issuance_full_intents',
+        'TRUNCATE'
+      ) AS can_truncate_full_intent,
+      pg_catalog.has_any_column_privilege(
+        current_user,
+        'public.project_issuance_full_intents',
+        'UPDATE'
+      ) AS can_update_any_full_intent_column,
+      pg_catalog.has_table_privilege(
+        current_user,
+        'public.project_issuance_transaction_attempts',
+        'INSERT'
+      ) AS can_insert_attempt,
+      pg_catalog.has_table_privilege(
+        current_user,
+        'public.project_issuance_transaction_attempts',
+        'UPDATE'
+      ) AS can_update_attempt,
+      pg_catalog.has_table_privilege(
+        current_user,
+        'public.project_issuance_transaction_attempts',
+        'DELETE'
+      ) AS can_delete_attempt,
+      pg_catalog.has_table_privilege(
+        current_user,
+        'public.project_issuance_transaction_attempts',
+        'TRUNCATE'
+      ) AS can_truncate_attempt,
+      pg_catalog.has_any_column_privilege(
+        current_user,
+        'public.project_issuance_transaction_attempts',
+        'UPDATE'
+      ) AS can_update_any_attempt_column,
       current_setting('transaction_read_only') = 'on'
         AS transaction_read_only
   `;
@@ -297,8 +390,19 @@ async function readActivationPrivileges(
   return {
     roleName: row.role_name,
     canInsertConfirmation: row.can_insert_confirmation,
+    canReadConfirmation: row.can_read_confirmation,
     canReadFullIntent: row.can_read_full_intent,
     canReadAttempt: row.can_read_attempt,
+    canInsertFullIntent: row.can_insert_full_intent,
+    canUpdateFullIntent: row.can_update_full_intent,
+    canDeleteFullIntent: row.can_delete_full_intent,
+    canTruncateFullIntent: row.can_truncate_full_intent,
+    canUpdateAnyFullIntentColumn: row.can_update_any_full_intent_column,
+    canInsertAttempt: row.can_insert_attempt,
+    canUpdateAttempt: row.can_update_attempt,
+    canDeleteAttempt: row.can_delete_attempt,
+    canTruncateAttempt: row.can_truncate_attempt,
+    canUpdateAnyAttemptColumn: row.can_update_any_attempt_column,
     transactionReadOnly: row.transaction_read_only,
   };
 }
