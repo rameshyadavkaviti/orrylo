@@ -31,6 +31,8 @@ The verified RYLO Testnet issuer is:
 
 `GDNSIP2SKNJIKN6IG3XZBQMHIKKDET25J33F4R5V6DALKHIUDTVZOPKX`
 
+The approved RYLO Testnet issuer `home_domain` is `orrylo.com`. Its canonical repository-published metadata endpoint is `https://orrylo.com/.well-known/stellar.toml`. Customer Shared Issuer metadata remains separate at `assets.orrylo.com`. This policy records the approved metadata identity only; it is not evidence that the issuer account's on-chain `home_domain` has already been mutated.
+
 The previous Testnet candidate
 `GDPKHRFAGZHDJFKLBERV7IXF2XX4TGW6MYYUDGME3MIJ3HES5SGICG5H` is abandoned
 and must not be used for Testnet RYLO identity, transaction construction, or SAC
