@@ -94,9 +94,12 @@ if (!TEST_DATABASE_URL) {
         ON project_issuance_full_intents,
           project_issuance_transaction_attempts
         FROM ${WRITER_ROLE}, ${BRIDGE_ROLE}, ${HARMLESS_ROLE};
+      REVOKE INSERT
+        ON project_issuance_ledger_confirmations
+        FROM ${APP_ROLE};
       REVOKE UPDATE, DELETE, TRUNCATE
         ON project_issuance_ledger_confirmations
-        FROM ${WRITER_ROLE}, ${BRIDGE_ROLE}, ${HARMLESS_ROLE};
+        FROM ${APP_ROLE}, ${WRITER_ROLE}, ${BRIDGE_ROLE}, ${HARMLESS_ROLE};
       REVOKE INSERT (issuance_request_id)
         ON project_issuance_full_intents
         FROM ${WRITER_ROLE};
@@ -108,7 +111,7 @@ if (!TEST_DATABASE_URL) {
         FROM ${WRITER_ROLE};
       REVOKE UPDATE (result_xdr_sha256)
         ON project_issuance_ledger_confirmations
-        FROM ${WRITER_ROLE};
+        FROM ${APP_ROLE}, ${WRITER_ROLE};
     `);
   });
 
@@ -578,6 +581,78 @@ if (!TEST_DATABASE_URL) {
       verifyTestnetActivationDatabaseBoundaries(app, writer),
       IssuanceDatabaseIdentityError,
     );
+  });
+
+  test("ordinary application rejects all confirmation table writes", async (t) => {
+    for (const privilege of ["INSERT", "UPDATE", "DELETE", "TRUNCATE"] as const) {
+      await t.test(`${privilege} on confirmations fails closed`, async () => {
+        await admin.unsafe(
+          `GRANT ${privilege} ON project_issuance_ledger_confirmations TO ${APP_ROLE}`,
+        );
+        try {
+          await assert.rejects(
+            verifyTestnetActivationDatabaseBoundaries(app, writer),
+            (error: unknown) =>
+              error instanceof TestnetActivationVerificationError &&
+              error.code === "database_privilege_mismatch",
+          );
+        } finally {
+          await admin.unsafe(
+            `REVOKE ${privilege} ON project_issuance_ledger_confirmations FROM ${APP_ROLE}`,
+          );
+        }
+      });
+    }
+  });
+
+  test("ordinary application rejects column-only UPDATE on confirmation evidence", async () => {
+    await admin.unsafe(`
+      GRANT UPDATE (result_xdr_sha256)
+        ON project_issuance_ledger_confirmations
+        TO ${APP_ROLE};
+    `);
+
+    try {
+      const [
+        {
+          can_update_confirmation_table: canUpdateConfirmationTable,
+          can_update_confirmation_column: canUpdateConfirmationColumn,
+        },
+      ] = await app<
+        {
+          can_update_confirmation_table: boolean;
+          can_update_confirmation_column: boolean;
+        }[]
+      >`
+        SELECT
+          pg_catalog.has_table_privilege(
+            current_user,
+            'public.project_issuance_ledger_confirmations',
+            'UPDATE'
+          ) AS can_update_confirmation_table,
+          pg_catalog.has_column_privilege(
+            current_user,
+            'public.project_issuance_ledger_confirmations',
+            'result_xdr_sha256',
+            'UPDATE'
+          ) AS can_update_confirmation_column
+      `;
+      assert.equal(canUpdateConfirmationTable, false);
+      assert.equal(canUpdateConfirmationColumn, true);
+
+      await assert.rejects(
+        verifyTestnetActivationDatabaseBoundaries(app, writer),
+        (error: unknown) =>
+          error instanceof TestnetActivationVerificationError &&
+          error.code === "database_privilege_mismatch",
+      );
+    } finally {
+      await admin.unsafe(`
+        REVOKE UPDATE (result_xdr_sha256)
+          ON project_issuance_ledger_confirmations
+          FROM ${APP_ROLE};
+      `);
+    }
   });
 
   test("confirmation writer rejects destructive table-level confirmation privileges", async (t) => {
