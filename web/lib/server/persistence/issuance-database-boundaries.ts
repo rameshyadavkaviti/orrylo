@@ -18,6 +18,7 @@ interface DatabaseIdentityRow {
   can_use_sensitive_owner: boolean;
   can_administer_sensitive_owner: boolean;
   can_administer_any_role: boolean;
+  can_set_role_to_unexpected_role: boolean;
 }
 
 const EXPECTED_PROTECTED_TABLE_COUNT = 5;
@@ -106,10 +107,11 @@ export async function assertTrustedConfirmationWriterDatabaseIdentity(
     identity.can_set_role_to_sensitive_owner ||
     identity.can_use_sensitive_owner ||
     identity.can_administer_sensitive_owner ||
-    identity.can_administer_any_role
+    identity.can_administer_any_role ||
+    identity.can_set_role_to_unexpected_role
   ) {
     throw new IssuanceDatabaseIdentityError(
-      "The confirmation writer requires a dedicated non-owner, non-superuser identity with only trusted confirmation-writer authority, no inherited/SET ROLE authority over a sensitive owner, and no ADMIN OPTION over any role.",
+      "The confirmation writer requires a dedicated non-owner, non-superuser identity with only the expected trusted confirmation-writer SET ROLE path, no inherited/SET ROLE authority over a sensitive owner, and no ADMIN OPTION over any role.",
     );
   }
 }
@@ -237,7 +239,18 @@ async function readIdentity(
             administered_role.oid,
             'MEMBER WITH ADMIN OPTION'
           )
-      ) AS can_administer_any_role
+      ) AS can_administer_any_role,
+      EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_roles AS settable_role
+        WHERE settable_role.oid <> role.oid
+          AND settable_role.rolname <> 'orrylo_confirmation_writer'
+          AND pg_catalog.pg_has_role(
+            session_user,
+            settable_role.oid,
+            'SET'
+          )
+      ) AS can_set_role_to_unexpected_role
     FROM pg_catalog.pg_roles AS role
     WHERE role.rolname = session_user
   `;
