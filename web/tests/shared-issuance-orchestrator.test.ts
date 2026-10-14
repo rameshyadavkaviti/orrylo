@@ -18,7 +18,12 @@ import {
   SharedIssuanceOrchestrator,
   type SharedIssuanceOrchestrationStore,
 } from "../lib/server/projects/shared-issuance-orchestrator";
+import { PrivateRailwaySharedIssuerSigningPrimitive } from "../lib/stellar/private-railway-signer";
 import type { SharedIssuerSigningPrimitive } from "../lib/stellar/shared-issuer-signing-policy";
+import {
+  createPrivateTestnetSignerRuntime,
+  handlePrivateTestnetSignerRequest,
+} from "../signer-service/private-testnet-signer";
 import {
   SHARED_ISSUANCE_POLICY_VERSION,
   SHARED_ISSUER_TESTNET_PASSPHRASE,
@@ -123,24 +128,26 @@ function fixture(
     signerFails?: boolean;
     submissionUncertain?: boolean;
     confirmationMismatch?: boolean;
+    primitive?: SharedIssuerSigningPrimitive;
   } = {},
 ) {
   const store = new MemoryStore();
   const calls: string[] = [];
   let submissions = 0;
-  const primitive: SharedIssuerSigningPrimitive = {
-    async signCanonicalEnvelope(input) {
-      calls.push("sign");
-      if (options.signerFails) throw new Error("signer unavailable");
-      const transaction = TransactionBuilder.fromXDR(
-        input.unsignedEnvelopeXdr,
-        Networks.TESTNET,
-      );
-      assert.ok(transaction instanceof Transaction);
-      transaction.sign(ISSUER_KEYPAIR);
-      return { signedEnvelopeXdr: transaction.toXDR() };
-    },
-  };
+  const primitive: SharedIssuerSigningPrimitive =
+    options.primitive ?? {
+      async signCanonicalEnvelope(input) {
+        calls.push("sign");
+        if (options.signerFails) throw new Error("signer unavailable");
+        const transaction = TransactionBuilder.fromXDR(
+          input.unsignedEnvelopeXdr,
+          Networks.TESTNET,
+        );
+        assert.ok(transaction instanceof Transaction);
+        transaction.sign(ISSUER_KEYPAIR);
+        return { signedEnvelopeXdr: transaction.toXDR() };
+      },
+    };
   const orchestrator = new SharedIssuanceOrchestrator({
     store,
     preflight: {
@@ -257,6 +264,68 @@ test("successful mocked path preserves the required order and returns durable co
     fx.store.confirmation?.transactionHash,
     fx.store.attempts[0]!.transactionHash,
   );
+});
+
+test("private Railway primitive reaches the existing one-shot issuance path", async () => {
+  const requestAuthSecret = "d".repeat(48);
+  const signerRuntime = createPrivateTestnetSignerRuntime({
+    issuerPublicKey: ISSUER,
+    requestAuthSecret,
+    signer: ISSUER_KEYPAIR,
+  });
+  const primitive = new PrivateRailwaySharedIssuerSigningPrimitive(
+    {
+      privateBaseUrl:
+        "http://orrylo-testnet-signer.railway.internal:8080",
+      requestAuthSecret,
+      issuerPublicKey: ISSUER,
+    },
+    (async (input, init) => {
+      const request = new Request(input, init);
+      const result = await handlePrivateTestnetSignerRequest(
+        {
+          method: request.method,
+          path: new URL(request.url).pathname,
+          authorization: request.headers.get("authorization"),
+          readBody: () => request.text(),
+        },
+        signerRuntime,
+      );
+      return Response.json(result.body, { status: result.status });
+    }) as typeof fetch,
+  );
+
+  const fx = fixture({ primitive });
+  const result = await fx.orchestrator.startOrResume(input);
+
+  assert.equal(result.status, "confirmed");
+  assert.equal(fx.submissions(), 1);
+  assert.equal(fx.store.attempts.length, 1);
+  assert.equal(fx.store.attempts[0]!.attemptNumber, 1);
+});
+
+test("private Railway signer failure causes zero submissions", async () => {
+  let signerCalls = 0;
+  const primitive = new PrivateRailwaySharedIssuerSigningPrimitive(
+    {
+      privateBaseUrl:
+        "http://orrylo-testnet-signer.railway.internal:8080",
+      requestAuthSecret: "e".repeat(48),
+      issuerPublicKey: ISSUER,
+    },
+    (async () => {
+      signerCalls += 1;
+      return new Response(null, { status: 503 });
+    }) as typeof fetch,
+  );
+
+  const fx = fixture({ primitive });
+  const result = await fx.orchestrator.startOrResume(input);
+
+  assert.equal(result.status, "failed_before_submission");
+  assert.equal(signerCalls, 1);
+  assert.equal(fx.submissions(), 0);
+  assert.equal(fx.store.attempts.length, 1);
 });
 
 test("wrong owner fails before preflight and signing", async () => {
