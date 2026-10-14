@@ -15,6 +15,7 @@ import {
 } from "../../stellar/official-testnet-horizon";
 import { createSharedIssuerMvpLiteSignerAuthorization } from "../../stellar/shared-issuer-signing-policy";
 import type { SharedIssuerSigningPrimitive } from "../../stellar/shared-issuer-signing-policy";
+import { PrivateRailwaySharedIssuerSigningPrimitive } from "../../stellar/private-railway-signer";
 import { OfficialStellarTestnetIssuancePreflightReader } from "../../stellar/shared-issuer-testnet-preflight";
 import { AuthoritativeSharedIssuanceConfirmationValidator } from "../../stellar/testnet-ledger-confirmation";
 import type { DatabaseClient } from "../persistence/database";
@@ -78,12 +79,98 @@ export async function createServerSharedIssuanceOrchestrator(input: {
   });
 }
 
+export interface SharedIssuanceRuntimeConfig {
+  issuerPublicKey: string;
+  feeStroops: string;
+  signerPrivateUrl: string;
+  signerRequestAuthSecret: string;
+  confirmationWriterDatabaseUrl: string;
+}
+
+let serverOrchestrator: Promise<SharedIssuanceOrchestrator> | null = null;
+
+export function readSharedIssuanceRuntimeConfig(
+  env: NodeJS.ProcessEnv = process.env,
+): SharedIssuanceRuntimeConfig {
+  if (env.NEXT_PUBLIC_STELLAR_NETWORK?.trim() !== "testnet") {
+    throw unavailable("NEXT_PUBLIC_STELLAR_NETWORK must be testnet.");
+  }
+
+  const config = {
+    issuerPublicKey: required(
+      env,
+      "ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY",
+    ),
+    feeStroops: required(
+      env,
+      "ORRYLO_TESTNET_SHARED_ISSUER_FEE_STROOPS",
+    ),
+    signerPrivateUrl: required(
+      env,
+      "ORRYLO_TESTNET_SIGNER_PRIVATE_URL",
+    ),
+    signerRequestAuthSecret: required(
+      env,
+      "ORRYLO_TESTNET_SIGNER_REQUEST_AUTH_SECRET",
+    ),
+    confirmationWriterDatabaseUrl: required(
+      env,
+      "ORRYLO_CONFIRMATION_WRITER_DATABASE_URL",
+    ),
+  };
+
+  if (!/^[1-9][0-9]*$/.test(config.feeStroops)) {
+    throw unavailable("Configured Shared Issuer fee is invalid.");
+  }
+
+  createSharedIssuanceRuntimeSigningPrimitive(config);
+  return config;
+}
+
+export function createSharedIssuanceRuntimeSigningPrimitive(
+  config: SharedIssuanceRuntimeConfig,
+  fetchImpl: typeof fetch = globalThis.fetch,
+): SharedIssuerSigningPrimitive {
+  try {
+    return new PrivateRailwaySharedIssuerSigningPrimitive(
+      {
+        privateBaseUrl: config.signerPrivateUrl,
+        requestAuthSecret: config.signerRequestAuthSecret,
+        issuerPublicKey: config.issuerPublicKey,
+      },
+      fetchImpl,
+    );
+  } catch {
+    throw unavailable("Private Testnet signer configuration is invalid.");
+  }
+}
+
 /**
- * Deliberately unavailable until the reviewed operational signer supplies the
- * injected secretless primitive. Fails before preflight or attempt creation.
+ * Production composition for the owner-approved bounded private Railway Testnet
+ * signer. Missing or invalid activation inputs fail before preflight or attempt
+ * creation. The web process receives no Stellar signing seed.
  */
 export async function getServerSharedIssuanceOrchestrator(): Promise<SharedIssuanceOrchestrator> {
-  throw new SharedIssuanceRuntimeUnavailableError(
-    "The reviewed Shared Issuer signing primitive is not installed.",
-  );
+  if (!serverOrchestrator) {
+    const config = readSharedIssuanceRuntimeConfig();
+    const primitive = createSharedIssuanceRuntimeSigningPrimitive(config);
+    serverOrchestrator = createServerSharedIssuanceOrchestrator({
+      primitive,
+      issuerPublicKey: config.issuerPublicKey,
+      feeStroops: config.feeStroops,
+      confirmationWriterDatabaseUrl: config.confirmationWriterDatabaseUrl,
+    });
+  }
+
+  return serverOrchestrator;
+}
+
+function required(env: NodeJS.ProcessEnv, name: string): string {
+  const value = env[name]?.trim();
+  if (!value) throw unavailable(`${name} is required.`);
+  return value;
+}
+
+function unavailable(message: string): SharedIssuanceRuntimeUnavailableError {
+  return new SharedIssuanceRuntimeUnavailableError(message);
 }

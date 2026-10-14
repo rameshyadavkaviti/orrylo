@@ -28,3 +28,13 @@ export function isKnownRyloIssuerPublicKey(publicKey: string): boolean {
     (knownIssuer) => knownIssuer === normalized,
   );
 }
+
+export function isForbiddenTestnetSharedIssuerPublicKey(
+  publicKey: string,
+): boolean {
+  const normalized = publicKey.trim().toUpperCase();
+  return (
+    normalized === SHARED_ISSUER_CANDIDATE ||
+    isKnownRyloIssuerPublicKey(normalized)
+  );
+}
