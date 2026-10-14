@@ -462,6 +462,8 @@ A separate marketing/application split may be introduced later if it becomes ope
 
 Shared assets continue to use the shared issuer home domain. Dedicated issuers may use per-project metadata domains and later custom domains according to the dedicated-issuer architecture. Public landing-page hosting and metadata hosting remain separate concerns even if a future domain happens to serve both roles.
 
+RYLO is explicitly separate from Shared Issuer metadata hosting. The approved RYLO **Testnet** issuer `home_domain` is `orrylo.com`, with canonical metadata at `https://orrylo.com/.well-known/stellar.toml`. The root-domain Testnet metadata identifies only the verified RYLO Testnet issuer and must not publish the abandoned Testnet issuer or reserved Mainnet candidate as its currency issuer. The deterministic Testnet SAC remains identity/provenance information only and must not be represented as deployed without independent Testnet RPC evidence. Customer Shared Issuer metadata remains at `assets.orrylo.com` and must not be merged into the RYLO root-domain publication.
+
 ### 15.1 Managed Stellar metadata
 
 High-quality Stellar metadata publication is a first-class Orrylo product capability.
