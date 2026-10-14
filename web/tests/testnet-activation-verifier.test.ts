@@ -177,10 +177,12 @@ test("database boundary failure fails the read-only activation verifier closed",
 test("ordinary application confirmation write authority fails closed", async () => {
   const forbiddenPrivileges = [
     "canInsertConfirmation",
+    "canInsertAnyConfirmationColumn",
     "canUpdateConfirmation",
     "canDeleteConfirmation",
     "canTruncateConfirmation",
     "canUpdateAnyConfirmationColumn",
+    "canSetRoleToForbiddenConfirmationAuthority",
   ] as const;
 
   for (const forbiddenPrivilege of forbiddenPrivileges) {
@@ -322,11 +324,13 @@ function activationDatabase(input: {
   roleName: string;
   isConfirmationWriter: boolean;
   canInsertConfirmation: boolean;
+  canInsertAnyConfirmationColumn?: boolean;
   canReadConfirmation?: boolean;
   canUpdateConfirmation?: boolean;
   canDeleteConfirmation?: boolean;
   canTruncateConfirmation?: boolean;
   canUpdateAnyConfirmationColumn?: boolean;
+  canSetRoleToForbiddenConfirmationAuthority?: boolean;
   canInsertFullIntent?: boolean;
   canInsertAnyFullIntentColumn?: boolean;
   canUpdateFullIntent?: boolean;
@@ -371,6 +375,8 @@ function activationDatabase(input: {
         {
           role_name: input.roleName,
           can_insert_confirmation: input.canInsertConfirmation,
+          can_insert_any_confirmation_column:
+            input.canInsertAnyConfirmationColumn ?? false,
           can_read_confirmation:
             input.canReadConfirmation ?? input.isConfirmationWriter,
           can_update_confirmation: input.canUpdateConfirmation ?? false,
@@ -378,6 +384,8 @@ function activationDatabase(input: {
           can_truncate_confirmation: input.canTruncateConfirmation ?? false,
           can_update_any_confirmation_column:
             input.canUpdateAnyConfirmationColumn ?? false,
+          can_set_role_to_forbidden_confirmation_authority:
+            input.canSetRoleToForbiddenConfirmationAuthority ?? false,
           can_read_full_intent: input.isConfirmationWriter,
           can_read_attempt: input.isConfirmationWriter,
           can_insert_full_intent: input.canInsertFullIntent ?? false,
