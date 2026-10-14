@@ -1,7 +1,9 @@
+import type postgres from "postgres";
+
 import type { DatabaseClient } from "../persistence/database";
 import {
-  SharedIssuanceApplicationDatabaseBoundary,
-  TrustedConfirmationWriterDatabaseBoundary,
+  assertSharedIssuanceApplicationDatabaseIdentity,
+  assertTrustedConfirmationWriterDatabaseIdentity,
 } from "../persistence/issuance-database-boundaries";
 import {
   KNOWN_RYLO_ISSUER_PUBLIC_KEYS,
@@ -48,6 +50,10 @@ export interface TestnetActivationDatabaseReport {
   applicationCanInsertConfirmation: false;
   confirmationWriterCanInsertConfirmation: true;
   confirmationWriterCanReadIntentAndAttempt: true;
+  applicationCanSetRoleToSensitiveOwner: false;
+  confirmationWriterCanSetRoleToSensitiveOwner: false;
+  applicationReadOnlyTransactionVerified: true;
+  confirmationWriterReadOnlyTransactionVerified: true;
 }
 
 export interface TestnetActivationVerificationReport {
@@ -187,15 +193,27 @@ export async function verifyTestnetActivationDatabaseBoundaries(
   applicationDatabase: DatabaseClient,
   confirmationWriterDatabase: DatabaseClient,
 ): Promise<TestnetActivationDatabaseReport> {
-  await SharedIssuanceApplicationDatabaseBoundary.authorize(
-    applicationDatabase,
+  const application = await applicationDatabase.begin(
+    "read only",
+    async (transaction) => {
+      await assertSharedIssuanceApplicationDatabaseIdentity(transaction);
+      return readActivationPrivileges(transaction);
+    },
   );
-  await TrustedConfirmationWriterDatabaseBoundary.authorize(
-    confirmationWriterDatabase,
+  const writer = await confirmationWriterDatabase.begin(
+    "read only",
+    async (transaction) => {
+      await assertTrustedConfirmationWriterDatabaseIdentity(transaction);
+      return readActivationPrivileges(transaction);
+    },
   );
 
-  const application = await readActivationPrivileges(applicationDatabase);
-  const writer = await readActivationPrivileges(confirmationWriterDatabase);
+  if (!application.transactionReadOnly || !writer.transactionReadOnly) {
+    throw new TestnetActivationVerificationError(
+      "database_privilege_mismatch",
+      "Database activation inspection must run inside PostgreSQL READ ONLY transactions.",
+    );
+  }
 
   if (application.canInsertConfirmation) {
     throw new TestnetActivationVerificationError(
@@ -221,6 +239,10 @@ export async function verifyTestnetActivationDatabaseBoundaries(
     applicationCanInsertConfirmation: false,
     confirmationWriterCanInsertConfirmation: true,
     confirmationWriterCanReadIntentAndAttempt: true,
+    applicationCanSetRoleToSensitiveOwner: false,
+    confirmationWriterCanSetRoleToSensitiveOwner: false,
+    applicationReadOnlyTransactionVerified: true,
+    confirmationWriterReadOnlyTransactionVerified: true,
   };
 }
 
@@ -229,10 +251,11 @@ interface ActivationPrivileges {
   canInsertConfirmation: boolean;
   canReadFullIntent: boolean;
   canReadAttempt: boolean;
+  transactionReadOnly: boolean;
 }
 
 async function readActivationPrivileges(
-  sql: DatabaseClient,
+  sql: postgres.TransactionSql,
 ): Promise<ActivationPrivileges> {
   const [row] = await sql<
     {
@@ -240,6 +263,7 @@ async function readActivationPrivileges(
       can_insert_confirmation: boolean;
       can_read_full_intent: boolean;
       can_read_attempt: boolean;
+      transaction_read_only: boolean;
     }[]
   >`
     SELECT
@@ -258,7 +282,9 @@ async function readActivationPrivileges(
         current_user,
         'public.project_issuance_transaction_attempts',
         'SELECT'
-      ) AS can_read_attempt
+      ) AS can_read_attempt,
+      current_setting('transaction_read_only') = 'on'
+        AS transaction_read_only
   `;
 
   if (!row) {
@@ -273,6 +299,7 @@ async function readActivationPrivileges(
     canInsertConfirmation: row.can_insert_confirmation,
     canReadFullIntent: row.can_read_full_intent,
     canReadAttempt: row.can_read_attempt,
+    transactionReadOnly: row.transaction_read_only,
   };
 }
 

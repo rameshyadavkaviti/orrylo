@@ -9,9 +9,11 @@ import {
 } from "../lib/product/constants";
 import {
   TestnetActivationVerificationError,
+  verifyTestnetActivationDatabaseBoundaries,
   verifyTestnetActivationReadiness,
   type TestnetActivationDatabaseReport,
 } from "../lib/server/projects/testnet-activation-verifier";
+import type { DatabaseClient } from "../lib/server/persistence/database";
 import { SHARED_ISSUER_TESTNET_PASSPHRASE } from "../lib/stellar/shared-issuer-issuance";
 import type { SharedIssuerTestnetPreflightResult } from "../lib/stellar/shared-issuer-testnet-preflight";
 
@@ -26,6 +28,10 @@ const DATABASE_REPORT: TestnetActivationDatabaseReport = {
   applicationCanInsertConfirmation: false,
   confirmationWriterCanInsertConfirmation: true,
   confirmationWriterCanReadIntentAndAttempt: true,
+  applicationCanSetRoleToSensitiveOwner: false,
+  confirmationWriterCanSetRoleToSensitiveOwner: false,
+  applicationReadOnlyTransactionVerified: true,
+  confirmationWriterReadOnlyTransactionVerified: true,
 };
 
 function preflight(
@@ -166,3 +172,85 @@ test("database boundary failure fails the read-only activation verifier closed",
   );
   assert.equal(databaseCalls, 1);
 });
+
+test("database boundary inspection requires PostgreSQL to confirm READ ONLY transactions", async () => {
+  const application = activationDatabase({
+    roleName: "orrylo_app",
+    isConfirmationWriter: false,
+    canInsertConfirmation: false,
+    transactionReadOnly: false,
+  });
+  const writer = activationDatabase({
+    roleName: "orrylo_confirmation_login",
+    isConfirmationWriter: true,
+    canInsertConfirmation: true,
+    transactionReadOnly: true,
+  });
+
+  await assert.rejects(
+    verifyTestnetActivationDatabaseBoundaries(
+      application.database,
+      writer.database,
+    ),
+    (error: unknown) =>
+      error instanceof TestnetActivationVerificationError &&
+      error.code === "database_privilege_mismatch" &&
+      /READ ONLY/.test(error.message),
+  );
+  assert.deepEqual(application.transactionModes, ["read only"]);
+  assert.deepEqual(writer.transactionModes, ["read only"]);
+  assert.ok(
+    [...application.queries, ...writer.queries].every((query) =>
+      /^(?:WITH|SELECT)\b/.test(query),
+    ),
+  );
+});
+
+function activationDatabase(input: {
+  roleName: string;
+  isConfirmationWriter: boolean;
+  canInsertConfirmation: boolean;
+  transactionReadOnly: boolean;
+}) {
+  const transactionModes: string[] = [];
+  const queries: string[] = [];
+  const transaction = async (template: TemplateStringsArray) => {
+    const query = template.join("?").replace(/\s+/g, " ").trim();
+    queries.push(query);
+    if (query.startsWith("WITH sensitive_roles")) {
+      return [
+        {
+          role_name: input.roleName,
+          is_superuser: false,
+          is_confirmation_writer: input.isConfirmationWriter,
+          owns_sensitive_schema: false,
+          owns_sensitive_table: false,
+          owns_sensitive_function: false,
+          can_set_role_to_sensitive_owner: false,
+        },
+      ];
+    }
+    if (query.startsWith("SELECT")) {
+      return [
+        {
+          role_name: input.roleName,
+          can_insert_confirmation: input.canInsertConfirmation,
+          can_read_full_intent: input.isConfirmationWriter,
+          can_read_attempt: input.isConfirmationWriter,
+          transaction_read_only: input.transactionReadOnly,
+        },
+      ];
+    }
+    throw new Error(`Unexpected database inspection query: ${query}`);
+  };
+  const database = {
+    async begin(
+      mode: string,
+      callback: (sql: typeof transaction) => Promise<unknown>,
+    ) {
+      transactionModes.push(mode);
+      return callback(transaction);
+    },
+  } as unknown as DatabaseClient;
+  return { database, transactionModes, queries };
+}

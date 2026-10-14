@@ -18,9 +18,9 @@ transaction signing/submission, or Mainnet activity.
 | Official Horizon authority                                     | Implemented / ready                                                                                     | Server issuance reader, preflight and submission adapter are pinned to `https://horizon-testnet.stellar.org`; not caller-overridable.                                                                                                                                                                           |
 | `NEXT_PUBLIC_STELLAR_HORIZON_URL`                              | Implemented public presentation config                                                                  | If explicitly set for the activation deployment, keep it at the same official Testnet Horizon URL. The authoritative server reader does not trust this browser value.                                                                                                                                           |
 | `ORRYLO_AUTH_DOMAIN`                                           | Implemented / operational config required                                                               | Exact deployed hostname; production fails if absent.                                                                                                                                                                                                                                                            |
-| `DATABASE_URL`                                                 | Implemented / operational config required                                                               | Dedicated ordinary application login. It must not be superuser, schema/sensitive-table owner, or member of `orrylo_confirmation_writer`.                                                                                                                                                                        |
+| `DATABASE_URL`                                                 | Implemented / operational config required                                                               | Dedicated ordinary application login. It must not be superuser, schema/sensitive-object owner, or member of `orrylo_confirmation_writer`, and it must have no direct or nested `SET ROLE` path to a protected schema/table/function owner or superuser.                                                         |
 | `MIGRATION_DATABASE_URL`                                       | Implemented / setup-only                                                                                | Schema-owner login. `npm run db:migrate` and `npm run db:verify` are mutating / migration-capable and require explicit authorization. `npm run db:verify:read-only` uses this credential only inside a PostgreSQL `READ ONLY` transaction. Never use it as application or confirmation-writer runtime identity. |
-| `ORRYLO_CONFIRMATION_WRITER_DATABASE_URL`                      | Verifier config added by this package; runtime composition already accepts a separate writer connection | Dedicated LOGIN member of the NOLOGIN `orrylo_confirmation_writer` role; non-superuser and non-owner. Final signer/runtime wiring must pass this connection to `createServerSharedIssuanceOrchestrator`.                                                                                                        |
+| `ORRYLO_CONFIRMATION_WRITER_DATABASE_URL`                      | Verifier config added by this package; runtime composition already accepts a separate writer connection | Dedicated LOGIN member of the NOLOGIN `orrylo_confirmation_writer` role; non-superuser and non-owner, with no direct or nested `SET ROLE` path to a protected schema/table/function owner or superuser. Final signer/runtime wiring must pass this connection to `createServerSharedIssuanceOrchestrator`.      |
 | `ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY`             | Reservation/immutable-intent path already consumes it                                                   | Owner must supply the public key of one newly generated random Testnet Shared Issuer. Never use RYLO or silently use `GBR7...ASSETS`.                                                                                                                                                                           |
 | `ORRYLO_TESTNET_SHARED_ISSUER_FEE_STROOPS`                     | Read-only verifier config; orchestrator already accepts `feeStroops` as an injected runtime value       | Operational value must be a positive integer and at least the stable observed Testnet base fee. No arbitrary extra fee policy is introduced here.                                                                                                                                                               |
 | Shared Issuer account state                                    | Code exists / live configuration missing                                                                | Account must exist on Testnet with AUTH_REQUIRED/OFF, AUTH_REVOCABLE/OFF, AUTH_CLAWBACK/OFF, AUTH_IMMUTABLE/OFF, Master weight 1, thresholds 1/1/1 and exactly the expected Master signer.                                                                                                                      |
@@ -169,7 +169,11 @@ that checkpoint's base fee; the issuer is neither known RYLO nor the reserved
 Shared Issuer candidate; the exact customer account and trustline exist; the
 trustline is authorized/usable and can receive the entire amount; and the
 application/confirmation database identities satisfy the split-authority
-boundary.
+boundary. Both database identities are inspected inside explicit PostgreSQL
+`READ ONLY` transactions. Catalog-derived protected schema/table/function
+owners and superusers must be unreachable through PostgreSQL `SET ROLE`,
+including indirect paths whose every membership edge has `SET TRUE`;
+`NOINHERIT` does not make such a path safe.
 
 It deliberately does **not** request a signature or test the signer service.
 
@@ -223,7 +227,10 @@ flow without live mutation:
 This readiness package adds deterministic tests for the read-only activation
 verifier itself: valid non-RYLO readiness, all known RYLO identities, reserved
 Shared Issuer candidate, missing/capacity-insufficient trustline and database
-boundary failure.
+boundary failure. PostgreSQL regressions additionally cover the normal
+application login, bounded confirmation writer, harmless memberships, direct
+`NOINHERIT` + `SET TRUE` owner escalation, writer escalation, nested `SET TRUE`
+owner escalation, and database-enforced read-only inspection.
 
 ## 6. Residual classification
 
