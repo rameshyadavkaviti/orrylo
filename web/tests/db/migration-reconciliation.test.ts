@@ -7,6 +7,7 @@ import { after, beforeEach, test } from "node:test";
 
 import { createDatabaseClient } from "../../lib/server/persistence/database";
 import { migrateDatabase } from "../../lib/server/persistence/migrations";
+import { verifyDatabaseSchemaReadOnly } from "../../lib/server/persistence/schema-verification";
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL?.trim();
 
@@ -80,6 +81,74 @@ if (!TEST_DATABASE_URL) {
     assert.deepEqual(again.applied, []);
     assert.deepEqual(again.reconciled, []);
     assert.deepEqual(again.verified, ALL_MIGRATIONS);
+  });
+
+  test("read-only schema verification accepts the exact trusted confirmation trigger binding", async () => {
+    await migrateDatabase(sql, directory);
+
+    await assert.doesNotReject(
+      verifyDatabaseSchemaReadOnly(sql, directory),
+    );
+  });
+
+  test("read-only schema verification rejects a missing trusted confirmation trigger", async () => {
+    await migrateDatabase(sql, directory);
+    await sql.unsafe(`
+      DROP TRIGGER project_issuance_confirmation_trusted_writer
+        ON public.project_issuance_ledger_confirmations;
+    `);
+
+    await assert.rejects(
+      verifyDatabaseSchemaReadOnly(sql, directory),
+      /trusted confirmation writing\/trigger binding/,
+    );
+  });
+
+  test("read-only schema verification rejects a disabled trusted confirmation trigger", async () => {
+    await migrateDatabase(sql, directory);
+    await sql.unsafe(`
+      ALTER TABLE public.project_issuance_ledger_confirmations
+        DISABLE TRIGGER project_issuance_confirmation_trusted_writer;
+    `);
+
+    await assert.rejects(
+      verifyDatabaseSchemaReadOnly(sql, directory),
+      /trusted confirmation writing\/trigger binding/,
+    );
+  });
+
+  test("read-only schema verification rejects trusted-writer trigger binding to the wrong table", async () => {
+    await migrateDatabase(sql, directory);
+    await sql.unsafe(`
+      DROP TRIGGER project_issuance_confirmation_trusted_writer
+        ON public.project_issuance_ledger_confirmations;
+      CREATE TRIGGER project_issuance_confirmation_trusted_writer
+        BEFORE INSERT ON public.project_issuance_full_intents
+        FOR EACH ROW
+        EXECUTE FUNCTION public.assert_trusted_confirmation_writer();
+    `);
+
+    await assert.rejects(
+      verifyDatabaseSchemaReadOnly(sql, directory),
+      /trusted confirmation writing\/trigger binding/,
+    );
+  });
+
+  test("read-only schema verification rejects trusted-writer trigger binding to the wrong function", async () => {
+    await migrateDatabase(sql, directory);
+    await sql.unsafe(`
+      DROP TRIGGER project_issuance_confirmation_trusted_writer
+        ON public.project_issuance_ledger_confirmations;
+      CREATE TRIGGER project_issuance_confirmation_trusted_writer
+        BEFORE INSERT ON public.project_issuance_ledger_confirmations
+        FOR EACH ROW
+        EXECUTE FUNCTION public.prevent_issuance_evidence_mutation();
+    `);
+
+    await assert.rejects(
+      verifyDatabaseSchemaReadOnly(sql, directory),
+      /trusted confirmation writing\/trigger binding/,
+    );
   });
 
   test("existing 001-005 database upgrades with 006-010 without rewriting earlier checksums or project rows", async () => {
