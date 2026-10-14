@@ -21,6 +21,7 @@ interface IdentityFixture {
   can_set_role_to_sensitive_owner: boolean;
   can_use_sensitive_owner: boolean;
   can_administer_sensitive_owner: boolean;
+  can_administer_any_role: boolean;
 }
 
 function identityDatabase(
@@ -39,6 +40,7 @@ function identityDatabase(
     can_set_role_to_sensitive_owner: false,
     can_use_sensitive_owner: false,
     can_administer_sensitive_owner: false,
+    can_administer_any_role: false,
     ...overrides,
   };
   const sql = async () => [identity];
@@ -92,6 +94,28 @@ test("confirmation writer rejects administrable sensitive-owner membership", asy
         role_name: "orrylo_confirmation_login",
         is_confirmation_writer: true,
         can_administer_sensitive_owner: true,
+      }),
+    ),
+    IssuanceDatabaseIdentityError,
+  );
+});
+
+test("application identity rejects ADMIN OPTION over any role", async () => {
+  await assert.rejects(
+    SharedIssuanceApplicationDatabaseBoundary.authorize(
+      identityDatabase({ can_administer_any_role: true }),
+    ),
+    IssuanceDatabaseIdentityError,
+  );
+});
+
+test("confirmation writer rejects ADMIN OPTION over any role", async () => {
+  await assert.rejects(
+    TrustedConfirmationWriterDatabaseBoundary.authorize(
+      identityDatabase({
+        role_name: "orrylo_confirmation_login",
+        is_confirmation_writer: true,
+        can_administer_any_role: true,
       }),
     ),
     IssuanceDatabaseIdentityError,
