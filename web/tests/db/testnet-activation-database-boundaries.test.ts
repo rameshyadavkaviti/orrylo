@@ -87,6 +87,8 @@ if (!TEST_DATABASE_URL) {
       REVOKE ${SCHEMA_OWNER_ROLE} FROM ${APP_ROLE}, ${WRITER_ROLE}, ${BRIDGE_ROLE};
       REVOKE ${BRIDGE_ROLE} FROM ${APP_ROLE}, ${WRITER_ROLE};
       REVOKE ${HARMLESS_ROLE} FROM ${WRITER_ROLE}, ${BRIDGE_ROLE};
+      GRANT ${HARMLESS_ROLE} TO ${APP_ROLE}
+        WITH ADMIN FALSE, INHERIT FALSE, SET TRUE;
       REVOKE ADMIN OPTION FOR orrylo_confirmation_writer FROM ${WRITER_ROLE};
       GRANT orrylo_confirmation_writer TO ${WRITER_ROLE}
         WITH ADMIN FALSE, INHERIT TRUE, SET TRUE;
@@ -96,7 +98,7 @@ if (!TEST_DATABASE_URL) {
         FROM ${WRITER_ROLE}, ${BRIDGE_ROLE}, ${HARMLESS_ROLE};
       REVOKE INSERT
         ON project_issuance_ledger_confirmations
-        FROM ${APP_ROLE};
+        FROM ${APP_ROLE}, ${BRIDGE_ROLE}, ${HARMLESS_ROLE};
       REVOKE UPDATE, DELETE, TRUNCATE
         ON project_issuance_ledger_confirmations
         FROM ${APP_ROLE}, ${WRITER_ROLE}, ${BRIDGE_ROLE}, ${HARMLESS_ROLE};
@@ -109,6 +111,9 @@ if (!TEST_DATABASE_URL) {
       REVOKE UPDATE (signed_envelope_xdr_sha256)
         ON project_issuance_transaction_attempts
         FROM ${WRITER_ROLE};
+      REVOKE INSERT (result_xdr_sha256)
+        ON project_issuance_ledger_confirmations
+        FROM ${APP_ROLE}, ${BRIDGE_ROLE}, ${HARMLESS_ROLE};
       REVOKE UPDATE (result_xdr_sha256)
         ON project_issuance_ledger_confirmations
         FROM ${APP_ROLE}, ${WRITER_ROLE};
@@ -581,6 +586,248 @@ if (!TEST_DATABASE_URL) {
       verifyTestnetActivationDatabaseBoundaries(app, writer),
       IssuanceDatabaseIdentityError,
     );
+  });
+
+  test("ordinary application rejects column-only INSERT on confirmation evidence", async () => {
+    await admin.unsafe(`
+      GRANT INSERT (result_xdr_sha256)
+        ON project_issuance_ledger_confirmations
+        TO ${APP_ROLE};
+    `);
+
+    try {
+      const [
+        {
+          can_insert_confirmation_table: canInsertConfirmationTable,
+          can_insert_confirmation_column: canInsertConfirmationColumn,
+        },
+      ] = await app<
+        {
+          can_insert_confirmation_table: boolean;
+          can_insert_confirmation_column: boolean;
+        }[]
+      >`
+        SELECT
+          pg_catalog.has_table_privilege(
+            current_user,
+            'public.project_issuance_ledger_confirmations',
+            'INSERT'
+          ) AS can_insert_confirmation_table,
+          pg_catalog.has_column_privilege(
+            current_user,
+            'public.project_issuance_ledger_confirmations',
+            'result_xdr_sha256',
+            'INSERT'
+          ) AS can_insert_confirmation_column
+      `;
+      assert.equal(canInsertConfirmationTable, false);
+      assert.equal(canInsertConfirmationColumn, true);
+
+      await assert.rejects(
+        verifyTestnetActivationDatabaseBoundaries(app, writer),
+        (error: unknown) =>
+          error instanceof TestnetActivationVerificationError &&
+          error.code === "database_privilege_mismatch",
+      );
+    } finally {
+      await admin.unsafe(`
+        REVOKE INSERT (result_xdr_sha256)
+          ON project_issuance_ledger_confirmations
+          FROM ${APP_ROLE};
+      `);
+    }
+  });
+
+  test("ordinary application rejects SET-reachable helper confirmation INSERT while current app INSERT remains false", async () => {
+    await admin.unsafe(`
+      GRANT INSERT ON project_issuance_ledger_confirmations
+        TO ${HARMLESS_ROLE};
+    `);
+
+    try {
+      const [
+        {
+          app_can_insert_confirmation: appCanInsertConfirmation,
+          helper_can_insert_confirmation: helperCanInsertConfirmation,
+          app_can_set_helper: appCanSetHelper,
+        },
+      ] = await app<
+        {
+          app_can_insert_confirmation: boolean;
+          helper_can_insert_confirmation: boolean;
+          app_can_set_helper: boolean;
+        }[]
+      >`
+        SELECT
+          pg_catalog.has_table_privilege(
+            current_user,
+            'public.project_issuance_ledger_confirmations',
+            'INSERT'
+          ) AS app_can_insert_confirmation,
+          pg_catalog.has_table_privilege(
+            ${HARMLESS_ROLE},
+            'public.project_issuance_ledger_confirmations',
+            'INSERT'
+          ) AS helper_can_insert_confirmation,
+          pg_catalog.pg_has_role(
+            session_user,
+            ${HARMLESS_ROLE},
+            'SET'
+          ) AS app_can_set_helper
+      `;
+      assert.deepEqual(
+        {
+          appCanInsertConfirmation,
+          helperCanInsertConfirmation,
+          appCanSetHelper,
+        },
+        {
+          appCanInsertConfirmation: false,
+          helperCanInsertConfirmation: true,
+          appCanSetHelper: true,
+        },
+      );
+
+      await assert.rejects(
+        verifyTestnetActivationDatabaseBoundaries(app, writer),
+        (error: unknown) =>
+          error instanceof TestnetActivationVerificationError &&
+          error.code === "database_privilege_mismatch",
+      );
+    } finally {
+      await admin.unsafe(`
+        REVOKE INSERT ON project_issuance_ledger_confirmations
+          FROM ${HARMLESS_ROLE};
+      `);
+    }
+  });
+
+  test("ordinary application rejects SET-reachable helper confirmation TRUNCATE", async () => {
+    await admin.unsafe(`
+      GRANT TRUNCATE ON project_issuance_ledger_confirmations
+        TO ${HARMLESS_ROLE};
+    `);
+
+    try {
+      await assert.rejects(
+        verifyTestnetActivationDatabaseBoundaries(app, writer),
+        (error: unknown) =>
+          error instanceof TestnetActivationVerificationError &&
+          error.code === "database_privilege_mismatch",
+      );
+    } finally {
+      await admin.unsafe(`
+        REVOKE TRUNCATE ON project_issuance_ledger_confirmations
+          FROM ${HARMLESS_ROLE};
+      `);
+    }
+  });
+
+  test("ordinary application rejects SET-reachable helper column-only confirmation INSERT", async () => {
+    await admin.unsafe(`
+      GRANT INSERT (result_xdr_sha256)
+        ON project_issuance_ledger_confirmations
+        TO ${HARMLESS_ROLE};
+    `);
+
+    try {
+      const [
+        {
+          helper_can_insert_confirmation_table: helperCanInsertConfirmationTable,
+          helper_can_insert_confirmation_column:
+            helperCanInsertConfirmationColumn,
+        },
+      ] = await app<
+        {
+          helper_can_insert_confirmation_table: boolean;
+          helper_can_insert_confirmation_column: boolean;
+        }[]
+      >`
+        SELECT
+          pg_catalog.has_table_privilege(
+            ${HARMLESS_ROLE},
+            'public.project_issuance_ledger_confirmations',
+            'INSERT'
+          ) AS helper_can_insert_confirmation_table,
+          pg_catalog.has_column_privilege(
+            ${HARMLESS_ROLE},
+            'public.project_issuance_ledger_confirmations',
+            'result_xdr_sha256',
+            'INSERT'
+          ) AS helper_can_insert_confirmation_column
+      `;
+      assert.equal(helperCanInsertConfirmationTable, false);
+      assert.equal(helperCanInsertConfirmationColumn, true);
+
+      await assert.rejects(
+        verifyTestnetActivationDatabaseBoundaries(app, writer),
+        (error: unknown) =>
+          error instanceof TestnetActivationVerificationError &&
+          error.code === "database_privilege_mismatch",
+      );
+    } finally {
+      await admin.unsafe(`
+        REVOKE INSERT (result_xdr_sha256)
+          ON project_issuance_ledger_confirmations
+          FROM ${HARMLESS_ROLE};
+      `);
+    }
+  });
+
+  test("ordinary application rejects nested SET-reachable helper confirmation authority", async () => {
+    await admin.unsafe(`
+      REVOKE ${HARMLESS_ROLE} FROM ${APP_ROLE};
+      GRANT DELETE ON project_issuance_ledger_confirmations
+        TO ${HARMLESS_ROLE};
+      GRANT ${HARMLESS_ROLE} TO ${BRIDGE_ROLE}
+        WITH ADMIN FALSE, INHERIT FALSE, SET TRUE;
+      GRANT ${BRIDGE_ROLE} TO ${APP_ROLE}
+        WITH ADMIN FALSE, INHERIT FALSE, SET TRUE;
+    `);
+
+    try {
+      const [
+        {
+          app_can_delete_confirmation: appCanDeleteConfirmation,
+          app_can_set_nested_helper: appCanSetNestedHelper,
+        },
+      ] = await app<
+        {
+          app_can_delete_confirmation: boolean;
+          app_can_set_nested_helper: boolean;
+        }[]
+      >`
+        SELECT
+          pg_catalog.has_table_privilege(
+            current_user,
+            'public.project_issuance_ledger_confirmations',
+            'DELETE'
+          ) AS app_can_delete_confirmation,
+          pg_catalog.pg_has_role(
+            session_user,
+            ${HARMLESS_ROLE},
+            'SET'
+          ) AS app_can_set_nested_helper
+      `;
+      assert.equal(appCanDeleteConfirmation, false);
+      assert.equal(appCanSetNestedHelper, true);
+
+      await assert.rejects(
+        verifyTestnetActivationDatabaseBoundaries(app, writer),
+        (error: unknown) =>
+          error instanceof TestnetActivationVerificationError &&
+          error.code === "database_privilege_mismatch",
+      );
+    } finally {
+      await admin.unsafe(`
+        REVOKE ${BRIDGE_ROLE} FROM ${APP_ROLE};
+        REVOKE ${HARMLESS_ROLE} FROM ${BRIDGE_ROLE};
+        REVOKE DELETE ON project_issuance_ledger_confirmations
+          FROM ${HARMLESS_ROLE};
+        GRANT ${HARMLESS_ROLE} TO ${APP_ROLE}
+          WITH ADMIN FALSE, INHERIT FALSE, SET TRUE;
+      `);
+    }
   });
 
   test("ordinary application rejects all confirmation table writes", async (t) => {
