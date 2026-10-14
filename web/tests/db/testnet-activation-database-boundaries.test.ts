@@ -5,7 +5,10 @@ import { after, before, beforeEach, test } from "node:test";
 import { createDatabaseClient } from "../../lib/server/persistence/database";
 import { IssuanceDatabaseIdentityError } from "../../lib/server/persistence/issuance-database-boundaries";
 import { migrateDatabase } from "../../lib/server/persistence/migrations";
-import { verifyTestnetActivationDatabaseBoundaries } from "../../lib/server/projects/testnet-activation-verifier";
+import {
+  TestnetActivationVerificationError,
+  verifyTestnetActivationDatabaseBoundaries,
+} from "../../lib/server/projects/testnet-activation-verifier";
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL?.trim();
 
@@ -73,9 +76,9 @@ if (!TEST_DATABASE_URL) {
       ALTER SCHEMA public OWNER TO ${SCHEMA_OWNER_ROLE};
       GRANT USAGE ON SCHEMA public TO ${APP_ROLE}, ${WRITER_ROLE};
       GRANT orrylo_confirmation_writer TO ${WRITER_ROLE}
-        WITH INHERIT TRUE, SET TRUE;
+        WITH ADMIN FALSE, INHERIT TRUE, SET TRUE;
       GRANT ${HARMLESS_ROLE} TO ${APP_ROLE}
-        WITH INHERIT FALSE, SET TRUE;
+        WITH ADMIN FALSE, INHERIT FALSE, SET TRUE;
     `);
   });
 
@@ -83,6 +86,16 @@ if (!TEST_DATABASE_URL) {
     await admin.unsafe(`
       REVOKE ${SCHEMA_OWNER_ROLE} FROM ${APP_ROLE}, ${WRITER_ROLE}, ${BRIDGE_ROLE};
       REVOKE ${BRIDGE_ROLE} FROM ${APP_ROLE}, ${WRITER_ROLE};
+      REVOKE ADMIN OPTION FOR orrylo_confirmation_writer FROM ${WRITER_ROLE};
+      GRANT orrylo_confirmation_writer TO ${WRITER_ROLE}
+        WITH ADMIN FALSE, INHERIT TRUE, SET TRUE;
+      REVOKE INSERT, UPDATE, DELETE, TRUNCATE
+        ON project_issuance_full_intents,
+          project_issuance_transaction_attempts
+        FROM ${WRITER_ROLE};
+      REVOKE UPDATE (signed_envelope_xdr_sha256)
+        ON project_issuance_transaction_attempts
+        FROM ${WRITER_ROLE};
     `);
   });
 
@@ -113,6 +126,15 @@ if (!TEST_DATABASE_URL) {
     `;
     assert.equal(applicationCurrentSchema, "pg_catalog");
     assert.equal(writerCurrentSchema, "pg_catalog");
+    const [{ writer_can_admin_confirmation_role: writerCanAdminConfirmationRole }] =
+      await writer<{ writer_can_admin_confirmation_role: boolean }[]>`
+        SELECT pg_catalog.pg_has_role(
+          session_user,
+          'orrylo_confirmation_writer',
+          'MEMBER WITH ADMIN OPTION'
+        ) AS writer_can_admin_confirmation_role
+      `;
+    assert.equal(writerCanAdminConfirmationRole, false);
 
     const report = await verifyTestnetActivationDatabaseBoundaries(app, writer);
 
@@ -263,6 +285,130 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
+  test("application login with ADMIN on an owner-reachable bridge fails even when direct sensitive-owner predicates are false", async () => {
+    await admin.unsafe(`
+      GRANT ${SCHEMA_OWNER_ROLE} TO ${BRIDGE_ROLE}
+        WITH ADMIN FALSE, INHERIT FALSE, SET TRUE;
+      GRANT ${BRIDGE_ROLE} TO ${APP_ROLE}
+        WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
+    `);
+
+    const [authority] = await app<
+      {
+        can_set_schema_owner: boolean;
+        can_use_schema_owner: boolean;
+        can_administer_schema_owner: boolean;
+        can_administer_bridge: boolean;
+      }[]
+    >`
+      SELECT
+        pg_catalog.pg_has_role(
+          session_user,
+          ${SCHEMA_OWNER_ROLE},
+          'SET'
+        ) AS can_set_schema_owner,
+        pg_catalog.pg_has_role(
+          session_user,
+          ${SCHEMA_OWNER_ROLE},
+          'USAGE'
+        ) AS can_use_schema_owner,
+        pg_catalog.pg_has_role(
+          session_user,
+          ${SCHEMA_OWNER_ROLE},
+          'MEMBER WITH ADMIN OPTION'
+        ) AS can_administer_schema_owner,
+        pg_catalog.pg_has_role(
+          session_user,
+          ${BRIDGE_ROLE},
+          'MEMBER WITH ADMIN OPTION'
+        ) AS can_administer_bridge
+    `;
+    assert.deepEqual(authority, {
+      can_set_schema_owner: false,
+      can_use_schema_owner: false,
+      can_administer_schema_owner: false,
+      can_administer_bridge: true,
+    });
+
+    await assert.rejects(
+      verifyTestnetActivationDatabaseBoundaries(app, writer),
+      IssuanceDatabaseIdentityError,
+    );
+  });
+
+  test("confirmation writer with ADMIN on an owner-reachable bridge fails even when direct sensitive-owner predicates are false", async () => {
+    await admin.unsafe(`
+      GRANT ${SCHEMA_OWNER_ROLE} TO ${BRIDGE_ROLE}
+        WITH ADMIN FALSE, INHERIT FALSE, SET TRUE;
+      GRANT ${BRIDGE_ROLE} TO ${WRITER_ROLE}
+        WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
+    `);
+
+    const [authority] = await writer<
+      {
+        can_set_schema_owner: boolean;
+        can_use_schema_owner: boolean;
+        can_administer_schema_owner: boolean;
+        can_administer_bridge: boolean;
+      }[]
+    >`
+      SELECT
+        pg_catalog.pg_has_role(
+          session_user,
+          ${SCHEMA_OWNER_ROLE},
+          'SET'
+        ) AS can_set_schema_owner,
+        pg_catalog.pg_has_role(
+          session_user,
+          ${SCHEMA_OWNER_ROLE},
+          'USAGE'
+        ) AS can_use_schema_owner,
+        pg_catalog.pg_has_role(
+          session_user,
+          ${SCHEMA_OWNER_ROLE},
+          'MEMBER WITH ADMIN OPTION'
+        ) AS can_administer_schema_owner,
+        pg_catalog.pg_has_role(
+          session_user,
+          ${BRIDGE_ROLE},
+          'MEMBER WITH ADMIN OPTION'
+        ) AS can_administer_bridge
+    `;
+    assert.deepEqual(authority, {
+      can_set_schema_owner: false,
+      can_use_schema_owner: false,
+      can_administer_schema_owner: false,
+      can_administer_bridge: true,
+    });
+
+    await assert.rejects(
+      verifyTestnetActivationDatabaseBoundaries(app, writer),
+      IssuanceDatabaseIdentityError,
+    );
+  });
+
+  test("confirmation writer with ADMIN OPTION on the trusted writer role fails closed", async () => {
+    await admin.unsafe(`
+      GRANT orrylo_confirmation_writer TO ${WRITER_ROLE}
+        WITH ADMIN TRUE, INHERIT TRUE, SET TRUE;
+    `);
+
+    const [{ can_administer_confirmation_role: canAdministerConfirmationRole }] =
+      await writer<{ can_administer_confirmation_role: boolean }[]>`
+        SELECT pg_catalog.pg_has_role(
+          session_user,
+          'orrylo_confirmation_writer',
+          'MEMBER WITH ADMIN OPTION'
+        ) AS can_administer_confirmation_role
+      `;
+    assert.equal(canAdministerConfirmationRole, true);
+
+    await assert.rejects(
+      verifyTestnetActivationDatabaseBoundaries(app, writer),
+      IssuanceDatabaseIdentityError,
+    );
+  });
+
   test("nested SET TRUE membership path to the schema owner fails closed", async () => {
     await admin.unsafe(`
       GRANT ${SCHEMA_OWNER_ROLE} TO ${BRIDGE_ROLE}
@@ -286,6 +432,89 @@ if (!TEST_DATABASE_URL) {
       verifyTestnetActivationDatabaseBoundaries(app, writer),
       IssuanceDatabaseIdentityError,
     );
+  });
+
+  test("confirmation writer rejects forbidden table-level writes on immutable evidence", async (t) => {
+    const cases = [
+      ["project_issuance_full_intents", "INSERT"],
+      ["project_issuance_transaction_attempts", "INSERT"],
+      ["project_issuance_full_intents", "UPDATE"],
+      ["project_issuance_transaction_attempts", "UPDATE"],
+      ["project_issuance_full_intents", "DELETE"],
+      ["project_issuance_transaction_attempts", "DELETE"],
+      ["project_issuance_full_intents", "TRUNCATE"],
+      ["project_issuance_transaction_attempts", "TRUNCATE"],
+    ] as const;
+
+    for (const [tableName, privilege] of cases) {
+      await t.test(`${privilege} on ${tableName} fails closed`, async () => {
+        await admin.unsafe(
+          `GRANT ${privilege} ON ${tableName} TO ${WRITER_ROLE}`,
+        );
+        try {
+          await assert.rejects(
+            verifyTestnetActivationDatabaseBoundaries(app, writer),
+            (error: unknown) =>
+              error instanceof TestnetActivationVerificationError &&
+              error.code === "database_privilege_mismatch",
+          );
+        } finally {
+          await admin.unsafe(
+            `REVOKE ${privilege} ON ${tableName} FROM ${WRITER_ROLE}`,
+          );
+        }
+      });
+    }
+  });
+
+  test("confirmation writer rejects column-level signed-envelope UPDATE authority", async () => {
+    await admin.unsafe(`
+      GRANT UPDATE (signed_envelope_xdr_sha256)
+        ON project_issuance_transaction_attempts
+        TO ${WRITER_ROLE};
+    `);
+
+    try {
+      const [
+        {
+          can_update_attempt_table: canUpdateAttemptTable,
+          can_update_attempt_column: canUpdateAttemptColumn,
+        },
+      ] = await writer<
+        {
+          can_update_attempt_table: boolean;
+          can_update_attempt_column: boolean;
+        }[]
+      >`
+        SELECT
+          pg_catalog.has_table_privilege(
+            current_user,
+            'public.project_issuance_transaction_attempts',
+            'UPDATE'
+          ) AS can_update_attempt_table,
+          pg_catalog.has_column_privilege(
+            current_user,
+            'public.project_issuance_transaction_attempts',
+            'signed_envelope_xdr_sha256',
+            'UPDATE'
+          ) AS can_update_attempt_column
+      `;
+      assert.equal(canUpdateAttemptTable, false);
+      assert.equal(canUpdateAttemptColumn, true);
+
+      await assert.rejects(
+        verifyTestnetActivationDatabaseBoundaries(app, writer),
+        (error: unknown) =>
+          error instanceof TestnetActivationVerificationError &&
+          error.code === "database_privilege_mismatch",
+      );
+    } finally {
+      await admin.unsafe(`
+        REVOKE UPDATE (signed_envelope_xdr_sha256)
+          ON project_issuance_transaction_attempts
+          FROM ${WRITER_ROLE};
+      `);
+    }
   });
 }
 
