@@ -216,10 +216,17 @@ export async function verifyTestnetActivationDatabaseBoundaries(
     );
   }
 
-  if (application.canInsertConfirmation) {
+  const applicationHasForbiddenConfirmationWriteAuthority =
+    application.canInsertConfirmation ||
+    application.canUpdateConfirmation ||
+    application.canDeleteConfirmation ||
+    application.canTruncateConfirmation ||
+    application.canUpdateAnyConfirmationColumn;
+
+  if (applicationHasForbiddenConfirmationWriteAuthority) {
     throw new TestnetActivationVerificationError(
       "database_privilege_mismatch",
-      "The ordinary application database identity must not be able to insert authoritative confirmations.",
+      "The ordinary application database identity must not have write authority over authoritative confirmations.",
     );
   }
 
