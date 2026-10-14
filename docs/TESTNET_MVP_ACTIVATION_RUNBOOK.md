@@ -176,10 +176,10 @@ It deliberately does **not** request a signature or test the signer service.
 | 4 | SAFE READ-ONLY | Independently inspect the issuer using official Testnet Horizon before any app configuration. | Timestamp, ledger checkpoint, exact issuer public key, flags, signer set, thresholds, sequence and XLM balance. |
 | 5 | OWNER MANUAL LIVE ACTION | Provision the separately approved signer/custody implementation with this Testnet key only. | Signer service identity/version, public-key fingerprint, deployment scope and proof the web application does not receive the seed. No secret values in evidence. |
 | 6 | OWNER MANUAL LIVE ACTION | Provision the ordinary application DB login and a distinct dedicated confirmation-writer LOGIN that is a member of `orrylo_confirmation_writer`; retain schema-owner credentials separately. | Role names, non-superuser/non-owner evidence, grants/membership output with passwords redacted. |
-| 7 | SAFE READ-ONLY | Apply/verify migrations 001–010 using the migration identity, then verify application/writer boundaries. | Migration output/checksums, schema verification output, read-only role-verifier result. |
+| 7 | AUTOMATED LIVE ACTION requiring explicit authorization | Apply migrations 001–010 using the migration/schema-owner identity **only after explicit owner/deployment authorization**. This mutates the deployment database and may create or alter schema objects, roles and grants. | Migration command output/checksums, exact code HEAD and deployment database identifier, with credentials redacted. |
 | 8 | OWNER MANUAL LIVE ACTION | Choose the customer Albedo Testnet wallet. If funding is needed, the owner/customer funds it manually. | Customer public `G...` address and official Horizon evidence that the account exists. |
 | 9 | OWNER MANUAL LIVE ACTION | Customer manually creates the exact trustline for the intended asset code + exact new Shared Issuer with a limit covering the complete initial supply. | Exact asset code, issuer, destination, trustline limit/balance/authorization from official Horizon. |
-| 10 | SAFE READ-ONLY | Run `npm run activation:verify:testnet` with the exact issuer, destination, asset code, amount and fee. Repeat if the stable-ledger check races a ledger close. | Full verifier JSON result with `ok: true`; public identifiers only. |
+| 10 | SAFE READ-ONLY | Without applying migrations or changing grants, verify migrations/schema state, verify application/confirmation-writer authority separation, and run `npm run activation:verify:testnet` with the exact issuer, destination, asset code, amount and fee. Repeat only the non-mutating inspection if the stable-ledger check races a ledger close. | Schema verification output, read-only role-verifier result, and full activation-verifier JSON with `ok: true`; public identifiers only. |
 | 11 | OWNER MANUAL LIVE ACTION | Explicitly approve activation of the signer adapter/runtime composition and application deployment for this one bounded Testnet issuance. | Written approval referencing exact code HEAD, issuer public key, destination, asset code, amount, fee, signer implementation and deployment target. |
 | 12 | AUTOMATED LIVE ACTION requiring explicit authorization | Deploy/configure the application and signer only after step 11. The runtime must use the ordinary app DB credential, distinct confirmation-writer credential, exact issuer/fee, fixed official Horizon and approved signer primitive. | Deployment IDs/commit SHA, redacted config-key names, signer public-key consistency result, health evidence. Never capture secret values. |
 | 13 | SAFE READ-ONLY | Run the activation verifier again against the deployed configuration immediately before issuance. | Fresh `ok: true` verifier evidence and stable ledger checkpoint. |
@@ -232,8 +232,10 @@ boundary failure.
   signer custody, select/fund the customer wallet if needed, and create the
   exact trustline.
 - Operational: create least-privilege application and confirmation-writer DB
-  logins, run migrations/schema verification, pass the read-only activation
-  verifier, then explicitly authorize deployment and the one issuance.
+  logins; after explicit owner/deployment authorization, apply migrations with
+  the migration/schema-owner identity; then separately perform read-only schema
+  and authority verification and pass the activation verifier before deployment
+  and the one issuance.
 
 ### POST-MVP
 
