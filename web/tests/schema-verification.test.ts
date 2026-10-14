@@ -106,6 +106,8 @@ function fakeDatabase(
           trusted_writer_function_search_path: [
             "search_path=pg_catalog, public, pg_temp",
           ],
+          trusted_writer_trigger_count: 1,
+          trusted_writer_trigger_binding: true,
           reachability_trigger: true,
           reachability_function_security_definer: true,
           reachability_function_search_path: ["search_path=pg_catalog, public"],
