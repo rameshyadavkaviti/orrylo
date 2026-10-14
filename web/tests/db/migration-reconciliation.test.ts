@@ -89,6 +89,24 @@ if (!TEST_DATABASE_URL) {
     await assert.doesNotReject(verifyDatabaseSchemaReadOnly(sql, directory));
   });
 
+  test("read-only schema verification rejects a conditional trusted confirmation trigger", async () => {
+    await migrateDatabase(sql, directory);
+    await sql.unsafe(`
+      DROP TRIGGER project_issuance_confirmation_trusted_writer
+        ON public.project_issuance_ledger_confirmations;
+      CREATE TRIGGER project_issuance_confirmation_trusted_writer
+        BEFORE INSERT ON public.project_issuance_ledger_confirmations
+        FOR EACH ROW
+        WHEN (false)
+        EXECUTE FUNCTION public.assert_trusted_confirmation_writer();
+    `);
+
+    await assert.rejects(
+      verifyDatabaseSchemaReadOnly(sql, directory),
+      /trusted confirmation writing\/trigger binding/,
+    );
+  });
+
   test("read-only schema verification rejects a missing trusted confirmation trigger", async () => {
     await migrateDatabase(sql, directory);
     await sql.unsafe(`
