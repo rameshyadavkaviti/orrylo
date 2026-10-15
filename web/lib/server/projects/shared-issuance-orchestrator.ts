@@ -201,13 +201,14 @@ export class SharedIssuanceOrchestrator {
     } else {
       let preflight: SharedIssuerTestnetPreflightResult;
       try {
-        preflight = await this.dependencies.preflight.readIssuancePreconditions({
-          issuerPublicKey: intent.issuerPublicKey,
-          destinationPublicKey: intent.destinationPublicKey,
-          assetCode: intent.assetCode,
-          assetCodeReservedForProject: true,
-          feeStroops: this.dependencies.feeStroops,
-        });
+        preflight =
+          await this.dependencies.preflight.readIssuancePreconditions({
+            issuerPublicKey: intent.issuerPublicKey,
+            destinationPublicKey: intent.destinationPublicKey,
+            assetCode: intent.assetCode,
+            assetCodeReservedForProject: true,
+            feeStroops: this.dependencies.feeStroops,
+          });
       } catch (error) {
         return this.failBeforeSubmission(input.requestId, error);
       }
@@ -389,13 +390,14 @@ export class SharedIssuanceOrchestrator {
     } else {
       let preflight: SharedIssuerTestnetPreflightResult;
       try {
-        preflight = await this.dependencies.preflight.readIssuancePreconditions({
-          issuerPublicKey: intent.issuerPublicKey,
-          destinationPublicKey: intent.destinationPublicKey,
-          assetCode: intent.assetCode,
-          assetCodeReservedForProject: true,
-          feeStroops: this.dependencies.feeStroops,
-        });
+        preflight =
+          await this.dependencies.preflight.readIssuancePreconditions({
+            issuerPublicKey: intent.issuerPublicKey,
+            destinationPublicKey: intent.destinationPublicKey,
+            assetCode: intent.assetCode,
+            assetCodeReservedForProject: true,
+            feeStroops: this.dependencies.feeStroops,
+          });
       } catch (error) {
         await this.failBeforeSubmission(input.requestId, error);
         throw error;
@@ -521,10 +523,7 @@ export class SharedIssuanceOrchestrator {
       throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
     }
     const attempt = attempts[0]!;
-    if (
-      attempt.signingMode !== "manual" ||
-      attempt.signedEnvelopeXdrSha256
-    ) {
+    if (attempt.signingMode !== "manual" || attempt.signedEnvelopeXdrSha256) {
       throw new SharedIssuanceOrchestrationError(
         "manual_signing_already_consumed",
       );
