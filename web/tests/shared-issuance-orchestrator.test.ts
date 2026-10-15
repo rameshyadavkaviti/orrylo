@@ -3,10 +3,14 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
+  Account,
+  Asset,
   Keypair,
   Networks,
+  Operation,
   Transaction,
   TransactionBuilder,
+  xdr,
 } from "@stellar/stellar-sdk";
 
 import type {
@@ -27,11 +31,14 @@ import {
 import {
   SHARED_ISSUANCE_POLICY_VERSION,
   SHARED_ISSUER_TESTNET_PASSPHRASE,
+  buildSharedIssuerIssuancePlan,
   hashSharedIssuerIssuanceIntent,
 } from "../lib/stellar/shared-issuer-issuance";
 
 const ISSUER_KEYPAIR = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 121));
 const ISSUER = ISSUER_KEYPAIR.publicKey();
+const OTHER_ISSUER_KEYPAIR = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 124));
+const WRONG_SIGNER_KEYPAIR = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 125));
 const OWNER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 122)).publicKey();
 const OTHER_OWNER = Keypair.fromRawEd25519Seed(
   Buffer.alloc(32, 123),
@@ -186,6 +193,7 @@ function fixture(
       async submitSignedEnvelope(signedEnvelopeXdr) {
         calls.push("submit");
         submissions++;
+        assert.ok(store.attempts[0]?.signedEnvelopeXdrSha256);
         const transaction = TransactionBuilder.fromXDR(
           signedEnvelopeXdr,
           Networks.TESTNET,
@@ -245,6 +253,102 @@ const input = {
   projectId: PROJECT_ID,
   ownerPublicKey: OWNER,
 };
+
+function buildVariantPlan(
+  overrides: Partial<{
+    assetCode: string;
+    issuerPublicKey: string;
+    destinationPublicKey: string;
+    amount: string;
+    validFrom: number;
+    validUntil: number;
+  }> = {},
+) {
+  const assetCode = overrides.assetCode ?? "NOVA";
+  const issuerPublicKey = overrides.issuerPublicKey ?? ISSUER;
+  const destinationPublicKey = overrides.destinationPublicKey ?? OWNER;
+  const validFrom = overrides.validFrom ?? Math.floor(NOW / 1_000);
+  const validUntil = overrides.validUntil ?? validFrom + 300;
+  return buildSharedIssuerIssuancePlan(
+    {
+      projectId: PROJECT_ID,
+      assetCode,
+      issuerPublicKey,
+      destinationPublicKey,
+      amount: overrides.amount ?? "25.0000000",
+      network: "testnet",
+      networkPassphrase: Networks.TESTNET,
+      validFrom,
+      validUntil,
+    },
+    {
+      assetCodeReservedForProject: true,
+      issuerSequence: "123",
+      issuerSpendableNativeStroops: "1000000",
+      feeStroops: "100",
+      destinationTrustline: {
+        network: "testnet",
+        networkPassphrase: Networks.TESTNET,
+        destinationPublicKey,
+        assetCode,
+        issuerPublicKey,
+        observedLedger: 100,
+        exists: true,
+        authorized: true,
+        balance: "0.0000000",
+        limit: "1000.0000000",
+        buyingLiabilities: "0.0000000",
+      },
+    },
+  );
+}
+
+function signPlan(
+  plan: ReturnType<typeof buildVariantPlan>,
+  signer = ISSUER_KEYPAIR,
+  networkPassphrase = Networks.TESTNET,
+) {
+  const transaction = TransactionBuilder.fromXDR(
+    plan.unsignedEnvelopeXdr,
+    networkPassphrase,
+  );
+  assert.ok(transaction instanceof Transaction);
+  transaction.sign(signer);
+  return transaction.toXDR();
+}
+
+function extraOperationSignedEnvelope() {
+  const account = new Account(ISSUER, "123");
+  const asset = new Asset("NOVA", ISSUER);
+  const transaction = new TransactionBuilder(account, {
+    fee: "100",
+    networkPassphrase: Networks.TESTNET,
+  })
+    .addOperation(
+      Operation.payment({
+        destination: OWNER,
+        asset,
+        amount: "25.0000000",
+      }),
+    )
+    .addOperation(
+      Operation.payment({
+        destination: OWNER,
+        asset,
+        amount: "1.0000000",
+      }),
+    )
+    .setTimebounds(Math.floor(NOW / 1_000), Math.floor(NOW / 1_000) + 300)
+    .build();
+  transaction.sign(ISSUER_KEYPAIR);
+  return transaction.toXDR();
+}
+
+function errorCode(error: unknown): string | undefined {
+  return error && typeof error === "object" && "code" in error
+    ? String(error.code)
+    : undefined;
+}
 
 test("successful mocked path preserves the required order and returns durable confirmation", async () => {
   const fx = fixture();
@@ -387,4 +491,175 @@ test("concurrent replay has one execution claimant and cannot create attempt 2",
   assert.equal(fx.submissions(), 1);
   assert.ok(results.some((result) => result.status === "confirmed"));
   assert.ok(results.some((result) => result.status === "preparing_issuance"));
+});
+
+
+test("manual handoff persists attempt 1 and exposes exact unsigned XDR without signer or submission", async () => {
+  const fx = fixture();
+  const handoff = await fx.orchestrator.prepareManualSigningHandoff(input);
+
+  assert.equal(handoff.status, "awaiting_manual_signature");
+  assert.equal(handoff.attemptId, ATTEMPT_ID);
+  assert.equal(handoff.issuerPublicKey, ISSUER);
+  assert.equal(handoff.destinationPublicKey, OWNER);
+  assert.equal(handoff.assetCode, "NOVA");
+  assert.equal(handoff.amount, "25.0000000");
+  assert.equal(handoff.transactionHash, buildVariantPlan().transactionHash);
+  assert.equal(
+    createHash("sha256").update(handoff.unsignedEnvelopeXdr).digest("hex"),
+    handoff.unsignedEnvelopeXdrSha256,
+  );
+  assert.deepEqual(fx.calls, ["preflight"]);
+  assert.equal(fx.submissions(), 0);
+  assert.equal(fx.store.attempts.length, 1);
+  assert.equal(fx.store.attempts[0]!.attemptNumber, 1);
+  assert.equal(fx.store.attempts[0]!.signedEnvelopeXdrSha256, undefined);
+});
+
+test("manual signed-envelope bridge accepts only the exact persisted Testnet transaction", async () => {
+  const fx = fixture();
+  const handoff = await fx.orchestrator.prepareManualSigningHandoff(input);
+  const canonicalPlan = buildVariantPlan();
+
+  const wrongNetwork = TransactionBuilder.fromXDR(
+    handoff.unsignedEnvelopeXdr,
+    Networks.PUBLIC,
+  );
+  assert.ok(wrongNetwork instanceof Transaction);
+  wrongNetwork.sign(ISSUER_KEYPAIR);
+
+  const malformed = TransactionBuilder.fromXDR(
+    handoff.unsignedEnvelopeXdr,
+    Networks.TESTNET,
+  );
+  assert.ok(malformed instanceof Transaction);
+  malformed.sign(ISSUER_KEYPAIR);
+  const validSignature = malformed.signatures[0]!;
+  malformed.signatures[0] = new xdr.DecoratedSignature({
+    hint: validSignature.hint,
+    signature: Buffer.alloc(validSignature.signature.length, 7),
+  });
+
+  const cases = [
+    {
+      name: "wrong transaction hash and amount",
+      xdr: signPlan(buildVariantPlan({ amount: "26.0000000" })),
+    },
+    {
+      name: "wrong issuer and transaction source",
+      xdr: signPlan(
+        buildVariantPlan({
+          issuerPublicKey: OTHER_ISSUER_KEYPAIR.publicKey(),
+        }),
+        OTHER_ISSUER_KEYPAIR,
+      ),
+    },
+    {
+      name: "wrong destination",
+      xdr: signPlan(buildVariantPlan({ destinationPublicKey: OTHER_OWNER })),
+    },
+    {
+      name: "wrong asset",
+      xdr: signPlan(buildVariantPlan({ assetCode: "OTHER" })),
+    },
+    {
+      name: "changed time bounds",
+      xdr: signPlan(
+        buildVariantPlan({
+          validFrom: canonicalPlan.validFrom + 1,
+          validUntil: canonicalPlan.validUntil + 1,
+        }),
+      ),
+    },
+    {
+      name: "extra operation",
+      xdr: extraOperationSignedEnvelope(),
+    },
+    {
+      name: "wrong network signature",
+      xdr: wrongNetwork.toXDR(),
+    },
+    {
+      name: "wrong signer",
+      xdr: signPlan(canonicalPlan, WRONG_SIGNER_KEYPAIR),
+    },
+    {
+      name: "malformed signature",
+      xdr: malformed.toXDR(),
+    },
+  ];
+
+  for (const candidate of cases) {
+    await assert.rejects(
+      () =>
+        fx.orchestrator.submitManualSignedEnvelope({
+          ...input,
+          signedEnvelopeXdr: candidate.xdr,
+        }),
+      undefined,
+      candidate.name,
+    );
+    assert.equal(
+      fx.store.attempts[0]!.signedEnvelopeXdrSha256,
+      undefined,
+      candidate.name,
+    );
+    assert.equal(fx.submissions(), 0, candidate.name);
+  }
+
+  const signedEnvelopeXdr = signPlan(canonicalPlan);
+  const result = await fx.orchestrator.submitManualSignedEnvelope({
+    ...input,
+    signedEnvelopeXdr,
+  });
+
+  assert.equal(result.status, "confirmed");
+  assert.equal(fx.submissions(), 1);
+  assert.ok(fx.store.attempts[0]!.signedEnvelopeXdrSha256);
+  assert.equal(fx.store.attempts.length, 1);
+});
+
+test("manual bridge persists signed digest before one submission and rejects every second-sign path", async () => {
+  const fx = fixture({ submissionUncertain: true });
+  const handoff = await fx.orchestrator.prepareManualSigningHandoff(input);
+  const signedEnvelopeXdr = signPlan(buildVariantPlan());
+
+  const first = await fx.orchestrator.submitManualSignedEnvelope({
+    ...input,
+    signedEnvelopeXdr,
+  });
+  assert.equal(first.status, "reconciliation_required");
+  assert.equal(fx.submissions(), 1);
+  assert.ok(fx.store.attempts[0]!.signedEnvelopeXdrSha256);
+
+  await assert.rejects(
+    () =>
+      fx.orchestrator.submitManualSignedEnvelope({
+        ...input,
+        signedEnvelopeXdr,
+      }),
+    (error: unknown) => errorCode(error) === "manual_signing_already_consumed",
+  );
+  assert.equal(fx.submissions(), 1);
+  assert.equal(fx.store.attempts.length, 1);
+
+  const reconciled = await fx.orchestrator.reconcileManualAttempt(input);
+  assert.equal(reconciled.status, "confirmed");
+  assert.equal(fx.submissions(), 1);
+  assert.equal(fx.store.attempts.length, 1);
+});
+
+test("manual handoff cannot be rebound to a different configured issuer", async () => {
+  const fx = fixture();
+  fx.store.intents.set(REQUEST_ID, {
+    ...intent(),
+    issuerPublicKey: OTHER_ISSUER_KEYPAIR.publicKey(),
+  });
+
+  await assert.rejects(
+    () => fx.orchestrator.prepareManualSigningHandoff(input),
+    (error: unknown) => errorCode(error) === "manual_issuer_mismatch",
+  );
+  assert.equal(fx.store.attempts.length, 0);
+  assert.equal(fx.submissions(), 0);
 });
