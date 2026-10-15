@@ -106,6 +106,10 @@ class MemoryStore implements SharedIssuanceOrchestrationStore {
   }) {
     const existing = await this.getAttempt(input.attemptId);
     assert.ok(existing);
+    assert.equal(existing.transactionHash, input.transactionHash);
+    if (existing.signedEnvelopeXdrSha256) {
+      throw new Error("signed envelope already claimed");
+    }
     Object.assign(existing, {
       signedEnvelopeXdrSha256: input.signedEnvelopeXdrSha256,
     });
@@ -651,6 +655,30 @@ test("manual bridge persists signed digest before one submission and rejects eve
   assert.equal(reconciled.status, "confirmed");
   assert.equal(fx.submissions(), 1);
   assert.equal(fx.store.attempts.length, 1);
+});
+
+test("concurrent manual signed-envelope submissions have exactly one Horizon claimant", async () => {
+  const fx = fixture({ submissionUncertain: true });
+  await fx.orchestrator.prepareManualSigningHandoff(input);
+  const signedEnvelopeXdr = signPlan(buildVariantPlan());
+
+  const results = await Promise.all([
+    fx.orchestrator.submitManualSignedEnvelope({
+      ...input,
+      signedEnvelopeXdr,
+    }),
+    fx.orchestrator.submitManualSignedEnvelope({
+      ...input,
+      signedEnvelopeXdr,
+    }),
+  ]);
+
+  assert.equal(fx.submissions(), 1);
+  assert.equal(fx.store.attempts.length, 1);
+  assert.ok(fx.store.attempts[0]!.signedEnvelopeXdrSha256);
+  assert.ok(
+    results.every((result) => result.status === "reconciliation_required"),
+  );
 });
 
 test("manual handoff cannot be rebound to a different configured issuer", async () => {
