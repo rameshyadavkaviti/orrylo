@@ -7,11 +7,14 @@ import type {
   TrustedLedgerConfirmationWriter,
 } from "./shared-issuance-persistence";
 import {
+  SHARED_ISSUER_TESTNET_PASSPHRASE,
   buildSharedIssuerIssuancePlan,
+  type SharedIssuerIssuancePlan,
   type SharedIssuerSignerAuthorization,
   type SharedIssuerSubmissionAdapter,
 } from "../../stellar/shared-issuer-issuance";
 import {
+  loadAndAssertDurableSharedIssuerPlan,
   persistAndSubmitSharedIssuerEnvelope,
   type SignedEnvelopeAttemptWriter,
 } from "../../stellar/shared-issuer-execution";
@@ -64,6 +67,27 @@ export type SharedIssuanceOrchestrationResult =
   | { status: "reconciliation_required"; transactionHash: string }
   | { status: "failed_before_submission"; failureCode: string };
 
+export interface ManualSharedIssuanceSigningHandoff {
+  status: "awaiting_manual_signature";
+  requestId: string;
+  attemptId: string;
+  projectId: string;
+  ownerPublicKey: string;
+  network: "testnet";
+  networkPassphrase: typeof SHARED_ISSUER_TESTNET_PASSPHRASE;
+  issuerPublicKey: string;
+  destinationPublicKey: string;
+  assetCode: string;
+  amount: string;
+  transactionHash: string;
+  unsignedEnvelopeXdr: string;
+  unsignedEnvelopeXdrSha256: string;
+  sourceSequence: string;
+  feeStroops: string;
+  validFrom: number;
+  validUntil: number;
+}
+
 interface ConfirmationValidator {
   validate(
     input: Parameters<
@@ -75,7 +99,13 @@ interface ConfirmationValidator {
 export class SharedIssuanceOrchestrationError extends Error {
   constructor(
     readonly code:
-      "intent_not_found" | "owner_intent_mismatch" | "invalid_attempt_history",
+      | "intent_not_found"
+      | "owner_intent_mismatch"
+      | "invalid_attempt_history"
+      | "manual_signing_not_ready"
+      | "manual_signing_already_consumed"
+      | "manual_signing_window_expired"
+      | "manual_issuer_mismatch",
   ) {
     super(code);
     this.name = "SharedIssuanceOrchestrationError";
@@ -261,6 +291,267 @@ export class SharedIssuanceOrchestrator {
     return this.reconcile(intent, persistedAttempt);
   }
 
+  /**
+   * Local/operator-only preparation path. It creates attempt 1 exactly once and
+   * returns only non-secret handoff data. It never invokes a signing primitive
+   * or a submission adapter.
+   */
+  async prepareManualSigningHandoff(input: {
+    requestId: string;
+    projectId: string;
+    ownerPublicKey: string;
+  }): Promise<ManualSharedIssuanceSigningHandoff> {
+    const intent = await this.dependencies.store.getIntent(input.requestId);
+    if (!intent) throw new SharedIssuanceOrchestrationError("intent_not_found");
+    assertAuthenticatedIntent(input, intent);
+    this.assertManualIssuer(intent);
+
+    if (await this.dependencies.store.getConfirmation(input.requestId)) {
+      throw new SharedIssuanceOrchestrationError(
+        "manual_signing_already_consumed",
+      );
+    }
+
+    const attempts = await this.dependencies.store.listAttempts(input.requestId);
+    if (
+      attempts.length > 1 ||
+      (attempts[0] && attempts[0].attemptNumber !== 1)
+    ) {
+      throw new SharedIssuanceOrchestrationError("invalid_attempt_history");
+    }
+
+    if (attempts[0]) {
+      if (attempts[0].signedEnvelopeXdrSha256) {
+        throw new SharedIssuanceOrchestrationError(
+          "manual_signing_already_consumed",
+        );
+      }
+      const lifecycle = await this.dependencies.store.getLifecycle(
+        input.requestId,
+      );
+      if (!lifecycle || lifecycle.status !== "pending_execution") {
+        throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
+      }
+      const plan = await this.loadCurrentManualPlan(intent, attempts[0]);
+      return manualHandoff(intent, attempts[0], plan);
+    }
+
+    const lifecycle = await this.dependencies.store.getLifecycle(input.requestId);
+    if (!lifecycle || lifecycle.status !== "awaiting_issuer_integration") {
+      throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
+    }
+
+    const claimed = await this.dependencies.store.transition(
+      input.requestId,
+      "pending_execution",
+    );
+    if (!claimed) {
+      throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
+    }
+
+    let preflight: SharedIssuerTestnetPreflightResult;
+    try {
+      preflight = await this.dependencies.preflight.readIssuancePreconditions({
+        issuerPublicKey: intent.issuerPublicKey,
+        destinationPublicKey: intent.destinationPublicKey,
+        assetCode: intent.assetCode,
+        assetCodeReservedForProject: true,
+        feeStroops: this.dependencies.feeStroops,
+      });
+    } catch (error) {
+      await this.failBeforeSubmission(input.requestId, error);
+      throw error;
+    }
+
+    const now = this.dependencies.now?.() ?? Date.now();
+    const validFrom = Math.floor(now / 1_000);
+    let plan: SharedIssuerIssuancePlan;
+    try {
+      plan = buildSharedIssuerIssuancePlan(
+        {
+          projectId: intent.projectId,
+          assetCode: intent.assetCode,
+          issuerPublicKey: intent.issuerPublicKey,
+          destinationPublicKey: intent.destinationPublicKey,
+          amount: intent.amount,
+          network: "testnet",
+          networkPassphrase: preflight.networkPassphrase,
+          validFrom,
+          validUntil: validFrom + this.dependencies.validitySeconds,
+        },
+        preflight.preconditions,
+      );
+    } catch (error) {
+      await this.failBeforeSubmission(input.requestId, error);
+      throw error;
+    }
+
+    const attempt: ImmutableSharedIssuanceTransactionAttempt = {
+      attemptId: (this.dependencies.randomUuid ?? randomUUID)(),
+      issuanceRequestId: intent.issuanceRequestId,
+      issuanceIntentFingerprint: intent.issuanceIntentFingerprint,
+      attemptNumber: 1,
+      transactionHash: plan.transactionHash,
+      envelopeXdrSha256: sha256(plan.unsignedEnvelopeXdr),
+      sourceSequence: plan.sourceSequence,
+      feeStroops: plan.feeStroops,
+      validFrom: plan.validFrom,
+      validUntil: plan.validUntil,
+      transactionSourcePublicKey: intent.issuerPublicKey,
+      operationCount: 1,
+      operationType: "payment",
+      operationSourcePublicKey: intent.issuerPublicKey,
+      assetCode: intent.assetCode,
+      issuerPublicKey: intent.issuerPublicKey,
+      destinationPublicKey: intent.destinationPublicKey,
+      amount: intent.amount,
+      createdAt: new Date(now).toISOString(),
+    };
+
+    const stored = await this.dependencies.store.appendAttempt(attempt);
+    await loadAndAssertDurableSharedIssuerPlan({
+      reader: this.dependencies.store,
+      attemptId: stored.attemptId,
+      plan,
+    });
+    return manualHandoff(intent, stored, plan);
+  }
+
+  /**
+   * Accepts one operator-supplied signed envelope for the already-persisted
+   * attempt. The existing authorization boundary validates the exact Testnet
+   * transaction and signer, persists the signed digest, and only then performs
+   * the single Horizon submission.
+   */
+  async submitManualSignedEnvelope(input: {
+    requestId: string;
+    projectId: string;
+    ownerPublicKey: string;
+    signedEnvelopeXdr: string;
+  }): Promise<SharedIssuanceOrchestrationResult> {
+    const intent = await this.dependencies.store.getIntent(input.requestId);
+    if (!intent) throw new SharedIssuanceOrchestrationError("intent_not_found");
+    assertAuthenticatedIntent(input, intent);
+    this.assertManualIssuer(intent);
+
+    const durableConfirmation = await this.dependencies.store.getConfirmation(
+      input.requestId,
+    );
+    if (durableConfirmation) {
+      throw new SharedIssuanceOrchestrationError(
+        "manual_signing_already_consumed",
+      );
+    }
+
+    const attempts = await this.dependencies.store.listAttempts(input.requestId);
+    if (
+      attempts.length !== 1 ||
+      attempts[0]!.attemptNumber !== 1
+    ) {
+      throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
+    }
+    const attempt = attempts[0]!;
+    if (attempt.signedEnvelopeXdrSha256) {
+      throw new SharedIssuanceOrchestrationError(
+        "manual_signing_already_consumed",
+      );
+    }
+
+    const lifecycle = await this.dependencies.store.getLifecycle(input.requestId);
+    if (!lifecycle || lifecycle.status !== "pending_execution") {
+      throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
+    }
+
+    const plan = await this.loadCurrentManualPlan(intent, attempt);
+
+    try {
+      await persistAndSubmitSharedIssuerEnvelope({
+        writer: this.dependencies.store,
+        attemptId: attempt.attemptId,
+        plan,
+        signedEnvelopeXdr: input.signedEnvelopeXdr,
+        authorization: this.dependencies.authorization,
+        submission: this.dependencies.submission,
+      });
+      await this.dependencies.store.transition(input.requestId, "submitted");
+    } catch (error) {
+      const stored = await this.dependencies.store.getAttempt(attempt.attemptId);
+      if (stored?.signedEnvelopeXdrSha256) {
+        await this.dependencies.store.transition(
+          input.requestId,
+          "reconciliation_required",
+          "submission_reconciliation_required",
+        );
+        return {
+          status: "reconciliation_required",
+          transactionHash: stored.transactionHash,
+        };
+      }
+      throw error;
+    }
+
+    const persistedAttempt = await this.dependencies.store.getAttempt(
+      attempt.attemptId,
+    );
+    if (!persistedAttempt) {
+      throw new SharedIssuanceOrchestrationError("invalid_attempt_history");
+    }
+    return this.reconcile(intent, persistedAttempt);
+  }
+
+  private async loadCurrentManualPlan(
+    intent: ImmutableSharedIssuanceIntent,
+    attempt: ImmutableSharedIssuanceTransactionAttempt,
+  ): Promise<SharedIssuerIssuancePlan> {
+    const nowUnix = Math.floor(
+      (this.dependencies.now?.() ?? Date.now()) / 1_000,
+    );
+    if (nowUnix >= attempt.validUntil) {
+      throw new SharedIssuanceOrchestrationError(
+        "manual_signing_window_expired",
+      );
+    }
+
+    const preflight = await this.dependencies.preflight.readIssuancePreconditions({
+      issuerPublicKey: intent.issuerPublicKey,
+      destinationPublicKey: intent.destinationPublicKey,
+      assetCode: intent.assetCode,
+      assetCodeReservedForProject: true,
+      feeStroops: this.dependencies.feeStroops,
+    });
+    const plan = buildSharedIssuerIssuancePlan(
+      {
+        projectId: intent.projectId,
+        assetCode: intent.assetCode,
+        issuerPublicKey: intent.issuerPublicKey,
+        destinationPublicKey: intent.destinationPublicKey,
+        amount: intent.amount,
+        network: "testnet",
+        networkPassphrase: preflight.networkPassphrase,
+        validFrom: attempt.validFrom,
+        validUntil: attempt.validUntil,
+      },
+      preflight.preconditions,
+    );
+    await loadAndAssertDurableSharedIssuerPlan({
+      reader: this.dependencies.store,
+      attemptId: attempt.attemptId,
+      plan,
+    });
+    return plan;
+  }
+
+  private assertManualIssuer(intent: ImmutableSharedIssuanceIntent): void {
+    if (
+      this.dependencies.authorization.network !== "testnet" ||
+      this.dependencies.authorization.networkPassphrase !==
+        SHARED_ISSUER_TESTNET_PASSPHRASE ||
+      this.dependencies.authorization.issuerPublicKey !== intent.issuerPublicKey
+    ) {
+      throw new SharedIssuanceOrchestrationError("manual_issuer_mismatch");
+    }
+  }
+
   private async reconcile(
     intent: ImmutableSharedIssuanceIntent,
     attempt: ImmutableSharedIssuanceTransactionAttempt,
@@ -331,6 +622,33 @@ function assertAuthenticatedIntent(
   ) {
     throw new SharedIssuanceOrchestrationError("owner_intent_mismatch");
   }
+}
+
+function manualHandoff(
+  intent: ImmutableSharedIssuanceIntent,
+  attempt: ImmutableSharedIssuanceTransactionAttempt,
+  plan: SharedIssuerIssuancePlan,
+): ManualSharedIssuanceSigningHandoff {
+  return {
+    status: "awaiting_manual_signature",
+    requestId: intent.issuanceRequestId,
+    attemptId: attempt.attemptId,
+    projectId: intent.projectId,
+    ownerPublicKey: intent.ownerPublicKey,
+    network: "testnet",
+    networkPassphrase: SHARED_ISSUER_TESTNET_PASSPHRASE,
+    issuerPublicKey: intent.issuerPublicKey,
+    destinationPublicKey: intent.destinationPublicKey,
+    assetCode: intent.assetCode,
+    amount: intent.amount,
+    transactionHash: attempt.transactionHash,
+    unsignedEnvelopeXdr: plan.unsignedEnvelopeXdr,
+    unsignedEnvelopeXdrSha256: attempt.envelopeXdrSha256,
+    sourceSequence: attempt.sourceSequence,
+    feeStroops: attempt.feeStroops,
+    validFrom: attempt.validFrom,
+    validUntil: attempt.validUntil,
+  };
 }
 
 function confirmed(
