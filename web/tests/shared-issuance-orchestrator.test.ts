@@ -348,6 +348,38 @@ function extraOperationSignedEnvelope() {
   return transaction.toXDR();
 }
 
+function singlePaymentVariantSignedEnvelope(
+  options: {
+    accountSequence?: string;
+    assetIssuerPublicKey?: string;
+    duplicateIssuerSignature?: boolean;
+  } = {},
+) {
+  const account = new Account(ISSUER, options.accountSequence ?? "123");
+  const asset = new Asset(
+    "NOVA",
+    options.assetIssuerPublicKey ?? ISSUER,
+  );
+  const transaction = new TransactionBuilder(account, {
+    fee: "100",
+    networkPassphrase: Networks.TESTNET,
+  })
+    .addOperation(
+      Operation.payment({
+        destination: OWNER,
+        asset,
+        amount: "25.0000000",
+      }),
+    )
+    .setTimebounds(Math.floor(NOW / 1_000), Math.floor(NOW / 1_000) + 300)
+    .build();
+  transaction.sign(ISSUER_KEYPAIR);
+  if (options.duplicateIssuerSignature) {
+    transaction.sign(ISSUER_KEYPAIR);
+  }
+  return transaction.toXDR();
+}
+
 function errorCode(error: unknown): string | undefined {
   return error && typeof error === "object" && "code" in error
     ? String(error.code)
@@ -580,8 +612,24 @@ test("manual signed-envelope bridge accepts only the exact persisted Testnet tra
       ),
     },
     {
+      name: "changed source sequence",
+      xdr: singlePaymentVariantSignedEnvelope({ accountSequence: "124" }),
+    },
+    {
+      name: "wrong issuer on asset",
+      xdr: singlePaymentVariantSignedEnvelope({
+        assetIssuerPublicKey: OTHER_ISSUER_KEYPAIR.publicKey(),
+      }),
+    },
+    {
       name: "extra operation",
       xdr: extraOperationSignedEnvelope(),
+    },
+    {
+      name: "extra issuer signature",
+      xdr: singlePaymentVariantSignedEnvelope({
+        duplicateIssuerSignature: true,
+      }),
     },
     {
       name: "wrong network signature",
