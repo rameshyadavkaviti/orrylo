@@ -336,7 +336,9 @@ export class SharedIssuanceOrchestrator {
       return manualHandoff(intent, attempts[0], plan);
     }
 
-    const lifecycle = await this.dependencies.store.getLifecycle(input.requestId);
+    const lifecycle = await this.dependencies.store.getLifecycle(
+      input.requestId,
+    );
     if (!lifecycle || lifecycle.status !== "awaiting_issuer_integration") {
       throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
     }
@@ -444,10 +446,7 @@ export class SharedIssuanceOrchestrator {
     }
 
     const attempts = await this.dependencies.store.listAttempts(input.requestId);
-    if (
-      attempts.length !== 1 ||
-      attempts[0]!.attemptNumber !== 1
-    ) {
+    if (attempts.length !== 1 || attempts[0]!.attemptNumber !== 1) {
       throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
     }
     const attempt = attempts[0]!;
@@ -457,7 +456,9 @@ export class SharedIssuanceOrchestrator {
       );
     }
 
-    const lifecycle = await this.dependencies.store.getLifecycle(input.requestId);
+    const lifecycle = await this.dependencies.store.getLifecycle(
+      input.requestId,
+    );
     if (!lifecycle || lifecycle.status !== "pending_execution") {
       throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
     }
@@ -545,13 +546,14 @@ export class SharedIssuanceOrchestrator {
       );
     }
 
-    const preflight = await this.dependencies.preflight.readIssuancePreconditions({
-      issuerPublicKey: intent.issuerPublicKey,
-      destinationPublicKey: intent.destinationPublicKey,
-      assetCode: intent.assetCode,
-      assetCodeReservedForProject: true,
-      feeStroops: this.dependencies.feeStroops,
-    });
+    const preflight =
+      await this.dependencies.preflight.readIssuancePreconditions({
+        issuerPublicKey: intent.issuerPublicKey,
+        destinationPublicKey: intent.destinationPublicKey,
+        assetCode: intent.assetCode,
+        assetCodeReservedForProject: true,
+        feeStroops: this.dependencies.feeStroops,
+      });
     const plan = buildSharedIssuerIssuancePlan(
       {
         projectId: intent.projectId,
