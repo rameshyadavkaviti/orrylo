@@ -166,6 +166,90 @@ process interruption after signed provenance, or uncertainty about whether the
 transaction reached Horizon is potentially successful. Stop all signing and
 submission activity and reconcile only the already-persisted exact hash.
 
+## 4.1 Bounded owner-local manual signing bridge
+
+For the first Testnet issuance only, the repository also provides an
+operator-local handoff path that preserves the same immutable attempt,
+signature validation, signed-envelope provenance, one-shot submission and
+exact-hash reconciliation guarantees as the private signer path.
+
+This is **not** a browser API, generic XDR-signing endpoint, replacement signer
+architecture, or Mainnet facility. It never loads a Stellar secret key. The
+owner's Stellar CLI identity remains entirely in the local Stellar secure store.
+
+After the normal application flow has created the immutable full issuance
+intent, run the existing read-only checks, then prepare attempt 1:
+
+```sh
+cd web
+
+npm run db:verify:read-only
+
+npm run activation:verify:testnet -- \
+  --destination "$CUSTOMER" \
+  --asset-code "$ASSET_CODE" \
+  --amount "$INITIAL_SUPPLY"
+
+npm run issuance:manual:testnet -- prepare \
+  --request-id "$REQUEST_ID" \
+  --project-id "$PROJECT_ID" \
+  --owner "$CUSTOMER" \
+  --unsigned-xdr-file ./orrylo-attempt-1-unsigned.xdr
+```
+
+The prepare command persists/reloads **attempt 1 only**, rechecks the official
+Testnet preflight, verifies the reconstructed unsigned envelope against durable
+intent/attempt evidence, writes the non-secret exact XDR to the requested local
+file, and stops before any signing or submission.
+
+Sign that exact file locally through the owner's secure-store identity:
+
+```sh
+stellar tx sign \
+  --network testnet \
+  --sign-with-key orrylo-mvp-testnet-shared-issuer \
+  ./orrylo-attempt-1-unsigned.xdr \
+  > ./orrylo-attempt-1-signed.xdr
+```
+
+The Stellar CLI accepts a base64 transaction-envelope XDR file as the
+`stellar tx sign` input and appends the selected local identity's signature.
+No seed export is required.
+
+Return the signed file through the local operator command:
+
+```sh
+npm run issuance:manual:testnet -- submit \
+  --request-id "$REQUEST_ID" \
+  --project-id "$PROJECT_ID" \
+  --owner "$CUSTOMER" \
+  --signed-xdr-file ./orrylo-attempt-1-signed.xdr
+```
+
+Before Horizon submission, Orrylo independently reconstructs the current exact
+attempt, requires the unchanged Testnet issuer/source, transaction hash,
+one-payment operation, asset, destination, amount, sequence, fee and time
+bounds, validates the approved issuer signature, and persists the decorated
+signed-envelope SHA-256 digest. Only then may the existing official-Horizon
+one-shot submission adapter run.
+
+If the command returns `confirming` or `reconciliation_required`, never run
+`submit` again. The signed-envelope path is consumed once and every second
+signed-envelope attempt is rejected. Reconcile the same exact transaction hash
+only:
+
+```sh
+npm run issuance:manual:testnet -- reconcile \
+  --request-id "$REQUEST_ID" \
+  --project-id "$PROJECT_ID" \
+  --owner "$CUSTOMER"
+```
+
+The manual transaction keeps the existing 300-second validity window. If the
+persisted unsigned attempt expires before its first valid signed envelope is
+accepted, this bridge fails closed: it does not rebuild, re-sign, create
+attempt 2, or silently replace the transaction.
+
 ## 5. Dry-run proof already present on current main
 
 The merged deterministic suites already prove the production-shaped control
