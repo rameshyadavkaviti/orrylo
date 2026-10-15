@@ -22,6 +22,7 @@ const ALL_MIGRATIONS = [
   "008_gate_a_confirmation_provenance.sql",
   "009_signed_envelope_digest.sql",
   "010_mvp_lite_db_security_hardening.sql",
+  "011_shared_issuance_signing_mode.sql",
 ];
 
 if (!TEST_DATABASE_URL) {
@@ -42,6 +43,16 @@ if (!TEST_DATABASE_URL) {
 
     await sql.unsafe("DROP SCHEMA public CASCADE");
     await sql.unsafe("CREATE SCHEMA public");
+    await sql.unsafe(`
+      DO $role$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_app') THEN
+          CREATE ROLE orrylo_app LOGIN PASSWORD 'migration-app-test';
+        END IF;
+      END;
+      $role$;
+      ALTER ROLE orrylo_app LOGIN PASSWORD 'migration-app-test';
+    `);
   });
 
   after(async () => {
@@ -71,7 +82,17 @@ if (!TEST_DATABASE_URL) {
     `;
   }
 
-  test("fresh bootstrap applies 001-010 and repeated runs verify without changes", async () => {
+  async function verifyCurrentSchemaReadOnly(): Promise<void> {
+    // Existing production state before migration 011 already grants this
+    // single signed-envelope provenance column to orrylo_app.
+    await sql`
+      GRANT UPDATE (signed_envelope_xdr_sha256)
+        ON project_issuance_transaction_attempts TO orrylo_app
+    `;
+    await verifyDatabaseSchemaReadOnly(sql, directory);
+  }
+
+  test("fresh bootstrap applies 001-011 and repeated runs verify without changes", async () => {
     const first = await migrateDatabase(sql, directory);
     assert.deepEqual(first.applied, ALL_MIGRATIONS);
     assert.deepEqual(first.reconciled, []);
@@ -83,10 +104,182 @@ if (!TEST_DATABASE_URL) {
     assert.deepEqual(again.verified, ALL_MIGRATIONS);
   });
 
+  test("existing 001-010 production ACL upgrades through 011 with only the signing-mode grant", async () => {
+    const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-signing-mode-"));
+    try {
+      for (const migration of ALL_MIGRATIONS.slice(0, 10)) {
+        await copyFile(join(directory, migration), join(temporary, migration));
+      }
+      const initial = await migrateDatabase(sql, temporary);
+      assert.deepEqual(initial.applied, ALL_MIGRATIONS.slice(0, 10));
+
+      await sql`
+        GRANT UPDATE (signed_envelope_xdr_sha256)
+          ON project_issuance_transaction_attempts TO orrylo_app
+      `;
+
+      const [writerBefore] = await sql<
+        {
+          full_intents_select: boolean;
+          attempts_select: boolean;
+          confirmations_select: boolean;
+          confirmations_insert: boolean;
+          confirmations_update: boolean;
+          confirmations_delete: boolean;
+          confirmations_truncate: boolean;
+        }[]
+      >`
+        SELECT
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_full_intents',
+            'SELECT'
+          ) AS full_intents_select,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_transaction_attempts',
+            'SELECT'
+          ) AS attempts_select,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'SELECT'
+          ) AS confirmations_select,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'INSERT'
+          ) AS confirmations_insert,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'UPDATE'
+          ) AS confirmations_update,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'DELETE'
+          ) AS confirmations_delete,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'TRUNCATE'
+          ) AS confirmations_truncate
+      `;
+
+      const upgraded = await migrateDatabase(sql, directory);
+      assert.deepEqual(upgraded.applied, [
+        "011_shared_issuance_signing_mode.sql",
+      ]);
+      assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 10));
+
+      const [appAcl] = await sql<
+        {
+          table_update: boolean;
+          signing_mode_update: boolean;
+          signed_envelope_update: boolean;
+          source_sequence_update: boolean;
+        }[]
+      >`
+        SELECT
+          pg_catalog.has_table_privilege(
+            'orrylo_app',
+            'public.project_issuance_transaction_attempts',
+            'UPDATE'
+          ) AS table_update,
+          pg_catalog.has_column_privilege(
+            'orrylo_app',
+            'public.project_issuance_transaction_attempts',
+            'signing_mode',
+            'UPDATE'
+          ) AS signing_mode_update,
+          pg_catalog.has_column_privilege(
+            'orrylo_app',
+            'public.project_issuance_transaction_attempts',
+            'signed_envelope_xdr_sha256',
+            'UPDATE'
+          ) AS signed_envelope_update,
+          pg_catalog.has_column_privilege(
+            'orrylo_app',
+            'public.project_issuance_transaction_attempts',
+            'source_sequence',
+            'UPDATE'
+          ) AS source_sequence_update
+      `;
+      assert.equal(appAcl.table_update, false);
+      assert.equal(appAcl.signing_mode_update, true);
+      assert.equal(appAcl.signed_envelope_update, true);
+      assert.equal(appAcl.source_sequence_update, false);
+
+      const [writerAfter] = await sql<
+        {
+          full_intents_select: boolean;
+          attempts_select: boolean;
+          confirmations_select: boolean;
+          confirmations_insert: boolean;
+          confirmations_update: boolean;
+          confirmations_delete: boolean;
+          confirmations_truncate: boolean;
+        }[]
+      >`
+        SELECT
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_full_intents',
+            'SELECT'
+          ) AS full_intents_select,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_transaction_attempts',
+            'SELECT'
+          ) AS attempts_select,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'SELECT'
+          ) AS confirmations_select,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'INSERT'
+          ) AS confirmations_insert,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'UPDATE'
+          ) AS confirmations_update,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'DELETE'
+          ) AS confirmations_delete,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'TRUNCATE'
+          ) AS confirmations_truncate
+      `;
+      assert.deepEqual(writerAfter, writerBefore);
+
+      await assert.doesNotReject(verifyCurrentSchemaReadOnly());
+
+      await sql`
+        REVOKE UPDATE (signing_mode)
+          ON project_issuance_transaction_attempts FROM orrylo_app
+      `;
+      await assert.rejects(
+        verifyCurrentSchemaReadOnly(),
+        /Missing or unsafe orrylo_app attempt UPDATE ACL/,
+      );
+    } finally {
+      await rm(temporary, { recursive: true, force: true });
+    }
+  });
+
   test("read-only schema verification accepts the exact trusted confirmation trigger binding", async () => {
     await migrateDatabase(sql, directory);
 
-    await assert.doesNotReject(verifyDatabaseSchemaReadOnly(sql, directory));
+    await assert.doesNotReject(verifyCurrentSchemaReadOnly());
   });
 
   test("read-only schema verification rejects a conditional trusted confirmation trigger", async () => {
@@ -102,7 +295,7 @@ if (!TEST_DATABASE_URL) {
     `);
 
     await assert.rejects(
-      verifyDatabaseSchemaReadOnly(sql, directory),
+      verifyCurrentSchemaReadOnly(),
       /trusted confirmation writing\/trigger binding/,
     );
   });
@@ -115,7 +308,7 @@ if (!TEST_DATABASE_URL) {
     `);
 
     await assert.rejects(
-      verifyDatabaseSchemaReadOnly(sql, directory),
+      verifyCurrentSchemaReadOnly(),
       /trusted confirmation writing\/trigger binding/,
     );
   });
@@ -128,7 +321,7 @@ if (!TEST_DATABASE_URL) {
     `);
 
     await assert.rejects(
-      verifyDatabaseSchemaReadOnly(sql, directory),
+      verifyCurrentSchemaReadOnly(),
       /trusted confirmation writing\/trigger binding/,
     );
   });
@@ -145,7 +338,7 @@ if (!TEST_DATABASE_URL) {
     `);
 
     await assert.rejects(
-      verifyDatabaseSchemaReadOnly(sql, directory),
+      verifyCurrentSchemaReadOnly(),
       /trusted confirmation writing\/trigger binding/,
     );
   });
@@ -162,12 +355,12 @@ if (!TEST_DATABASE_URL) {
     `);
 
     await assert.rejects(
-      verifyDatabaseSchemaReadOnly(sql, directory),
+      verifyCurrentSchemaReadOnly(),
       /trusted confirmation writing\/trigger binding/,
     );
   });
 
-  test("existing 001-005 database upgrades with 006-010 without rewriting earlier checksums or project rows", async () => {
+  test("existing 001-005 database upgrades with 006-011 without rewriting earlier checksums or project rows", async () => {
     const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-metadata-"));
     try {
       for (const migration of ALL_MIGRATIONS.slice(0, 5)) {
@@ -195,6 +388,7 @@ if (!TEST_DATABASE_URL) {
         "008_gate_a_confirmation_provenance.sql",
         "009_signed_envelope_digest.sql",
         "010_mvp_lite_db_security_hardening.sql",
+        "011_shared_issuance_signing_mode.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 5));
       const after = await sql<{ name: string; checksum: string }[]>`
@@ -214,7 +408,7 @@ if (!TEST_DATABASE_URL) {
     }
   });
 
-  test("existing 001-006 publication rows are retained but fail closed during 007-010 upgrade", async () => {
+  test("existing 001-006 publication rows are retained but fail closed during 007-011 upgrade", async () => {
     const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-confirmation-"));
     try {
       for (const migration of ALL_MIGRATIONS.slice(0, 6)) {
@@ -261,6 +455,7 @@ if (!TEST_DATABASE_URL) {
         "008_gate_a_confirmation_provenance.sql",
         "009_signed_envelope_digest.sql",
         "010_mvp_lite_db_security_hardening.sql",
+        "011_shared_issuance_signing_mode.sql",
       ]);
       const [legacy] = await sql<
         {
@@ -298,6 +493,7 @@ if (!TEST_DATABASE_URL) {
         "008_gate_a_confirmation_provenance.sql",
         "009_signed_envelope_digest.sql",
         "010_mvp_lite_db_security_hardening.sql",
+        "011_shared_issuance_signing_mode.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 7));
       const after = await sql<{ name: string; checksum: string }[]>`
@@ -323,6 +519,7 @@ if (!TEST_DATABASE_URL) {
       assert.deepEqual(upgraded.applied, [
         "009_signed_envelope_digest.sql",
         "010_mvp_lite_db_security_hardening.sql",
+        "011_shared_issuance_signing_mode.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 8));
       const after = await sql<{ name: string; checksum: string }[]>`
@@ -334,7 +531,7 @@ if (!TEST_DATABASE_URL) {
     }
   });
 
-  test("existing 001-009 successor attempts survive 010 while new successor writes fail closed", async () => {
+  test("existing 001-009 successor attempts survive 010-011 while new successor writes fail closed", async () => {
     const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-db-hardening-"));
     try {
       for (const migration of ALL_MIGRATIONS.slice(0, 9)) {
@@ -570,6 +767,7 @@ if (!TEST_DATABASE_URL) {
       const upgraded = await migrateDatabase(sql, directory);
       assert.deepEqual(upgraded.applied, [
         "010_mvp_lite_db_security_hardening.sql",
+        "011_shared_issuance_signing_mode.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 9));
 
@@ -617,26 +815,18 @@ if (!TEST_DATABASE_URL) {
       ]);
 
       await sql.unsafe(`
-        DO $$
-        BEGIN
-          IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_gate_a_upgrade_app_test') THEN
-            CREATE ROLE orrylo_gate_a_upgrade_app_test LOGIN PASSWORD 'gate-a-upgrade-app-test';
-          END IF;
-        END;
-        $$;
-        ALTER ROLE orrylo_gate_a_upgrade_app_test PASSWORD 'gate-a-upgrade-app-test';
-        GRANT USAGE ON SCHEMA public TO orrylo_gate_a_upgrade_app_test;
+        ALTER ROLE orrylo_app PASSWORD 'gate-a-upgrade-app-test';
+        GRANT USAGE ON SCHEMA public TO orrylo_app;
         GRANT SELECT, INSERT ON project_issuance_full_intents,
-          project_issuance_transaction_attempts TO orrylo_gate_a_upgrade_app_test;
+          project_issuance_transaction_attempts TO orrylo_app;
         GRANT UPDATE (signed_envelope_xdr_sha256)
-          ON project_issuance_transaction_attempts
-          TO orrylo_gate_a_upgrade_app_test;
+          ON project_issuance_transaction_attempts TO orrylo_app;
         GRANT SELECT, INSERT, UPDATE ON project_metadata_publications
-          TO orrylo_gate_a_upgrade_app_test;
+          TO orrylo_app;
       `);
 
       const appUrl = new URL(databaseUrl);
-      appUrl.username = "orrylo_gate_a_upgrade_app_test";
+      appUrl.username = "orrylo_app";
       appUrl.password = "gate-a-upgrade-app-test";
       const appSql = createDatabaseClient(appUrl.toString());
       try {

@@ -40,11 +40,7 @@ if (!TEST_DATABASE_URL) {
   );
 } else {
   const admin = createDatabaseClient(TEST_DATABASE_URL);
-  const appUrl = roleUrl(
-    TEST_DATABASE_URL,
-    "orrylo_gate_a_app_test",
-    "gate-a-app-test",
-  );
+  const appUrl = roleUrl(TEST_DATABASE_URL, "orrylo_app", "gate-a-app-test");
   const writerUrl = roleUrl(
     TEST_DATABASE_URL,
     "orrylo_gate_a_writer_test",
@@ -70,25 +66,32 @@ if (!TEST_DATABASE_URL) {
     }
     await admin.unsafe("DROP SCHEMA public CASCADE");
     await admin.unsafe("CREATE SCHEMA public");
+    await admin.unsafe(`
+      DO $role$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_app') THEN
+          CREATE ROLE orrylo_app LOGIN PASSWORD 'gate-a-app-test';
+        END IF;
+      END;
+      $role$;
+      ALTER ROLE orrylo_app LOGIN PASSWORD 'gate-a-app-test';
+    `);
     await migrateDatabase(admin, resolve(process.cwd(), "db/migrations"));
     await admin.unsafe(`
-      DO $$
+      DO $role$
       BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_gate_a_app_test') THEN
-          CREATE ROLE orrylo_gate_a_app_test LOGIN PASSWORD 'gate-a-app-test';
-        END IF;
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_gate_a_writer_test') THEN
           CREATE ROLE orrylo_gate_a_writer_test LOGIN PASSWORD 'gate-a-writer-test';
         END IF;
       END;
-      $$;
-      ALTER ROLE orrylo_gate_a_app_test PASSWORD 'gate-a-app-test';
+      $role$;
       ALTER ROLE orrylo_gate_a_writer_test PASSWORD 'gate-a-writer-test';
-      GRANT USAGE ON SCHEMA public TO orrylo_gate_a_app_test;
+      REVOKE orrylo_confirmation_writer FROM orrylo_app;
+      GRANT USAGE ON SCHEMA public TO orrylo_app;
       GRANT SELECT, INSERT ON project_issuance_full_intents,
-        project_issuance_transaction_attempts TO orrylo_gate_a_app_test;
+        project_issuance_transaction_attempts TO orrylo_app;
       GRANT UPDATE (signed_envelope_xdr_sha256)
-        ON project_issuance_transaction_attempts TO orrylo_gate_a_app_test;
+        ON project_issuance_transaction_attempts TO orrylo_app;
       GRANT orrylo_confirmation_writer TO orrylo_gate_a_writer_test;
     `);
     repository = new PostgresSharedIssuancePersistenceRepository(
@@ -223,6 +226,18 @@ if (!TEST_DATABASE_URL) {
       signedEnvelopeXdr,
       signedEnvelopeXdrSha256,
     };
+  }
+
+  async function claimPrivateSigning(
+    attempt: ImmutableSharedIssuanceTransactionAttempt,
+  ) {
+    const claimed = await repository.claimSigningMode({
+      attemptId: attempt.attemptId,
+      transactionHash: attempt.transactionHash,
+      signingMode: "private",
+    });
+    assert.equal(claimed?.signingMode, "private");
+    return claimed;
   }
 
   test("application and trusted-writer identities are mutually isolated from the migration owner", async () => {
@@ -369,6 +384,7 @@ if (!TEST_DATABASE_URL) {
     `;
     assert.equal(count, "1");
 
+    await claimPrivateSigning(attempt);
     const recorded = await repository.recordSignedEnvelope({
       attemptId: attempt.attemptId,
       transactionHash: attempt.transactionHash,
@@ -416,24 +432,95 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
+  test("signing mode has exactly one concurrent winner and cannot switch", async () => {
+    const { intent, attempt } = await createFixture();
+    await repository.appendIntent(intent);
+    await repository.appendAttempt(attempt);
+
+    const [privateClaim, manualClaim] = await Promise.all([
+      repository.claimSigningMode({
+        attemptId: attempt.attemptId,
+        transactionHash: attempt.transactionHash,
+        signingMode: "private",
+      }),
+      repository.claimSigningMode({
+        attemptId: attempt.attemptId,
+        transactionHash: attempt.transactionHash,
+        signingMode: "manual",
+      }),
+    ]);
+
+    const winners = [privateClaim, manualClaim].filter(
+      (claim): claim is ImmutableSharedIssuanceTransactionAttempt =>
+        claim !== null,
+    );
+    assert.equal(winners.length, 1);
+    assert.ok(
+      winners[0]!.signingMode === "private" ||
+        winners[0]!.signingMode === "manual",
+    );
+
+    const stored = await repository.getAttempt(attempt.attemptId);
+    assert.equal(stored?.signingMode, winners[0]!.signingMode);
+    assert.equal(stored?.signedEnvelopeXdrSha256, undefined);
+
+    assert.equal(
+      await repository.claimSigningMode({
+        attemptId: attempt.attemptId,
+        transactionHash: attempt.transactionHash,
+        signingMode: winners[0]!.signingMode!,
+      }),
+      null,
+    );
+
+    await assert.rejects(
+      appSql`
+        UPDATE project_issuance_transaction_attempts
+        SET signing_mode = ${winners[0]!.signingMode === "private" ? "manual" : "private"}
+        WHERE attempt_id = ${attempt.attemptId}
+      `,
+      /append-only/,
+    );
+  });
+
+  test("signed-envelope provenance cannot be persisted before signing mode ownership", async () => {
+    const { intent, attempt, signedEnvelopeXdrSha256 } = await createFixture();
+    await repository.appendIntent(intent);
+    await repository.appendAttempt(attempt);
+
+    await assert.rejects(
+      repository.recordSignedEnvelope({
+        attemptId: attempt.attemptId,
+        transactionHash: attempt.transactionHash,
+        signedEnvelopeXdrSha256,
+      }),
+      SharedIssuancePersistenceConflictError,
+    );
+    assert.equal(
+      (await repository.getAttempt(attempt.attemptId))?.signedEnvelopeXdrSha256,
+      undefined,
+    );
+  });
+
   test("signed-envelope digest has one immutable pre-submission transition", async () => {
     const { intent, attempt, signedEnvelopeXdrSha256 } = await createFixture();
     await repository.appendIntent(intent);
     await repository.appendAttempt(attempt);
 
+    await claimPrivateSigning(attempt);
     const recorded = await repository.recordSignedEnvelope({
       attemptId: attempt.attemptId,
       transactionHash: attempt.transactionHash,
       signedEnvelopeXdrSha256,
     });
     assert.equal(recorded.signedEnvelopeXdrSha256, signedEnvelopeXdrSha256);
-    assert.deepEqual(
-      await repository.recordSignedEnvelope({
+    await assert.rejects(
+      repository.recordSignedEnvelope({
         attemptId: attempt.attemptId,
         transactionHash: attempt.transactionHash,
         signedEnvelopeXdrSha256,
       }),
-      recorded,
+      SharedIssuancePersistenceConflictError,
     );
     await assert.rejects(
       repository.recordSignedEnvelope({
@@ -451,11 +538,48 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
+  test("signed-envelope claim has exactly one concurrent winner", async () => {
+    const { intent, attempt, signedEnvelopeXdrSha256 } = await createFixture();
+    await repository.appendIntent(intent);
+    await repository.appendAttempt(attempt);
+    await claimPrivateSigning(attempt);
+
+    const results = await Promise.allSettled([
+      repository.recordSignedEnvelope({
+        attemptId: attempt.attemptId,
+        transactionHash: attempt.transactionHash,
+        signedEnvelopeXdrSha256,
+      }),
+      repository.recordSignedEnvelope({
+        attemptId: attempt.attemptId,
+        transactionHash: attempt.transactionHash,
+        signedEnvelopeXdrSha256,
+      }),
+    ]);
+
+    assert.equal(
+      results.filter((result) => result.status === "fulfilled").length,
+      1,
+    );
+    const rejected = results.filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    assert.equal(rejected.length, 1);
+    assert.ok(
+      rejected[0]!.reason instanceof SharedIssuancePersistenceConflictError,
+    );
+    assert.equal(
+      (await repository.getAttempt(attempt.attemptId))?.signedEnvelopeXdrSha256,
+      signedEnvelopeXdrSha256,
+    );
+  });
+
   test("only validated ledger evidence can be written and confirmation replay is immutable", async () => {
     const { intent, attempt, signedEnvelopeXdr, signedEnvelopeXdrSha256 } =
       await createFixture();
     await repository.appendIntent(intent);
     await repository.appendAttempt(attempt);
+    await claimPrivateSigning(attempt);
     const persistedAttempt = await repository.recordSignedEnvelope({
       attemptId: attempt.attemptId,
       transactionHash: attempt.transactionHash,
