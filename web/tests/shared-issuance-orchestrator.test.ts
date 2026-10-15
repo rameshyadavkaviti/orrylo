@@ -531,12 +531,17 @@ test("manual signed-envelope bridge accepts only the exact persisted Testnet tra
     handoff.unsignedEnvelopeXdr,
     Networks.TESTNET,
   );
+  const wrongSignature = TransactionBuilder.fromXDR(
+    handoff.unsignedEnvelopeXdr,
+    Networks.TESTNET,
+  );
   assert.ok(malformed instanceof Transaction);
+  assert.ok(wrongSignature instanceof Transaction);
   malformed.sign(ISSUER_KEYPAIR);
-  const validSignature = malformed.signatures[0]!;
+  wrongSignature.sign(WRONG_SIGNER_KEYPAIR);
   malformed.signatures[0] = new xdr.DecoratedSignature({
-    hint: validSignature.hint,
-    signature: Buffer.alloc(validSignature.signature.length, 7),
+    hint: malformed.signatures[0]!.hint,
+    signature: wrongSignature.signatures[0]!.signature,
   });
 
   const cases = [
@@ -595,7 +600,7 @@ test("manual signed-envelope bridge accepts only the exact persisted Testnet tra
           ...input,
           signedEnvelopeXdr: candidate.xdr,
         }),
-      undefined,
+      (error: unknown) => error instanceof Error,
       candidate.name,
     );
     assert.equal(
