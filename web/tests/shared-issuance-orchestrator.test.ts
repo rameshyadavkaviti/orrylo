@@ -719,7 +719,7 @@ test("private signer mode claim is never retried after signer failure", async ()
   assert.equal(fx.store.attempts[0]!.signingMode, "private");
 
   const second = await fx.orchestrator.startOrResume(input);
-  assert.equal(second.status, "preparing_issuance");
+  assert.equal(second.status, "failed_before_submission");
   assert.equal(signerCalls, 1);
   assert.equal(fx.submissions(), 0);
   assert.equal(fx.store.attempts.length, 1);
