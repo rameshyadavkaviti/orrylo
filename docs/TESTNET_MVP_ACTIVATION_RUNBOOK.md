@@ -201,8 +201,16 @@ npm run issuance:manual:testnet -- prepare \
 
 The prepare command persists/reloads **attempt 1 only**, rechecks the official
 Testnet preflight, verifies the reconstructed unsigned envelope against durable
-intent/attempt evidence, writes the non-secret exact XDR to the requested local
-file, and stops before any signing or submission.
+intent/attempt evidence, atomically claims durable signing mode `manual`, writes
+the non-secret exact XDR to the requested local file, and stops before any
+signing or submission. That mode claim happens before the XDR is returned. A
+second manual prepare, or a private-signer path that already claimed `private`,
+fails closed and cannot produce another signable handoff.
+
+The normal private-signer path uses the same one-winner database boundary and
+must atomically claim `private` before invoking the private signer. Signing mode
+is immutable once claimed. Exactly one of `manual` or `private` can ever own
+attempt 1.
 
 Sign that exact file locally through the owner's secure-store identity:
 
@@ -229,11 +237,11 @@ npm run issuance:manual:testnet -- submit \
 ```
 
 Before Horizon submission, Orrylo independently reconstructs the current exact
-attempt, requires the unchanged Testnet issuer/source, transaction hash,
-one-payment operation, asset, destination, amount, sequence, fee and time
-bounds, validates the approved issuer signature, and persists the decorated
-signed-envelope SHA-256 digest. Only then may the existing official-Horizon
-one-shot submission adapter run.
+attempt, requires durable `manual` ownership plus the unchanged Testnet
+issuer/source, transaction hash, one-payment operation, asset, destination,
+amount, sequence, fee and time bounds, validates the approved issuer signature,
+and persists the decorated signed-envelope SHA-256 digest. Only then may the
+existing official-Horizon one-shot submission adapter run.
 
 If the command returns `confirming` or `reconciliation_required`, never run
 `submit` again. The signed-envelope path is consumed once and every second
@@ -297,11 +305,13 @@ owner escalation, and database-enforced read-only inspection.
 
 ### POST-MVP
 
-- Crash after `pending_execution` before attempt persistence can strand the
-  lifecycle.
 - Authoritative Horizon `failed` currently remains `confirming`.
 
-These two already-approved post-MVP issues are intentionally untouched here.
+The former `pending_execution` / missing-attempt crash window is closed by the
+manual-signing remediation: attempt 1 is persisted before a fresh lifecycle
+claim, and an existing legacy `pending_execution` row with no attempt remains
+retryable until exactly attempt 1 is created. No attempt 2 or replacement
+transaction is introduced.
 
 ### MAINNET / PRODUCTION ONLY
 
