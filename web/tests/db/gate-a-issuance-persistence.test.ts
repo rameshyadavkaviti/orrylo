@@ -474,8 +474,7 @@ if (!TEST_DATABASE_URL) {
       1,
     );
     const rejected = results.filter(
-      (result): result is PromiseRejectedResult =>
-        result.status === "rejected",
+      (result): result is PromiseRejectedResult => result.status === "rejected",
     );
     assert.equal(rejected.length, 1);
     assert.ok(
