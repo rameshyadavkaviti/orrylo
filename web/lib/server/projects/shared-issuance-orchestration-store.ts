@@ -2,6 +2,7 @@ import type { SharedIssuanceApplicationDatabaseBoundary } from "../persistence/i
 import {
   PostgresSharedIssuancePersistenceRepository,
   type ImmutableSharedIssuanceTransactionAttempt,
+  type SharedIssuanceSigningMode,
 } from "./shared-issuance-persistence";
 import type { SharedIssuanceOrchestrationStore } from "./shared-issuance-orchestrator";
 import type { TestnetIssuanceStatus } from "./testnet-issuance-service";
@@ -38,6 +39,13 @@ export class PostgresSharedIssuanceOrchestrationStore implements SharedIssuanceO
   }
   appendAttempt(attempt: ImmutableSharedIssuanceTransactionAttempt) {
     return this.repository.appendAttempt(attempt);
+  }
+  claimSigningMode(input: {
+    attemptId: string;
+    transactionHash: string;
+    signingMode: SharedIssuanceSigningMode;
+  }) {
+    return this.repository.claimSigningMode(input);
   }
   recordSignedEnvelope(input: {
     attemptId: string;
