@@ -167,9 +167,6 @@ export class SharedIssuanceOrchestrator {
     if (attempt?.signedEnvelopeXdrSha256) {
       return this.reconcile(intent, attempt);
     }
-    if (attempt?.signingMode) {
-      return { status: "preparing_issuance" };
-    }
 
     const lifecycle = await this.dependencies.store.getLifecycle(
       input.requestId,
@@ -182,6 +179,9 @@ export class SharedIssuanceOrchestrator {
         failureCode:
           lifecycle.failureCode ?? "execution_failed_before_submission",
       };
+    }
+    if (attempt?.signingMode) {
+      return { status: "preparing_issuance" };
     }
     if (
       lifecycle.status !== "awaiting_issuer_integration" &&
