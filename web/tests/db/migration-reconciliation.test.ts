@@ -815,26 +815,18 @@ if (!TEST_DATABASE_URL) {
       ]);
 
       await sql.unsafe(`
-        DO $$
-        BEGIN
-          IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_gate_a_upgrade_app_test') THEN
-            CREATE ROLE orrylo_gate_a_upgrade_app_test LOGIN PASSWORD 'gate-a-upgrade-app-test';
-          END IF;
-        END;
-        $$;
-        ALTER ROLE orrylo_gate_a_upgrade_app_test PASSWORD 'gate-a-upgrade-app-test';
-        GRANT USAGE ON SCHEMA public TO orrylo_gate_a_upgrade_app_test;
+        ALTER ROLE orrylo_app PASSWORD 'gate-a-upgrade-app-test';
+        GRANT USAGE ON SCHEMA public TO orrylo_app;
         GRANT SELECT, INSERT ON project_issuance_full_intents,
-          project_issuance_transaction_attempts TO orrylo_gate_a_upgrade_app_test;
-        GRANT UPDATE (signing_mode, signed_envelope_xdr_sha256)
-          ON project_issuance_transaction_attempts
-          TO orrylo_gate_a_upgrade_app_test;
+          project_issuance_transaction_attempts TO orrylo_app;
+        GRANT UPDATE (signed_envelope_xdr_sha256)
+          ON project_issuance_transaction_attempts TO orrylo_app;
         GRANT SELECT, INSERT, UPDATE ON project_metadata_publications
-          TO orrylo_gate_a_upgrade_app_test;
+          TO orrylo_app;
       `);
 
       const appUrl = new URL(databaseUrl);
-      appUrl.username = "orrylo_gate_a_upgrade_app_test";
+      appUrl.username = "orrylo_app";
       appUrl.password = "gate-a-upgrade-app-test";
       const appSql = createDatabaseClient(appUrl.toString());
       try {
