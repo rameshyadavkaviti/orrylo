@@ -493,7 +493,6 @@ test("concurrent replay has one execution claimant and cannot create attempt 2",
   assert.ok(results.some((result) => result.status === "preparing_issuance"));
 });
 
-
 test("manual handoff persists attempt 1 and exposes exact unsigned XDR without signer or submission", async () => {
   const fx = fixture();
   const handoff = await fx.orchestrator.prepareManualSigningHandoff(input);
