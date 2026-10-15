@@ -161,22 +161,21 @@ function createStableFetch(options?: {
     if (url.includes("/ledgers?")) {
       ledgerReads += 1;
       const firstRead = ledgerReads === 1;
+      const sequence = firstRead
+        ? (options?.firstLedger ?? 1_000)
+        : (options?.secondLedger ?? options?.firstLedger ?? 1_000);
+      const baseFeeStroops = firstRead
+        ? (options?.firstBaseFeeStroops ?? 100)
+        : (options?.secondBaseFeeStroops ??
+          options?.firstBaseFeeStroops ??
+          100);
+      const baseReserveStroops = firstRead
+        ? (options?.firstBaseReserveStroops ?? 5_000_000)
+        : (options?.secondBaseReserveStroops ??
+          options?.firstBaseReserveStroops ??
+          5_000_000);
       return jsonResponse(
-        ledgerRecord(
-          firstRead
-            ? (options?.firstLedger ?? 1_000)
-            : (options?.secondLedger ?? options?.firstLedger ?? 1_000),
-          firstRead
-            ? (options?.firstBaseFeeStroops ?? 100)
-            : (options?.secondBaseFeeStroops ??
-              options?.firstBaseFeeStroops ??
-              100),
-          firstRead
-            ? (options?.firstBaseReserveStroops ?? 5_000_000)
-            : (options?.secondBaseReserveStroops ??
-              options?.firstBaseReserveStroops ??
-              5_000_000),
-        ),
+        ledgerRecord(sequence, baseFeeStroops, baseReserveStroops),
       );
     }
 
