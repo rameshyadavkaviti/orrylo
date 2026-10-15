@@ -140,7 +140,9 @@ function destinationAccount(
 
 function createStableFetch(options?: {
   issuer?: Record<string, unknown>;
+  issuerAfterAdvance?: Record<string, unknown>;
   destination?: Record<string, unknown>;
+  destinationAfterAdvance?: Record<string, unknown>;
   firstLedger?: number;
   secondLedger?: number;
   firstBaseFeeStroops?: number;
@@ -151,6 +153,8 @@ function createStableFetch(options?: {
 }): { fetchImpl: typeof fetch; calls: FetchCall[] } {
   const calls: FetchCall[] = [];
   let ledgerReads = 0;
+  let issuerReads = 0;
+  let destinationReads = 0;
   const fetchImpl = (async (
     input: Parameters<typeof fetch>[0],
     init?: RequestInit,
@@ -180,14 +184,26 @@ function createStableFetch(options?: {
     }
 
     if (url.endsWith(`/accounts/${ISSUER}`)) {
-      return jsonResponse(options?.issuer ?? issuerAccount());
+      issuerReads += 1;
+      return jsonResponse(
+        issuerReads > 1
+          ? (options?.issuerAfterAdvance ?? options?.issuer ?? issuerAccount())
+          : (options?.issuer ?? issuerAccount()),
+      );
     }
 
     if (url.endsWith(`/accounts/${DESTINATION}`)) {
+      destinationReads += 1;
       if (options?.destinationStatus === 404) {
         return jsonResponse({ status: 404 }, 404);
       }
-      return jsonResponse(options?.destination ?? destinationAccount());
+      return jsonResponse(
+        destinationReads > 1
+          ? (options?.destinationAfterAdvance ??
+            options?.destination ??
+            destinationAccount())
+          : (options?.destination ?? destinationAccount()),
+      );
     }
 
     return jsonResponse({ error: "unexpected request" }, 500);
@@ -300,7 +316,39 @@ test("a forward ledger close during account reads remains a valid deterministic 
   assert.equal(result.observedLedger, 1_001);
   assert.equal(result.preconditions.destinationTrustline.observedLedger, 1_001);
   assert.equal(result.preconditions.issuerSequence, "123456");
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 6);
+  assert.ok(
+    calls.slice(4).every((call) => call.url.includes("/accounts/")),
+  );
+});
+
+test("an advancing checkpoint revalidates issuer policy from the bounded second account read", async () => {
+  const changedIssuer = issuerAccount({
+    flags: {
+      auth_required: true,
+      auth_revocable: false,
+      auth_immutable: false,
+      auth_clawback_enabled: false,
+    },
+  });
+  const { fetchImpl } = createStableFetch({
+    firstLedger: 1_000,
+    secondLedger: 1_001,
+    issuerAfterAdvance: changedIssuer,
+  });
+
+  await assert.rejects(
+    new OfficialStellarTestnetIssuancePreflightReader(
+      fetchImpl,
+    ).readIssuancePreconditions({
+      issuerPublicKey: ISSUER,
+      destinationPublicKey: DESTINATION,
+      assetCode: "NOVA",
+      assetCodeReservedForProject: true,
+      feeStroops: "100",
+    }),
+    (error: unknown) => preflightErrorCode(error) === "issuer_policy_mismatch",
+  );
 });
 
 test("the later ledger checkpoint supplies fee and reserve policy when the window advances", async () => {
