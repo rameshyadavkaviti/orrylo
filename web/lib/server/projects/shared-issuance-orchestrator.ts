@@ -747,10 +747,7 @@ export class SharedIssuanceOrchestrator {
 function assertSingleAttemptHistory(
   attempts: ImmutableSharedIssuanceTransactionAttempt[],
 ): void {
-  if (
-    attempts.length > 1 ||
-    (attempts[0] && attempts[0].attemptNumber !== 1)
-  ) {
+  if (attempts.length > 1 || (attempts[0] && attempts[0].attemptNumber !== 1)) {
     throw new SharedIssuanceOrchestrationError("invalid_attempt_history");
   }
 }
