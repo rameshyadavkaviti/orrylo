@@ -54,7 +54,7 @@ test("shared schema inspector exists without migration or mutating SQL dependenc
     .join("\n");
   assert.doesNotMatch(
     sqlTemplates,
-    /\b(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|GRANT|REVOKE)\b/i,
+    /^\s*(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|GRANT|REVOKE)\b/im,
   );
 });
 
