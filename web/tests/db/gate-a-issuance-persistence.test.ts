@@ -40,11 +40,7 @@ if (!TEST_DATABASE_URL) {
   );
 } else {
   const admin = createDatabaseClient(TEST_DATABASE_URL);
-  const appUrl = roleUrl(
-    TEST_DATABASE_URL,
-    "orrylo_gate_a_app_test",
-    "gate-a-app-test",
-  );
+  const appUrl = roleUrl(TEST_DATABASE_URL, "orrylo_app", "gate-a-app-test");
   const writerUrl = roleUrl(
     TEST_DATABASE_URL,
     "orrylo_gate_a_writer_test",
@@ -70,25 +66,32 @@ if (!TEST_DATABASE_URL) {
     }
     await admin.unsafe("DROP SCHEMA public CASCADE");
     await admin.unsafe("CREATE SCHEMA public");
+    await admin.unsafe(`
+      DO $
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_app') THEN
+          CREATE ROLE orrylo_app LOGIN PASSWORD 'gate-a-app-test';
+        END IF;
+      END;
+      $;
+      ALTER ROLE orrylo_app LOGIN PASSWORD 'gate-a-app-test';
+    `);
     await migrateDatabase(admin, resolve(process.cwd(), "db/migrations"));
     await admin.unsafe(`
-      DO $$
+      DO $
       BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_gate_a_app_test') THEN
-          CREATE ROLE orrylo_gate_a_app_test LOGIN PASSWORD 'gate-a-app-test';
-        END IF;
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_gate_a_writer_test') THEN
           CREATE ROLE orrylo_gate_a_writer_test LOGIN PASSWORD 'gate-a-writer-test';
         END IF;
       END;
-      $$;
-      ALTER ROLE orrylo_gate_a_app_test PASSWORD 'gate-a-app-test';
+      $;
       ALTER ROLE orrylo_gate_a_writer_test PASSWORD 'gate-a-writer-test';
-      GRANT USAGE ON SCHEMA public TO orrylo_gate_a_app_test;
+      REVOKE orrylo_confirmation_writer FROM orrylo_app;
+      GRANT USAGE ON SCHEMA public TO orrylo_app;
       GRANT SELECT, INSERT ON project_issuance_full_intents,
-        project_issuance_transaction_attempts TO orrylo_gate_a_app_test;
-      GRANT UPDATE (signing_mode, signed_envelope_xdr_sha256)
-        ON project_issuance_transaction_attempts TO orrylo_gate_a_app_test;
+        project_issuance_transaction_attempts TO orrylo_app;
+      GRANT UPDATE (signed_envelope_xdr_sha256)
+        ON project_issuance_transaction_attempts TO orrylo_app;
       GRANT orrylo_confirmation_writer TO orrylo_gate_a_writer_test;
     `);
     repository = new PostgresSharedIssuancePersistenceRepository(
