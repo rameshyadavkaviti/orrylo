@@ -4,6 +4,9 @@ import { createDatabaseClient } from "../lib/server/persistence/database";
 import { createServerSharedIssuanceOrchestrator } from "../lib/server/projects/shared-issuance-runtime";
 import type { SharedIssuerSigningPrimitive } from "../lib/stellar/shared-issuer-signing-policy";
 
+const APPROVED_MANUAL_TESTNET_SHARED_ISSUER =
+  "GBW4IKGPC5Q4YRKGRMNNXTVRZNQZ3DFWFHXSQUAMWLXES75MWTY3TWOV";
+
 type Command = "prepare" | "submit" | "reconcile";
 
 interface CommonArgs {
@@ -121,6 +124,11 @@ async function main() {
   const issuerPublicKey = requiredEnv(
     "ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY",
   );
+  if (issuerPublicKey !== APPROVED_MANUAL_TESTNET_SHARED_ISSUER) {
+    throw new Error(
+      "ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY must match the approved live Testnet Shared Issuer.",
+    );
+  }
   const feeStroops = requiredEnv("ORRYLO_TESTNET_SHARED_ISSUER_FEE_STROOPS");
   const applicationDatabase = createDatabaseClient(requiredEnv("DATABASE_URL"));
   const confirmationWriterDatabaseUrl = requiredEnv(
