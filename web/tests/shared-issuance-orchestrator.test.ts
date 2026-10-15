@@ -47,6 +47,13 @@ const PROJECT_ID = "10000000-0000-4000-8000-000000000001";
 const REQUEST_ID = "10000000-0000-4000-8000-000000000002";
 const ATTEMPT_ID = "10000000-0000-4000-8000-000000000003";
 const NOW = 1_800_000_000_000;
+type DurableStatus =
+  | "awaiting_issuer_integration"
+  | "pending_execution"
+  | "submitted"
+  | "confirmed"
+  | "failed"
+  | "reconciliation_required";
 
 function intent(): ImmutableSharedIssuanceIntent {
   const issuanceIntentFingerprint = hashSharedIssuerIssuanceIntent({
@@ -81,9 +88,9 @@ class MemoryStore implements SharedIssuanceOrchestrationStore {
   readonly intents = new Map([[REQUEST_ID, intent()]]);
   readonly attempts: ImmutableSharedIssuanceTransactionAttempt[] = [];
   confirmation: ImmutableSharedIssuanceLedgerConfirmation | null = null;
-  status = "awaiting_issuer_integration" as const;
+  status: DurableStatus = "awaiting_issuer_integration";
   failureCode: string | null = null;
-  transitions: string[] = [];
+  transitions: DurableStatus[] = [];
 
   async getIntent(requestId: string) {
     return this.intents.get(requestId) ?? null;
@@ -122,9 +129,11 @@ class MemoryStore implements SharedIssuanceOrchestrationStore {
     return { status: this.status, failureCode: this.failureCode };
   }
   async transition(
-    status: typeof this.status,
+    issuanceRequestId: string,
+    status: DurableStatus,
     failureCode: string | null = null,
   ) {
+    assert.equal(issuanceRequestId, REQUEST_ID);
     if (this.status === status) return false;
     this.transitions.push(status);
     this.status = status;
