@@ -312,7 +312,9 @@ export class SharedIssuanceOrchestrator {
       );
     }
 
-    const attempts = await this.dependencies.store.listAttempts(input.requestId);
+    const attempts = await this.dependencies.store.listAttempts(
+      input.requestId,
+    );
     if (
       attempts.length > 1 ||
       (attempts[0] && attempts[0].attemptNumber !== 1)
@@ -445,7 +447,9 @@ export class SharedIssuanceOrchestrator {
       );
     }
 
-    const attempts = await this.dependencies.store.listAttempts(input.requestId);
+    const attempts = await this.dependencies.store.listAttempts(
+      input.requestId,
+    );
     if (attempts.length !== 1 || attempts[0]!.attemptNumber !== 1) {
       throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
     }
@@ -476,7 +480,9 @@ export class SharedIssuanceOrchestrator {
       });
       await this.dependencies.store.transition(input.requestId, "submitted");
     } catch (error) {
-      const stored = await this.dependencies.store.getAttempt(attempt.attemptId);
+      const stored = await this.dependencies.store.getAttempt(
+        attempt.attemptId,
+      );
       if (stored?.signedEnvelopeXdrSha256) {
         await this.dependencies.store.transition(
           input.requestId,
@@ -522,7 +528,9 @@ export class SharedIssuanceOrchestrator {
       return confirmed(durableConfirmation);
     }
 
-    const attempts = await this.dependencies.store.listAttempts(input.requestId);
+    const attempts = await this.dependencies.store.listAttempts(
+      input.requestId,
+    );
     if (
       attempts.length !== 1 ||
       attempts[0]!.attemptNumber !== 1 ||
