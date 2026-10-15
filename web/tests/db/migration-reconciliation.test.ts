@@ -44,13 +44,13 @@ if (!TEST_DATABASE_URL) {
     await sql.unsafe("DROP SCHEMA public CASCADE");
     await sql.unsafe("CREATE SCHEMA public");
     await sql.unsafe(`
-      DO $
+      DO $role$
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_app') THEN
           CREATE ROLE orrylo_app LOGIN PASSWORD 'migration-app-test';
         END IF;
       END;
-      $;
+      $role$;
       ALTER ROLE orrylo_app LOGIN PASSWORD 'migration-app-test';
     `);
   });
