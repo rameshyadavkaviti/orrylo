@@ -427,13 +427,13 @@ if (!TEST_DATABASE_URL) {
       signedEnvelopeXdrSha256,
     });
     assert.equal(recorded.signedEnvelopeXdrSha256, signedEnvelopeXdrSha256);
-    assert.deepEqual(
-      await repository.recordSignedEnvelope({
+    await assert.rejects(
+      repository.recordSignedEnvelope({
         attemptId: attempt.attemptId,
         transactionHash: attempt.transactionHash,
         signedEnvelopeXdrSha256,
       }),
-      recorded,
+      SharedIssuancePersistenceConflictError,
     );
     await assert.rejects(
       repository.recordSignedEnvelope({
@@ -448,6 +448,43 @@ if (!TEST_DATABASE_URL) {
         SET signed_envelope_xdr_sha256 = ${"e".repeat(64)}
         WHERE attempt_id = ${attempt.attemptId}`,
       /append-only/,
+    );
+  });
+
+  test("signed-envelope claim has exactly one concurrent winner", async () => {
+    const { intent, attempt, signedEnvelopeXdrSha256 } = await createFixture();
+    await repository.appendIntent(intent);
+    await repository.appendAttempt(attempt);
+
+    const results = await Promise.allSettled([
+      repository.recordSignedEnvelope({
+        attemptId: attempt.attemptId,
+        transactionHash: attempt.transactionHash,
+        signedEnvelopeXdrSha256,
+      }),
+      repository.recordSignedEnvelope({
+        attemptId: attempt.attemptId,
+        transactionHash: attempt.transactionHash,
+        signedEnvelopeXdrSha256,
+      }),
+    ]);
+
+    assert.equal(
+      results.filter((result) => result.status === "fulfilled").length,
+      1,
+    );
+    const rejected = results.filter(
+      (result): result is PromiseRejectedResult =>
+        result.status === "rejected",
+    );
+    assert.equal(rejected.length, 1);
+    assert.ok(
+      rejected[0]!.reason instanceof SharedIssuancePersistenceConflictError,
+    );
+    assert.equal(
+      (await repository.getAttempt(attempt.attemptId))
+        ?.signedEnvelopeXdrSha256,
+      signedEnvelopeXdrSha256,
     );
   });
 
