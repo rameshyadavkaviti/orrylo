@@ -4,6 +4,7 @@ import type {
   ImmutableSharedIssuanceIntent,
   ImmutableSharedIssuanceLedgerConfirmation,
   ImmutableSharedIssuanceTransactionAttempt,
+  type SharedIssuanceSigningMode,
   TrustedLedgerConfirmationWriter,
 } from "./shared-issuance-persistence";
 import {
@@ -42,6 +43,11 @@ export interface SharedIssuanceOrchestrationStore extends SignedEnvelopeAttemptW
   appendAttempt(
     attempt: ImmutableSharedIssuanceTransactionAttempt,
   ): Promise<ImmutableSharedIssuanceTransactionAttempt>;
+  claimSigningMode(input: {
+    attemptId: string;
+    transactionHash: string;
+    signingMode: SharedIssuanceSigningMode;
+  }): Promise<ImmutableSharedIssuanceTransactionAttempt | null>;
   getConfirmation(
     issuanceRequestId: string,
   ): Promise<ImmutableSharedIssuanceLedgerConfirmation | null>;
@@ -105,7 +111,8 @@ export class SharedIssuanceOrchestrationError extends Error {
       | "manual_signing_not_ready"
       | "manual_signing_already_consumed"
       | "manual_signing_window_expired"
-      | "manual_issuer_mismatch",
+      | "manual_issuer_mismatch"
+      | "signing_mode_already_claimed",
   ) {
     super(code);
     this.name = "SharedIssuanceOrchestrationError";
@@ -153,16 +160,16 @@ export class SharedIssuanceOrchestrator {
       return confirmed(durableConfirmation);
     }
 
-    const attempts = await this.dependencies.store.listAttempts(
-      input.requestId,
-    );
-    if (
-      attempts.length > 1 ||
-      (attempts[0] && attempts[0].attemptNumber !== 1)
-    ) {
-      throw new SharedIssuanceOrchestrationError("invalid_attempt_history");
+    let attempts = await this.dependencies.store.listAttempts(input.requestId);
+    assertSingleAttemptHistory(attempts);
+    let attempt = attempts[0];
+
+    if (attempt?.signedEnvelopeXdrSha256) {
+      return this.reconcile(intent, attempt);
     }
-    if (attempts[0]) return this.reconcile(intent, attempts[0]);
+    if (attempt?.signingMode) {
+      return { status: "preparing_issuance" };
+    }
 
     const lifecycle = await this.dependencies.store.getLifecycle(
       input.requestId,
@@ -176,88 +183,125 @@ export class SharedIssuanceOrchestrator {
           lifecycle.failureCode ?? "execution_failed_before_submission",
       };
     }
-
-    const claimed = await this.dependencies.store.transition(
-      input.requestId,
-      "pending_execution",
-    );
-    if (!claimed) {
-      const concurrentAttempts = await this.dependencies.store.listAttempts(
-        input.requestId,
-      );
-      if (concurrentAttempts[0])
-        return this.reconcile(intent, concurrentAttempts[0]);
+    if (
+      lifecycle.status !== "awaiting_issuer_integration" &&
+      lifecycle.status !== "pending_execution"
+    ) {
       return { status: "preparing_issuance" };
     }
-    let preflight: SharedIssuerTestnetPreflightResult;
-    try {
-      preflight = await this.dependencies.preflight.readIssuancePreconditions({
-        issuerPublicKey: intent.issuerPublicKey,
-        destinationPublicKey: intent.destinationPublicKey,
-        assetCode: intent.assetCode,
-        assetCodeReservedForProject: true,
-        feeStroops: this.dependencies.feeStroops,
-      });
-    } catch (error) {
-      return this.failBeforeSubmission(input.requestId, error);
-    }
 
-    const now = this.dependencies.now?.() ?? Date.now();
-    const validFrom = Math.floor(now / 1_000);
-    let plan;
-    try {
-      plan = buildSharedIssuerIssuancePlan(
-        {
-          projectId: intent.projectId,
-          assetCode: intent.assetCode,
+    let plan: SharedIssuerIssuancePlan;
+
+    if (attempt) {
+      try {
+        plan = await this.loadCurrentPlan(intent, attempt);
+      } catch (error) {
+        return this.failBeforeSubmission(input.requestId, error);
+      }
+    } else {
+      let preflight: SharedIssuerTestnetPreflightResult;
+      try {
+        preflight = await this.dependencies.preflight.readIssuancePreconditions({
           issuerPublicKey: intent.issuerPublicKey,
           destinationPublicKey: intent.destinationPublicKey,
-          amount: intent.amount,
-          network: "testnet",
-          networkPassphrase: preflight.networkPassphrase,
-          validFrom,
-          validUntil: validFrom + this.dependencies.validitySeconds,
-        },
-        preflight.preconditions,
-      );
-    } catch (error) {
-      return this.failBeforeSubmission(input.requestId, error);
+          assetCode: intent.assetCode,
+          assetCodeReservedForProject: true,
+          feeStroops: this.dependencies.feeStroops,
+        });
+      } catch (error) {
+        return this.failBeforeSubmission(input.requestId, error);
+      }
+
+      const now = this.dependencies.now?.() ?? Date.now();
+      const validFrom = Math.floor(now / 1_000);
+      try {
+        plan = buildSharedIssuerIssuancePlan(
+          {
+            projectId: intent.projectId,
+            assetCode: intent.assetCode,
+            issuerPublicKey: intent.issuerPublicKey,
+            destinationPublicKey: intent.destinationPublicKey,
+            amount: intent.amount,
+            network: "testnet",
+            networkPassphrase: preflight.networkPassphrase,
+            validFrom,
+            validUntil: validFrom + this.dependencies.validitySeconds,
+          },
+          preflight.preconditions,
+        );
+      } catch (error) {
+        return this.failBeforeSubmission(input.requestId, error);
+      }
+
+      const candidate: ImmutableSharedIssuanceTransactionAttempt = {
+        attemptId: (this.dependencies.randomUuid ?? randomUUID)(),
+        issuanceRequestId: intent.issuanceRequestId,
+        issuanceIntentFingerprint: intent.issuanceIntentFingerprint,
+        attemptNumber: 1,
+        transactionHash: plan.transactionHash,
+        envelopeXdrSha256: sha256(plan.unsignedEnvelopeXdr),
+        sourceSequence: plan.sourceSequence,
+        feeStroops: plan.feeStroops,
+        validFrom: plan.validFrom,
+        validUntil: plan.validUntil,
+        transactionSourcePublicKey: intent.issuerPublicKey,
+        operationCount: 1,
+        operationType: "payment",
+        operationSourcePublicKey: intent.issuerPublicKey,
+        assetCode: intent.assetCode,
+        issuerPublicKey: intent.issuerPublicKey,
+        destinationPublicKey: intent.destinationPublicKey,
+        amount: intent.amount,
+        createdAt: new Date(now).toISOString(),
+      };
+
+      try {
+        attempt = await this.dependencies.store.appendAttempt(candidate);
+      } catch {
+        attempts = await this.dependencies.store.listAttempts(input.requestId);
+        assertSingleAttemptHistory(attempts);
+        attempt = attempts[0];
+        if (!attempt) {
+          return { status: "preparing_issuance" };
+        }
+        if (attempt.signedEnvelopeXdrSha256) {
+          return this.reconcile(intent, attempt);
+        }
+        if (attempt.signingMode) {
+          return { status: "preparing_issuance" };
+        }
+        try {
+          plan = await this.loadCurrentPlan(intent, attempt);
+        } catch (error) {
+          return this.failBeforeSubmission(input.requestId, error);
+        }
+      }
     }
 
-    const attempt: ImmutableSharedIssuanceTransactionAttempt = {
-      attemptId: (this.dependencies.randomUuid ?? randomUUID)(),
-      issuanceRequestId: intent.issuanceRequestId,
-      issuanceIntentFingerprint: intent.issuanceIntentFingerprint,
-      attemptNumber: 1,
-      transactionHash: plan.transactionHash,
-      envelopeXdrSha256: sha256(plan.unsignedEnvelopeXdr),
-      sourceSequence: plan.sourceSequence,
-      feeStroops: plan.feeStroops,
-      validFrom: plan.validFrom,
-      validUntil: plan.validUntil,
-      transactionSourcePublicKey: intent.issuerPublicKey,
-      operationCount: 1,
-      operationType: "payment",
-      operationSourcePublicKey: intent.issuerPublicKey,
-      assetCode: intent.assetCode,
-      issuerPublicKey: intent.issuerPublicKey,
-      destinationPublicKey: intent.destinationPublicKey,
-      amount: intent.amount,
-      createdAt: new Date(now).toISOString(),
-    };
+    if (!(await this.ensurePendingExecution(input.requestId))) {
+      return { status: "preparing_issuance" };
+    }
+
+    const claimedAttempt = await this.dependencies.store.claimSigningMode({
+      attemptId: attempt.attemptId,
+      transactionHash: attempt.transactionHash,
+      signingMode: "private",
+    });
+    if (!claimedAttempt) {
+      return { status: "preparing_issuance" };
+    }
 
     try {
-      await this.dependencies.store.appendAttempt(attempt);
       const signed = await signDurableSharedIssuerTestnetEnvelope({
         reader: this.dependencies.store,
-        attemptId: attempt.attemptId,
+        attemptId: claimedAttempt.attemptId,
         plan,
         policy: { issuerPublicKey: intent.issuerPublicKey },
         primitive: this.dependencies.primitive,
       });
       await persistAndSubmitSharedIssuerEnvelope({
         writer: this.dependencies.store,
-        attemptId: attempt.attemptId,
+        attemptId: claimedAttempt.attemptId,
         plan,
         signedEnvelopeXdr: signed.signedEnvelopeXdr,
         authorization: this.dependencies.authorization,
@@ -266,7 +310,7 @@ export class SharedIssuanceOrchestrator {
       await this.dependencies.store.transition(input.requestId, "submitted");
     } catch (error) {
       const stored = await this.dependencies.store.getAttempt(
-        attempt.attemptId,
+        claimedAttempt.attemptId,
       );
       if (stored?.signedEnvelopeXdrSha256) {
         await this.dependencies.store.transition(
@@ -283,7 +327,7 @@ export class SharedIssuanceOrchestrator {
     }
 
     const persistedAttempt = await this.dependencies.store.getAttempt(
-      attempt.attemptId,
+      claimedAttempt.attemptId,
     );
     if (!persistedAttempt) {
       throw new SharedIssuanceOrchestrationError("invalid_attempt_history");
@@ -312,113 +356,136 @@ export class SharedIssuanceOrchestrator {
       );
     }
 
-    const attempts = await this.dependencies.store.listAttempts(
-      input.requestId,
-    );
-    if (
-      attempts.length > 1 ||
-      (attempts[0] && attempts[0].attemptNumber !== 1)
-    ) {
-      throw new SharedIssuanceOrchestrationError("invalid_attempt_history");
-    }
+    let attempts = await this.dependencies.store.listAttempts(input.requestId);
+    assertSingleAttemptHistory(attempts);
+    let attempt = attempts[0];
 
-    if (attempts[0]) {
-      if (attempts[0].signedEnvelopeXdrSha256) {
-        throw new SharedIssuanceOrchestrationError(
-          "manual_signing_already_consumed",
-        );
-      }
-      const lifecycle = await this.dependencies.store.getLifecycle(
-        input.requestId,
+    if (attempt?.signedEnvelopeXdrSha256 || attempt?.signingMode) {
+      throw new SharedIssuanceOrchestrationError(
+        "manual_signing_already_consumed",
       );
-      if (!lifecycle || lifecycle.status !== "pending_execution") {
-        throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
-      }
-      const plan = await this.loadCurrentManualPlan(intent, attempts[0]);
-      return manualHandoff(intent, attempts[0], plan);
     }
 
     const lifecycle = await this.dependencies.store.getLifecycle(
       input.requestId,
     );
-    if (!lifecycle || lifecycle.status !== "awaiting_issuer_integration") {
+    if (
+      !lifecycle ||
+      (lifecycle.status !== "awaiting_issuer_integration" &&
+        lifecycle.status !== "pending_execution")
+    ) {
       throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
     }
 
-    const claimed = await this.dependencies.store.transition(
-      input.requestId,
-      "pending_execution",
-    );
-    if (!claimed) {
-      throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
-    }
-
-    let preflight: SharedIssuerTestnetPreflightResult;
-    try {
-      preflight = await this.dependencies.preflight.readIssuancePreconditions({
-        issuerPublicKey: intent.issuerPublicKey,
-        destinationPublicKey: intent.destinationPublicKey,
-        assetCode: intent.assetCode,
-        assetCodeReservedForProject: true,
-        feeStroops: this.dependencies.feeStroops,
-      });
-    } catch (error) {
-      await this.failBeforeSubmission(input.requestId, error);
-      throw error;
-    }
-
-    const now = this.dependencies.now?.() ?? Date.now();
-    const validFrom = Math.floor(now / 1_000);
     let plan: SharedIssuerIssuancePlan;
-    try {
-      plan = buildSharedIssuerIssuancePlan(
-        {
-          projectId: intent.projectId,
-          assetCode: intent.assetCode,
+
+    if (attempt) {
+      try {
+        plan = await this.loadCurrentPlan(intent, attempt);
+      } catch (error) {
+        await this.failBeforeSubmission(input.requestId, error);
+        throw error;
+      }
+    } else {
+      let preflight: SharedIssuerTestnetPreflightResult;
+      try {
+        preflight = await this.dependencies.preflight.readIssuancePreconditions({
           issuerPublicKey: intent.issuerPublicKey,
           destinationPublicKey: intent.destinationPublicKey,
-          amount: intent.amount,
-          network: "testnet",
-          networkPassphrase: preflight.networkPassphrase,
-          validFrom,
-          validUntil: validFrom + this.dependencies.validitySeconds,
-        },
-        preflight.preconditions,
-      );
-    } catch (error) {
-      await this.failBeforeSubmission(input.requestId, error);
-      throw error;
+          assetCode: intent.assetCode,
+          assetCodeReservedForProject: true,
+          feeStroops: this.dependencies.feeStroops,
+        });
+      } catch (error) {
+        await this.failBeforeSubmission(input.requestId, error);
+        throw error;
+      }
+
+      const now = this.dependencies.now?.() ?? Date.now();
+      const validFrom = Math.floor(now / 1_000);
+      try {
+        plan = buildSharedIssuerIssuancePlan(
+          {
+            projectId: intent.projectId,
+            assetCode: intent.assetCode,
+            issuerPublicKey: intent.issuerPublicKey,
+            destinationPublicKey: intent.destinationPublicKey,
+            amount: intent.amount,
+            network: "testnet",
+            networkPassphrase: preflight.networkPassphrase,
+            validFrom,
+            validUntil: validFrom + this.dependencies.validitySeconds,
+          },
+          preflight.preconditions,
+        );
+      } catch (error) {
+        await this.failBeforeSubmission(input.requestId, error);
+        throw error;
+      }
+
+      const candidate: ImmutableSharedIssuanceTransactionAttempt = {
+        attemptId: (this.dependencies.randomUuid ?? randomUUID)(),
+        issuanceRequestId: intent.issuanceRequestId,
+        issuanceIntentFingerprint: intent.issuanceIntentFingerprint,
+        attemptNumber: 1,
+        transactionHash: plan.transactionHash,
+        envelopeXdrSha256: sha256(plan.unsignedEnvelopeXdr),
+        sourceSequence: plan.sourceSequence,
+        feeStroops: plan.feeStroops,
+        validFrom: plan.validFrom,
+        validUntil: plan.validUntil,
+        transactionSourcePublicKey: intent.issuerPublicKey,
+        operationCount: 1,
+        operationType: "payment",
+        operationSourcePublicKey: intent.issuerPublicKey,
+        assetCode: intent.assetCode,
+        issuerPublicKey: intent.issuerPublicKey,
+        destinationPublicKey: intent.destinationPublicKey,
+        amount: intent.amount,
+        createdAt: new Date(now).toISOString(),
+      };
+
+      try {
+        attempt = await this.dependencies.store.appendAttempt(candidate);
+      } catch {
+        attempts = await this.dependencies.store.listAttempts(input.requestId);
+        assertSingleAttemptHistory(attempts);
+        attempt = attempts[0];
+        if (!attempt) {
+          throw new SharedIssuanceOrchestrationError(
+            "manual_signing_not_ready",
+          );
+        }
+        if (attempt.signedEnvelopeXdrSha256 || attempt.signingMode) {
+          throw new SharedIssuanceOrchestrationError(
+            "manual_signing_already_consumed",
+          );
+        }
+        plan = await this.loadCurrentPlan(intent, attempt);
+      }
     }
 
-    const attempt: ImmutableSharedIssuanceTransactionAttempt = {
-      attemptId: (this.dependencies.randomUuid ?? randomUUID)(),
-      issuanceRequestId: intent.issuanceRequestId,
-      issuanceIntentFingerprint: intent.issuanceIntentFingerprint,
-      attemptNumber: 1,
-      transactionHash: plan.transactionHash,
-      envelopeXdrSha256: sha256(plan.unsignedEnvelopeXdr),
-      sourceSequence: plan.sourceSequence,
-      feeStroops: plan.feeStroops,
-      validFrom: plan.validFrom,
-      validUntil: plan.validUntil,
-      transactionSourcePublicKey: intent.issuerPublicKey,
-      operationCount: 1,
-      operationType: "payment",
-      operationSourcePublicKey: intent.issuerPublicKey,
-      assetCode: intent.assetCode,
-      issuerPublicKey: intent.issuerPublicKey,
-      destinationPublicKey: intent.destinationPublicKey,
-      amount: intent.amount,
-      createdAt: new Date(now).toISOString(),
-    };
+    if (!(await this.ensurePendingExecution(input.requestId))) {
+      throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
+    }
 
-    const stored = await this.dependencies.store.appendAttempt(attempt);
+    const claimedAttempt = await this.dependencies.store.claimSigningMode({
+      attemptId: attempt.attemptId,
+      transactionHash: attempt.transactionHash,
+      signingMode: "manual",
+    });
+    if (!claimedAttempt) {
+      throw new SharedIssuanceOrchestrationError(
+        "manual_signing_already_consumed",
+      );
+    }
+
     await loadAndAssertDurableSharedIssuerPlan({
       reader: this.dependencies.store,
-      attemptId: stored.attemptId,
+      attemptId: claimedAttempt.attemptId,
       plan,
     });
-    return manualHandoff(intent, stored, plan);
+    return manualHandoff(intent, claimedAttempt, plan);
   }
 
   /**
@@ -454,7 +521,10 @@ export class SharedIssuanceOrchestrator {
       throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
     }
     const attempt = attempts[0]!;
-    if (attempt.signedEnvelopeXdrSha256) {
+    if (
+      attempt.signingMode !== "manual" ||
+      attempt.signedEnvelopeXdrSha256
+    ) {
       throw new SharedIssuanceOrchestrationError(
         "manual_signing_already_consumed",
       );
@@ -467,7 +537,7 @@ export class SharedIssuanceOrchestrator {
       throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
     }
 
-    const plan = await this.loadCurrentManualPlan(intent, attempt);
+    const plan = await this.loadCurrentPlan(intent, attempt);
 
     try {
       await persistAndSubmitSharedIssuerEnvelope({
@@ -534,6 +604,7 @@ export class SharedIssuanceOrchestrator {
     if (
       attempts.length !== 1 ||
       attempts[0]!.attemptNumber !== 1 ||
+      attempts[0]!.signingMode !== "manual" ||
       !attempts[0]!.signedEnvelopeXdrSha256
     ) {
       throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
@@ -541,7 +612,7 @@ export class SharedIssuanceOrchestrator {
     return this.reconcile(intent, attempts[0]!);
   }
 
-  private async loadCurrentManualPlan(
+  private async loadCurrentPlan(
     intent: ImmutableSharedIssuanceIntent,
     attempt: ImmutableSharedIssuanceTransactionAttempt,
   ): Promise<SharedIssuerIssuancePlan> {
@@ -582,6 +653,26 @@ export class SharedIssuanceOrchestrator {
       plan,
     });
     return plan;
+  }
+
+  private async ensurePendingExecution(requestId: string): Promise<boolean> {
+    const lifecycle = await this.dependencies.store.getLifecycle(requestId);
+    if (!lifecycle) {
+      throw new SharedIssuanceOrchestrationError("intent_not_found");
+    }
+    if (lifecycle.status === "pending_execution") {
+      return true;
+    }
+    if (lifecycle.status !== "awaiting_issuer_integration") {
+      return false;
+    }
+    if (
+      await this.dependencies.store.transition(requestId, "pending_execution")
+    ) {
+      return true;
+    }
+    const current = await this.dependencies.store.getLifecycle(requestId);
+    return current?.status === "pending_execution";
   }
 
   private assertManualIssuer(intent: ImmutableSharedIssuanceIntent): void {
@@ -651,6 +742,17 @@ export class SharedIssuanceOrchestrator {
     const failureCode = safeFailureCode(error);
     await this.dependencies.store.transition(requestId, "failed", failureCode);
     return { status: "failed_before_submission", failureCode };
+  }
+}
+
+function assertSingleAttemptHistory(
+  attempts: ImmutableSharedIssuanceTransactionAttempt[],
+): void {
+  if (
+    attempts.length > 1 ||
+    (attempts[0] && attempts[0].attemptNumber !== 1)
+  ) {
+    throw new SharedIssuanceOrchestrationError("invalid_attempt_history");
   }
 }
 
