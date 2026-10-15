@@ -40,6 +40,10 @@ interface FakeCatalogOptions {
   missingTable?: string;
   corruptMigration?: string;
   unexpectedMigration?: string;
+  missingSigningModeUpdate?: boolean;
+  tableWideAttemptUpdate?: boolean;
+  unrelatedAttemptUpdate?: boolean;
+  writerBoundaryChanged?: boolean;
 }
 
 function fakeDatabase(
@@ -81,6 +85,31 @@ function fakeDatabase(
     }
     if (query.startsWith("SELECT conname FROM pg_constraint")) {
       return (values[0] as readonly string[]).map((conname) => ({ conname }));
+    }
+    if (query.includes("app_update_columns")) {
+      return [
+        {
+          app_role_exists: true,
+          app_table_update: options.tableWideAttemptUpdate ?? false,
+          app_update_columns: options.missingSigningModeUpdate
+            ? ["signed_envelope_xdr_sha256"]
+            : options.unrelatedAttemptUpdate
+              ? [
+                  "signed_envelope_xdr_sha256",
+                  "signing_mode",
+                  "source_sequence",
+                ]
+              : ["signed_envelope_xdr_sha256", "signing_mode"],
+          writer_full_intents_select: true,
+          writer_attempts_select: true,
+          writer_attempts_update_columns: [],
+          writer_confirmations_select: true,
+          writer_confirmations_insert: true,
+          writer_confirmations_update: options.writerBoundaryChanged ?? false,
+          writer_confirmations_delete: false,
+          writer_confirmations_truncate: false,
+        },
+      ];
     }
     if (query.includes("FROM pg_roles")) return [{ exists: true }];
     if (query.includes("UNION ALL")) {
@@ -195,5 +224,45 @@ test("missing required schema object fails closed", async () => {
       MIGRATIONS_DIRECTORY,
     ),
     /Missing database tables: project_issuance_ledger_confirmations/,
+  );
+});
+
+test("runtime ACL verification fails closed for missing or broadened app UPDATE authority", async () => {
+  const expected = await loadExpectedMigrationEvidence(MIGRATIONS_DIRECTORY);
+
+  await assert.rejects(
+    verifyDatabaseSchemaReadOnly(
+      fakeDatabase(expected, { missingSigningModeUpdate: true }).sql,
+      MIGRATIONS_DIRECTORY,
+    ),
+    /Missing or unsafe orrylo_app attempt UPDATE ACL/,
+  );
+
+  await assert.rejects(
+    verifyDatabaseSchemaReadOnly(
+      fakeDatabase(expected, { tableWideAttemptUpdate: true }).sql,
+      MIGRATIONS_DIRECTORY,
+    ),
+    /Missing or unsafe orrylo_app attempt UPDATE ACL/,
+  );
+
+  await assert.rejects(
+    verifyDatabaseSchemaReadOnly(
+      fakeDatabase(expected, { unrelatedAttemptUpdate: true }).sql,
+      MIGRATIONS_DIRECTORY,
+    ),
+    /Missing or unsafe orrylo_app attempt UPDATE ACL/,
+  );
+});
+
+test("runtime ACL verification rejects confirmation-writer privilege drift", async () => {
+  const expected = await loadExpectedMigrationEvidence(MIGRATIONS_DIRECTORY);
+
+  await assert.rejects(
+    verifyDatabaseSchemaReadOnly(
+      fakeDatabase(expected, { writerBoundaryChanged: true }).sql,
+      MIGRATIONS_DIRECTORY,
+    ),
+    /Unexpected trusted confirmation writer ACL/,
   );
 });
