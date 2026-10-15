@@ -296,16 +296,19 @@ export class PostgresSharedIssuancePersistenceRepository implements SharedIssuan
     ) {
       throw new SharedIssuancePersistenceConflictError();
     }
-    await this.boundary.sql`
+    const [row] = await this.boundary.sql<AttemptRow[]>`
       UPDATE project_issuance_transaction_attempts
       SET signed_envelope_xdr_sha256 = ${input.signedEnvelopeXdrSha256}
       WHERE attempt_id = ${input.attemptId}
         AND transaction_hash = ${input.transactionHash}
         AND signed_envelope_xdr_sha256 IS NULL
+      RETURNING *
     `;
-    const stored = await this.getAttempt(input.attemptId);
+    if (!row) {
+      throw new SharedIssuancePersistenceConflictError();
+    }
+    const stored = mapAttempt(row);
     if (
-      !stored ||
       stored.transactionHash !== input.transactionHash ||
       stored.signedEnvelopeXdrSha256 !== input.signedEnvelopeXdrSha256
     ) {
