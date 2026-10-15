@@ -365,10 +365,7 @@ function singlePaymentVariantSignedEnvelope(
   } = {},
 ) {
   const account = new Account(ISSUER, options.accountSequence ?? "123");
-  const asset = new Asset(
-    "NOVA",
-    options.assetIssuerPublicKey ?? ISSUER,
-  );
+  const asset = new Asset("NOVA", options.assetIssuerPublicKey ?? ISSUER);
   const transaction = new TransactionBuilder(account, {
     fee: "100",
     networkPassphrase: Networks.TESTNET,
