@@ -122,11 +122,12 @@ interface LedgerCheckpoint {
  * Reads the Testnet state needed to prepare one Shared Issuer issuance without
  * mutating either the issuer or the customer wallet.
  *
- * The reader brackets account reads with latest-ledger checkpoints, but a
- * normal forward ledger close does not invalidate otherwise consistent account
- * state. The later checkpoint supplies the network fee/reserve parameters and
- * the observation ledger; only an impossible ledger regression or conflicting
- * metadata for the same ledger fails closed.
+ * The reader brackets account reads with latest-ledger checkpoints. If the
+ * ledger advances, it deterministically re-reads the two accounts exactly once
+ * after the later checkpoint instead of waiting for a quiet ledger. The later
+ * checkpoint supplies network fee/reserve parameters and the observation
+ * ledger; only an impossible regression or conflicting metadata for the same
+ * ledger fails closed.
  */
 export class OfficialStellarTestnetIssuancePreflightReader {
   constructor(private readonly fetchImpl: FetchLike = globalThis.fetch) {}
@@ -160,12 +161,19 @@ export class OfficialStellarTestnetIssuancePreflightReader {
     const feeStroops = parsePositiveInteger(request.feeStroops, "invalid_fee");
 
     const before = await this.readLatestLedger();
-    const [issuer, destination] = await Promise.all([
+    let [issuer, destination] = await Promise.all([
       this.readAccount(issuerPublicKey, "issuer_not_found"),
       this.readAccount(destinationPublicKey, "destination_not_found"),
     ]);
     const after = await this.readLatestLedger();
     assertMonotonicLedgerWindow(before, after);
+
+    if (after.sequence > before.sequence) {
+      [issuer, destination] = await Promise.all([
+        this.readAccount(issuerPublicKey, "issuer_not_found"),
+        this.readAccount(destinationPublicKey, "destination_not_found"),
+      ]);
+    }
 
     assertIssuerPolicy(issuer, issuerPublicKey);
 
