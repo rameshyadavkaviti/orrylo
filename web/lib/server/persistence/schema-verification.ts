@@ -185,45 +185,33 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
       writer_confirmations_truncate: boolean;
     }[]
   >`
-    WITH app_role AS (
-      SELECT oid
-      FROM pg_catalog.pg_roles
-      WHERE rolname = 'orrylo_app'
-    ),
-    writer_role AS (
-      SELECT oid
-      FROM pg_catalog.pg_roles
-      WHERE rolname = 'orrylo_confirmation_writer'
-    ),
-    attempts AS (
-      SELECT 'public.project_issuance_transaction_attempts'::regclass AS oid
-    ),
-    full_intents AS (
-      SELECT 'public.project_issuance_full_intents'::regclass AS oid
-    ),
-    confirmations AS (
-      SELECT 'public.project_issuance_ledger_confirmations'::regclass AS oid
-    )
     SELECT
-      EXISTS (SELECT 1 FROM app_role) AS app_role_exists,
+      EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_roles
+        WHERE rolname = 'orrylo_app'
+      ) AS app_role_exists,
       COALESCE((
         SELECT pg_catalog.has_table_privilege(
-          app_role.oid,
-          attempts.oid,
+          role.oid,
+          'public.project_issuance_transaction_attempts',
           'UPDATE'
         )
-        FROM app_role, attempts
+        FROM pg_catalog.pg_roles AS role
+        WHERE role.rolname = 'orrylo_app'
       ), false) AS app_table_update,
       ARRAY(
         SELECT attribute.attname
-        FROM app_role, attempts
+        FROM pg_catalog.pg_roles AS role
         JOIN pg_catalog.pg_attribute AS attribute
-          ON attribute.attrelid = attempts.oid
-        WHERE attribute.attnum > 0
+          ON attribute.attrelid =
+            'public.project_issuance_transaction_attempts'::regclass
+        WHERE role.rolname = 'orrylo_app'
+          AND attribute.attnum > 0
           AND NOT attribute.attisdropped
           AND pg_catalog.has_column_privilege(
-            app_role.oid,
-            attempts.oid,
+            role.oid,
+            attribute.attrelid,
             attribute.attnum,
             'UPDATE'
           )
@@ -231,30 +219,34 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
       ) AS app_update_columns,
       COALESCE((
         SELECT pg_catalog.has_table_privilege(
-          writer_role.oid,
-          full_intents.oid,
+          role.oid,
+          'public.project_issuance_full_intents',
           'SELECT'
         )
-        FROM writer_role, full_intents
+        FROM pg_catalog.pg_roles AS role
+        WHERE role.rolname = 'orrylo_confirmation_writer'
       ), false) AS writer_full_intents_select,
       COALESCE((
         SELECT pg_catalog.has_table_privilege(
-          writer_role.oid,
-          attempts.oid,
+          role.oid,
+          'public.project_issuance_transaction_attempts',
           'SELECT'
         )
-        FROM writer_role, attempts
+        FROM pg_catalog.pg_roles AS role
+        WHERE role.rolname = 'orrylo_confirmation_writer'
       ), false) AS writer_attempts_select,
       ARRAY(
         SELECT attribute.attname
-        FROM writer_role, attempts
+        FROM pg_catalog.pg_roles AS role
         JOIN pg_catalog.pg_attribute AS attribute
-          ON attribute.attrelid = attempts.oid
-        WHERE attribute.attnum > 0
+          ON attribute.attrelid =
+            'public.project_issuance_transaction_attempts'::regclass
+        WHERE role.rolname = 'orrylo_confirmation_writer'
+          AND attribute.attnum > 0
           AND NOT attribute.attisdropped
           AND pg_catalog.has_column_privilege(
-            writer_role.oid,
-            attempts.oid,
+            role.oid,
+            attribute.attrelid,
             attribute.attnum,
             'UPDATE'
           )
@@ -262,43 +254,48 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
       ) AS writer_attempts_update_columns,
       COALESCE((
         SELECT pg_catalog.has_table_privilege(
-          writer_role.oid,
-          confirmations.oid,
+          role.oid,
+          'public.project_issuance_ledger_confirmations',
           'SELECT'
         )
-        FROM writer_role, confirmations
+        FROM pg_catalog.pg_roles AS role
+        WHERE role.rolname = 'orrylo_confirmation_writer'
       ), false) AS writer_confirmations_select,
       COALESCE((
         SELECT pg_catalog.has_table_privilege(
-          writer_role.oid,
-          confirmations.oid,
+          role.oid,
+          'public.project_issuance_ledger_confirmations',
           'INSERT'
         )
-        FROM writer_role, confirmations
+        FROM pg_catalog.pg_roles AS role
+        WHERE role.rolname = 'orrylo_confirmation_writer'
       ), false) AS writer_confirmations_insert,
       COALESCE((
         SELECT pg_catalog.has_table_privilege(
-          writer_role.oid,
-          confirmations.oid,
+          role.oid,
+          'public.project_issuance_ledger_confirmations',
           'UPDATE'
         )
-        FROM writer_role, confirmations
+        FROM pg_catalog.pg_roles AS role
+        WHERE role.rolname = 'orrylo_confirmation_writer'
       ), false) AS writer_confirmations_update,
       COALESCE((
         SELECT pg_catalog.has_table_privilege(
-          writer_role.oid,
-          confirmations.oid,
+          role.oid,
+          'public.project_issuance_ledger_confirmations',
           'DELETE'
         )
-        FROM writer_role, confirmations
+        FROM pg_catalog.pg_roles AS role
+        WHERE role.rolname = 'orrylo_confirmation_writer'
       ), false) AS writer_confirmations_delete,
       COALESCE((
         SELECT pg_catalog.has_table_privilege(
-          writer_role.oid,
-          confirmations.oid,
+          role.oid,
+          'public.project_issuance_ledger_confirmations',
           'TRUNCATE'
         )
-        FROM writer_role, confirmations
+        FROM pg_catalog.pg_roles AS role
+        WHERE role.rolname = 'orrylo_confirmation_writer'
       ), false) AS writer_confirmations_truncate
   `;
 
