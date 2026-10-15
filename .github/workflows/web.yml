@@ -105,6 +105,18 @@ jobs:
       - name: Apply migrations
         run: npm run db:migrate
 
+      - name: Restore production-shaped pre-011 app ACL fixture
+        run: |
+          node --input-type=module <<'NODE'
+          import postgres from "postgres";
+          const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+          await sql.unsafe(`
+            GRANT UPDATE (signed_envelope_xdr_sha256)
+              ON project_issuance_transaction_attempts TO orrylo_app
+          `);
+          await sql.end({ timeout: 5 });
+          NODE
+
       - name: Verify schema read-only
         run: npm run db:verify:read-only
 
