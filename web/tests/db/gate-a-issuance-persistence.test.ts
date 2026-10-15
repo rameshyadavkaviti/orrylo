@@ -481,8 +481,7 @@ if (!TEST_DATABASE_URL) {
       rejected[0]!.reason instanceof SharedIssuancePersistenceConflictError,
     );
     assert.equal(
-      (await repository.getAttempt(attempt.attemptId))
-        ?.signedEnvelopeXdrSha256,
+      (await repository.getAttempt(attempt.attemptId))?.signedEnvelopeXdrSha256,
       signedEnvelopeXdrSha256,
     );
   });
