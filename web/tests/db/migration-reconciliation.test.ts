@@ -82,6 +82,16 @@ if (!TEST_DATABASE_URL) {
     `;
   }
 
+  async function verifyCurrentSchemaReadOnly(): Promise<void> {
+    -- Existing production state before migration 011 already grants this
+    -- single signed-envelope provenance column to orrylo_app.
+    await sql`
+      GRANT UPDATE (signed_envelope_xdr_sha256)
+        ON project_issuance_transaction_attempts TO orrylo_app
+    `;
+    await verifyCurrentSchemaReadOnly();
+  }
+
   test("fresh bootstrap applies 001-011 and repeated runs verify without changes", async () => {
     const first = await migrateDatabase(sql, directory);
     assert.deepEqual(first.applied, ALL_MIGRATIONS);
@@ -251,14 +261,14 @@ if (!TEST_DATABASE_URL) {
       `;
       assert.deepEqual(writerAfter, writerBefore);
 
-      await assert.doesNotReject(verifyDatabaseSchemaReadOnly(sql, directory));
+      await assert.doesNotReject(verifyCurrentSchemaReadOnly());
 
       await sql`
         REVOKE UPDATE (signing_mode)
           ON project_issuance_transaction_attempts FROM orrylo_app
       `;
       await assert.rejects(
-        verifyDatabaseSchemaReadOnly(sql, directory),
+        verifyCurrentSchemaReadOnly(),
         /Missing or unsafe orrylo_app attempt UPDATE ACL/,
       );
     } finally {
@@ -269,7 +279,7 @@ if (!TEST_DATABASE_URL) {
   test("read-only schema verification accepts the exact trusted confirmation trigger binding", async () => {
     await migrateDatabase(sql, directory);
 
-    await assert.doesNotReject(verifyDatabaseSchemaReadOnly(sql, directory));
+    await assert.doesNotReject(verifyCurrentSchemaReadOnly());
   });
 
   test("read-only schema verification rejects a conditional trusted confirmation trigger", async () => {
@@ -285,7 +295,7 @@ if (!TEST_DATABASE_URL) {
     `);
 
     await assert.rejects(
-      verifyDatabaseSchemaReadOnly(sql, directory),
+      verifyCurrentSchemaReadOnly(),
       /trusted confirmation writing\/trigger binding/,
     );
   });
@@ -298,7 +308,7 @@ if (!TEST_DATABASE_URL) {
     `);
 
     await assert.rejects(
-      verifyDatabaseSchemaReadOnly(sql, directory),
+      verifyCurrentSchemaReadOnly(),
       /trusted confirmation writing\/trigger binding/,
     );
   });
@@ -311,7 +321,7 @@ if (!TEST_DATABASE_URL) {
     `);
 
     await assert.rejects(
-      verifyDatabaseSchemaReadOnly(sql, directory),
+      verifyCurrentSchemaReadOnly(),
       /trusted confirmation writing\/trigger binding/,
     );
   });
@@ -328,7 +338,7 @@ if (!TEST_DATABASE_URL) {
     `);
 
     await assert.rejects(
-      verifyDatabaseSchemaReadOnly(sql, directory),
+      verifyCurrentSchemaReadOnly(),
       /trusted confirmation writing\/trigger binding/,
     );
   });
@@ -345,7 +355,7 @@ if (!TEST_DATABASE_URL) {
     `);
 
     await assert.rejects(
-      verifyDatabaseSchemaReadOnly(sql, directory),
+      verifyCurrentSchemaReadOnly(),
       /trusted confirmation writing\/trigger binding/,
     );
   });
