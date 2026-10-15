@@ -185,11 +185,10 @@ function createStableFetch(options?: {
 
     if (url.endsWith(`/accounts/${ISSUER}`)) {
       issuerReads += 1;
-      return jsonResponse(
-        issuerReads > 1
-          ? (options?.issuerAfterAdvance ?? options?.issuer ?? issuerAccount())
-          : (options?.issuer ?? issuerAccount()),
-      );
+      if (issuerReads > 1 && options?.issuerAfterAdvance) {
+        return jsonResponse(options.issuerAfterAdvance);
+      }
+      return jsonResponse(options?.issuer ?? issuerAccount());
     }
 
     if (url.endsWith(`/accounts/${DESTINATION}`)) {
@@ -197,13 +196,10 @@ function createStableFetch(options?: {
       if (options?.destinationStatus === 404) {
         return jsonResponse({ status: 404 }, 404);
       }
-      return jsonResponse(
-        destinationReads > 1
-          ? (options?.destinationAfterAdvance ??
-            options?.destination ??
-            destinationAccount())
-          : (options?.destination ?? destinationAccount()),
-      );
+      if (destinationReads > 1 && options?.destinationAfterAdvance) {
+        return jsonResponse(options.destinationAfterAdvance);
+      }
+      return jsonResponse(options?.destination ?? destinationAccount());
     }
 
     return jsonResponse({ error: "unexpected request" }, 500);
@@ -317,9 +313,7 @@ test("a forward ledger close during account reads remains a valid deterministic 
   assert.equal(result.preconditions.destinationTrustline.observedLedger, 1_001);
   assert.equal(result.preconditions.issuerSequence, "123456");
   assert.equal(calls.length, 6);
-  assert.ok(
-    calls.slice(4).every((call) => call.url.includes("/accounts/")),
-  );
+  assert.ok(calls.slice(4).every((call) => call.url.includes("/accounts/")));
 });
 
 test("an advancing checkpoint revalidates issuer policy from the bounded second account read", async () => {
