@@ -4,7 +4,7 @@ import type {
   ImmutableSharedIssuanceIntent,
   ImmutableSharedIssuanceLedgerConfirmation,
   ImmutableSharedIssuanceTransactionAttempt,
-  type SharedIssuanceSigningMode,
+  SharedIssuanceSigningMode,
   TrustedLedgerConfirmationWriter,
 } from "./shared-issuance-persistence";
 import {
