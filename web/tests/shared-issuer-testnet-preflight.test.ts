@@ -32,15 +32,19 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-function ledgerRecord(sequence = 1_000) {
+function ledgerRecord(
+  sequence = 1_000,
+  baseFeeStroops = 100,
+  baseReserveStroops = 5_000_000,
+) {
   return {
     _embedded: {
       records: [
         {
           sequence,
           closed_at: LEDGER_CLOSED_AT,
-          base_fee_in_stroops: 100,
-          base_reserve_in_stroops: 5_000_000,
+          base_fee_in_stroops: baseFeeStroops,
+          base_reserve_in_stroops: baseReserveStroops,
         },
       ],
     },
@@ -139,6 +143,10 @@ function createStableFetch(options?: {
   destination?: Record<string, unknown>;
   firstLedger?: number;
   secondLedger?: number;
+  firstBaseFeeStroops?: number;
+  secondBaseFeeStroops?: number;
+  firstBaseReserveStroops?: number;
+  secondBaseReserveStroops?: number;
   destinationStatus?: number;
 }): { fetchImpl: typeof fetch; calls: FetchCall[] } {
   const calls: FetchCall[] = [];
@@ -152,11 +160,22 @@ function createStableFetch(options?: {
 
     if (url.includes("/ledgers?")) {
       ledgerReads += 1;
+      const firstRead = ledgerReads === 1;
       return jsonResponse(
         ledgerRecord(
-          ledgerReads === 1
+          firstRead
             ? (options?.firstLedger ?? 1_000)
             : (options?.secondLedger ?? options?.firstLedger ?? 1_000),
+          firstRead
+            ? (options?.firstBaseFeeStroops ?? 100)
+            : (options?.secondBaseFeeStroops ??
+              options?.firstBaseFeeStroops ??
+              100),
+          firstRead
+            ? (options?.firstBaseReserveStroops ?? 5_000_000)
+            : (options?.secondBaseReserveStroops ??
+              options?.firstBaseReserveStroops ??
+              5_000_000),
         ),
       );
     }
@@ -263,10 +282,34 @@ test("preflight output feeds the existing canonical builder without browser-supp
   assert.equal(plan.intent.amount, "25.0000000");
 });
 
-test("fails closed if the Testnet ledger advances while account preflight reads are in flight", async () => {
+test("a forward ledger close during account reads remains a valid deterministic preflight observation", async () => {
+  const { fetchImpl, calls } = createStableFetch({
+    firstLedger: 1_000,
+    secondLedger: 1_001,
+  });
+
+  const result = await new OfficialStellarTestnetIssuancePreflightReader(
+    fetchImpl,
+  ).readIssuancePreconditions({
+    issuerPublicKey: ISSUER,
+    destinationPublicKey: DESTINATION,
+    assetCode: "NOVA",
+    assetCodeReservedForProject: true,
+    feeStroops: "100",
+  });
+
+  assert.equal(result.observedLedger, 1_001);
+  assert.equal(result.preconditions.destinationTrustline.observedLedger, 1_001);
+  assert.equal(result.preconditions.issuerSequence, "123456");
+  assert.equal(calls.length, 4);
+});
+
+test("the later ledger checkpoint supplies fee and reserve policy when the window advances", async () => {
   const { fetchImpl } = createStableFetch({
     firstLedger: 1_000,
     secondLedger: 1_001,
+    firstBaseFeeStroops: 99,
+    secondBaseFeeStroops: 101,
   });
 
   await assert.rejects(
@@ -280,7 +323,7 @@ test("fails closed if the Testnet ledger advances while account preflight reads 
       feeStroops: "100",
     }),
     (error: unknown) =>
-      preflightErrorCode(error) === "preflight_ledger_advanced",
+      preflightErrorCode(error) === "fee_below_network_minimum",
   );
 });
 
@@ -356,7 +399,111 @@ test("represents a missing exact destination trustline truthfully so constructio
   );
 });
 
-test("rejects a configured transaction fee below the stable network base fee", async () => {
+test("unauthorized exact destination trustline still fails canonical construction", async () => {
+  const unauthorized = destinationAccount([
+    {
+      asset_type: "native",
+      balance: "5.0000000",
+      buying_liabilities: "0.0000000",
+      selling_liabilities: "0.0000000",
+    },
+    {
+      asset_type: "credit_alphanum4",
+      asset_code: "NOVA",
+      asset_issuer: ISSUER,
+      balance: "10.0000000",
+      limit: "1000.0000000",
+      buying_liabilities: "2.0000000",
+      selling_liabilities: "0.0000000",
+      is_authorized: false,
+    },
+  ]);
+  const { fetchImpl } = createStableFetch({ destination: unauthorized });
+  const result = await new OfficialStellarTestnetIssuancePreflightReader(
+    fetchImpl,
+  ).readIssuancePreconditions({
+    issuerPublicKey: ISSUER,
+    destinationPublicKey: DESTINATION,
+    assetCode: "NOVA",
+    assetCodeReservedForProject: true,
+    feeStroops: "100",
+  });
+
+  assert.throws(
+    () =>
+      buildSharedIssuerIssuancePlan(
+        {
+          projectId: "project-unauthorized-trustline",
+          assetCode: "NOVA",
+          issuerPublicKey: ISSUER,
+          destinationPublicKey: DESTINATION,
+          amount: "25",
+          network: "testnet",
+          networkPassphrase: Networks.TESTNET,
+          validFrom: 1_800_000_000,
+          validUntil: 1_800_000_300,
+        },
+        result.preconditions,
+      ),
+    (error: unknown) =>
+      error instanceof SharedIssuerIssuanceError &&
+      error.code === "trustline_unauthorized",
+  );
+});
+
+test("insufficient exact destination trustline capacity still fails canonical construction", async () => {
+  const constrained = destinationAccount([
+    {
+      asset_type: "native",
+      balance: "5.0000000",
+      buying_liabilities: "0.0000000",
+      selling_liabilities: "0.0000000",
+    },
+    {
+      asset_type: "credit_alphanum4",
+      asset_code: "NOVA",
+      asset_issuer: ISSUER,
+      balance: "990.0000000",
+      limit: "1000.0000000",
+      buying_liabilities: "2.0000000",
+      selling_liabilities: "0.0000000",
+      is_authorized: true,
+    },
+  ]);
+  const { fetchImpl } = createStableFetch({ destination: constrained });
+  const result = await new OfficialStellarTestnetIssuancePreflightReader(
+    fetchImpl,
+  ).readIssuancePreconditions({
+    issuerPublicKey: ISSUER,
+    destinationPublicKey: DESTINATION,
+    assetCode: "NOVA",
+    assetCodeReservedForProject: true,
+    feeStroops: "100",
+  });
+
+  assert.throws(
+    () =>
+      buildSharedIssuerIssuancePlan(
+        {
+          projectId: "project-capacity",
+          assetCode: "NOVA",
+          issuerPublicKey: ISSUER,
+          destinationPublicKey: DESTINATION,
+          amount: "25",
+          network: "testnet",
+          networkPassphrase: Networks.TESTNET,
+          validFrom: 1_800_000_000,
+          validUntil: 1_800_000_300,
+        },
+        result.preconditions,
+      ),
+    (error: unknown) =>
+      error instanceof SharedIssuerIssuanceError &&
+      error.code === "trustline_capacity_exceeded",
+  );
+});
+
+test("rejects a configured transaction fee below the observed network base fee", async () => {
   const { fetchImpl } = createStableFetch();
 
   await assert.rejects(
