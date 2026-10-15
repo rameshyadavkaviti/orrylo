@@ -14,7 +14,7 @@ ALTER TABLE project_issuance_transaction_attempts
 -- schema migrations. When the existing production role is present, extend only
 -- its already-column-scoped attempt UPDATE authority for the new ownership
 -- claim. Do not grant table-wide UPDATE or any unrelated mutation privilege.
-DO $
+DO $acl$
 BEGIN
   IF EXISTS (
     SELECT 1
@@ -25,7 +25,7 @@ BEGIN
       'GRANT UPDATE (signing_mode) ON TABLE public.project_issuance_transaction_attempts TO orrylo_app';
   END IF;
 END;
-$;
+$acl$;
 
 CREATE OR REPLACE FUNCTION protect_issuance_transaction_attempt()
 RETURNS trigger LANGUAGE plpgsql AS $$
