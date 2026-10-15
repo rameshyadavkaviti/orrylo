@@ -27,6 +27,7 @@ test("loads exact ordered migration names and SHA-256 checksums", async () => {
       "008_gate_a_confirmation_provenance.sql",
       "009_signed_envelope_digest.sql",
       "010_mvp_lite_db_security_hardening.sql",
+      "011_shared_issuance_signing_mode.sql",
     ],
   );
   for (const migration of evidence) {
