@@ -91,6 +91,7 @@ class MemoryStore implements SharedIssuanceOrchestrationStore {
   status: DurableStatus = "awaiting_issuer_integration";
   failureCode: string | null = null;
   transitions: DurableStatus[] = [];
+  appendFailuresRemaining = 0;
 
   async getIntent(requestId: string) {
     return this.intents.get(requestId) ?? null;
@@ -99,12 +100,30 @@ class MemoryStore implements SharedIssuanceOrchestrationStore {
     return this.attempts.filter((item) => item.issuanceRequestId === requestId);
   }
   async appendAttempt(attempt: ImmutableSharedIssuanceTransactionAttempt) {
+    if (this.appendFailuresRemaining > 0) {
+      this.appendFailuresRemaining -= 1;
+      throw new Error("append attempt failed");
+    }
     if (this.attempts.length) throw new Error("attempt 2 rejected");
     this.attempts.push(attempt);
     return attempt;
   }
   async getAttempt(attemptId: string) {
     return this.attempts.find((item) => item.attemptId === attemptId) ?? null;
+  }
+  async claimSigningMode(input: {
+    attemptId: string;
+    transactionHash: string;
+    signingMode: "private" | "manual";
+  }) {
+    const existing = await this.getAttempt(input.attemptId);
+    assert.ok(existing);
+    assert.equal(existing.transactionHash, input.transactionHash);
+    if (existing.signingMode || existing.signedEnvelopeXdrSha256) {
+      return null;
+    }
+    existing.signingMode = input.signingMode;
+    return existing;
   }
   async recordSignedEnvelope(input: {
     attemptId: string;
@@ -114,6 +133,7 @@ class MemoryStore implements SharedIssuanceOrchestrationStore {
     const existing = await this.getAttempt(input.attemptId);
     assert.ok(existing);
     assert.equal(existing.transactionHash, input.transactionHash);
+    assert.ok(existing.signingMode);
     if (existing.signedEnvelopeXdrSha256) {
       throw new Error("signed envelope already claimed");
     }
@@ -149,9 +169,11 @@ function fixture(
     submissionUncertain?: boolean;
     confirmationMismatch?: boolean;
     primitive?: SharedIssuerSigningPrimitive;
+    appendFailures?: number;
   } = {},
 ) {
   const store = new MemoryStore();
+  store.appendFailuresRemaining = options.appendFailures ?? 0;
   const calls: string[] = [];
   let submissions = 0;
   const primitive: SharedIssuerSigningPrimitive = options.primitive ?? {
@@ -405,6 +427,7 @@ test("successful mocked path preserves the required order and returns durable co
   ]);
   assert.equal(fx.store.attempts.length, 1);
   assert.equal(fx.store.attempts[0]!.attemptNumber, 1);
+  assert.equal(fx.store.attempts[0]!.signingMode, "private");
   assert.equal(
     fx.store.confirmation?.transactionHash,
     fx.store.attempts[0]!.transactionHash,
@@ -446,6 +469,7 @@ test("private Railway primitive reaches the existing one-shot issuance path", as
   assert.equal(fx.submissions(), 1);
   assert.equal(fx.store.attempts.length, 1);
   assert.equal(fx.store.attempts[0]!.attemptNumber, 1);
+  assert.equal(fx.store.attempts[0]!.signingMode, "private");
 });
 
 test("private Railway signer failure causes zero submissions", async () => {
@@ -554,7 +578,169 @@ test("manual handoff persists attempt 1 and exposes exact unsigned XDR without s
   assert.equal(fx.submissions(), 0);
   assert.equal(fx.store.attempts.length, 1);
   assert.equal(fx.store.attempts[0]!.attemptNumber, 1);
+  assert.equal(fx.store.attempts[0]!.signingMode, "manual");
   assert.equal(fx.store.attempts[0]!.signedEnvelopeXdrSha256, undefined);
+});
+
+test("private signing mode claimed first rejects manual export before a second signer can begin", async () => {
+  let releaseSigner!: () => void;
+  let signerEntered!: () => void;
+  const entered = new Promise<void>((resolve) => {
+    signerEntered = resolve;
+  });
+  const release = new Promise<void>((resolve) => {
+    releaseSigner = resolve;
+  });
+  let signerCalls = 0;
+
+  const fx = fixture({
+    primitive: {
+      async signCanonicalEnvelope(request) {
+        signerCalls += 1;
+        signerEntered();
+        await release;
+        const transaction = TransactionBuilder.fromXDR(
+          request.unsignedEnvelopeXdr,
+          Networks.TESTNET,
+        );
+        assert.ok(transaction instanceof Transaction);
+        transaction.sign(ISSUER_KEYPAIR);
+        return { signedEnvelopeXdr: transaction.toXDR() };
+      },
+    },
+  });
+
+  const privateRun = fx.orchestrator.startOrResume(input);
+  await entered;
+
+  assert.equal(fx.store.attempts[0]!.signingMode, "private");
+  await assert.rejects(
+    () => fx.orchestrator.prepareManualSigningHandoff(input),
+    (error: unknown) => errorCode(error) === "manual_signing_already_consumed",
+  );
+  assert.equal(signerCalls, 1);
+
+  releaseSigner();
+  const result = await privateRun;
+  assert.equal(result.status, "confirmed");
+  assert.equal(signerCalls, 1);
+  assert.equal(fx.submissions(), 1);
+  assert.equal(fx.store.attempts.length, 1);
+});
+
+test("manual signing mode claimed first prevents private signer invocation and second export", async () => {
+  let signerCalls = 0;
+  const fx = fixture({
+    primitive: {
+      async signCanonicalEnvelope() {
+        signerCalls += 1;
+        throw new Error("private signer must not be reached");
+      },
+    },
+  });
+
+  const first = await fx.orchestrator.prepareManualSigningHandoff(input);
+  assert.equal(first.status, "awaiting_manual_signature");
+  assert.equal(fx.store.attempts[0]!.signingMode, "manual");
+
+  const privateResult = await fx.orchestrator.startOrResume(input);
+  assert.equal(privateResult.status, "preparing_issuance");
+  assert.equal(signerCalls, 0);
+  assert.equal(fx.submissions(), 0);
+
+  await assert.rejects(
+    () => fx.orchestrator.prepareManualSigningHandoff(input),
+    (error: unknown) => errorCode(error) === "manual_signing_already_consumed",
+  );
+  assert.equal(fx.store.attempts.length, 1);
+  assert.equal(fx.store.attempts[0]!.attemptNumber, 1);
+});
+
+test("simultaneous private and manual signing-mode claims have exactly one winner", async () => {
+  let signerCalls = 0;
+  const fx = fixture({
+    primitive: {
+      async signCanonicalEnvelope(request) {
+        signerCalls += 1;
+        const transaction = TransactionBuilder.fromXDR(
+          request.unsignedEnvelopeXdr,
+          Networks.TESTNET,
+        );
+        assert.ok(transaction instanceof Transaction);
+        transaction.sign(ISSUER_KEYPAIR);
+        return { signedEnvelopeXdr: transaction.toXDR() };
+      },
+    },
+  });
+
+  const results = await Promise.allSettled([
+    fx.orchestrator.startOrResume(input),
+    fx.orchestrator.prepareManualSigningHandoff(input),
+  ]);
+
+  assert.equal(fx.store.attempts.length, 1);
+  assert.equal(fx.store.attempts[0]!.attemptNumber, 1);
+  assert.ok(
+    fx.store.attempts[0]!.signingMode === "private" ||
+      fx.store.attempts[0]!.signingMode === "manual",
+  );
+
+  const manualWins = results.filter(
+    (result) =>
+      result.status === "fulfilled" &&
+      "status" in result.value &&
+      result.value.status === "awaiting_manual_signature",
+  ).length;
+
+  if (fx.store.attempts[0]!.signingMode === "manual") {
+    assert.equal(manualWins, 1);
+    assert.equal(signerCalls, 0);
+    assert.equal(fx.submissions(), 0);
+  } else {
+    assert.equal(manualWins, 0);
+    assert.equal(signerCalls, 1);
+    assert.equal(fx.submissions(), 1);
+  }
+});
+
+test("private signer mode claim is never retried after signer failure", async () => {
+  let signerCalls = 0;
+  const fx = fixture({
+    primitive: {
+      async signCanonicalEnvelope() {
+        signerCalls += 1;
+        throw new Error("signer unavailable");
+      },
+    },
+  });
+
+  const first = await fx.orchestrator.startOrResume(input);
+  assert.equal(first.status, "failed_before_submission");
+  assert.equal(fx.store.attempts[0]!.signingMode, "private");
+
+  const second = await fx.orchestrator.startOrResume(input);
+  assert.equal(second.status, "preparing_issuance");
+  assert.equal(signerCalls, 1);
+  assert.equal(fx.submissions(), 0);
+  assert.equal(fx.store.attempts.length, 1);
+});
+
+test("legacy pending execution without an attempt remains recoverable after append failure", async () => {
+  const fx = fixture({ appendFailures: 1 });
+  fx.store.status = "pending_execution";
+
+  const first = await fx.orchestrator.startOrResume(input);
+  assert.equal(first.status, "preparing_issuance");
+  assert.equal(fx.store.status, "pending_execution");
+  assert.equal(fx.store.attempts.length, 0);
+  assert.equal(fx.calls.filter((call) => call === "sign").length, 0);
+
+  const second = await fx.orchestrator.startOrResume(input);
+  assert.equal(second.status, "confirmed");
+  assert.equal(fx.store.attempts.length, 1);
+  assert.equal(fx.store.attempts[0]!.attemptNumber, 1);
+  assert.equal(fx.store.attempts[0]!.signingMode, "private");
+  assert.equal(fx.submissions(), 1);
 });
 
 test("manual signed-envelope bridge accepts only the exact persisted Testnet transaction", async () => {
