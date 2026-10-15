@@ -67,24 +67,24 @@ if (!TEST_DATABASE_URL) {
     await admin.unsafe("DROP SCHEMA public CASCADE");
     await admin.unsafe("CREATE SCHEMA public");
     await admin.unsafe(`
-      DO $
+      DO $role$
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_app') THEN
           CREATE ROLE orrylo_app LOGIN PASSWORD 'gate-a-app-test';
         END IF;
       END;
-      $;
+      $role$;
       ALTER ROLE orrylo_app LOGIN PASSWORD 'gate-a-app-test';
     `);
     await migrateDatabase(admin, resolve(process.cwd(), "db/migrations"));
     await admin.unsafe(`
-      DO $
+      DO $role$
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_gate_a_writer_test') THEN
           CREATE ROLE orrylo_gate_a_writer_test LOGIN PASSWORD 'gate-a-writer-test';
         END IF;
       END;
-      $;
+      $role$;
       ALTER ROLE orrylo_gate_a_writer_test PASSWORD 'gate-a-writer-test';
       REVOKE orrylo_confirmation_writer FROM orrylo_app;
       GRANT USAGE ON SCHEMA public TO orrylo_app;
