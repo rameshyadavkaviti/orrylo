@@ -29,6 +29,8 @@ export interface ImmutableSharedIssuanceIntent {
   createdAt: string;
 }
 
+export type SharedIssuanceSigningMode = "private" | "manual";
+
 export interface ImmutableSharedIssuanceTransactionAttempt {
   attemptId: string;
   issuanceRequestId: string;
@@ -37,6 +39,8 @@ export interface ImmutableSharedIssuanceTransactionAttempt {
   transactionHash: string;
   /** Digest of the unsigned envelope persisted before signing. */
   envelopeXdrSha256: string;
+  /** Durable one-winner ownership of the only permitted signing path. */
+  signingMode?: SharedIssuanceSigningMode;
   /** Digest of the fully decorated envelope, populated once after signing. */
   signedEnvelopeXdrSha256?: string;
   sourceSequence: string;
@@ -93,6 +97,11 @@ export interface SharedIssuancePersistenceRepository {
   appendAttempt(
     attempt: ImmutableSharedIssuanceTransactionAttempt,
   ): Promise<ImmutableSharedIssuanceTransactionAttempt>;
+  claimSigningMode(input: {
+    attemptId: string;
+    transactionHash: string;
+    signingMode: SharedIssuanceSigningMode;
+  }): Promise<ImmutableSharedIssuanceTransactionAttempt | null>;
   recordSignedEnvelope(input: {
     attemptId: string;
     transactionHash: string;
@@ -163,6 +172,7 @@ interface AttemptRow {
   transaction_hash: string;
   envelope_xdr_sha256: string;
   signed_envelope_xdr_sha256: string | null;
+  signing_mode: SharedIssuanceSigningMode | null;
   source_sequence: string;
   fee_stroops: string;
   valid_from: string;
@@ -248,7 +258,10 @@ export class PostgresSharedIssuancePersistenceRepository implements SharedIssuan
     attempt: ImmutableSharedIssuanceTransactionAttempt,
   ): Promise<ImmutableSharedIssuanceTransactionAttempt> {
     assertAttempt(attempt);
-    if (attempt.signedEnvelopeXdrSha256 !== undefined) {
+    if (
+      attempt.signingMode !== undefined ||
+      attempt.signedEnvelopeXdrSha256 !== undefined
+    ) {
       throw new SharedIssuancePersistenceConflictError();
     }
     const intent = await this.getIntent(attempt.issuanceRequestId);
@@ -284,6 +297,30 @@ export class PostgresSharedIssuancePersistenceRepository implements SharedIssuan
     return stored;
   }
 
+  async claimSigningMode(input: {
+    attemptId: string;
+    transactionHash: string;
+    signingMode: SharedIssuanceSigningMode;
+  }): Promise<ImmutableSharedIssuanceTransactionAttempt | null> {
+    if (
+      !UUID_PATTERN.test(input.attemptId) ||
+      !HASH_PATTERN.test(input.transactionHash) ||
+      (input.signingMode !== "private" && input.signingMode !== "manual")
+    ) {
+      throw new SharedIssuancePersistenceConflictError();
+    }
+    const [row] = await this.boundary.sql<AttemptRow[]>`
+      UPDATE project_issuance_transaction_attempts
+      SET signing_mode = ${input.signingMode}
+      WHERE attempt_id = ${input.attemptId}
+        AND transaction_hash = ${input.transactionHash}
+        AND signing_mode IS NULL
+        AND signed_envelope_xdr_sha256 IS NULL
+      RETURNING *
+    `;
+    return row ? mapAttempt(row) : null;
+  }
+
   async recordSignedEnvelope(input: {
     attemptId: string;
     transactionHash: string;
@@ -301,6 +338,7 @@ export class PostgresSharedIssuancePersistenceRepository implements SharedIssuan
       SET signed_envelope_xdr_sha256 = ${input.signedEnvelopeXdrSha256}
       WHERE attempt_id = ${input.attemptId}
         AND transaction_hash = ${input.transactionHash}
+        AND signing_mode IS NOT NULL
         AND signed_envelope_xdr_sha256 IS NULL
       RETURNING *
     `;
@@ -430,6 +468,15 @@ export class UnavailableSharedIssuancePersistenceWriter implements SharedIssuanc
     throw new SharedIssuancePersistenceUnavailableError();
   }
 
+  async claimSigningMode(_input: {
+    attemptId: string;
+    transactionHash: string;
+    signingMode: SharedIssuanceSigningMode;
+  }): Promise<never> {
+    void _input;
+    throw new SharedIssuancePersistenceUnavailableError();
+  }
+
   async recordSignedEnvelope(_input: {
     attemptId: string;
     transactionHash: string;
@@ -511,6 +558,9 @@ function mapAttempt(
     amount: row.amount,
     createdAt: row.created_at.toISOString(),
   };
+  if (row.signing_mode !== null) {
+    attempt.signingMode = row.signing_mode;
+  }
   if (row.signed_envelope_xdr_sha256 !== null) {
     attempt.signedEnvelopeXdrSha256 = row.signed_envelope_xdr_sha256.trim();
   }
@@ -587,6 +637,9 @@ function assertAttempt(
     !HASH_PATTERN.test(attempt.issuanceIntentFingerprint) ||
     !HASH_PATTERN.test(attempt.transactionHash) ||
     !HASH_PATTERN.test(attempt.envelopeXdrSha256) ||
+    (attempt.signingMode !== undefined &&
+      attempt.signingMode !== "private" &&
+      attempt.signingMode !== "manual") ||
     (attempt.signedEnvelopeXdrSha256 !== undefined &&
       !HASH_PATTERN.test(attempt.signedEnvelopeXdrSha256)) ||
     !Number.isSafeInteger(attempt.attemptNumber) ||
