@@ -176,6 +176,8 @@ exact-hash reconciliation guarantees as the private signer path.
 This is **not** a browser API, generic XDR-signing endpoint, replacement signer
 architecture, or Mainnet facility. It never loads a Stellar secret key. The
 owner's Stellar CLI identity remains entirely in the local Stellar secure store.
+The operator bridge is hard-pinned to the approved live Testnet Shared Issuer
+`GBW4IKGPC5Q4YRKGRMNNXTVRZNQZ3DFWFHXSQUAMWLXES75MWTY3TWOV`; any different configured issuer fails closed.
 
 After the normal application flow has created the immutable full issuance
 intent, run the existing read-only checks, then prepare attempt 1:
