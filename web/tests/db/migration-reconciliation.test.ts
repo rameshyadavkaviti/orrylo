@@ -22,6 +22,7 @@ const ALL_MIGRATIONS = [
   "008_gate_a_confirmation_provenance.sql",
   "009_signed_envelope_digest.sql",
   "010_mvp_lite_db_security_hardening.sql",
+  "011_shared_issuance_signing_mode.sql",
 ];
 
 if (!TEST_DATABASE_URL) {
@@ -71,7 +72,7 @@ if (!TEST_DATABASE_URL) {
     `;
   }
 
-  test("fresh bootstrap applies 001-010 and repeated runs verify without changes", async () => {
+  test("fresh bootstrap applies 001-011 and repeated runs verify without changes", async () => {
     const first = await migrateDatabase(sql, directory);
     assert.deepEqual(first.applied, ALL_MIGRATIONS);
     assert.deepEqual(first.reconciled, []);
@@ -167,7 +168,7 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
-  test("existing 001-005 database upgrades with 006-010 without rewriting earlier checksums or project rows", async () => {
+  test("existing 001-005 database upgrades with 006-011 without rewriting earlier checksums or project rows", async () => {
     const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-metadata-"));
     try {
       for (const migration of ALL_MIGRATIONS.slice(0, 5)) {
@@ -195,6 +196,7 @@ if (!TEST_DATABASE_URL) {
         "008_gate_a_confirmation_provenance.sql",
         "009_signed_envelope_digest.sql",
         "010_mvp_lite_db_security_hardening.sql",
+        "011_shared_issuance_signing_mode.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 5));
       const after = await sql<{ name: string; checksum: string }[]>`
@@ -214,7 +216,7 @@ if (!TEST_DATABASE_URL) {
     }
   });
 
-  test("existing 001-006 publication rows are retained but fail closed during 007-010 upgrade", async () => {
+  test("existing 001-006 publication rows are retained but fail closed during 007-011 upgrade", async () => {
     const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-confirmation-"));
     try {
       for (const migration of ALL_MIGRATIONS.slice(0, 6)) {
@@ -261,6 +263,7 @@ if (!TEST_DATABASE_URL) {
         "008_gate_a_confirmation_provenance.sql",
         "009_signed_envelope_digest.sql",
         "010_mvp_lite_db_security_hardening.sql",
+        "011_shared_issuance_signing_mode.sql",
       ]);
       const [legacy] = await sql<
         {
@@ -298,6 +301,7 @@ if (!TEST_DATABASE_URL) {
         "008_gate_a_confirmation_provenance.sql",
         "009_signed_envelope_digest.sql",
         "010_mvp_lite_db_security_hardening.sql",
+        "011_shared_issuance_signing_mode.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 7));
       const after = await sql<{ name: string; checksum: string }[]>`
@@ -323,6 +327,7 @@ if (!TEST_DATABASE_URL) {
       assert.deepEqual(upgraded.applied, [
         "009_signed_envelope_digest.sql",
         "010_mvp_lite_db_security_hardening.sql",
+        "011_shared_issuance_signing_mode.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 8));
       const after = await sql<{ name: string; checksum: string }[]>`
@@ -334,7 +339,7 @@ if (!TEST_DATABASE_URL) {
     }
   });
 
-  test("existing 001-009 successor attempts survive 010 while new successor writes fail closed", async () => {
+  test("existing 001-009 successor attempts survive 010-011 while new successor writes fail closed", async () => {
     const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-db-hardening-"));
     try {
       for (const migration of ALL_MIGRATIONS.slice(0, 9)) {
@@ -570,6 +575,7 @@ if (!TEST_DATABASE_URL) {
       const upgraded = await migrateDatabase(sql, directory);
       assert.deepEqual(upgraded.applied, [
         "010_mvp_lite_db_security_hardening.sql",
+        "011_shared_issuance_signing_mode.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 9));
 
@@ -628,7 +634,7 @@ if (!TEST_DATABASE_URL) {
         GRANT USAGE ON SCHEMA public TO orrylo_gate_a_upgrade_app_test;
         GRANT SELECT, INSERT ON project_issuance_full_intents,
           project_issuance_transaction_attempts TO orrylo_gate_a_upgrade_app_test;
-        GRANT UPDATE (signed_envelope_xdr_sha256)
+        GRANT UPDATE (signing_mode, signed_envelope_xdr_sha256)
           ON project_issuance_transaction_attempts
           TO orrylo_gate_a_upgrade_app_test;
         GRANT SELECT, INSERT, UPDATE ON project_metadata_publications
