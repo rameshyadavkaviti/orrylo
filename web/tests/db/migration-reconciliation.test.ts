@@ -43,6 +43,16 @@ if (!TEST_DATABASE_URL) {
 
     await sql.unsafe("DROP SCHEMA public CASCADE");
     await sql.unsafe("CREATE SCHEMA public");
+    await sql.unsafe(`
+      DO $
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'orrylo_app') THEN
+          CREATE ROLE orrylo_app LOGIN PASSWORD 'migration-app-test';
+        END IF;
+      END;
+      $;
+      ALTER ROLE orrylo_app LOGIN PASSWORD 'migration-app-test';
+    `);
   });
 
   after(async () => {
@@ -82,6 +92,178 @@ if (!TEST_DATABASE_URL) {
     assert.deepEqual(again.applied, []);
     assert.deepEqual(again.reconciled, []);
     assert.deepEqual(again.verified, ALL_MIGRATIONS);
+  });
+
+  test("existing 001-010 production ACL upgrades through 011 with only the signing-mode grant", async () => {
+    const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-signing-mode-"));
+    try {
+      for (const migration of ALL_MIGRATIONS.slice(0, 10)) {
+        await copyFile(join(directory, migration), join(temporary, migration));
+      }
+      const initial = await migrateDatabase(sql, temporary);
+      assert.deepEqual(initial.applied, ALL_MIGRATIONS.slice(0, 10));
+
+      await sql`
+        GRANT UPDATE (signed_envelope_xdr_sha256)
+          ON project_issuance_transaction_attempts TO orrylo_app
+      `;
+
+      const [writerBefore] = await sql<
+        {
+          full_intents_select: boolean;
+          attempts_select: boolean;
+          confirmations_select: boolean;
+          confirmations_insert: boolean;
+          confirmations_update: boolean;
+          confirmations_delete: boolean;
+          confirmations_truncate: boolean;
+        }[]
+      >`
+        SELECT
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_full_intents',
+            'SELECT'
+          ) AS full_intents_select,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_transaction_attempts',
+            'SELECT'
+          ) AS attempts_select,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'SELECT'
+          ) AS confirmations_select,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'INSERT'
+          ) AS confirmations_insert,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'UPDATE'
+          ) AS confirmations_update,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'DELETE'
+          ) AS confirmations_delete,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'TRUNCATE'
+          ) AS confirmations_truncate
+      `;
+
+      const upgraded = await migrateDatabase(sql, directory);
+      assert.deepEqual(upgraded.applied, [
+        "011_shared_issuance_signing_mode.sql",
+      ]);
+      assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 10));
+
+      const [appAcl] = await sql<
+        {
+          table_update: boolean;
+          signing_mode_update: boolean;
+          signed_envelope_update: boolean;
+          source_sequence_update: boolean;
+        }[]
+      >`
+        SELECT
+          pg_catalog.has_table_privilege(
+            'orrylo_app',
+            'public.project_issuance_transaction_attempts',
+            'UPDATE'
+          ) AS table_update,
+          pg_catalog.has_column_privilege(
+            'orrylo_app',
+            'public.project_issuance_transaction_attempts',
+            'signing_mode',
+            'UPDATE'
+          ) AS signing_mode_update,
+          pg_catalog.has_column_privilege(
+            'orrylo_app',
+            'public.project_issuance_transaction_attempts',
+            'signed_envelope_xdr_sha256',
+            'UPDATE'
+          ) AS signed_envelope_update,
+          pg_catalog.has_column_privilege(
+            'orrylo_app',
+            'public.project_issuance_transaction_attempts',
+            'source_sequence',
+            'UPDATE'
+          ) AS source_sequence_update
+      `;
+      assert.equal(appAcl.table_update, false);
+      assert.equal(appAcl.signing_mode_update, true);
+      assert.equal(appAcl.signed_envelope_update, true);
+      assert.equal(appAcl.source_sequence_update, false);
+
+      const [writerAfter] = await sql<
+        {
+          full_intents_select: boolean;
+          attempts_select: boolean;
+          confirmations_select: boolean;
+          confirmations_insert: boolean;
+          confirmations_update: boolean;
+          confirmations_delete: boolean;
+          confirmations_truncate: boolean;
+        }[]
+      >`
+        SELECT
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_full_intents',
+            'SELECT'
+          ) AS full_intents_select,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_transaction_attempts',
+            'SELECT'
+          ) AS attempts_select,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'SELECT'
+          ) AS confirmations_select,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'INSERT'
+          ) AS confirmations_insert,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'UPDATE'
+          ) AS confirmations_update,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'DELETE'
+          ) AS confirmations_delete,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_ledger_confirmations',
+            'TRUNCATE'
+          ) AS confirmations_truncate
+      `;
+      assert.deepEqual(writerAfter, writerBefore);
+
+      await assert.doesNotReject(verifyDatabaseSchemaReadOnly(sql, directory));
+
+      await sql`
+        REVOKE UPDATE (signing_mode)
+          ON project_issuance_transaction_attempts FROM orrylo_app
+      `;
+      await assert.rejects(
+        verifyDatabaseSchemaReadOnly(sql, directory),
+        /Missing or unsafe orrylo_app attempt UPDATE ACL/,
+      );
+    } finally {
+      await rm(temporary, { recursive: true, force: true });
+    }
   });
 
   test("read-only schema verification accepts the exact trusted confirmation trigger binding", async () => {
