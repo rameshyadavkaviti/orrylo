@@ -170,6 +170,160 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
     throw new Error("Missing non-login trusted confirmation writer role.");
   }
 
+  const [runtimeAcl] = await sql<
+    {
+      app_role_exists: boolean;
+      app_table_update: boolean;
+      app_update_columns: string[];
+      writer_full_intents_select: boolean;
+      writer_attempts_select: boolean;
+      writer_attempts_update_columns: string[];
+      writer_confirmations_select: boolean;
+      writer_confirmations_insert: boolean;
+      writer_confirmations_update: boolean;
+      writer_confirmations_delete: boolean;
+      writer_confirmations_truncate: boolean;
+    }[]
+  >`
+    WITH app_role AS (
+      SELECT oid
+      FROM pg_catalog.pg_roles
+      WHERE rolname = 'orrylo_app'
+    ),
+    writer_role AS (
+      SELECT oid
+      FROM pg_catalog.pg_roles
+      WHERE rolname = 'orrylo_confirmation_writer'
+    ),
+    attempts AS (
+      SELECT 'public.project_issuance_transaction_attempts'::regclass AS oid
+    ),
+    full_intents AS (
+      SELECT 'public.project_issuance_full_intents'::regclass AS oid
+    ),
+    confirmations AS (
+      SELECT 'public.project_issuance_ledger_confirmations'::regclass AS oid
+    )
+    SELECT
+      EXISTS (SELECT 1 FROM app_role) AS app_role_exists,
+      COALESCE((
+        SELECT pg_catalog.has_table_privilege(
+          app_role.oid,
+          attempts.oid,
+          'UPDATE'
+        )
+        FROM app_role, attempts
+      ), false) AS app_table_update,
+      ARRAY(
+        SELECT attribute.attname
+        FROM app_role, attempts
+        JOIN pg_catalog.pg_attribute AS attribute
+          ON attribute.attrelid = attempts.oid
+        WHERE attribute.attnum > 0
+          AND NOT attribute.attisdropped
+          AND pg_catalog.has_column_privilege(
+            app_role.oid,
+            attempts.oid,
+            attribute.attnum,
+            'UPDATE'
+          )
+        ORDER BY attribute.attname
+      ) AS app_update_columns,
+      COALESCE((
+        SELECT pg_catalog.has_table_privilege(
+          writer_role.oid,
+          full_intents.oid,
+          'SELECT'
+        )
+        FROM writer_role, full_intents
+      ), false) AS writer_full_intents_select,
+      COALESCE((
+        SELECT pg_catalog.has_table_privilege(
+          writer_role.oid,
+          attempts.oid,
+          'SELECT'
+        )
+        FROM writer_role, attempts
+      ), false) AS writer_attempts_select,
+      ARRAY(
+        SELECT attribute.attname
+        FROM writer_role, attempts
+        JOIN pg_catalog.pg_attribute AS attribute
+          ON attribute.attrelid = attempts.oid
+        WHERE attribute.attnum > 0
+          AND NOT attribute.attisdropped
+          AND pg_catalog.has_column_privilege(
+            writer_role.oid,
+            attempts.oid,
+            attribute.attnum,
+            'UPDATE'
+          )
+        ORDER BY attribute.attname
+      ) AS writer_attempts_update_columns,
+      COALESCE((
+        SELECT pg_catalog.has_table_privilege(
+          writer_role.oid,
+          confirmations.oid,
+          'SELECT'
+        )
+        FROM writer_role, confirmations
+      ), false) AS writer_confirmations_select,
+      COALESCE((
+        SELECT pg_catalog.has_table_privilege(
+          writer_role.oid,
+          confirmations.oid,
+          'INSERT'
+        )
+        FROM writer_role, confirmations
+      ), false) AS writer_confirmations_insert,
+      COALESCE((
+        SELECT pg_catalog.has_table_privilege(
+          writer_role.oid,
+          confirmations.oid,
+          'UPDATE'
+        )
+        FROM writer_role, confirmations
+      ), false) AS writer_confirmations_update,
+      COALESCE((
+        SELECT pg_catalog.has_table_privilege(
+          writer_role.oid,
+          confirmations.oid,
+          'DELETE'
+        )
+        FROM writer_role, confirmations
+      ), false) AS writer_confirmations_delete,
+      COALESCE((
+        SELECT pg_catalog.has_table_privilege(
+          writer_role.oid,
+          confirmations.oid,
+          'TRUNCATE'
+        )
+        FROM writer_role, confirmations
+      ), false) AS writer_confirmations_truncate
+  `;
+
+  if (
+    !runtimeAcl?.app_role_exists ||
+    runtimeAcl.app_table_update ||
+    runtimeAcl.app_update_columns.join(",") !==
+      "signed_envelope_xdr_sha256,signing_mode"
+  ) {
+    throw new Error("Missing or unsafe orrylo_app attempt UPDATE ACL.");
+  }
+
+  if (
+    !runtimeAcl.writer_full_intents_select ||
+    !runtimeAcl.writer_attempts_select ||
+    runtimeAcl.writer_attempts_update_columns.length > 0 ||
+    !runtimeAcl.writer_confirmations_select ||
+    !runtimeAcl.writer_confirmations_insert ||
+    runtimeAcl.writer_confirmations_update ||
+    runtimeAcl.writer_confirmations_delete ||
+    runtimeAcl.writer_confirmations_truncate
+  ) {
+    throw new Error("Unexpected trusted confirmation writer ACL.");
+  }
+
   const ownershipRows = await sql<
     { object_name: string; owner_name: string }[]
   >`
