@@ -10,6 +10,23 @@ ALTER TABLE project_issuance_transaction_attempts
       OR signing_mode IN ('private', 'manual')
     );
 
+-- The application runtime login is provisioned operationally rather than by
+-- schema migrations. When the existing production role is present, extend only
+-- its already-column-scoped attempt UPDATE authority for the new ownership
+-- claim. Do not grant table-wide UPDATE or any unrelated mutation privilege.
+DO $
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_roles
+    WHERE rolname = 'orrylo_app'
+  ) THEN
+    EXECUTE
+      'GRANT UPDATE (signing_mode) ON TABLE public.project_issuance_transaction_attempts TO orrylo_app';
+  END IF;
+END;
+$;
+
 CREATE OR REPLACE FUNCTION protect_issuance_transaction_attempt()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
