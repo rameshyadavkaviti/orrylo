@@ -725,6 +725,23 @@ test("private signer mode claim is never retried after signer failure", async ()
   assert.equal(fx.store.attempts.length, 1);
 });
 
+test("fresh append failure leaves lifecycle retryable before pending execution", async () => {
+  const fx = fixture({ appendFailures: 1 });
+
+  const first = await fx.orchestrator.startOrResume(input);
+  assert.equal(first.status, "preparing_issuance");
+  assert.equal(fx.store.status, "awaiting_issuer_integration");
+  assert.equal(fx.store.attempts.length, 0);
+  assert.equal(fx.calls.filter((call) => call === "sign").length, 0);
+
+  const second = await fx.orchestrator.startOrResume(input);
+  assert.equal(second.status, "confirmed");
+  assert.equal(fx.store.attempts.length, 1);
+  assert.equal(fx.store.attempts[0]!.attemptNumber, 1);
+  assert.equal(fx.store.attempts[0]!.signingMode, "private");
+  assert.equal(fx.submissions(), 1);
+});
+
 test("legacy pending execution without an attempt remains recoverable after append failure", async () => {
   const fx = fixture({ appendFailures: 1 });
   fx.store.status = "pending_execution";
