@@ -57,6 +57,7 @@ const EXPECTED_CONSTRAINTS = [
   "project_issuance_attempt_signed_envelope_hash",
   "project_issuance_confirmation_signed_envelope_hash",
   "project_issuance_attempt_number_mvp_lite",
+  "project_issuance_attempt_signing_mode",
   "project_metadata_publications_confirmation_scope_fk",
   "project_metadata_publications_owner_required",
 ] as const;
