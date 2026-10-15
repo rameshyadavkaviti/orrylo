@@ -499,6 +499,39 @@ export class SharedIssuanceOrchestrator {
     return this.reconcile(intent, persistedAttempt);
   }
 
+  /**
+   * Manual/operator reconciliation never signs or submits. Once signed
+   * provenance exists, this is the only supported replay path.
+   */
+  async reconcileManualAttempt(input: {
+    requestId: string;
+    projectId: string;
+    ownerPublicKey: string;
+  }): Promise<SharedIssuanceOrchestrationResult> {
+    const intent = await this.dependencies.store.getIntent(input.requestId);
+    if (!intent) throw new SharedIssuanceOrchestrationError("intent_not_found");
+    assertAuthenticatedIntent(input, intent);
+    this.assertManualIssuer(intent);
+
+    const durableConfirmation = await this.dependencies.store.getConfirmation(
+      input.requestId,
+    );
+    if (durableConfirmation) {
+      await this.dependencies.store.transition(input.requestId, "confirmed");
+      return confirmed(durableConfirmation);
+    }
+
+    const attempts = await this.dependencies.store.listAttempts(input.requestId);
+    if (
+      attempts.length !== 1 ||
+      attempts[0]!.attemptNumber !== 1 ||
+      !attempts[0]!.signedEnvelopeXdrSha256
+    ) {
+      throw new SharedIssuanceOrchestrationError("manual_signing_not_ready");
+    }
+    return this.reconcile(intent, attempts[0]!);
+  }
+
   private async loadCurrentManualPlan(
     intent: ImmutableSharedIssuanceIntent,
     attempt: ImmutableSharedIssuanceTransactionAttempt,
