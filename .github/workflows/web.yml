@@ -88,17 +88,16 @@ jobs:
           node --input-type=module <<'NODE'
           import postgres from "postgres";
           const sql = postgres(process.env.DATABASE_URL, { max: 1 });
-          await sql.unsafe(`
-            DO $
-            BEGIN
-              IF NOT EXISTS (
-                SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'orrylo_app'
-              ) THEN
-                CREATE ROLE orrylo_app LOGIN;
-              END IF;
-            END;
-            $;
-          `);
+          const [{ exists }] = await sql`
+            SELECT EXISTS (
+              SELECT 1
+              FROM pg_catalog.pg_roles
+              WHERE rolname = 'orrylo_app'
+            ) AS "exists"
+          `;
+          if (!exists) {
+            await sql.unsafe("CREATE ROLE orrylo_app LOGIN");
+          }
           await sql.end({ timeout: 5 });
           NODE
 
