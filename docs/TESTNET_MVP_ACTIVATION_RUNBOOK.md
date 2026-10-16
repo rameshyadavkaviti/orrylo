@@ -32,7 +32,7 @@ transaction signing/submission, or Mainnet activity.
 | Official one-shot submission adapter                           | Implemented / ready                                                                                     | Never retries. Ambiguous outcomes require exact-hash reconciliation.                                                                                                                                                                                                                                            |
 | Authoritative confirmation validator                           | Implemented / ready                                                                                     | Uses exact-hash official Testnet Horizon evidence and the persisted signed-envelope digest.                                                                                                                                                                                                                     |
 | Confirmation writer                                            | Implemented boundary / operational credential missing                                                   | Dedicated writer login is required; ordinary app authority cannot create confirmation evidence.                                                                                                                                                                                                                 |
-| Schema migrations 001–011                                      | Implemented / deployment database must prove applied                                                    | Run migrations with the schema owner and verify before activation.                                                                                                                                                                                                                                              |
+| Schema migrations 001–012                                      | Implemented / deployment database must prove applied                                                    | Run migrations with the schema owner and verify before activation.                                                                                                                                                                                                                                              |
 | Deployment | Not authorized | Deploy only after explicit owner authorization and successful activation verification; signer implementation alone is not deployment evidence. |
 
 `TEST_DATABASE_URL`, `ORRYLO_OFFICIAL_LAUNCH_AT`,
@@ -147,7 +147,7 @@ It deliberately does **not** request a signature or test the signer service.
 | 4   | SAFE READ-ONLY                                         | Independently inspect the issuer using official Testnet Horizon before any app configuration.                                                                                                                                                                                                                                                                                                                                               | Timestamp, ledger checkpoint, exact issuer public key, flags, signer set, thresholds, sequence and XLM balance.                                                                     |
 | 5   | OWNER MANUAL LIVE ACTION                               | Provision the separately approved signer/custody implementation with this Testnet key only.                                                                                                                                                                                                                                                                                                                                                 | Signer service identity/version, public-key fingerprint, deployment scope and proof the web application does not receive the seed. No secret values in evidence.                    |
 | 6   | OWNER MANUAL LIVE ACTION                               | Provision the ordinary application DB login and a distinct dedicated confirmation-writer LOGIN that is a member of `orrylo_confirmation_writer`; retain schema-owner credentials separately.                                                                                                                                                                                                                                                | Role names, non-superuser/non-owner evidence, grants/membership output with passwords redacted.                                                                                     |
-| 7   | AUTOMATED LIVE ACTION requiring explicit authorization | Run `npm run db:migrate` to apply migrations 001–011 using the migration/schema-owner identity **only after explicit owner/deployment authorization**. This mutates the deployment database and may create or alter schema objects, roles and grants.                                                                                                                                                                                       | Migration command output/checksums, exact code HEAD and deployment database identifier, with credentials redacted.                                                                  |
+| 7   | AUTOMATED LIVE ACTION requiring explicit authorization | Run `npm run db:migrate` to apply migrations 001–012 using the migration/schema-owner identity **only after explicit owner/deployment authorization**. This mutates the deployment database and may create or alter schema objects, roles and grants.                                                                                                                                                                                       | Migration command output/checksums, exact code HEAD and deployment database identifier, with credentials redacted.                                                                  |
 | 8   | OWNER MANUAL LIVE ACTION                               | Choose the customer Albedo Testnet wallet. If funding is needed, the owner/customer funds it manually.                                                                                                                                                                                                                                                                                                                                      | Customer public `G...` address and official Horizon evidence that the account exists.                                                                                               |
 | 9   | OWNER MANUAL LIVE ACTION                               | Customer manually creates the exact trustline for the intended asset code + exact new Shared Issuer with a limit covering the complete initial supply.                                                                                                                                                                                                                                                                                      | Exact asset code, issuer, destination, trustline limit/balance/authorization from official Horizon.                                                                                 |
 | 10  | SAFE READ-ONLY                                         | Run `npm run db:verify:read-only` to inspect exact migration checksums and schema/security invariants without applying/reconciling migrations or changing grants. Then run `npm run activation:verify:testnet` with the exact issuer, destination, asset code, amount and fee. Never run a migration-capable compatibility verifier in this phase. Repeat only the non-mutating inspection if the stable-ledger check races a ledger close. | Read-only schema verification output, read-only role-verifier result, and full activation-verifier JSON with `ok: true`; public identifiers only.                                   |
@@ -180,7 +180,7 @@ The operator bridge is hard-pinned to the approved live Testnet Shared Issuer
 `GBW4IKGPC5Q4YRKGRMNNXTVRZNQZ3DFWFHXSQUAMWLXES75MWTY3TWOV`; any different configured issuer fails closed.
 
 Before this manual path is used, the deployment database must be at the exact
-`001–011` migration baseline. Migration `011` extends the existing
+`001–012` migration baseline. Migration `011` extends the existing
 `orrylo_app` runtime identity with only column-level
 `UPDATE(signing_mode)` on `project_issuance_transaction_attempts`; the
 existing column-level `UPDATE(signed_envelope_xdr_sha256)` authority remains
@@ -263,10 +263,105 @@ npm run issuance:manual:testnet -- reconcile \
   --owner "$CUSTOMER"
 ```
 
-The manual transaction keeps the existing 300-second validity window. If the
-persisted unsigned attempt expires before its first valid signed envelope is
-accepted, this bridge fails closed: it does not rebuild, re-sign, create
-attempt 2, or silently replace the transaction.
+The normal manual transaction keeps the existing 300-second validity window. If
+a persisted unsigned attempt expires before its first valid signed envelope is
+accepted, the ordinary bridge fails closed and does not rebuild or silently
+replace it. The only approved exception is the exact TEST8926 recovery procedure
+below; this does not create a general retry path.
+
+## 4.2 Exact owner-authorized TEST8926 attempt-2 recovery
+
+This section applies **only** to:
+
+- request `cda25e25-322b-46fa-9081-fe4c382b5614`;
+- project `cabb5cec-0140-4d7f-93a5-d37d7b7a5f13`;
+- owner/destination `GBJIM6BH2WYV3BLAFR4F6KW6Y7XZV36FBXZFICMWQ5Y7DVL4RGV2CYPB`;
+- issuer `GBW4IKGPC5Q4YRKGRMNNXTVRZNQZ3DFWFHXSQUAMWLXES75MWTY3TWOV`;
+- asset `TEST8926`, amount `991100.0000000`;
+- superseded attempt 1 `96708101-1afc-4897-b141-fa6839fe6307`;
+- superseded hash `478da69fea287435c93ae284dad2d0de90993c2f92dd758f5f706f77f0eac124`.
+
+Migration `012_test8926_bounded_recovery_attempt.sql` records that exact
+owner authorization. It permits attempts 1 or 2 only; PostgreSQL rejects
+attempt 3. The ordinary `orrylo_app` identity cannot write recovery
+authorization or recovery evidence. The existing isolated confirmation-writer
+credential is reused to persist independently validated official-Horizon
+post-expiry recovery evidence. That evidence is bound to the exact freshly
+constructed attempt-2 ID, transaction hash, unsigned-XDR digest, source
+sequence, fee and time bounds before the application identity can append it.
+
+After merge/deployment authorization, apply migration 012 with the schema owner
+and re-run the read-only gates before recovery:
+
+```sh
+cd web
+
+npm run db:migrate
+npm run db:verify:read-only
+
+npm run activation:verify:testnet -- \
+  --destination "GBJIM6BH2WYV3BLAFR4F6KW6Y7XZV36FBXZFICMWQ5Y7DVL4RGV2CYPB" \
+  --asset-code "TEST8926" \
+  --amount "991100.0000000"
+```
+
+Prepare the one authorized recovery attempt:
+
+```sh
+npm run issuance:manual:testnet -- recover-prepare \
+  --request-id "cda25e25-322b-46fa-9081-fe4c382b5614" \
+  --project-id "cabb5cec-0140-4d7f-93a5-d37d7b7a5f13" \
+  --owner "GBJIM6BH2WYV3BLAFR4F6KW6Y7XZV36FBXZFICMWQ5Y7DVL4RGV2CYPB" \
+  --unsigned-xdr-file ./orrylo-attempt-2-unsigned.xdr
+```
+
+`recover-prepare` is read-only on Stellar. It first performs a fresh preflight,
+constructs the exact candidate, then requires official Testnet Horizon to prove
+the expired attempt-1 hash is still `not_found` from post-expiry ledger
+observations and that the issuer sequence still satisfies the conservative
+recovery rule. It persists protected evidence, appends exactly attempt 2 and
+claims durable signing mode `manual`. It does not sign or submit.
+
+Record the returned attempt-2 ID. Sign only the returned attempt-2 XDR locally:
+
+```sh
+stellar tx sign \
+  --network testnet \
+  --sign-with-key orrylo-mvp-testnet-shared-issuer \
+  ./orrylo-attempt-2-unsigned.xdr \
+  > ./orrylo-attempt-2-signed.xdr
+```
+
+Submit exactly that attempt ID once:
+
+```sh
+npm run issuance:manual:testnet -- recover-submit \
+  --request-id "cda25e25-322b-46fa-9081-fe4c382b5614" \
+  --project-id "cabb5cec-0140-4d7f-93a5-d37d7b7a5f13" \
+  --owner "GBJIM6BH2WYV3BLAFR4F6KW6Y7XZV36FBXZFICMWQ5Y7DVL4RGV2CYPB" \
+  --attempt-id "$ATTEMPT_2_ID" \
+  --signed-xdr-file ./orrylo-attempt-2-signed.xdr
+```
+
+The recovery submit path independently reconstructs attempt 2, validates the
+exact approved issuer signature and immutable transaction binding, persists the
+signed-envelope digest first, and then allows exactly one Horizon POST. Never
+run `recover-submit` a second time.
+
+If submission is ambiguous or confirmation is not yet authoritative, reconcile
+only the exact persisted attempt-2 hash:
+
+```sh
+npm run issuance:manual:testnet -- recover-reconcile \
+  --request-id "cda25e25-322b-46fa-9081-fe4c382b5614" \
+  --project-id "cabb5cec-0140-4d7f-93a5-d37d7b7a5f13" \
+  --owner "GBJIM6BH2WYV3BLAFR4F6KW6Y7XZV36FBXZFICMWQ5Y7DVL4RGV2CYPB" \
+  --attempt-id "$ATTEMPT_2_ID"
+```
+
+If attempt 2 expires before its signed envelope is durably accepted, or any
+authorization/evidence/sequence/intent check fails, stop. There is no attempt 3
+and no automatic recovery loop.
 
 ## 5. Dry-run proof already present on current main
 
@@ -277,7 +372,7 @@ flow without live mutation:
 - signer failure creates zero submit calls;
 - submission uncertainty causes one submission only and replay reconciles the
   existing exact hash;
-- an existing attempt is never resubmitted and attempt 2 is never created;
+- ordinary issuance never creates a successor; the exact TEST8926 exception can create only one evidence-gated manual attempt 2 and PostgreSQL rejects attempt 3;
 - RYLO issuer identities fail before signer/digest/submission;
 - exact-hash authoritative ledger validation rejects forged/mismatched evidence;
 - confirmation requires the signed-envelope digest and exact immutable
@@ -318,8 +413,8 @@ owner escalation, and database-enforced read-only inspection.
 The former `pending_execution` / missing-attempt crash window is closed by the
 manual-signing remediation: attempt 1 is persisted before a fresh lifecycle
 claim, and an existing legacy `pending_execution` row with no attempt remains
-retryable until exactly attempt 1 is created. No attempt 2 or replacement
-transaction is introduced.
+retryable until exactly attempt 1 is created. No general retry or replacement transaction is introduced; only the exact
+owner-authorized TEST8926 attempt-2 exception in section 4.2 is permitted.
 
 ### MAINNET / PRODUCTION ONLY
 
