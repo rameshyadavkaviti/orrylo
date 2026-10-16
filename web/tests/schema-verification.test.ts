@@ -28,6 +28,7 @@ test("loads exact ordered migration names and SHA-256 checksums", async () => {
       "009_signed_envelope_digest.sql",
       "010_mvp_lite_db_security_hardening.sql",
       "011_shared_issuance_signing_mode.sql",
+      "012_test8926_bounded_recovery_attempt.sql",
     ],
   );
   for (const migration of evidence) {
@@ -44,6 +45,9 @@ interface FakeCatalogOptions {
   tableWideAttemptUpdate?: boolean;
   unrelatedAttemptUpdate?: boolean;
   writerBoundaryChanged?: boolean;
+  recoveryAclChanged?: boolean;
+  recoveryAuthorizationMissing?: boolean;
+  recoveryTriggerMissing?: boolean;
 }
 
 function fakeDatabase(
@@ -111,17 +115,35 @@ function fakeDatabase(
         },
       ];
     }
+    if (query.includes("app_authorization_any")) {
+      return [
+        {
+          app_authorization_any: options.recoveryAclChanged ?? false,
+          app_evidence_any: false,
+          writer_authorization_any: false,
+          writer_evidence_select: true,
+          writer_evidence_insert: true,
+          writer_evidence_update: false,
+          writer_evidence_delete: false,
+          writer_evidence_truncate: false,
+        },
+      ];
+    }
     if (query.includes("FROM pg_roles")) return [{ exists: true }];
     if (query.includes("UNION ALL")) {
       return [
         "project_issuance_full_intents",
         "project_issuance_transaction_attempts",
         "project_issuance_ledger_confirmations",
+        "project_issuance_recovery_authorizations",
+        "project_issuance_recovery_evidence",
         "assert_issuance_attempt_matches_intent",
         "assert_trusted_confirmation_writer",
         "protect_issuance_transaction_attempt",
         "prevent_issuance_evidence_mutation",
         "assert_metadata_reachability_signed_confirmation",
+        "assert_trusted_recovery_evidence_writer",
+        "assert_bounded_recovery_attempt_insert",
       ].map((object_name) => ({ object_name, owner_name: "schema_owner" }));
     }
     if (query.includes("current_user AS role_name")) {
@@ -130,7 +152,8 @@ function fakeDatabase(
     if (query.includes("attempt_constraint")) {
       return [
         {
-          attempt_constraint: "CHECK ((attempt_number = 1)) NOT VALID",
+          attempt_constraint:
+            "CHECK ((attempt_number = ANY (ARRAY[1, 2]))) NOT VALID",
           attempt_constraint_validated: false,
           trusted_writer_function_security_definer: false,
           trusted_writer_function_search_path: [
@@ -144,6 +167,27 @@ function fakeDatabase(
           reachability_function_public_execute: false,
         },
       ];
+    if (query.includes("manual_constraint")) {
+      return [
+        {
+          manual_constraint:
+            "CHECK (((attempt_number <> 2) OR (signing_mode IS NULL) OR (signing_mode = 'manual'::text))) NOT VALID",
+          manual_constraint_validated: false,
+          evidence_writer_security_definer: true,
+          evidence_writer_search_path: ["search_path=pg_catalog, public"],
+          evidence_writer_public_execute: false,
+          evidence_trigger_binding: !options.recoveryTriggerMissing,
+          recovery_attempt_security_definer: true,
+          recovery_attempt_search_path: ["search_path=pg_catalog, public"],
+          recovery_attempt_public_execute: false,
+          recovery_attempt_trigger_binding: !options.recoveryTriggerMissing,
+          exact_authorization_count: options.recoveryAuthorizationMissing
+            ? 0
+            : 1,
+        },
+      ];
+    }
+
     }
 
     throw new Error(`Unexpected inspection query: ${query}`);
@@ -248,6 +292,34 @@ test("runtime ACL verification fails closed for missing or broadened app UPDATE 
       MIGRATIONS_DIRECTORY,
     ),
     /Missing or unsafe orrylo_app attempt UPDATE ACL/,
+  );
+});
+
+test("bounded recovery verifier rejects app ACL drift, missing owner authorization, or trigger drift", async () => {
+  const expected = await loadExpectedMigrationEvidence(MIGRATIONS_DIRECTORY);
+
+  await assert.rejects(
+    verifyDatabaseSchemaReadOnly(
+      fakeDatabase(expected, { recoveryAclChanged: true }).sql,
+      MIGRATIONS_DIRECTORY,
+    ),
+    /Unexpected bounded recovery ACL/,
+  );
+
+  await assert.rejects(
+    verifyDatabaseSchemaReadOnly(
+      fakeDatabase(expected, { recoveryAuthorizationMissing: true }).sql,
+      MIGRATIONS_DIRECTORY,
+    ),
+    /Missing or unsafe bounded TEST8926 recovery hardening/,
+  );
+
+  await assert.rejects(
+    verifyDatabaseSchemaReadOnly(
+      fakeDatabase(expected, { recoveryTriggerMissing: true }).sql,
+      MIGRATIONS_DIRECTORY,
+    ),
+    /Missing or unsafe bounded TEST8926 recovery hardening/,
   );
 });
 
