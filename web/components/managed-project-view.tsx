@@ -126,7 +126,11 @@ export function ManagedProjectView({
             </div>
             <div>
               <dt>Stellar asset</dt>
-              <dd>{issuance?.status === "confirmed" ? "Ledger verified" : "Not confirmed"}</dd>
+              <dd>
+                {issuance?.status === "confirmed"
+                  ? "Ledger verified"
+                  : "Not confirmed"}
+              </dd>
             </div>
           </dl>
 

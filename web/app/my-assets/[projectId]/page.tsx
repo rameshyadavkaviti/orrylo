@@ -42,7 +42,8 @@ export default async function ManagedProjectPage({
   const publication = await publicationRepository.getByProjectId(projectId);
   const issuance = await new TestnetIssuanceService(sql, {
     network: project.network,
-    approvedIssuerPublicKey: process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY,
+    approvedIssuerPublicKey:
+      process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY,
   }).getOwnedStatus(projectId, session.publicKey);
   return (
     <ManagedProjectView

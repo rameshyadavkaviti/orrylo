@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { Keypair, Networks, Operation, Transaction, TransactionBuilder } from "@stellar/stellar-sdk";
+import {
+  Keypair,
+  Networks,
+  Operation,
+  Transaction,
+  TransactionBuilder,
+} from "@stellar/stellar-sdk";
 
 import {
   CustomerTrustlineError,
@@ -13,7 +19,11 @@ import {
 const ISSUER = "GBW4IKGPC5Q4YRKGRMNNXTVRZNQZ3DFWFHXSQUAMWLXES75MWTY3TWOV";
 const WALLET = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 203));
 const CUSTOMER = WALLET.publicKey();
-const CONFIG = { issuerPublicKey: ISSUER, issuerFeeStroops: "100", maxCustomerFeeStroops: "200" };
+const CONFIG = {
+  issuerPublicKey: ISSUER,
+  issuerFeeStroops: "100",
+  maxCustomerFeeStroops: "200",
+};
 
 function issuerAccount() {
   return {
@@ -30,12 +40,14 @@ function issuerAccount() {
       auth_clawback_enabled: false,
     },
     signers: [{ key: ISSUER, weight: 1, type: "ed25519_public_key" }],
-    balances: [{
-      asset_type: "native",
-      balance: "10.0000000",
-      buying_liabilities: "0.0000000",
-      selling_liabilities: "0.0000000",
-    }],
+    balances: [
+      {
+        asset_type: "native",
+        balance: "10.0000000",
+        buying_liabilities: "0.0000000",
+        selling_liabilities: "0.0000000",
+      },
+    ],
   };
 }
 
@@ -68,15 +80,17 @@ function customerAccount(input?: {
         selling_liabilities: "0.0000000",
       },
       ...(trustline
-        ? [{
-            asset_type: "credit_alphanum12",
-            asset_code: "TESTNEW",
-            asset_issuer: ISSUER,
-            balance: "0.0000000",
-            limit: input?.limit ?? "100.0000000",
-            buying_liabilities: "0.0000000",
-            is_authorized: input?.authorized ?? true,
-          }]
+        ? [
+            {
+              asset_type: "credit_alphanum12",
+              asset_code: "TESTNEW",
+              asset_issuer: ISSUER,
+              balance: "0.0000000",
+              limit: input?.limit ?? "100.0000000",
+              buying_liabilities: "0.0000000",
+              is_authorized: input?.authorized ?? true,
+            },
+          ]
         : []),
     ],
   };
@@ -99,12 +113,16 @@ function fixture(input?: {
     let body: unknown;
     if (path.includes("/ledgers?")) {
       body = {
-        _embedded: { records: [{
-          sequence: 900,
-          closed_at: "2026-10-16T09:00:00Z",
-          base_fee_in_stroops: input?.baseFee ?? 100,
-          base_reserve_in_stroops: 5_000_000,
-        }] },
+        _embedded: {
+          records: [
+            {
+              sequence: 900,
+              closed_at: "2026-10-16T09:00:00Z",
+              base_fee_in_stroops: input?.baseFee ?? 100,
+              base_reserve_in_stroops: 5_000_000,
+            },
+          ],
+        },
       };
     } else if (path.endsWith("/accounts/" + ISSUER)) {
       body = issuerAccount();
@@ -157,8 +175,9 @@ test("existing authorized trustline with capacity bypasses signing and charges z
 
 test("missing trustline produces one exact wallet-funded ChangeTrust on Testnet", async () => {
   const fx = fixture();
-  const plan = await inspectCustomerTrustline(args(), fx.fetchImpl,
-    () => Date.parse("2026-10-16T09:00:01Z"));
+  const plan = await inspectCustomerTrustline(args(), fx.fetchImpl, () =>
+    Date.parse("2026-10-16T09:00:01Z"),
+  );
   assert.equal(plan.status, "signature_required");
   assert.equal(plan.customerFeeStroops, "100");
   assert.equal(plan.additionalReserveStroops, "5000000");
@@ -170,7 +189,10 @@ test("missing trustline produces one exact wallet-funded ChangeTrust on Testnet"
   assert.equal(tx.source, CUSTOMER);
   assert.equal(tx.operations.length, 1);
   assert.equal(tx.operations[0]?.type, "changeTrust");
-  const op = tx.operations[0] as unknown as { line: { getIssuer(): string; getCode(): string }; limit: string };
+  const op = tx.operations[0] as unknown as {
+    line: { getIssuer(): string; getCode(): string };
+    limit: string;
+  };
   assert.equal(op.line.getCode(), "TESTNEW");
   assert.equal(op.line.getIssuer(), ISSUER);
   assert.equal(op.limit, "250.0000000");
@@ -183,23 +205,39 @@ test("insufficient capacity produces a new limit; unauthorized trustline fails c
   const plan = await inspectCustomerTrustline(args(), fx.fetchImpl);
   assert.equal(plan.status, "signature_required");
   assert.equal(plan.additionalReserveStroops, "0");
-  const op = (TransactionBuilder.fromXDR(plan.unsignedXdr!, Networks.TESTNET) as Transaction)
-    .operations[0] as unknown as { limit: string };
+  const op = (
+    TransactionBuilder.fromXDR(
+      plan.unsignedXdr!,
+      Networks.TESTNET,
+    ) as Transaction
+  ).operations[0] as unknown as { limit: string };
   assert.equal(op.limit, "250.0000000");
   await assert.rejects(
-    inspectCustomerTrustline(args(), fixture({ trustline: true, authorized: false }).fetchImpl),
-    (error: unknown) => error instanceof CustomerTrustlineError && error.code === "trustline_unauthorized",
+    inspectCustomerTrustline(
+      args(),
+      fixture({ trustline: true, authorized: false }).fetchImpl,
+    ),
+    (error: unknown) =>
+      error instanceof CustomerTrustlineError &&
+      error.code === "trustline_unauthorized",
   );
 });
 
 test("customer fee cap and reserve safety reject before wallet signing", async () => {
   await assert.rejects(
     inspectCustomerTrustline(args(), fixture({ baseFee: 201 }).fetchImpl),
-    (error: unknown) => error instanceof CustomerTrustlineError && error.code === "trustline_fee_cap_exceeded",
+    (error: unknown) =>
+      error instanceof CustomerTrustlineError &&
+      error.code === "trustline_fee_cap_exceeded",
   );
   await assert.rejects(
-    inspectCustomerTrustline(args(), fixture({ nativeBalance: "1.0000000" }).fetchImpl),
-    (error: unknown) => error instanceof CustomerTrustlineError && error.code === "insufficient_customer_xlm",
+    inspectCustomerTrustline(
+      args(),
+      fixture({ nativeBalance: "1.0000000" }).fetchImpl,
+    ),
+    (error: unknown) =>
+      error instanceof CustomerTrustlineError &&
+      error.code === "insufficient_customer_xlm",
   );
 });
 
@@ -207,11 +245,18 @@ test("configured fee cap is mandatory; no uncontrolled or Mainnet trustline", ()
   for (const overrides of [
     { NEXT_PUBLIC_STELLAR_NETWORK: "public" },
     { NEXT_PUBLIC_STELLAR_NETWORK: "testnet" },
-    { NEXT_PUBLIC_STELLAR_NETWORK: "testnet", ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY: ISSUER, ORRYLO_TESTNET_SHARED_ISSUER_FEE_STROOPS: "100" },
+    {
+      NEXT_PUBLIC_STELLAR_NETWORK: "testnet",
+      ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY: ISSUER,
+      ORRYLO_TESTNET_SHARED_ISSUER_FEE_STROOPS: "100",
+    },
   ]) {
-    assert.throws(() => readCustomerTrustlineConfiguration(overrides),
-      (error: unknown) => error instanceof CustomerTrustlineError &&
-        error.code === "trustline_configuration_unavailable");
+    assert.throws(
+      () => readCustomerTrustlineConfiguration(overrides),
+      (error: unknown) =>
+        error instanceof CustomerTrustlineError &&
+        error.code === "trustline_configuration_unavailable",
+    );
   }
 });
 
@@ -233,22 +278,38 @@ test("only an official exact-hash successful ChangeTrust followed by usable capa
     limit: "250.0000000",
     transaction: () => evidence,
   });
-  const accepted = await confirmCustomerTrustline({
-    ...args(), transactionHash: unsigned.transactionHash,
-  }, confirmedFx.fetchImpl);
+  const accepted = await confirmCustomerTrustline(
+    {
+      ...args(),
+      transactionHash: unsigned.transactionHash,
+    },
+    confirmedFx.fetchImpl,
+  );
   assert.equal(accepted.status, "ready");
 
   const unconfirmed = fixture({
     transaction: () => ({ ...evidence, successful: false }),
   });
-  await assert.rejects(confirmCustomerTrustline({
-    ...args(), transactionHash: unsigned.transactionHash,
-  }, unconfirmed.fetchImpl));
+  await assert.rejects(
+    confirmCustomerTrustline(
+      {
+        ...args(),
+        transactionHash: unsigned.transactionHash,
+      },
+      unconfirmed.fetchImpl,
+    ),
+  );
 
   const missing = fixture({
     transaction: () => evidence,
   });
-  await assert.rejects(confirmCustomerTrustline({
-    ...args(), transactionHash: unsigned.transactionHash,
-  }, missing.fetchImpl));
+  await assert.rejects(
+    confirmCustomerTrustline(
+      {
+        ...args(),
+        transactionHash: unsigned.transactionHash,
+      },
+      missing.fetchImpl,
+    ),
+  );
 });

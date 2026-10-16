@@ -138,7 +138,11 @@ export function TestnetIssuanceSection({
           <div>
             <dt>Transaction hash</dt>
             <dd>
-              <a href={`https://horizon-testnet.stellar.org/transactions/${issuance.transactionHash}`} target="_blank" rel="noopener noreferrer">
+              <a
+                href={`https://horizon-testnet.stellar.org/transactions/${issuance.transactionHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <code>{issuance.transactionHash}</code>
               </a>
             </dd>

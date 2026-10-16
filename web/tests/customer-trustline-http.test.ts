@@ -13,7 +13,8 @@ const PROJECT = "00000000-0000-4000-8000-000000000101";
 const OWNER = "GBJIM6BH2WYV3BLAFR4F6KW6Y7XZV36FBXZFICMWQ5Y7DVL4RGV2CYPB";
 const ISSUER = "GBW4IKGPC5Q4YRKGRMNNXTVRZNQZ3DFWFHXSQUAMWLXES75MWTY3TWOV";
 const HASH = "a".repeat(64);
-const URL = "https://orrylo.com/api/projects/" + PROJECT + "/issuance/trustline";
+const URL =
+  "https://orrylo.com/api/projects/" + PROJECT + "/issuance/trustline";
 
 const PROJECT_RECORD = {
   projectId: PROJECT,
@@ -45,8 +46,13 @@ function deps(overrides?: {
   return {
     authDomain: "orrylo.com",
     getSession: async () => ({ publicKey: OWNER }) as never,
-    getOwnedProject: async () => overrides?.owned === false
-      ? null : ({ ...PROJECT_RECORD, network: overrides?.network ?? "testnet" } as never),
+    getOwnedProject: async () =>
+      overrides?.owned === false
+        ? null
+        : ({
+            ...PROJECT_RECORD,
+            network: overrides?.network ?? "testnet",
+          } as never),
     inspect: async () => ({ ...READY, status: overrides?.status ?? "ready" }),
     confirm: async () => READY,
   };
@@ -55,14 +61,26 @@ function deps(overrides?: {
 const context = { params: Promise.resolve({ projectId: PROJECT }) };
 
 test("readiness is scoped to authenticated owner and exact eligible Testnet project", async () => {
-  const ok = await handleInspectTrustline(new NextRequest(URL + "?amount=50"), context, deps());
+  const ok = await handleInspectTrustline(
+    new NextRequest(URL + "?amount=50"),
+    context,
+    deps(),
+  );
   assert.equal(ok.status, 200);
   assert.equal((await ok.json()).trustline.destinationPublicKey, OWNER);
 
-  const notOwned = await handleInspectTrustline(new NextRequest(URL + "?amount=50"), context, deps({ owned: false }));
+  const notOwned = await handleInspectTrustline(
+    new NextRequest(URL + "?amount=50"),
+    context,
+    deps({ owned: false }),
+  );
   assert.equal(notOwned.status, 404);
 
-  const publicNetwork = await handleInspectTrustline(new NextRequest(URL + "?amount=50"), context, deps({ network: "public" }));
+  const publicNetwork = await handleInspectTrustline(
+    new NextRequest(URL + "?amount=50"),
+    context,
+    deps({ network: "public" }),
+  );
   assert.equal(publicNetwork.status, 409);
 });
 
@@ -73,31 +91,51 @@ test("malformed or extra readiness fields cannot select arbitrary issuer or dest
     URL + "?amount=50&destination=" + OWNER,
     URL + "?amount=50&assetCode=WRONG",
   ]) {
-    const response = await handleInspectTrustline(new NextRequest(url), context, deps());
+    const response = await handleInspectTrustline(
+      new NextRequest(url),
+      context,
+      deps(),
+    );
     assert.equal(response.status, 400);
   }
 });
 
 test("trustline confirmation enforces same-origin, exact inputs, and verified readiness", async () => {
-  const denied = await handleConfirmTrustline(new NextRequest(URL, {
-    method: "POST",
-    headers: { origin: "https://other.example" },
-    body: JSON.stringify({ amount: "50", transactionHash: HASH }),
-  }), context, deps());
+  const denied = await handleConfirmTrustline(
+    new NextRequest(URL, {
+      method: "POST",
+      headers: { origin: "https://other.example" },
+      body: JSON.stringify({ amount: "50", transactionHash: HASH }),
+    }),
+    context,
+    deps(),
+  );
   assert.equal(denied.status, 403);
 
-  const valid = await handleConfirmTrustline(new NextRequest(URL, {
-    method: "POST",
-    headers: { origin: "https://orrylo.com" },
-    body: JSON.stringify({ amount: "50", transactionHash: HASH }),
-  }), context, deps());
+  const valid = await handleConfirmTrustline(
+    new NextRequest(URL, {
+      method: "POST",
+      headers: { origin: "https://orrylo.com" },
+      body: JSON.stringify({ amount: "50", transactionHash: HASH }),
+    }),
+    context,
+    deps(),
+  );
   assert.equal(valid.status, 200);
   assert.equal((await valid.json()).trustline.status, "ready");
 
-  const changed = await handleConfirmTrustline(new NextRequest(URL, {
-    method: "POST",
-    headers: { origin: "https://orrylo.com" },
-    body: JSON.stringify({ amount: "50", transactionHash: HASH, issuerPublicKey: ISSUER }),
-  }), context, deps());
+  const changed = await handleConfirmTrustline(
+    new NextRequest(URL, {
+      method: "POST",
+      headers: { origin: "https://orrylo.com" },
+      body: JSON.stringify({
+        amount: "50",
+        transactionHash: HASH,
+        issuerPublicKey: ISSUER,
+      }),
+    }),
+    context,
+    deps(),
+  );
   assert.equal(changed.status, 400);
 });

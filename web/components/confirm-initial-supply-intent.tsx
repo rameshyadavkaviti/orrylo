@@ -183,9 +183,15 @@ export function ConfirmInitialSupplyIntent({
           Intent fingerprint: <code>{confirmed.fingerprint}</code>
         </p>
         {confirmed.transactionHash ? (
-          <p>Exact transaction hash: <code>{confirmed.transactionHash}</code></p>
+          <p>
+            Exact transaction hash: <code>{confirmed.transactionHash}</code>
+          </p>
         ) : null}
-        <p><a href={`/my-assets/${projectId}`}>Open this project to check exact issuance status</a></p>
+        <p>
+          <a href={`/my-assets/${projectId}`}>
+            Open this project to check exact issuance status
+          </a>
+        </p>
       </div>
     );
   }

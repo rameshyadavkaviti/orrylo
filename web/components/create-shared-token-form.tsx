@@ -814,15 +814,15 @@ export function CreateSharedTokenForm() {
             >
               {saveState.status === "saving"
                 ? "Validating / saving…"
-                 : saveState.status === "trustline_required"
+                : saveState.status === "trustline_required"
                   ? "Trustline approval required…"
-                : saveState.status === "persisting_intent"
-                  ? "Saving immutable intent…"
-                  : saveState.status === "preparing_issuance"
-                    ? "Preparing issuance…"
-                    : saveState.status === "confirming"
-                      ? "Confirming…"
-                      : "Create Token"}
+                  : saveState.status === "persisting_intent"
+                    ? "Saving immutable intent…"
+                    : saveState.status === "preparing_issuance"
+                      ? "Preparing issuance…"
+                      : saveState.status === "confirming"
+                        ? "Confirming…"
+                        : "Create Token"}
             </button>
 
             {saveState.status === "needs_wallet" ||
@@ -848,12 +848,14 @@ export function CreateSharedTokenForm() {
                 projectId={trustlineStep.projectId}
                 assetCode={trustlineStep.assetCode}
                 amount={trustlineStep.supply}
-                onConfirmed={() => persistIntentAndExecute(
-                  trustlineStep.projectId,
-                  trustlineStep.managePath,
-                  trustlineStep.assetCode,
-                  trustlineStep.supply,
-                )}
+                onConfirmed={() =>
+                  persistIntentAndExecute(
+                    trustlineStep.projectId,
+                    trustlineStep.managePath,
+                    trustlineStep.assetCode,
+                    trustlineStep.supply,
+                  )
+                }
               />
             ) : null}
 
