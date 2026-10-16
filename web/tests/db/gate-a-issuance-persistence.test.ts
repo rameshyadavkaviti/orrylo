@@ -827,6 +827,7 @@ if (!TEST_DATABASE_URL) {
       reader: recoveryReaderFor(previous),
       intent,
       attempt: previous,
+      recoveryAttempt: recovery,
       nowUnix: previous.validUntil + 2,
       verifierIdentity: "official-stellar-testnet-horizon",
       verificationPolicyVersion: "db-test-bounded-recovery-v1",
@@ -892,11 +893,16 @@ if (!TEST_DATABASE_URL) {
     });
     await insertRecoveryAuthorization(signedFixture.intent, signedAttempt);
 
+    const signedRecovery = buildRecoveryAttempt(
+      signedFixture.intent,
+      signedAttempt,
+    );
     await assert.rejects(
       validateBoundedSharedIssuanceRecoveryEvidence({
         reader: recoveryReaderFor(signedAttempt),
         intent: signedFixture.intent,
         attempt: (await repository.getAttempt(signedAttempt.attemptId))!,
+        recoveryAttempt: signedRecovery,
         nowUnix: signedAttempt.validUntil + 2,
         verifierIdentity: "official-stellar-testnet-horizon",
         verificationPolicyVersion: "db-test-bounded-recovery-v1",
@@ -921,6 +927,7 @@ if (!TEST_DATABASE_URL) {
         reader: recoveryReaderFor(previous, "124"),
         intent: changed.intent,
         attempt: previous,
+        recoveryAttempt: buildRecoveryAttempt(changed.intent, previous),
         nowUnix: previous.validUntil + 2,
         verifierIdentity: "official-stellar-testnet-horizon",
         verificationPolicyVersion: "db-test-bounded-recovery-v1",
