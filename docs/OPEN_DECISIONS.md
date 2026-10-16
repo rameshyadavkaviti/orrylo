@@ -243,9 +243,14 @@ Still open before broad public production:
 
 The RYLO direct sale price is decided separately from Orrylo service pricing.
 
+Decided:
+
+- base Dedicated Issuer production price: **$20 one-time per Dedicated Issuer**.
+
 Still open:
 
-- exact production prices for token creation and other Orrylo services;
+- exact production prices for Shared Issuer/token creation and other Orrylo services not covered by the approved Dedicated Issuer base price;
+- pricing for future Dedicated Issuer advanced contract/template capabilities, optional managed services, custom domains, and custom development;
 - RYLO-denominated service price schedule.
 
 ## Domains and hosting

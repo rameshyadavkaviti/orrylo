@@ -112,6 +112,8 @@ The Shared Issuer may use a branded vanity address if convenient, but a random S
 
 The premium tier provides dedicated asset infrastructure per customer/project.
 
+**Approved base production price: $20 one-time per Dedicated Issuer.** This locks the base service price only; pricing for future advanced contract/template capabilities, optional managed services, custom domains, and custom development remains separate unless explicitly approved.
+
 The selected architecture is **Contract-Controlled Issuer** rather than simply handing over a raw issuer secret key.
 
 The contract/policy layer may govern:
