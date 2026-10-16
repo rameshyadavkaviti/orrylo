@@ -28,6 +28,9 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const POSTGRES_TIMESTAMPTZ_MIN_MS = Date.parse("-004713-11-24T00:00:00.000Z");
 const VALIDATION_TOKEN = Symbol("validated-shared-issuance-confirmation");
+const RECOVERY_VALIDATION_TOKEN = Symbol(
+  "validated-shared-issuance-recovery-evidence",
+);
 
 interface StellarTestnetLedgerObservation {
   network: typeof SHARED_ISSUER_TESTNET_NETWORK;
@@ -123,7 +126,9 @@ export type StellarLedgerEvidenceErrorCode =
   | "sequence_mismatch"
   | "stale_ledger_evidence"
   | "invalid_timestamp"
-  | "invalid_ledger_sequence";
+  | "invalid_ledger_sequence"
+  | "recovery_not_eligible"
+  | "recovery_sequence_changed";
 
 export class StellarLedgerEvidenceError extends Error {
   constructor(readonly code: StellarLedgerEvidenceErrorCode) {
@@ -153,6 +158,45 @@ export class ValidatedSharedIssuanceLedgerConfirmation {
   assertValidated(): void {
     if (!this.#validated)
       throw new StellarLedgerEvidenceError("invalid_confirmation_request");
+  }
+}
+
+export interface ValidatedSharedIssuanceRecoveryEvidenceRecord {
+  issuanceRequestId: string;
+  supersededAttemptId: string;
+  issuanceIntentFingerprint: string;
+  supersededTransactionHash: string;
+  network: "testnet";
+  lookupStatus: "not_found";
+  lookupObservedLedger: number;
+  lookupObservedLedgerClosedAt: string;
+  sequenceObservedLedger: number;
+  sequenceObservedLedgerClosedAt: string;
+  issuerPublicKey: string;
+  issuerSequence: string;
+  verifierIdentity: string;
+  verificationPolicyVersion: string;
+  verifiedAt: string;
+}
+
+export class ValidatedSharedIssuanceRecoveryEvidence {
+  readonly #validated = true;
+
+  constructor(
+    validationToken: typeof RECOVERY_VALIDATION_TOKEN,
+    readonly record: Readonly<ValidatedSharedIssuanceRecoveryEvidenceRecord>,
+  ) {
+    if (validationToken !== RECOVERY_VALIDATION_TOKEN) {
+      throw new StellarLedgerEvidenceError("invalid_confirmation_request");
+    }
+    Object.freeze(record);
+    Object.freeze(this);
+  }
+
+  assertValidated(): void {
+    if (!this.#validated) {
+      throw new StellarLedgerEvidenceError("invalid_confirmation_request");
+    }
   }
 }
 
@@ -300,6 +344,93 @@ export class AuthoritativeSharedIssuanceConfirmationValidator {
       createdAt: verifiedAt,
     });
   }
+}
+
+export async function validateBoundedSharedIssuanceRecoveryEvidence(input: {
+  reader: StellarTestnetLedgerReader;
+  intent: ImmutableSharedIssuanceIntent;
+  attempt: ImmutableSharedIssuanceTransactionAttempt;
+  nowUnix: number;
+  verifierIdentity: string;
+  verificationPolicyVersion: string;
+}): Promise<ValidatedSharedIssuanceRecoveryEvidence> {
+  assertIntentAttemptMatch(input.intent, input.attempt);
+  if (
+    input.attempt.attemptNumber !== 1 ||
+    input.attempt.signingMode !== "manual" ||
+    input.attempt.signedEnvelopeXdrSha256 !== undefined ||
+    !Number.isSafeInteger(input.nowUnix) ||
+    input.nowUnix <= input.attempt.validUntil ||
+    !input.verifierIdentity.trim() ||
+    !input.verificationPolicyVersion.trim()
+  ) {
+    throw new StellarLedgerEvidenceError("recovery_not_eligible");
+  }
+  if (input.reader.authority !== "official_testnet_horizon") {
+    throw new StellarLedgerEvidenceError("non_authoritative_evidence");
+  }
+
+  const [lookup, sequence] = await Promise.all([
+    input.reader.lookupTransaction(input.attempt.transactionHash),
+    input.reader.readAccountSequence(input.intent.issuerPublicKey),
+  ]);
+  assertLedgerObservation(lookup);
+  assertLedgerObservation(sequence);
+
+  if (
+    lookup.transactionHash.toLowerCase() !== input.attempt.transactionHash ||
+    sequence.accountPublicKey !== input.intent.issuerPublicKey
+  ) {
+    throw new StellarLedgerEvidenceError("wrong_transaction");
+  }
+  if (
+    lookup.status !== "not_found" ||
+    sequence.observedLedger < lookup.observedLedger
+  ) {
+    throw new StellarLedgerEvidenceError("recovery_not_eligible");
+  }
+
+  const lookupClosedAtMs = parseTimestamp(lookup.observedLedgerClosedAt);
+  const sequenceClosedAtMs = parseTimestamp(sequence.observedLedgerClosedAt);
+  const expiryMs = input.attempt.validUntil * 1_000;
+  if (lookupClosedAtMs <= expiryMs || sequenceClosedAtMs <= expiryMs) {
+    throw new StellarLedgerEvidenceError("stale_ledger_evidence");
+  }
+  if (sequence.sequence !== input.attempt.sourceSequence) {
+    throw new StellarLedgerEvidenceError("recovery_sequence_changed");
+  }
+
+  const verifiedAtMs = input.nowUnix * 1_000;
+  assertTimestamp(verifiedAtMs);
+  if (
+    verifiedAtMs < lookupClosedAtMs ||
+    verifiedAtMs < sequenceClosedAtMs
+  ) {
+    throw new StellarLedgerEvidenceError("invalid_timestamp");
+  }
+
+  return new ValidatedSharedIssuanceRecoveryEvidence(
+    RECOVERY_VALIDATION_TOKEN,
+    {
+      issuanceRequestId: input.intent.issuanceRequestId,
+      supersededAttemptId: input.attempt.attemptId,
+      issuanceIntentFingerprint: input.intent.issuanceIntentFingerprint,
+      supersededTransactionHash: input.attempt.transactionHash,
+      network: "testnet",
+      lookupStatus: "not_found",
+      lookupObservedLedger: lookup.observedLedger,
+      lookupObservedLedgerClosedAt: new Date(lookupClosedAtMs).toISOString(),
+      sequenceObservedLedger: sequence.observedLedger,
+      sequenceObservedLedgerClosedAt: new Date(
+        sequenceClosedAtMs,
+      ).toISOString(),
+      issuerPublicKey: input.intent.issuerPublicKey,
+      issuerSequence: sequence.sequence,
+      verifierIdentity: input.verifierIdentity.trim(),
+      verificationPolicyVersion: input.verificationPolicyVersion.trim(),
+      verifiedAt: new Date(verifiedAtMs).toISOString(),
+    },
+  );
 }
 
 export type SharedIssuanceReconciliationDecision =
