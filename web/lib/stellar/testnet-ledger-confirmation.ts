@@ -384,7 +384,8 @@ export async function validateBoundedSharedIssuanceRecoveryEvidence(input: {
     input.recoveryAttempt.attemptNumber !== 2 ||
     input.recoveryAttempt.attemptId === input.attempt.attemptId ||
     input.recoveryAttempt.transactionHash === input.attempt.transactionHash ||
-    input.recoveryAttempt.envelopeXdrSha256 === input.attempt.envelopeXdrSha256 ||
+    input.recoveryAttempt.envelopeXdrSha256 ===
+      input.attempt.envelopeXdrSha256 ||
     input.recoveryAttempt.signingMode !== undefined ||
     input.recoveryAttempt.signedEnvelopeXdrSha256 !== undefined ||
     input.recoveryAttempt.validFrom !== input.nowUnix ||
@@ -430,10 +431,7 @@ export async function validateBoundedSharedIssuanceRecoveryEvidence(input: {
 
   const verifiedAtMs = input.nowUnix * 1_000;
   assertTimestamp(verifiedAtMs);
-  if (
-    verifiedAtMs < lookupClosedAtMs ||
-    verifiedAtMs < sequenceClosedAtMs
-  ) {
+  if (verifiedAtMs < lookupClosedAtMs || verifiedAtMs < sequenceClosedAtMs) {
     throw new StellarLedgerEvidenceError("invalid_timestamp");
   }
 
