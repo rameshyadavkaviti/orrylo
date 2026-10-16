@@ -878,7 +878,10 @@ export function CreateSharedTokenForm() {
               <p role="status">
                 Confirmed on Stellar Testnet with durable exact-hash evidence:{" "}
                 <code>{saveState.transactionHash}</code>
-                <span> · {saveState.supply} {saveState.assetCode}</span>
+                <span>
+                  {" "}
+                  · {saveState.supply} {saveState.assetCode}
+                </span>
                 <a href={saveState.managePath}> Open token project</a>
               </p>
             ) : null}
