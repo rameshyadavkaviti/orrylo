@@ -342,13 +342,13 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
           pg_catalog.has_table_privilege(
             role.oid,
             'public.project_issuance_recovery_authorizations',
-            privilege
+            privileges.privilege_name
           )
         )
         FROM pg_catalog.pg_roles AS role
         CROSS JOIN unnest(ARRAY[
           'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'
-        ]) AS privilege
+        ]) AS privileges(privilege_name)
         WHERE role.rolname = 'orrylo_app'
       ), false) AS app_authorization_any,
       COALESCE((
@@ -356,13 +356,13 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
           pg_catalog.has_table_privilege(
             role.oid,
             'public.project_issuance_recovery_evidence',
-            privilege
+            privileges.privilege_name
           )
         )
         FROM pg_catalog.pg_roles AS role
         CROSS JOIN unnest(ARRAY[
           'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'
-        ]) AS privilege
+        ]) AS privileges(privilege_name)
         WHERE role.rolname = 'orrylo_app'
       ), false) AS app_evidence_any,
       COALESCE((
@@ -370,13 +370,13 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
           pg_catalog.has_table_privilege(
             role.oid,
             'public.project_issuance_recovery_authorizations',
-            privilege
+            privileges.privilege_name
           )
         )
         FROM pg_catalog.pg_roles AS role
         CROSS JOIN unnest(ARRAY[
           'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'
-        ]) AS privilege
+        ]) AS privileges(privilege_name)
         WHERE role.rolname = 'orrylo_confirmation_writer'
       ), false) AS writer_authorization_any,
       COALESCE((
