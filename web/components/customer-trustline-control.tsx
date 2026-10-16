@@ -45,7 +45,7 @@ export function CustomerTrustlineControl({
     setError(null);
     try {
       const response = await fetch(
-        \`/api/projects/\${projectId}/issuance/trustline?amount=\${encodeURIComponent(amount)}\`,
+        `/api/projects/${projectId}/issuance/trustline?amount=${encodeURIComponent(amount)}`,
         { credentials: "same-origin", cache: "no-store" },
       );
       const result = await readResponse(response);
@@ -102,7 +102,7 @@ export function CustomerTrustlineControl({
         throw new Error("Albedo did not return the expected Testnet transaction.");
       }
       const response = await fetch(
-        \`/api/projects/\${projectId}/issuance/trustline\`,
+        `/api/projects/${projectId}/issuance/trustline`,
         {
           method: "POST",
           credentials: "same-origin",
