@@ -411,3 +411,146 @@ function parseAmountString(value: string): bigint {
     throw new CustomerTrustlineError("trustline_transaction_mismatch");
   return parsed.stroops;
 }
+
+/**
+ * Reconcile an Albedo handoff before a browser may produce another ChangeTrust.
+ * A successful exact-hash result OR independently ready trustline permits
+ * progression; a proven terminal result permits a *fresh* server plan.
+ * A 404 or missing trustline alone never releases the pending signing guard.
+ */
+export async function reconcileCustomerTrustline(
+  input: {
+    configuration: CustomerTrustlineConfiguration;
+    destinationPublicKey: string;
+    assetCode: string;
+    initialSupply: string;
+    transactionHash: string;
+    unsignedXdr: string;
+  },
+  fetchImpl: typeof fetch = globalThis.fetch,
+): Promise<
+  | { status: "ready"; trustline: CustomerTrustlinePlan }
+  | { status: "terminal" }
+  | { status: "pending" }
+> {
+  if (!HASH.test(input.transactionHash) || input.unsignedXdr.length > 4096) {
+    throw new CustomerTrustlineError("invalid_request");
+  }
+
+  let unsigned: Transaction;
+  let maxTime: bigint;
+  try {
+    const parsed = TransactionBuilder.fromXDR(
+      input.unsignedXdr,
+      Networks.TESTNET,
+    );
+    if (!(parsed instanceof Transaction)) throw new Error("fee bump");
+    unsigned = parsed;
+    maxTime = BigInt(unsigned.timeBounds?.maxTime ?? "0");
+  } catch {
+    throw new CustomerTrustlineError("trustline_transaction_mismatch");
+  }
+
+  const amount = validateInitialSupply(input.initialSupply);
+  const op = unsigned.operations[0] as unknown as {
+    type: string;
+    source?: string;
+    line?: Asset;
+    limit?: string;
+  };
+  if (
+    !amount.valid ||
+    input.configuration.issuerPublicKey !== APPROVED_ISSUER ||
+    !INTEGER.test(input.configuration.maxCustomerFeeStroops) ||
+    input.configuration.maxCustomerFeeStroops === "0" ||
+    unsigned.signatures.length !== 0 ||
+    Buffer.from(unsigned.hash()).toString("hex") !== input.transactionHash ||
+    unsigned.source !== input.destinationPublicKey ||
+    unsigned.operations.length !== 1 ||
+    op?.type !== "changeTrust" ||
+    (op.source && op.source !== input.destinationPublicKey) ||
+    op.line?.getCode() !== input.assetCode ||
+    op.line?.getIssuer() !== APPROVED_ISSUER ||
+    !op.limit ||
+    parseAmountString(op.limit) < amount.stroops ||
+    !unsigned.timeBounds ||
+    maxTime <= 0n ||
+    BigInt(unsigned.fee) > BigInt(input.configuration.maxCustomerFeeStroops)
+  ) {
+    throw new CustomerTrustlineError("trustline_transaction_mismatch");
+  }
+
+  // Authoritative readiness can independently establish that the destination
+  // is already able to receive the full amount, without another wallet action.
+  const current = await inspectCustomerTrustline(input, fetchImpl);
+  if (current.status === "ready") {
+    return { status: "ready", trustline: current };
+  }
+
+  let record: Record<string, unknown>;
+  try {
+    record = recordFromExactHash(
+      await readJson(fetchImpl, "/transactions/" + input.transactionHash),
+    );
+  } catch (error) {
+    if (!(error instanceof CustomerTrustlineError) || error.code !== "not_found") {
+      throw error;
+    }
+
+    // Post-expiry non-inclusion only: stable/monotonic official-Horizon ledger
+    // evidence plus unchanged source account sequence. A sequence advance is
+    // ambiguous, so fail closed rather than inventing a failed submission.
+    const before = await latestLedger(fetchImpl);
+    let account = await readAccount(fetchImpl, input.destinationPublicKey);
+    const after = await latestLedger(fetchImpl);
+    if (
+      after.sequence < before.sequence ||
+      Date.parse(after.closed_at) < Date.parse(before.closed_at) ||
+      (after.sequence === before.sequence &&
+        (after.closed_at !== before.closed_at ||
+          after.base_fee_in_stroops !== before.base_fee_in_stroops ||
+          after.base_reserve_in_stroops !== before.base_reserve_in_stroops))
+    ) {
+      throw new CustomerTrustlineError("malformed_horizon_response");
+    }
+    if (after.sequence > before.sequence) {
+      account = await readAccount(fetchImpl, input.destinationPublicKey);
+    }
+    if (
+      BigInt(Math.floor(Date.parse(after.closed_at) / 1000)) <= maxTime ||
+      BigInt(account.sequence) !== BigInt(unsigned.sequence) - 1n
+    ) {
+      return { status: "pending" };
+    }
+    return { status: "terminal" };
+  }
+
+  // The exact transaction is durably terminal whether succeeded or failed.
+  // The previously observed trustline was not ready; no automatic signing is
+  // allowed. The browser must obtain a new independently checked plan.
+  let signed: Transaction;
+  try {
+    const parsed = TransactionBuilder.fromXDR(
+      String(record.envelope_xdr),
+      Networks.TESTNET,
+    );
+    if (!(parsed instanceof Transaction)) throw new Error("fee bump");
+    signed = parsed;
+  } catch {
+    throw new CustomerTrustlineError("trustline_transaction_mismatch");
+  }
+  if (
+    record.hash !== input.transactionHash ||
+    typeof record.successful !== "boolean" ||
+    !Number.isSafeInteger(record.ledger) ||
+    (record.ledger as number) <= 0 ||
+    Buffer.from(signed.hash()).toString("hex") !== input.transactionHash
+  ) {
+    throw new CustomerTrustlineError("trustline_transaction_mismatch");
+  }
+  return { status: "terminal" };
+}
+
+function recordFromExactHash(value: unknown): Record<string, unknown> {
+  return record(value);
+}
