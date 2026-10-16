@@ -9,10 +9,16 @@ import {
 import type { AuthSession } from "../../../../../../lib/auth/stores";
 import { isValidProjectId } from "../../../../../../lib/projects/project-profile";
 import type { ManagedProjectProfile } from "../../../../../../lib/projects/project-profile";
-import { getDatabaseClient } from "../../../../../../lib/server/persistence/database";
+import { createDatabaseClient, getDatabaseClient } from "../../../../../../lib/server/persistence/database";
+import { TrustedConfirmationWriterDatabaseBoundary } from "../../../../../../lib/server/persistence/issuance-database-boundaries";
+import {
+  PostgresCustomerTrustlineGuard,
+  PostgresCustomerTrustlineResolutionWriter,
+} from "../../../../../../lib/server/projects/customer-trustline-guard";
 import { PostgresProjectProfileRepository } from "../../../../../../lib/server/persistence/project-profile-repository";
 import {
   confirmCustomerTrustline,
+  reconcileCustomerTrustline,
   CustomerTrustlineError,
   inspectCustomerTrustline,
   reconcileCustomerTrustline,
@@ -38,6 +44,13 @@ export interface CustomerTrustlineRouteDependencies {
     project: ManagedProjectProfile,
     amount: string,
   ): Promise<CustomerTrustlinePlan>;
+  reserve?(input: {
+    project: ManagedProjectProfile;
+    plan: CustomerTrustlinePlan;
+  }): Promise<
+    | { status: "claimed"; plan: CustomerTrustlinePlan }
+    | { status: "pending"; transactionHash: string }
+  >;
   confirm(
     project: ManagedProjectProfile,
     amount: string,
@@ -47,13 +60,19 @@ export interface CustomerTrustlineRouteDependencies {
     project: ManagedProjectProfile;
     amount: string;
     transactionHash: string;
-    unsignedXdr: string;
-  }): ReturnType<typeof reconcileCustomerTrustline>;
+    unsignedXdr?: string;
+  }): Promise<
+    | { status: "pending" }
+    | { status: "terminal" }
+    | { status: "ready"; trustline: CustomerTrustlinePlan }
+  >;
 }
 
 function dependencies(): CustomerTrustlineRouteDependencies {
   const auth = readServerAuthConfig();
-  const projects = new PostgresProjectProfileRepository(getDatabaseClient());
+  const database = getDatabaseClient();
+  const projects = new PostgresProjectProfileRepository(database);
+  const guard = new PostgresCustomerTrustlineGuard(database);
   return {
     authDomain: auth.domain,
     getSession: (token) => getWalletAuthService().getSession(token),
@@ -65,6 +84,12 @@ function dependencies(): CustomerTrustlineRouteDependencies {
         assetCode: project.assetCode,
         initialSupply: amount,
       }),
+    reserve: ({ project, plan }) =>
+      guard.reserve({
+        projectId: project.projectId,
+        ownerPublicKey: project.ownerPublicKey,
+        plan,
+      }),
     confirm: (project, amount, hash) =>
       confirmCustomerTrustline({
         configuration: readCustomerTrustlineConfiguration(),
@@ -73,15 +98,46 @@ function dependencies(): CustomerTrustlineRouteDependencies {
         initialSupply: amount,
         transactionHash: hash,
       }),
-    reconcile: ({ project, amount, transactionHash, unsignedXdr }) =>
-      reconcileCustomerTrustline({
+    async reconcile({ project, amount, transactionHash, unsignedXdr }) {
+      const prior = await guard.latest(project.projectId, project.ownerPublicKey);
+      if (
+        !prior ||
+        prior.transactionHash !== transactionHash ||
+        prior.amount !== amount ||
+        prior.assetCode !== project.assetCode ||
+        prior.destinationPublicKey !== project.ownerPublicKey ||
+        (unsignedXdr !== undefined && prior.unsignedXdr !== unsignedXdr)
+      ) {
+        throw new CustomerTrustlineError("trustline_transaction_mismatch");
+      }
+      if (prior.resolution !== null) return { status: "terminal" };
+      const evidence = await reconcileCustomerTrustline({
         configuration: readCustomerTrustlineConfiguration(),
         destinationPublicKey: project.ownerPublicKey,
         assetCode: project.assetCode,
         initialSupply: amount,
         transactionHash,
-        unsignedXdr,
-      }),
+        unsignedXdr: prior.unsignedXdr,
+      });
+      if (evidence.status !== "terminal") return evidence;
+      const url = process.env.ORRYLO_CONFIRMATION_WRITER_DATABASE_URL?.trim();
+      if (!url) throw new CustomerTrustlineError("trustline_confirmation_writer_unavailable");
+      const trustedSql = createDatabaseClient(url);
+      try {
+        await TrustedConfirmationWriterDatabaseBoundary.authorize(trustedSql);
+        const writer = new PostgresCustomerTrustlineResolutionWriter(trustedSql);
+        await writer.terminal({
+          handoff: prior,
+          kind: evidence.evidence.kind,
+          observedLedger: evidence.evidence.observedLedger,
+          observedLedgerClosedAt: evidence.evidence.observedLedgerClosedAt,
+          observedSourceSequence: evidence.evidence.observedSourceSequence,
+        });
+      } finally {
+        await trustedSql.end({ timeout: 5 });
+      }
+      return { status: "terminal" };
+    },
   };
 }
 
@@ -132,8 +188,24 @@ export async function handleInspectTrustline(
       return failure("invalid_request", 400);
     }
     const plan = await deps.inspect(authorized.project, amount);
+    let trustline: CustomerTrustlinePlan | (Omit<CustomerTrustlinePlan, "status"> & { status: "pending" }) = plan;
+    if (plan.status === "signature_required") {
+      if (!deps.reserve) return failure("trustline_guard_unavailable", 503);
+      const claim = await deps.reserve({ project: authorized.project, plan });
+      if (claim.status === "claimed") {
+        trustline = claim.plan;
+      } else {
+        trustline = {
+          ...plan,
+          status: "pending",
+          transactionHash: claim.transactionHash,
+          unsignedXdr: undefined,
+          validUntil: undefined,
+        };
+      }
+    }
     return NextResponse.json(
-      { ok: true, trustline: plan },
+      { ok: true, trustline },
       {
         headers: { "Cache-Control": "no-store" },
       },
@@ -161,6 +233,7 @@ export async function handleConfirmTrustline(
     const keys = Object.keys(fields).sort().join(",");
     if (
       (keys !== "amount,transactionHash" &&
+        keys !== "amount,reconcile,transactionHash" &&
         keys !== "amount,transactionHash,unsignedXdr") ||
       typeof fields.amount !== "string" ||
       !validateInitialSupply(fields.amount).valid ||
@@ -169,12 +242,14 @@ export async function handleConfirmTrustline(
     ) {
       return failure("invalid_request", 400);
     }
-    if (keys === "amount,transactionHash,unsignedXdr") {
+    if (keys !== "amount,transactionHash") {
       if (
-        typeof fields.unsignedXdr !== "string" ||
-        fields.unsignedXdr.length === 0 ||
-        fields.unsignedXdr.length > 4096 ||
-        !deps.reconcile
+        !deps.reconcile ||
+        (keys === "amount,reconcile,transactionHash" && fields.reconcile !== true) ||
+        (keys === "amount,transactionHash,unsignedXdr" &&
+          (typeof fields.unsignedXdr !== "string" ||
+            fields.unsignedXdr.length === 0 ||
+            fields.unsignedXdr.length > 4096))
       ) {
         return failure("invalid_request", 400);
       }
@@ -182,7 +257,9 @@ export async function handleConfirmTrustline(
         project: authorized.project,
         amount: fields.amount,
         transactionHash: fields.transactionHash,
-        unsignedXdr: fields.unsignedXdr,
+        unsignedXdr: keys === "amount,transactionHash,unsignedXdr"
+          ? fields.unsignedXdr as string
+          : undefined,
       });
       return NextResponse.json(
         { ok: true, reconciliation },
