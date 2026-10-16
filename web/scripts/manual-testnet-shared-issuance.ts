@@ -7,7 +7,13 @@ import type { SharedIssuerSigningPrimitive } from "../lib/stellar/shared-issuer-
 const APPROVED_MANUAL_TESTNET_SHARED_ISSUER =
   "GBW4IKGPC5Q4YRKGRMNNXTVRZNQZ3DFWFHXSQUAMWLXES75MWTY3TWOV";
 
-type Command = "prepare" | "submit" | "reconcile";
+type Command =
+  | "prepare"
+  | "submit"
+  | "reconcile"
+  | "recover-prepare"
+  | "recover-submit"
+  | "recover-reconcile";
 
 interface CommonArgs {
   command: Command;
@@ -17,7 +23,7 @@ interface CommonArgs {
 }
 
 interface PrepareArgs extends CommonArgs {
-  command: "prepare";
+  command: "prepare" | "recover-prepare";
   unsignedXdrFile: string;
 }
 
@@ -26,11 +32,27 @@ interface SubmitArgs extends CommonArgs {
   signedXdrFile: string;
 }
 
+interface RecoverySubmitArgs extends CommonArgs {
+  command: "recover-submit";
+  attemptId: string;
+  signedXdrFile: string;
+}
+
 interface ReconcileArgs extends CommonArgs {
   command: "reconcile";
 }
 
-type Args = PrepareArgs | SubmitArgs | ReconcileArgs;
+interface RecoveryReconcileArgs extends CommonArgs {
+  command: "recover-reconcile";
+  attemptId: string;
+}
+
+type Args =
+  | PrepareArgs
+  | SubmitArgs
+  | RecoverySubmitArgs
+  | ReconcileArgs
+  | RecoveryReconcileArgs;
 
 const manualOnlyPrimitive: SharedIssuerSigningPrimitive = {
   async signCanonicalEnvelope() {
@@ -51,7 +73,10 @@ function parseArgs(argv: string[]): Args {
   if (
     commandValue !== "prepare" &&
     commandValue !== "submit" &&
-    commandValue !== "reconcile"
+    commandValue !== "reconcile" &&
+    commandValue !== "recover-prepare" &&
+    commandValue !== "recover-submit" &&
+    commandValue !== "recover-reconcile"
   ) {
     throw new Error(usage());
   }
@@ -69,7 +94,7 @@ function parseArgs(argv: string[]): Args {
   const ownerPublicKey = values.get("--owner");
   if (!requestId || !projectId || !ownerPublicKey) throw new Error(usage());
 
-  if (commandValue === "prepare") {
+  if (commandValue === "prepare" || commandValue === "recover-prepare") {
     const unsignedXdrFile = values.get("--unsigned-xdr-file");
     if (!unsignedXdrFile || values.size !== 4) throw new Error(usage());
     return {
@@ -93,6 +118,34 @@ function parseArgs(argv: string[]): Args {
     };
   }
 
+  if (commandValue === "recover-submit") {
+    const attemptId = values.get("--attempt-id");
+    const signedXdrFile = values.get("--signed-xdr-file");
+    if (!attemptId || !signedXdrFile || values.size !== 5) {
+      throw new Error(usage());
+    }
+    return {
+      command: commandValue,
+      requestId,
+      projectId,
+      ownerPublicKey,
+      attemptId,
+      signedXdrFile,
+    };
+  }
+
+  if (commandValue === "recover-reconcile") {
+    const attemptId = values.get("--attempt-id");
+    if (!attemptId || values.size !== 4) throw new Error(usage());
+    return {
+      command: commandValue,
+      requestId,
+      projectId,
+      ownerPublicKey,
+      attemptId,
+    };
+  }
+
   if (values.size !== 3) throw new Error(usage());
   return { command: commandValue, requestId, projectId, ownerPublicKey };
 }
@@ -103,6 +156,11 @@ function usage(): string {
     "  npm run issuance:manual:testnet -- prepare --request-id UUID --project-id UUID --owner G... --unsigned-xdr-file ./attempt-1-unsigned.xdr",
     "  npm run issuance:manual:testnet -- submit --request-id UUID --project-id UUID --owner G... --signed-xdr-file ./attempt-1-signed.xdr",
     "  npm run issuance:manual:testnet -- reconcile --request-id UUID --project-id UUID --owner G...",
+    "  npm run issuance:manual:testnet -- recover-prepare --request-id UUID --project-id UUID --owner G... --unsigned-xdr-file ./attempt-2-unsigned.xdr",
+    "  npm run issuance:manual:testnet -- recover-submit --request-id UUID --project-id UUID --owner G... --attempt-id UUID --signed-xdr-file ./attempt-2-signed.xdr",
+    "  npm run issuance:manual:testnet -- recover-reconcile --request-id UUID --project-id UUID --owner G... --attempt-id UUID",
+    "",
+    "Recovery is hard-gated to the owner-authorized TEST8926 request and creates at most attempt 2.",
     "",
     "Required server-only environment:",
     "  NEXT_PUBLIC_STELLAR_NETWORK=testnet",
@@ -113,6 +171,36 @@ function usage(): string {
     "",
     "No signer URL, signer auth secret, or Stellar secret key is accepted.",
   ].join("\n");
+}
+
+async function writeUnsignedHandoff(
+  unsignedXdrFile: string,
+  handoff: Awaited<
+    ReturnType<
+      | import("../lib/server/projects/shared-issuance-orchestrator").SharedIssuanceOrchestrator["prepareManualSigningHandoff"]
+      | import("../lib/server/projects/shared-issuance-orchestrator").SharedIssuanceOrchestrator["prepareManualRecoverySigningHandoff"]
+    >
+  >,
+  action: string,
+) {
+  await writeFile(unsignedXdrFile, `${handoff.unsignedEnvelopeXdr}\n`, {
+    encoding: "utf8",
+    flag: "wx",
+    mode: 0o600,
+  });
+  const { unsignedEnvelopeXdr: _omitted, ...publicHandoff } = handoff;
+  process.stdout.write(
+    `${JSON.stringify(
+      {
+        ok: true,
+        action,
+        unsignedXdrFile,
+        ...publicHandoff,
+      },
+      null,
+      2,
+    )}\n`,
+  );
 }
 
 async function main() {
@@ -156,27 +244,21 @@ async function main() {
 
     if (args.command === "prepare") {
       const handoff = await orchestrator.prepareManualSigningHandoff(common);
-      await writeFile(
+      await writeUnsignedHandoff(
         args.unsignedXdrFile,
-        `${handoff.unsignedEnvelopeXdr}\n`,
-        {
-          encoding: "utf8",
-          flag: "wx",
-          mode: 0o600,
-        },
+        handoff,
+        "awaiting_manual_signature",
       );
-      const { unsignedEnvelopeXdr: _omitted, ...publicHandoff } = handoff;
-      process.stdout.write(
-        `${JSON.stringify(
-          {
-            ok: true,
-            action: "awaiting_manual_signature",
-            unsignedXdrFile: args.unsignedXdrFile,
-            ...publicHandoff,
-          },
-          null,
-          2,
-        )}\n`,
+      return;
+    }
+
+    if (args.command === "recover-prepare") {
+      const handoff =
+        await orchestrator.prepareManualRecoverySigningHandoff(common);
+      await writeUnsignedHandoff(
+        args.unsignedXdrFile,
+        handoff,
+        "awaiting_manual_recovery_signature",
       );
       return;
     }
@@ -195,6 +277,51 @@ async function main() {
           {
             ok: true,
             action: "manual_signed_envelope_consumed",
+            execution,
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      return;
+    }
+
+    if (args.command === "recover-submit") {
+      const signedEnvelopeXdr = (
+        await readFile(args.signedXdrFile, "utf8")
+      ).trim();
+      if (!signedEnvelopeXdr) throw new Error("Signed XDR file is empty.");
+      const execution = await orchestrator.submitManualRecoverySignedEnvelope({
+        ...common,
+        attemptId: args.attemptId,
+        signedEnvelopeXdr,
+      });
+      process.stdout.write(
+        `${JSON.stringify(
+          {
+            ok: true,
+            action: "manual_recovery_signed_envelope_consumed",
+            attemptId: args.attemptId,
+            execution,
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      return;
+    }
+
+    if (args.command === "recover-reconcile") {
+      const execution = await orchestrator.reconcileManualRecoveryAttempt({
+        ...common,
+        attemptId: args.attemptId,
+      });
+      process.stdout.write(
+        `${JSON.stringify(
+          {
+            ok: true,
+            action: "reconciled_exact_recovery_attempt",
+            attemptId: args.attemptId,
             execution,
           },
           null,
