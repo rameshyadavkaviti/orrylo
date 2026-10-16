@@ -417,6 +417,7 @@ test("authoritatively failed exact-hash transaction permits only fresh planning"
       hash: unsigned.transactionHash,
       successful: false,
       ledger: 901,
+      created_at: "2026-10-16T09:00:00Z",
       envelope_xdr: tx.toXDR(),
     }),
   });
