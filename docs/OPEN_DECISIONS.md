@@ -207,6 +207,26 @@ Still open (must not be silently selected by implementation):
 - policy for reservation handling on project ownership transfer;
 - final Mainnet/production Shared Issuer identity, flags, custody and execution policy; the bounded Testnet MVP Lite A–F decisions above are already approved.
 
+## First usable Testnet token-creation UX and supply
+
+Decided:
+
+- The first genuinely usable public Testnet creator must allow the user to **choose the initial issuance supply**, not merely enter a token name/code or save a draft.
+- Minimum creator experience includes display name, Stellar asset code, positive precise initial amount, safely validated logo and description, truthful issuer/authority disclosure, pre-confirmation review, and independently verified creation status.
+- Initial supply is server-authoritatively and immutably bound to request, full issuance intent, transaction attempts and on-chain confirmation; retries cannot change the amount.
+- Initial issued supply is distinct from an enforceable lifetime max supply. The product design may explain Fixed Supply and Mintable, but those modes must remain disabled/unavailable for execution until the selected tier can actually and verifiably enforce them; no false promise under an unrestricted Shared Issuer.
+- Max Supply/Capped and advanced control templates are not first-release executable promises.
+- Successful Testnet product acceptance requires actual on-chain issuance matching the user-approved amount, issuer and destination, not mere project creation.
+
+Still open:
+
+- Exact acceptable UI supply range/defaults (if any), beyond native Stellar precision and amount bounds.
+- Final first-issuance destination and customer authorization/trustline semantics.
+- Which asset-control modes can actually ship on the Shared Issuer tier, and enforcement/review evidence for any Fixed/Mintable control.
+- Metadata image storage/validation/publishing implementation and precise required-field constraints.
+- Detailed feature-tier presentation, pricing and promotion criteria.
+- Real Testnet execution/confirmation/abuse and release controls remain separate activation gates.
+
 ## Dedicated Issuer templates
 
 The Contract-Controlled Issuer model is selected.

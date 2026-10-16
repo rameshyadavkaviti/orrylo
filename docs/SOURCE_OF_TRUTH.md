@@ -126,6 +126,31 @@ The contract/policy layer may govern:
 
 Dedicated assets may receive distinct subdomains such as `tokenname.orrylo.com`, and may later support a user-owned custom domain.
 
+### 3.3 Approved first usable Testnet token-creation experience
+
+The first genuinely usable public Testnet token creator must give the customer meaningful control over the asset they request, **including a required initial supply amount**. The existing guided draft and project-creation UI are not sufficient evidence of usable on-chain token issuance. This requirement applies to the customer-asset product and must not change the independently governed RYLO supply/economics policy.
+
+**Minimum required customer inputs and presentation:**
+
+1. **Token/project display name** and **Stellar asset code**, with supported character and length validation and issuer-scoped availability/identity disclosure.
+2. **Initial issuance supply amount**, chosen by the customer, shown unambiguously in token units and committed as the exact canonical amount in the immutable full issuance intent. A draft may hold this value, but it must not silently mint or reserve an asset code.
+3. **Project description and token logo/image** through validated, safe metadata inputs, including truthful status when storage/publication is not yet available.
+4. **Pre-confirmation review** of final network, selected tier, effective issuer account, initial amount, destination account (when approved), issuer control and mint authority, any actual fees, and what will happen when the user confirms.
+5. **Post-confirmation ledger status** that distinguishes draft, reservation/request acceptance, submitted/ambiguous, independently confirmed issuance, and metadata publication. Never label an editable project or saved order as a successfully issued token.
+
+**Supply controls and claims:**
+
+- The initial supply is **not** merely display metadata. Its exact validated value must be server-authoritatively bound to the request, the full immutable intent, transaction attempts, confirmation and the actual issued asset/payment amount. Client-submitted values cannot override an already committed intent on retry.
+- Use an exact decimal representation consistent with Stellar's seven-decimal-place asset precision and strictly positive native amount bounds; reject invalid, unsupported or overflowing values instead of truncating, silently rounding or choosing an undocumented default. Concrete UI range limits and tier-specific amounts remain open until separately approved.
+- **Fixed Supply** and **Mintable** are approved as user-understandable *policy choices in the product design*, but must be **disabled, marked unavailable, or omitted from executable Testnet creation** until the selected issuer/contract tier demonstrably enforces the chosen rule, including protection against alternate unrestricted issuer keys. Do not show a working Fixed Supply toggle for assets under an unrestricted shared issuer.
+- A selected **Fixed Supply** mode may be advertised only when no undisclosed mint path can increase that asset's supply. **Mintable** requires explicit, verifiable identification of the actual future minting authority. **Capped/Max Supply** and advanced governance are later-phase features, not promises made by a current Shared Issuer creation form.
+- The UI must distinguish **initial issued supply** from a **maximum lifetime supply** and any subsequently observed circulating/held amount; never infer a fixed lifetime cap from the initial payment amount.
+- Where a Shared Issuer cannot enforce independent customer-specific supply privileges, explain the shared operational authority plainly and do not imply the customer exclusively owns the issuer.
+
+**First-product acceptance gate:** Before Orrylo presents public Testnet token creation as a usable product, the customer can choose the initial issuance supply, review the exact committed effective terms, confirm once, and independently verify the resulting asset/amount/issuer/transaction on Testnet. Issuance must remain disabled until approved issuer, destination, trustline, signer, submission, ledger-confirmation, abuse-control and recovery gates are satisfied. No UI-only feature may bypass or weaken the existing server-side reservation and immutable confirmation architecture.
+
+**Not approved by this decision:** numeric supply min/max beyond Stellar protocol constraints, initial distribution destination rule, fees/deposits, shared-issuer permanent supply locks, issuer-account changes, dedicated templates or their deployment, issuance activation, secret custody, or Mainnet operations. These require separate decisions and evidence.
+
 ## 4. Core trust model
 
 Orrylo should prefer verifiable rules over trust promises.
