@@ -561,17 +561,6 @@ export class SharedIssuanceOrchestrator {
       throw new SharedIssuanceOrchestrationError("manual_recovery_not_ready");
     }
 
-    const validatedEvidence =
-      await validateBoundedSharedIssuanceRecoveryEvidence({
-        reader: this.dependencies.recoveryReader,
-        intent,
-        attempt: previous,
-        nowUnix,
-        verifierIdentity: "official-stellar-testnet-horizon",
-        verificationPolicyVersion:
-          TEST8926_BOUNDED_RECOVERY_POLICY.policyVersion,
-      });
-
     const preflight =
       await this.dependencies.preflight.readIssuancePreconditions({
         issuerPublicKey: intent.issuerPublicKey,
@@ -580,10 +569,7 @@ export class SharedIssuanceOrchestrator {
         assetCodeReservedForProject: true,
         feeStroops: this.dependencies.feeStroops,
       });
-    if (
-      preflight.preconditions.issuerSequence !==
-      validatedEvidence.record.issuerSequence
-    ) {
+    if (preflight.preconditions.issuerSequence !== previous.sourceSequence) {
       throw new SharedIssuanceOrchestrationError(
         "manual_recovery_sequence_changed",
       );
@@ -625,6 +611,18 @@ export class SharedIssuanceOrchestrator {
       amount: intent.amount,
       createdAt: new Date(now).toISOString(),
     };
+
+    const validatedEvidence =
+      await validateBoundedSharedIssuanceRecoveryEvidence({
+        reader: this.dependencies.recoveryReader,
+        intent,
+        attempt: previous,
+        recoveryAttempt: candidate,
+        nowUnix,
+        verifierIdentity: "official-stellar-testnet-horizon",
+        verificationPolicyVersion:
+          TEST8926_BOUNDED_RECOVERY_POLICY.policyVersion,
+      });
 
     await this.dependencies.recoveryEvidenceWriter.appendRecoveryEvidence(
       validatedEvidence,
