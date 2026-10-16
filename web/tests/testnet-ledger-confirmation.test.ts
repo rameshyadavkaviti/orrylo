@@ -606,7 +606,11 @@ test("bounded recovery validates exact post-expiry not-found evidence for an uns
 test("bounded recovery rejects non-expired or signed-digest attempt 1", async () => {
   const { intent, attempt } = unsignedFixture();
   const recoveryAttempt = { ...attempt, signingMode: "manual" as const };
-  const recoveryAtExpiry = recoveryCandidate(intent, attempt, attempt.validUntil);
+  const recoveryAtExpiry = recoveryCandidate(
+    intent,
+    attempt,
+    attempt.validUntil,
+  );
   const recovery = recoveryCandidate(intent, attempt, attempt.validUntil + 2);
   const afterExpiry = new Date((attempt.validUntil + 1) * 1_000).toISOString();
   const lookup: StellarTestnetTransactionLookup = {
