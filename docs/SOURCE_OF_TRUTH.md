@@ -897,6 +897,36 @@ A fresh agent is considered successfully recovered when it can, without prior ch
 
 If it cannot do these things, repository documentation or GitHub work-item state is insufficient and should be improved as part of enablement/documentation work.
 
+### 18.8 Work-agent finisher model
+
+Orrylo uses a two-phase execution model for defined milestones so specialist agents prepare the work and the Work Agent can finish the objective with minimal additional coordination.
+
+**Phase A — specialist preparation**
+
+- Product Architect defines the milestone, acceptance criteria, critical path, owner-gated actions, and the explicit **WORK-READY** checkpoint.
+- Full-stack, Stellar / Contract, Security / Enablement, UI/UX, and other specialist agents resolve or narrow their owned blockers, implementation gaps, reviews, evidence, configuration requirements, and handoffs before the Work Agent is invoked.
+- Specialist work should leave no avoidable unresolved architecture, policy, security, dependency, or repository-state question for the Work Agent.
+- Agents should prefer preparatory changes and evidence that make the final execution deterministic, bounded, and independently verifiable.
+
+**Phase B — Work Agent finish**
+
+- Once the Product Architect determines the milestone is **WORK-READY**, the Work Agent receives one comprehensive execution prompt whenever practical, and no more than two prompts for the same finishing pass unless a genuinely new owner decision or external blocker appears.
+- The finishing prompt should cover the remaining end-to-end execution needed to complete the milestone, such as reconciliation, configuration, deployment, verification, integration testing, evidence collection, and concise final reporting, subject to existing authorization boundaries.
+- The Work Agent is not the place to discover unresolved product policy, redesign security architecture, or compensate for incomplete specialist review. If it encounters such a blocker, it must stop at that boundary and hand back the concrete blocker rather than invent a decision.
+- Existing live-action, secret-handling, financial, deployment, Testnet, and Mainnet authorization gates remain fully effective. **WORK-READY does not itself authorize a gated live action.**
+
+For each active milestone, the Product Architect should be able to state the execution shape as:
+
+```
+Goal
+→ specialist preparation
+→ WORK-READY checkpoint
+→ Work Agent finishing prompt
+→ independently verified completion evidence
+```
+
+The purpose of this model is to minimize fragmented owner routing and repeated agent handoffs while preserving specialist ownership, independent Security review, and explicit owner authorization gates.
+
 ## 19. Canonical companion documents
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system architecture and boundaries
