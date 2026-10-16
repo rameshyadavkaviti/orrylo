@@ -84,6 +84,7 @@ if (!TEST_DATABASE_URL) {
       "009_signed_envelope_digest.sql",
       "010_mvp_lite_db_security_hardening.sql",
       "011_shared_issuance_signing_mode.sql",
+      "012_customer_change_trust_interlock.sql",
     ]);
 
     const [{ count }] = await sql<{ count: string }[]>`
@@ -105,11 +106,13 @@ if (!TEST_DATABASE_URL) {
           'project_issuance_intents',
           'project_issuance_full_intents',
           'project_issuance_transaction_attempts',
-          'project_issuance_ledger_confirmations'
+          'project_issuance_ledger_confirmations',
+          'project_customer_change_trust_handoffs',
+          'project_customer_change_trust_resolutions'
         )
     `;
 
-    assert.equal(count, "15");
+    assert.equal(count, "17");
   });
 
   test("eligibility reward migration installs evidence integrity constraints", async () => {
