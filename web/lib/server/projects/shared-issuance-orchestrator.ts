@@ -521,7 +521,9 @@ export class SharedIssuanceOrchestrator {
     assertAuthenticatedIntent(input, intent);
     this.assertManualIssuer(intent);
 
-    const attempts = await this.dependencies.store.listAttempts(input.requestId);
+    const attempts = await this.dependencies.store.listAttempts(
+      input.requestId,
+    );
     if (attempts.length !== 1 || attempts[0]!.attemptNumber !== 1) {
       throw new SharedIssuanceOrchestrationError("manual_recovery_not_ready");
     }
@@ -660,7 +662,9 @@ export class SharedIssuanceOrchestrator {
     assertAuthenticatedIntent(input, intent);
     this.assertManualIssuer(intent);
 
-    const attempts = await this.dependencies.store.listAttempts(input.requestId);
+    const attempts = await this.dependencies.store.listAttempts(
+      input.requestId,
+    );
     const { previous, recovery } = selectExactRecoveryAttempts(
       intent,
       attempts,
@@ -739,7 +743,9 @@ export class SharedIssuanceOrchestrator {
     assertAuthenticatedIntent(input, intent);
     this.assertManualIssuer(intent);
 
-    const attempts = await this.dependencies.store.listAttempts(input.requestId);
+    const attempts = await this.dependencies.store.listAttempts(
+      input.requestId,
+    );
     const { recovery } = selectExactRecoveryAttempts(
       intent,
       attempts,
