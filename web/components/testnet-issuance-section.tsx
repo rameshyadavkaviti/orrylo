@@ -5,7 +5,7 @@ import type { ManagedProjectProfile } from "../lib/projects/project-profile";
 
 const descriptions = {
   awaiting_issuer_integration:
-    "Your request is saved. Issuer execution is unavailable until the reviewed Stellar integration is installed.",
+    "Your immutable request is saved. The approved isolated Testnet signer must be available before issuance.",
   pending_execution: "The request is waiting for a reviewed execution service.",
   submitted:
     "Submission is recorded. Ledger confirmation is not yet established.",
@@ -138,7 +138,9 @@ export function TestnetIssuanceSection({
           <div>
             <dt>Transaction hash</dt>
             <dd>
-              <code>{issuance.transactionHash}</code>
+              <a href={`https://horizon-testnet.stellar.org/transactions/${issuance.transactionHash}`} target="_blank" rel="noopener noreferrer">
+                <code>{issuance.transactionHash}</code>
+              </a>
             </dd>
           </div>
           <div>
