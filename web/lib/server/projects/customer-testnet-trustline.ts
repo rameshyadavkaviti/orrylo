@@ -430,7 +430,15 @@ export async function reconcileCustomerTrustline(
   fetchImpl: typeof fetch = globalThis.fetch,
 ): Promise<
   | { status: "ready"; trustline: CustomerTrustlinePlan }
-  | { status: "terminal" }
+  | {
+      status: "terminal";
+      evidence: {
+        kind: "failed" | "expired_not_found";
+        observedLedger: number;
+        observedLedgerClosedAt: string;
+        observedSourceSequence?: string;
+      };
+    }
   | { status: "pending" }
 > {
   if (!HASH.test(input.transactionHash) || input.unsignedXdr.length > 4096) {
@@ -525,7 +533,15 @@ export async function reconcileCustomerTrustline(
     ) {
       return { status: "pending" };
     }
-    return { status: "terminal" };
+    return {
+      status: "terminal",
+      evidence: {
+        kind: "expired_not_found",
+        observedLedger: after.sequence,
+        observedLedgerClosedAt: after.closed_at,
+        observedSourceSequence: account.sequence,
+      },
+    };
   }
 
   // The exact transaction is durably terminal whether succeeded or failed.
@@ -551,7 +567,21 @@ export async function reconcileCustomerTrustline(
   ) {
     throw new CustomerTrustlineError("trustline_transaction_mismatch");
   }
-  return { status: "terminal" };
+  if (record.successful !== false) return { status: "pending" };
+  if (
+    typeof record.created_at !== "string" ||
+    !Number.isFinite(Date.parse(record.created_at))
+  ) {
+    throw new CustomerTrustlineError("malformed_horizon_response");
+  }
+  return {
+    status: "terminal",
+    evidence: {
+      kind: "failed",
+      observedLedger: record.ledger as number,
+      observedLedgerClosedAt: record.created_at,
+    },
+  };
 }
 
 function recordFromExactHash(value: unknown): Record<string, unknown> {
