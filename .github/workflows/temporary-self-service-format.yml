@@ -1,0 +1,45 @@
+name: Temporary self-service formatter
+on:
+  push:
+    branches:
+      - feat/self-service-testnet-issuance
+    paths:
+      - .github/workflows/temporary-self-service-format.yml
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Format only self-service files
+        working-directory: web
+        run: |
+          npm ci
+          npx prettier --write \
+            app/my-assets/'[projectId]'/page.tsx \
+            app/api/projects/'[projectId]'/issuance/trustline/route.ts \
+            components/confirm-initial-supply-intent.tsx \
+            components/create-shared-token-form.tsx \
+            components/customer-trustline-control.tsx \
+            components/managed-project-view.tsx \
+            components/testnet-issuance-section.tsx \
+            lib/server/projects/customer-testnet-trustline.ts \
+            tests/customer-testnet-trustline.test.ts \
+            tests/customer-trustline-http.test.ts
+      - name: Commit formatting to feature branch only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/
+          if ! git diff --cached --quiet; then
+            git commit -m "STYLE: format Testnet self-service implementation"
+            git push origin HEAD:feat/self-service-testnet-issuance
+          fi
