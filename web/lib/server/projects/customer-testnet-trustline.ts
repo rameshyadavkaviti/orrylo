@@ -228,7 +228,7 @@ export async function inspectCustomerTrustline(
     throw new CustomerTrustlineError("invalid_destination");
 
   // Reuse the issuer flag/signer/threshold, fee/reserve and exact trustline reader.
-  const preflight = await new OfficialStellarTestnetIssuancePreflightReader(
+  await new OfficialStellarTestnetIssuancePreflightReader(
     fetchImpl,
   ).readIssuancePreconditions({
     issuerPublicKey: APPROVED_ISSUER,
