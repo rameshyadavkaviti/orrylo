@@ -113,17 +113,19 @@ function fakeDatabase(
       ];
     }
     if (query.includes("app_handoff_write")) {
-      return [{
-        app_handoff_write: false,
-        app_resolution_write: false,
-        writer_handoff_write: false,
-        writer_resolution_insert: true,
-        writer_resolution_mutate: false,
-        app_reserve_execute: true,
-        public_reserve_execute: false,
-        reserve_security_definer: true,
-        reserve_search_path: ["search_path=pg_catalog, public"],
-      }];
+      return [
+        {
+          app_handoff_write: false,
+          app_resolution_write: false,
+          writer_handoff_write: false,
+          writer_resolution_insert: true,
+          writer_resolution_mutate: false,
+          app_reserve_execute: true,
+          public_reserve_execute: false,
+          reserve_security_definer: true,
+          reserve_search_path: ["search_path=pg_catalog, public"],
+        },
+      ];
     }
     if (query.includes("FROM pg_roles")) return [{ exists: true }];
     if (query.includes("UNION ALL")) {
