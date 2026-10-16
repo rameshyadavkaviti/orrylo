@@ -23,6 +23,7 @@ import {
   StellarLedgerEvidenceError,
   UnavailableStellarTestnetLedgerReader,
   reconcileSharedIssuanceAttempt,
+  validateBoundedSharedIssuanceRecoveryEvidence,
   type StellarTestnetAccountSequenceEvidence,
   type StellarTestnetLedgerReader,
   type StellarTestnetTransactionLookup,
@@ -501,6 +502,148 @@ test("rejects evidence when issuer, asset, or amount differs from the immutable 
       StellarLedgerEvidenceError,
     );
   }
+});
+
+test("bounded recovery validates exact post-expiry not-found evidence for an unsigned manual attempt", async () => {
+  const { intent, attempt } = unsignedFixture();
+  const recoveryAttempt = { ...attempt, signingMode: "manual" as const };
+  const afterExpiry = new Date((attempt.validUntil + 1) * 1_000).toISOString();
+  const lookup: StellarTestnetTransactionLookup = {
+    status: "not_found",
+    network: "testnet",
+    networkPassphrase: Networks.TESTNET,
+    transactionHash: attempt.transactionHash,
+    observedLedger: 600,
+    observedAt: afterExpiry,
+    observedLedgerClosedAt: afterExpiry,
+  };
+
+  const validated = await validateBoundedSharedIssuanceRecoveryEvidence({
+    reader: readerFor(lookup, attempt.sourceSequence, {
+      lookupLedgerClosedAt: afterExpiry,
+      sequenceLedgerClosedAt: afterExpiry,
+    }),
+    intent,
+    attempt: recoveryAttempt,
+    nowUnix: attempt.validUntil + 2,
+    verifierIdentity: "official-stellar-testnet-horizon",
+    verificationPolicyVersion: "test8926-owner-bounded-recovery-v1",
+  });
+
+  assert.equal(validated.record.lookupStatus, "not_found");
+  assert.equal(validated.record.supersededAttemptId, attempt.attemptId);
+  assert.equal(
+    validated.record.supersededTransactionHash,
+    attempt.transactionHash,
+  );
+  assert.equal(validated.record.issuerSequence, attempt.sourceSequence);
+});
+
+test("bounded recovery rejects non-expired or signed-digest attempt 1", async () => {
+  const { intent, attempt } = unsignedFixture();
+  const recoveryAttempt = { ...attempt, signingMode: "manual" as const };
+  const afterExpiry = new Date((attempt.validUntil + 1) * 1_000).toISOString();
+  const lookup: StellarTestnetTransactionLookup = {
+    status: "not_found",
+    network: "testnet",
+    networkPassphrase: Networks.TESTNET,
+    transactionHash: attempt.transactionHash,
+    observedLedger: 600,
+    observedAt: afterExpiry,
+    observedLedgerClosedAt: afterExpiry,
+  };
+  const reader = readerFor(lookup, attempt.sourceSequence, {
+    lookupLedgerClosedAt: afterExpiry,
+    sequenceLedgerClosedAt: afterExpiry,
+  });
+
+  await assert.rejects(
+    validateBoundedSharedIssuanceRecoveryEvidence({
+      reader,
+      intent,
+      attempt: recoveryAttempt,
+      nowUnix: attempt.validUntil,
+      verifierIdentity: "official-stellar-testnet-horizon",
+      verificationPolicyVersion: "test8926-owner-bounded-recovery-v1",
+    }),
+    (error: unknown) =>
+      error instanceof StellarLedgerEvidenceError &&
+      error.code === "recovery_not_eligible",
+  );
+
+  await assert.rejects(
+    validateBoundedSharedIssuanceRecoveryEvidence({
+      reader,
+      intent,
+      attempt: {
+        ...recoveryAttempt,
+        signedEnvelopeXdrSha256: "a".repeat(64),
+      },
+      nowUnix: attempt.validUntil + 2,
+      verifierIdentity: "official-stellar-testnet-horizon",
+      verificationPolicyVersion: "test8926-owner-bounded-recovery-v1",
+    }),
+    (error: unknown) =>
+      error instanceof StellarLedgerEvidenceError &&
+      error.code === "recovery_not_eligible",
+  );
+});
+
+test("bounded recovery rejects missing exact-hash not-found proof and changed issuer sequence", async () => {
+  const { intent, attempt, lookup: confirmed } = unsignedFixture();
+  const recoveryAttempt = { ...attempt, signingMode: "manual" as const };
+  const afterExpiry = new Date((attempt.validUntil + 1) * 1_000).toISOString();
+
+  await assert.rejects(
+    validateBoundedSharedIssuanceRecoveryEvidence({
+      reader: readerFor(
+        {
+          ...confirmed,
+          observedAt: afterExpiry,
+          observedLedgerClosedAt: afterExpiry,
+        },
+        attempt.sourceSequence,
+        {
+          lookupLedgerClosedAt: afterExpiry,
+          sequenceLedgerClosedAt: afterExpiry,
+        },
+      ),
+      intent,
+      attempt: recoveryAttempt,
+      nowUnix: attempt.validUntil + 2,
+      verifierIdentity: "official-stellar-testnet-horizon",
+      verificationPolicyVersion: "test8926-owner-bounded-recovery-v1",
+    }),
+    (error: unknown) =>
+      error instanceof StellarLedgerEvidenceError &&
+      error.code === "recovery_not_eligible",
+  );
+
+  const notFound: StellarTestnetTransactionLookup = {
+    status: "not_found",
+    network: "testnet",
+    networkPassphrase: Networks.TESTNET,
+    transactionHash: attempt.transactionHash,
+    observedLedger: 600,
+    observedAt: afterExpiry,
+    observedLedgerClosedAt: afterExpiry,
+  };
+  await assert.rejects(
+    validateBoundedSharedIssuanceRecoveryEvidence({
+      reader: readerFor(notFound, "124", {
+        lookupLedgerClosedAt: afterExpiry,
+        sequenceLedgerClosedAt: afterExpiry,
+      }),
+      intent,
+      attempt: recoveryAttempt,
+      nowUnix: attempt.validUntil + 2,
+      verifierIdentity: "official-stellar-testnet-horizon",
+      verificationPolicyVersion: "test8926-owner-bounded-recovery-v1",
+    }),
+    (error: unknown) =>
+      error instanceof StellarLedgerEvidenceError &&
+      error.code === "recovery_sequence_changed",
+  );
 });
 
 test("reconciliation never permits replacement for ambiguity or sequence conflict", async () => {
