@@ -751,6 +751,72 @@ Dynamic implementation state, exact PR heads, CI runs, review findings, and merg
 
 At the time this workflow was canonicalized, the active engineering sequence was centered on PR #32 (Gate A / persistence-security foundation), PR #46 (immutable issuance intent), and the Stellar execution/activation work tracked from the approved Testnet Shared Issuer decisions. Future agents must verify whether those references are still active before relying on them.
 
+
+### 17.2 Testnet MVP Fast Track
+
+The owner approves a **Testnet MVP Fast Track** for the first real customer Shared Issuer issuance.
+
+The optimization target is now the shortest safe path to:
+
+```text
+Connect wallet
+→ enter token details
+→ review
+→ Create Token
+→ real Stellar Testnet issuance
+→ exact authoritative confirmation
+→ success UI
+```
+
+Internal security stages may remain separate in implementation, but they must not become separate customer-facing products or unnecessary serial gates.
+
+For this milestone, a finding is a **Testnet MVP blocker** only when it can realistically cause one or more of the following:
+
+- issuance to the wrong wallet;
+- wrong issuer, asset code, amount, or network;
+- duplicate issuance;
+- transaction/body substitution;
+- unauthorized signing or secret exposure;
+- blind resubmission after an ambiguous outcome;
+- fabricated or mismatched ledger confirmation;
+- UI success without authoritative exact-transaction evidence;
+- direct application/database bypass of the above invariants.
+
+The preferred MVP design is deliberately narrow and fail-closed:
+
+- Shared Issuer only;
+- Stellar Testnet only;
+- authenticated owner wallet as destination;
+- exact immutable initial supply;
+- one issuance attempt only;
+- no automatic retry or successor-attempt flow;
+- one explicitly approved Testnet Shared Issuer;
+- one protected Testnet signer boundary;
+- official Testnet Horizon;
+- persist required evidence before submission;
+- on uncertainty, stop and require reconciliation;
+- exact-hash authoritative confirmation before success UI.
+
+Valid hardening work that does not materially protect those invariants must be classified as **post-MVP hardening** or **Mainnet/production hardening** and must not delay the first real Testnet issuance.
+
+Examples that should normally remain outside the Fast Track critical path unless evidence shows they are required for the first safe issuance include:
+
+- generalized multi-attempt or retry/replacement architecture;
+- broad historical recovery machinery unrelated to the active first-issuance path;
+- full metadata/TOML automation;
+- Dedicated Issuer;
+- RYLO execution;
+- Mainnet;
+- generalized signer orchestration;
+- scale/HA/advanced observability;
+- unrelated production hardening.
+
+Security review for the Fast Track must be **bounded**: classify each relevant finding as `MVP BLOCKER`, `POST-MVP HARDENING`, or `MAINNET / PRODUCTION ONLY`, with concrete exploit/correctness reasoning. Severity labels alone do not make a finding a Testnet MVP blocker.
+
+Engineering should prefer a thin complete vertical slice over completing horizontal subsystems in isolation. Work that does not directly reduce time or risk to the first real Testnet issuance should be removed from the active critical path.
+
+This Fast Track changes sequencing and blocker classification only. It does **not** waive owner gates for secrets, signer custody, funding, live signing/submission, trustline/account mutation, or other explicitly gated live actions.
+
 ## 18. Agent continuity, recovery, and autonomous workflow
 
 This section is canonical process policy. Its purpose is to make an Orrylo agent recoverable in a fresh conversation with only:
