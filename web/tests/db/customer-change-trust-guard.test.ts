@@ -43,10 +43,10 @@ if (!TEST_DATABASE_URL) {
     roleUrl(TEST_DATABASE_URL, "orrylo_app", "trustline-app-test"),
   );
   const appB = createDatabaseClient(
-    roleUrl(URL, "orrylo_app", "trustline-app-test"),
+    roleUrl(TEST_DATABASE_URL, "orrylo_app", "trustline-app-test"),
   );
   const writerClient = createDatabaseClient(
-    roleUrl(URL, "orrylo_trustline_writer_test", "trustline-writer-test"),
+    roleUrl(TEST_DATABASE_URL, "orrylo_trustline_writer_test", "trustline-writer-test"),
   );
   const first = new PostgresCustomerTrustlineGuard(appA);
   const second = new PostgresCustomerTrustlineGuard(appB);
