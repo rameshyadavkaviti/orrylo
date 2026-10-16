@@ -219,3 +219,44 @@ test("reconciliation rejects injected authority, forged origin, and malformed XD
   assert.equal(crossOrigin.status, 403);
   assert.equal(called, false);
 });
+
+test("a second authenticated browser receives pending without a signable XDR", async () => {
+  let claims = 0;
+  const fixture = deps();
+  const signable = {
+    ...READY,
+    status: "signature_required" as const,
+    unsignedXdr: "SERVER-BOUND-ONE-TIME-XDR",
+    transactionHash: HASH,
+    validUntil: 1800000300,
+  };
+  fixture.inspect = async () => signable;
+  fixture.reserve = async () => {
+    claims += 1;
+    return claims === 1
+      ? { status: "claimed", plan: signable }
+      : { status: "pending", transactionHash: HASH };
+  };
+  const first = await handleInspectTrustline(
+    new NextRequest(URL + "?amount=50"),
+    context,
+    fixture,
+  );
+  assert.equal(first.status, 200);
+  const firstResult = (await first.json()).trustline;
+  assert.equal(firstResult.status, "signature_required");
+  assert.equal(firstResult.unsignedXdr, signable.unsignedXdr);
+
+  // Same authenticated wallet in another browser/server session.
+  const second = await handleInspectTrustline(
+    new NextRequest(URL + "?amount=50"),
+    context,
+    fixture,
+  );
+  assert.equal(second.status, 200);
+  const secondResult = (await second.json()).trustline;
+  assert.equal(secondResult.status, "pending");
+  assert.equal(secondResult.transactionHash, HASH);
+  assert.equal(secondResult.unsignedXdr, undefined);
+  assert.equal(claims, 2);
+});
