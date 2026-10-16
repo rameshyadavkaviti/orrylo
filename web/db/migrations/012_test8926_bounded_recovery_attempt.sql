@@ -106,8 +106,7 @@ BEGIN
     AND procedure.proname = 'assert_trusted_recovery_evidence_writer'
   LIMIT 1;
 
-  IF session_user <> current_user
-    OR login_is_superuser
+  IF login_is_superuser
     OR login_owns_evidence_table
     OR login_owns_enforcement_function
     OR NOT pg_catalog.pg_has_role(
