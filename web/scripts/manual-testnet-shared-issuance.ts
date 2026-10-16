@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 
 import { createDatabaseClient } from "../lib/server/persistence/database";
+import type { ManualSharedIssuanceSigningHandoff } from "../lib/server/projects/shared-issuance-orchestrator";
 import { createServerSharedIssuanceOrchestrator } from "../lib/server/projects/shared-issuance-runtime";
 import type { SharedIssuerSigningPrimitive } from "../lib/stellar/shared-issuer-signing-policy";
 
@@ -175,12 +176,7 @@ function usage(): string {
 
 async function writeUnsignedHandoff(
   unsignedXdrFile: string,
-  handoff: Awaited<
-    ReturnType<
-      | import("../lib/server/projects/shared-issuance-orchestrator").SharedIssuanceOrchestrator["prepareManualSigningHandoff"]
-      | import("../lib/server/projects/shared-issuance-orchestrator").SharedIssuanceOrchestrator["prepareManualRecoverySigningHandoff"]
-    >
-  >,
+  handoff: ManualSharedIssuanceSigningHandoff,
   action: string,
 ) {
   await writeFile(unsignedXdrFile, `${handoff.unsignedEnvelopeXdr}\n`, {
