@@ -167,6 +167,7 @@ function fakeDatabase(
           reachability_function_public_execute: false,
         },
       ];
+    }
     if (query.includes("manual_constraint")) {
       return [
         {
@@ -186,8 +187,6 @@ function fakeDatabase(
             : 1,
         },
       ];
-    }
-
     }
 
     throw new Error(`Unexpected inspection query: ${query}`);
