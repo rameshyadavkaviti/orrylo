@@ -9,7 +9,10 @@ import {
 import type { AuthSession } from "../../../../../../lib/auth/stores";
 import { isValidProjectId } from "../../../../../../lib/projects/project-profile";
 import type { ManagedProjectProfile } from "../../../../../../lib/projects/project-profile";
-import { createDatabaseClient, getDatabaseClient } from "../../../../../../lib/server/persistence/database";
+import {
+  createDatabaseClient,
+  getDatabaseClient,
+} from "../../../../../../lib/server/persistence/database";
 import { TrustedConfirmationWriterDatabaseBoundary } from "../../../../../../lib/server/persistence/issuance-database-boundaries";
 import {
   PostgresCustomerTrustlineGuard,
@@ -99,7 +102,10 @@ function dependencies(): CustomerTrustlineRouteDependencies {
         transactionHash: hash,
       }),
     async reconcile({ project, amount, transactionHash, unsignedXdr }) {
-      const prior = await guard.latest(project.projectId, project.ownerPublicKey);
+      const prior = await guard.latest(
+        project.projectId,
+        project.ownerPublicKey,
+      );
       if (
         !prior ||
         prior.transactionHash !== transactionHash ||
@@ -121,11 +127,16 @@ function dependencies(): CustomerTrustlineRouteDependencies {
       });
       if (evidence.status !== "terminal") return evidence;
       const url = process.env.ORRYLO_CONFIRMATION_WRITER_DATABASE_URL?.trim();
-      if (!url) throw new CustomerTrustlineError("trustline_confirmation_writer_unavailable");
+      if (!url)
+        throw new CustomerTrustlineError(
+          "trustline_confirmation_writer_unavailable",
+        );
       const trustedSql = createDatabaseClient(url);
       try {
         await TrustedConfirmationWriterDatabaseBoundary.authorize(trustedSql);
-        const writer = new PostgresCustomerTrustlineResolutionWriter(trustedSql);
+        const writer = new PostgresCustomerTrustlineResolutionWriter(
+          trustedSql,
+        );
         await writer.terminal({
           handoff: prior,
           kind: evidence.evidence.kind,
@@ -188,7 +199,9 @@ export async function handleInspectTrustline(
       return failure("invalid_request", 400);
     }
     const plan = await deps.inspect(authorized.project, amount);
-    let trustline: CustomerTrustlinePlan | (Omit<CustomerTrustlinePlan, "status"> & { status: "pending" }) = plan;
+    let trustline:
+      | CustomerTrustlinePlan
+      | (Omit<CustomerTrustlinePlan, "status"> & { status: "pending" }) = plan;
     if (plan.status === "signature_required") {
       if (!deps.reserve) return failure("trustline_guard_unavailable", 503);
       const claim = await deps.reserve({ project: authorized.project, plan });
@@ -245,7 +258,8 @@ export async function handleConfirmTrustline(
     if (keys !== "amount,transactionHash") {
       if (
         !deps.reconcile ||
-        (keys === "amount,reconcile,transactionHash" && fields.reconcile !== true) ||
+        (keys === "amount,reconcile,transactionHash" &&
+          fields.reconcile !== true) ||
         (keys === "amount,transactionHash,unsignedXdr" &&
           (typeof fields.unsignedXdr !== "string" ||
             fields.unsignedXdr.length === 0 ||
@@ -257,9 +271,10 @@ export async function handleConfirmTrustline(
         project: authorized.project,
         amount: fields.amount,
         transactionHash: fields.transactionHash,
-        unsignedXdr: keys === "amount,transactionHash,unsignedXdr"
-          ? fields.unsignedXdr as string
-          : undefined,
+        unsignedXdr:
+          keys === "amount,transactionHash,unsignedXdr"
+            ? (fields.unsignedXdr as string)
+            : undefined,
       });
       return NextResponse.json(
         { ok: true, reconciliation },

@@ -1,14 +1,23 @@
-
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { before, after, beforeEach, test } from "node:test";
-import { Account, Asset, Keypair, Networks, Operation, TransactionBuilder } from "@stellar/stellar-sdk";
+import {
+  Account,
+  Asset,
+  Keypair,
+  Networks,
+  Operation,
+  TransactionBuilder,
+} from "@stellar/stellar-sdk";
 import { createDatabaseClient } from "../../lib/server/persistence/database";
 import { migrateDatabase } from "../../lib/server/persistence/migrations";
 import { verifyDatabaseSchemaReadOnly } from "../../lib/server/persistence/schema-verification";
 import { ManagedProjectService } from "../../lib/server/projects/managed-project-service";
-import { PostgresCustomerTrustlineGuard, PostgresCustomerTrustlineResolutionWriter } from "../../lib/server/projects/customer-trustline-guard";
+import {
+  PostgresCustomerTrustlineGuard,
+  PostgresCustomerTrustlineResolutionWriter,
+} from "../../lib/server/projects/customer-trustline-guard";
 import type { CustomerTrustlinePlan } from "../../lib/server/projects/customer-testnet-trustline";
 
 const URL = process.env.TEST_DATABASE_URL?.trim();
@@ -23,19 +32,30 @@ function roleUrl(base: string, role: string, password: string) {
 }
 
 if (!URL) {
-  test("customer ChangeTrust interlock PostgreSQL suite", { skip: true }, () => {});
+  test(
+    "customer ChangeTrust interlock PostgreSQL suite",
+    { skip: true },
+    () => {},
+  );
 } else {
   const admin = createDatabaseClient(URL);
-  const appA = createDatabaseClient(roleUrl(URL, "orrylo_app", "trustline-app-test"));
-  const appB = createDatabaseClient(roleUrl(URL, "orrylo_app", "trustline-app-test"));
-  const writerClient = createDatabaseClient(roleUrl(URL, "orrylo_trustline_writer_test", "trustline-writer-test"));
+  const appA = createDatabaseClient(
+    roleUrl(URL, "orrylo_app", "trustline-app-test"),
+  );
+  const appB = createDatabaseClient(
+    roleUrl(URL, "orrylo_app", "trustline-app-test"),
+  );
+  const writerClient = createDatabaseClient(
+    roleUrl(URL, "orrylo_trustline_writer_test", "trustline-writer-test"),
+  );
   const first = new PostgresCustomerTrustlineGuard(appA);
   const second = new PostgresCustomerTrustlineGuard(appB);
   const writer = new PostgresCustomerTrustlineResolutionWriter(writerClient);
   let projectId = "";
 
   before(async () => {
-    if (!/test/i.test(new URL(URL).pathname.slice(1))) throw new Error("Test DB only.");
+    if (!/test/i.test(new URL(URL).pathname.slice(1)))
+      throw new Error("Test DB only.");
     await admin.unsafe("DROP SCHEMA public CASCADE; CREATE SCHEMA public");
     await admin.unsafe(`
       DO $do$ BEGIN
@@ -68,7 +88,9 @@ if (!URL) {
     `);
     await admin`UPDATE audit_chain_heads SET last_sequence = 0,
       last_event_hash = NULL WHERE chain_id = 'application'`;
-    const project = await new ManagedProjectService(admin, { network: "testnet" }).createManagedProject({
+    const project = await new ManagedProjectService(admin, {
+      network: "testnet",
+    }).createManagedProject({
       ownerPublicKey: OWNER,
       idempotencyKey: randomUUID(),
       code: "TCROSS",
@@ -90,10 +112,17 @@ if (!URL) {
   function plan(sequence: string): CustomerTrustlinePlan {
     const now = Math.floor(Date.now() / 1000);
     const tx = new TransactionBuilder(new Account(OWNER, sequence), {
-      fee: "100", networkPassphrase: Networks.TESTNET,
-    }).addOperation(Operation.changeTrust({
-      asset: new Asset("TCROSS", ISSUER), limit: "250.0000000",
-    })).setTimebounds(now, now + 300).build();
+      fee: "100",
+      networkPassphrase: Networks.TESTNET,
+    })
+      .addOperation(
+        Operation.changeTrust({
+          asset: new Asset("TCROSS", ISSUER),
+          limit: "250.0000000",
+        }),
+      )
+      .setTimebounds(now, now + 300)
+      .build();
     return {
       status: "signature_required",
       network: "testnet",
@@ -112,36 +141,58 @@ if (!URL) {
   }
 
   test("concurrent authenticated browsers receive exactly one signable plan", async () => {
-    const [a,b] = await Promise.all([
+    const [a, b] = await Promise.all([
       first.reserve({ projectId, ownerPublicKey: OWNER, plan: plan("123") }),
       second.reserve({ projectId, ownerPublicKey: OWNER, plan: plan("124") }),
     ]);
-    assert.deepEqual([a.status,b.status].sort(), ["claimed","pending"]);
+    assert.deepEqual([a.status, b.status].sort(), ["claimed", "pending"]);
     const claimed = a.status === "claimed" ? a : b;
     const pending = a.status === "pending" ? a : b;
     assert.equal(pending.transactionHash, claimed.plan.transactionHash);
-    const [{total}] = await admin<{total: number}[]>`
+    const [{ total }] = await admin<{ total: number }[]>`
       SELECT count(*)::integer AS total FROM project_customer_change_trust_handoffs
     `;
-    assert.equal(total,1);
+    assert.equal(total, 1);
   });
 
   test("unresolved hash persists across other sessions and new proposed XDR", async () => {
     const original = plan("123");
-    assert.equal((await first.reserve({
-      projectId, ownerPublicKey: OWNER, plan: original,
-    })).status,"claimed");
-    assert.equal((await second.latest(projectId, OWNER))?.transactionHash, original.transactionHash);
+    assert.equal(
+      (
+        await first.reserve({
+          projectId,
+          ownerPublicKey: OWNER,
+          plan: original,
+        })
+      ).status,
+      "claimed",
+    );
+    assert.equal(
+      (await second.latest(projectId, OWNER))?.transactionHash,
+      original.transactionHash,
+    );
     const next = await second.reserve({
-      projectId, ownerPublicKey: OWNER, plan: plan("124"),
+      projectId,
+      ownerPublicKey: OWNER,
+      plan: plan("124"),
     });
-    assert.deepEqual(next, {status:"pending",transactionHash: original.transactionHash});
+    assert.deepEqual(next, {
+      status: "pending",
+      transactionHash: original.transactionHash,
+    });
   });
 
   test("app direct SQL cannot modify guard or forge reconciliation; failed exact hash may release", async () => {
-    assert.equal((await first.reserve({
-      projectId, ownerPublicKey: OWNER, plan: plan("123"),
-    })).status, "claimed");
+    assert.equal(
+      (
+        await first.reserve({
+          projectId,
+          ownerPublicKey: OWNER,
+          plan: plan("123"),
+        })
+      ).status,
+      "claimed",
+    );
     const handoff = await first.latest(projectId, OWNER);
     assert.ok(handoff);
     await assert.rejects(appA`
@@ -160,17 +211,35 @@ if (!URL) {
       ) VALUES (${handoff.handoffId}::uuid, ${handoff.transactionHash},
         'failed', 901, now())
     `);
-    assert.equal((await second.reserve({
-      projectId, ownerPublicKey: OWNER, plan: plan("124"),
-    })).status, "pending");
+    assert.equal(
+      (
+        await second.reserve({
+          projectId,
+          ownerPublicKey: OWNER,
+          plan: plan("124"),
+        })
+      ).status,
+      "pending",
+    );
     await writer.terminal({
-      handoff, kind:"failed", observedLedger: 901,
+      handoff,
+      kind: "failed",
+      observedLedger: 901,
       observedLedgerClosedAt: new Date().toISOString(),
     });
-    assert.equal((await second.reserve({
-      projectId, ownerPublicKey: OWNER, plan: plan("124"),
-    })).status, "claimed");
-    const [{ handoffs, resolutions }] = await admin<{handoffs:number;resolutions:number}[]>`
+    assert.equal(
+      (
+        await second.reserve({
+          projectId,
+          ownerPublicKey: OWNER,
+          plan: plan("124"),
+        })
+      ).status,
+      "claimed",
+    );
+    const [{ handoffs, resolutions }] = await admin<
+      { handoffs: number; resolutions: number }[]
+    >`
       SELECT
         (SELECT count(*)::integer FROM project_customer_change_trust_handoffs) AS handoffs,
         (SELECT count(*)::integer FROM project_customer_change_trust_resolutions) AS resolutions
@@ -180,39 +249,80 @@ if (!URL) {
   });
 
   test("post-expiry not-found proof requires later ledger and unchanged account sequence", async () => {
-    await first.reserve({ projectId, ownerPublicKey: OWNER, plan: plan("123") });
+    await first.reserve({
+      projectId,
+      ownerPublicKey: OWNER,
+      plan: plan("123"),
+    });
     const handoff = await second.latest(projectId, OWNER);
     assert.ok(handoff);
-    await assert.rejects(writer.terminal({
-      handoff, kind: "expired_not_found", observedLedger: 902,
-      observedLedgerClosedAt: new Date(handoff.validUntil * 1000 - 1000).toISOString(),
-      observedSourceSequence: handoff.sourceSequence,
-    }));
-    await assert.rejects(writer.terminal({
-      handoff, kind: "expired_not_found", observedLedger: 902,
-      observedLedgerClosedAt: new Date(handoff.validUntil * 1000 + 1000).toISOString(),
-      observedSourceSequence: "999",
-    }));
-    assert.equal((await second.reserve({
-      projectId, ownerPublicKey: OWNER, plan: plan("124"),
-    })).status, "pending");
+    await assert.rejects(
+      writer.terminal({
+        handoff,
+        kind: "expired_not_found",
+        observedLedger: 902,
+        observedLedgerClosedAt: new Date(
+          handoff.validUntil * 1000 - 1000,
+        ).toISOString(),
+        observedSourceSequence: handoff.sourceSequence,
+      }),
+    );
+    await assert.rejects(
+      writer.terminal({
+        handoff,
+        kind: "expired_not_found",
+        observedLedger: 902,
+        observedLedgerClosedAt: new Date(
+          handoff.validUntil * 1000 + 1000,
+        ).toISOString(),
+        observedSourceSequence: "999",
+      }),
+    );
+    assert.equal(
+      (
+        await second.reserve({
+          projectId,
+          ownerPublicKey: OWNER,
+          plan: plan("124"),
+        })
+      ).status,
+      "pending",
+    );
     await writer.terminal({
-      handoff, kind:"expired_not_found", observedLedger: 903,
-      observedLedgerClosedAt: new Date(handoff.validUntil * 1000 + 1000).toISOString(),
+      handoff,
+      kind: "expired_not_found",
+      observedLedger: 903,
+      observedLedgerClosedAt: new Date(
+        handoff.validUntil * 1000 + 1000,
+      ).toISOString(),
       observedSourceSequence: handoff.sourceSequence,
     });
-    assert.equal((await second.reserve({
-      projectId, ownerPublicKey: OWNER, plan: plan("124"),
-    })).status, "claimed");
+    assert.equal(
+      (
+        await second.reserve({
+          projectId,
+          ownerPublicKey: OWNER,
+          plan: plan("124"),
+        })
+      ).status,
+      "claimed",
+    );
   });
 
   test("forged owner fails claim; read-only schema verifier validates safe privileges", async () => {
-    const badOwner = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 214)).publicKey();
-    await assert.rejects(first.reserve({
-      projectId,
-      ownerPublicKey: badOwner,
-      plan: { ...plan("123"), destinationPublicKey: badOwner },
-    }));
-    await verifyDatabaseSchemaReadOnly(admin, resolve(process.cwd(), "db/migrations"));
+    const badOwner = Keypair.fromRawEd25519Seed(
+      Buffer.alloc(32, 214),
+    ).publicKey();
+    await assert.rejects(
+      first.reserve({
+        projectId,
+        ownerPublicKey: badOwner,
+        plan: { ...plan("123"), destinationPublicKey: badOwner },
+      }),
+    );
+    await verifyDatabaseSchemaReadOnly(
+      admin,
+      resolve(process.cwd(), "db/migrations"),
+    );
   });
 }

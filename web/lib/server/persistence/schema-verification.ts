@@ -331,17 +331,19 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
   // The ordinary application identity has no direct write privileges over
   // cross-browser ChangeTrust evidence. Only the trusted writer can append
   // terminal proof; the transactional reservation is migration-owned.
-  const [trustlineAcl] = await sql<{
-    app_handoff_write: boolean;
-    app_resolution_write: boolean;
-    writer_handoff_write: boolean;
-    writer_resolution_insert: boolean;
-    writer_resolution_mutate: boolean;
-    app_reserve_execute: boolean;
-    public_reserve_execute: boolean;
-    reserve_security_definer: boolean;
-    reserve_search_path: string[] | null;
-  }[]>`
+  const [trustlineAcl] = await sql<
+    {
+      app_handoff_write: boolean;
+      app_resolution_write: boolean;
+      writer_handoff_write: boolean;
+      writer_resolution_insert: boolean;
+      writer_resolution_mutate: boolean;
+      app_reserve_execute: boolean;
+      public_reserve_execute: boolean;
+      reserve_security_definer: boolean;
+      reserve_search_path: string[] | null;
+    }[]
+  >`
     SELECT
       (SELECT bool_or(pg_catalog.has_table_privilege(
         'orrylo_app','public.project_customer_change_trust_handoffs',p
@@ -386,9 +388,13 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
     !trustlineAcl.app_reserve_execute ||
     trustlineAcl.public_reserve_execute ||
     !trustlineAcl.reserve_security_definer ||
-    !trustlineAcl.reserve_search_path?.includes("search_path=pg_catalog, public")
+    !trustlineAcl.reserve_search_path?.includes(
+      "search_path=pg_catalog, public",
+    )
   ) {
-    throw new Error("Unexpected protected customer ChangeTrust database authority.");
+    throw new Error(
+      "Unexpected protected customer ChangeTrust database authority.",
+    );
   }
 
   const ownershipRows = await sql<

@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import { Networks, Transaction, TransactionBuilder } from "@stellar/stellar-sdk";
+import {
+  Networks,
+  Transaction,
+  TransactionBuilder,
+} from "@stellar/stellar-sdk";
 
 import type { DatabaseClient } from "../persistence/database";
 import type { CustomerTrustlinePlan } from "./customer-testnet-trustline";
@@ -56,7 +60,10 @@ function mapHandoff(row: HandoffRow): CustomerTrustlineHandoff {
     destinationPublicKey: row.destination_public_key.trim(),
     amount: (() => {
       const value = validateInitialSupply(row.amount);
-      if (!value.valid) throw new CustomerTrustlineGuardError("Corrupt persisted trustline amount.");
+      if (!value.valid)
+        throw new CustomerTrustlineGuardError(
+          "Corrupt persisted trustline amount.",
+        );
       return value.normalized;
     })(),
     transactionHash: row.transaction_hash.trim(),
@@ -70,7 +77,10 @@ function mapHandoff(row: HandoffRow): CustomerTrustlineHandoff {
 export class PostgresCustomerTrustlineGuard {
   constructor(private readonly sql: DatabaseClient) {}
 
-  async latest(projectId: string, owner: string): Promise<CustomerTrustlineHandoff | null> {
+  async latest(
+    projectId: string,
+    owner: string,
+  ): Promise<CustomerTrustlineHandoff | null> {
     const [row] = await this.sql<HandoffRow[]>`
       SELECT h.*, resolution.resolution
       FROM public.project_customer_change_trust_handoffs AS h
@@ -102,15 +112,22 @@ export class PostgresCustomerTrustlineGuard {
       !input.plan.validUntil ||
       input.plan.destinationPublicKey !== input.ownerPublicKey
     ) {
-      throw new CustomerTrustlineGuardError("Only exact customer ChangeTrust plans can be reserved.");
+      throw new CustomerTrustlineGuardError(
+        "Only exact customer ChangeTrust plans can be reserved.",
+      );
     }
     let transaction: Transaction;
     try {
-      const parsed = TransactionBuilder.fromXDR(input.plan.unsignedXdr, Networks.TESTNET);
+      const parsed = TransactionBuilder.fromXDR(
+        input.plan.unsignedXdr,
+        Networks.TESTNET,
+      );
       if (!(parsed instanceof Transaction)) throw new Error("fee bump");
       transaction = parsed;
     } catch {
-      throw new CustomerTrustlineGuardError("Invalid signable ChangeTrust plan.");
+      throw new CustomerTrustlineGuardError(
+        "Invalid signable ChangeTrust plan.",
+      );
     }
     const [outcome] = await this.sql<
       { result_handoff_id: string; result_claimed: boolean }[]
@@ -129,11 +146,20 @@ export class PostgresCustomerTrustlineGuard {
         ${new Date(input.plan.validUntil * 1000)}::timestamptz
       )
     `;
-    if (!outcome) throw new CustomerTrustlineGuardError("Durable ChangeTrust reservation unavailable.");
+    if (!outcome)
+      throw new CustomerTrustlineGuardError(
+        "Durable ChangeTrust reservation unavailable.",
+      );
     if (!outcome.result_claimed) {
       const prior = await this.latest(input.projectId, input.ownerPublicKey);
-      if (!prior || prior.handoffId !== outcome.result_handoff_id || prior.resolution) {
-        throw new CustomerTrustlineGuardError("Concurrent pending ChangeTrust state changed.");
+      if (
+        !prior ||
+        prior.handoffId !== outcome.result_handoff_id ||
+        prior.resolution
+      ) {
+        throw new CustomerTrustlineGuardError(
+          "Concurrent pending ChangeTrust state changed.",
+        );
       }
       return { status: "pending", transactionHash: prior.transactionHash };
     }
@@ -152,13 +178,19 @@ export class PostgresCustomerTrustlineResolutionWriter {
     observedSourceSequence?: string;
   }): Promise<void> {
     const { handoff, kind } = input;
-    if (!Number.isSafeInteger(input.observedLedger) || input.observedLedger <= 0 ||
-        !Number.isFinite(Date.parse(input.observedLedgerClosedAt)) ||
-        (kind === "expired_not_found" &&
-          (!input.observedSourceSequence ||
-           input.observedSourceSequence !== handoff.sourceSequence ||
-           Date.parse(input.observedLedgerClosedAt) <= handoff.validUntil * 1000))) {
-      throw new CustomerTrustlineGuardError("Missing authoritative terminal reconciliation evidence.");
+    if (
+      !Number.isSafeInteger(input.observedLedger) ||
+      input.observedLedger <= 0 ||
+      !Number.isFinite(Date.parse(input.observedLedgerClosedAt)) ||
+      (kind === "expired_not_found" &&
+        (!input.observedSourceSequence ||
+          input.observedSourceSequence !== handoff.sourceSequence ||
+          Date.parse(input.observedLedgerClosedAt) <=
+            handoff.validUntil * 1000))
+    ) {
+      throw new CustomerTrustlineGuardError(
+        "Missing authoritative terminal reconciliation evidence.",
+      );
     }
     await this.sql`
       INSERT INTO public.project_customer_change_trust_resolutions(

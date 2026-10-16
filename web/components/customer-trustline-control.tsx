@@ -167,25 +167,39 @@ export function CustomerTrustlineControl({
           setError("A pending ChangeTrust could not be reconciled.");
           return;
         }
-        const response = await fetch(`/api/projects/${projectId}/issuance/trustline`, {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount,
-            transactionHash: fresh.transactionHash,
-            reconcile: true,
-          }),
-        });
+        const response = await fetch(
+          `/api/projects/${projectId}/issuance/trustline`,
+          {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              amount,
+              transactionHash: fresh.transactionHash,
+              reconcile: true,
+            }),
+          },
+        );
         const result = await readReconciliation(response);
-        if (!response.ok || !result?.ok || result.reconciliation.status === "pending") {
-          setError("The server-authoritative ChangeTrust transaction is unresolved. Do not sign again.");
+        if (
+          !response.ok ||
+          !result?.ok ||
+          result.reconciliation.status === "pending"
+        ) {
+          setError(
+            "The server-authoritative ChangeTrust transaction is unresolved. Do not sign again.",
+          );
           return;
         }
-        const checked = result.reconciliation.status === "ready"
-          ? result.reconciliation.trustline
-          : await inspectFresh();
-        if (!checked || !matchesReview(checked) || checked.status === "pending") {
+        const checked =
+          result.reconciliation.status === "ready"
+            ? result.reconciliation.trustline
+            : await inspectFresh();
+        if (
+          !checked ||
+          !matchesReview(checked) ||
+          checked.status === "pending"
+        ) {
           setError("Another pending ChangeTrust still blocks signing.");
           return;
         }
