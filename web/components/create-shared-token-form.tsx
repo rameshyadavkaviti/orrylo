@@ -26,6 +26,7 @@ import {
   validateSharedAssetDraft,
 } from "../lib/validation/token";
 import { WalletAuthControl } from "./wallet-auth-control";
+import { CustomerTrustlineControl } from "./customer-trustline-control";
 
 const INITIAL_DRAFT: SharedAssetDraft = {
   code: "",
@@ -39,6 +40,7 @@ const LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 type SaveState =
   | { status: "idle" }
   | { status: "saving" }
+  | { status: "trustline_required" }
   | { status: "persisting_intent" }
   | { status: "preparing_issuance" }
   | { status: "confirming" }
@@ -60,6 +62,12 @@ export function CreateSharedTokenForm() {
   const [logoName, setLogoName] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
+  const [trustlineStep, setTrustlineStep] = useState<{
+    projectId: string;
+    managePath: string;
+    assetCode: string;
+    supply: string;
+  } | null>(null);
   const idempotencyKeyRef = useRef<string | null>(null);
   const issuanceIdempotencyKeyRef = useRef<string | null>(null);
   const pendingSaveRef = useRef<PendingManagedProjectSave | null>(null);
@@ -71,6 +79,7 @@ export function CreateSharedTokenForm() {
     revisionRef.current += 1;
     setReview(null);
     setSaveState({ status: "idle" });
+    setTrustlineStep(null);
     idempotencyKeyRef.current = null;
     issuanceIdempotencyKeyRef.current = null;
     pendingSaveRef.current = null;
@@ -238,12 +247,13 @@ export function CreateSharedTokenForm() {
         window.location.assign(result.managePath);
         return;
       }
-      await persistIntentAndExecute(
-        result.projectId,
-        result.managePath,
-        review.assetCode,
-        review.initialSupply,
-      );
+      setTrustlineStep({
+        projectId: result.projectId,
+        managePath: result.managePath,
+        assetCode: review.assetCode,
+        supply: review.initialSupply,
+      });
+      setSaveState({ status: "trustline_required" });
     } catch {
       if (submittedRevision === revisionRef.current) {
         setSaveState({
@@ -264,6 +274,7 @@ export function CreateSharedTokenForm() {
     supply: string,
   ) {
     issuanceIdempotencyKeyRef.current ??= crypto.randomUUID();
+    setTrustlineStep(null);
     setSaveState({ status: "persisting_intent" });
     try {
       const intentResponse = await fetch(
@@ -370,6 +381,7 @@ export function CreateSharedTokenForm() {
     !logoError;
   const isWorking = [
     "saving",
+    "trustline_required",
     "persisting_intent",
     "preparing_issuance",
     "confirming",
@@ -802,6 +814,8 @@ export function CreateSharedTokenForm() {
             >
               {saveState.status === "saving"
                 ? "Validating / saving…"
+                 : saveState.status === "trustline_required"
+                  ? "Trustline approval required…"
                 : saveState.status === "persisting_intent"
                   ? "Saving immutable intent…"
                   : saveState.status === "preparing_issuance"
@@ -826,6 +840,21 @@ export function CreateSharedTokenForm() {
                   }
                 />
               </div>
+            ) : null}
+
+            {trustlineStep && saveState.status === "trustline_required" ? (
+              <CustomerTrustlineControl
+                key={`${trustlineStep.projectId}:${trustlineStep.supply}`}
+                projectId={trustlineStep.projectId}
+                assetCode={trustlineStep.assetCode}
+                amount={trustlineStep.supply}
+                onConfirmed={() => persistIntentAndExecute(
+                  trustlineStep.projectId,
+                  trustlineStep.managePath,
+                  trustlineStep.assetCode,
+                  trustlineStep.supply,
+                )}
+              />
             ) : null}
 
             {saveState.status === "failure" ? (
