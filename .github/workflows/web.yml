@@ -68,24 +68,6 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Temporary recovery formatting diagnostic
-        run: |
-          npx prettier --write \
-            lib/server/projects/shared-issuance-orchestrator.ts \
-            lib/stellar/testnet-ledger-confirmation.ts \
-            tests/db/gate-a-issuance-persistence.test.ts \
-            tests/schema-verification.test.ts \
-            tests/shared-issuance-orchestrator.test.ts \
-            tests/testnet-ledger-confirmation.test.ts
-          git diff --no-color -- \
-            lib/server/projects/shared-issuance-orchestrator.ts \
-            lib/stellar/testnet-ledger-confirmation.ts \
-            tests/db/gate-a-issuance-persistence.test.ts \
-            tests/schema-verification.test.ts \
-            tests/shared-issuance-orchestrator.test.ts \
-            tests/testnet-ledger-confirmation.test.ts
-          exit 1
-
       - name: Check formatting
         run: npm run format:check
 
