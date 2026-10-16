@@ -27,6 +27,7 @@ import {
 } from "../../lib/stellar/shared-issuer-issuance";
 import {
   AuthoritativeSharedIssuanceConfirmationValidator,
+  validateBoundedSharedIssuanceRecoveryEvidence,
   type StellarTestnetLedgerReader,
 } from "../../lib/stellar/testnet-ledger-confirmation";
 
@@ -104,7 +105,7 @@ if (!TEST_DATABASE_URL) {
 
   beforeEach(async () => {
     await admin.unsafe(
-      "TRUNCATE project_issuance_ledger_confirmations, project_issuance_transaction_attempts, project_issuance_full_intents, project_issuance_intents, project_profile_owners, project_profiles, workflow_intents, audit_events CASCADE",
+      "TRUNCATE project_issuance_recovery_evidence, project_issuance_ledger_confirmations, project_issuance_transaction_attempts, project_issuance_full_intents, project_issuance_intents, project_profile_owners, project_profiles, workflow_intents, audit_events CASCADE",
     );
     await admin`UPDATE audit_chain_heads SET last_sequence = 0,
       last_event_hash = NULL WHERE chain_id = 'application'`;
@@ -238,6 +239,135 @@ if (!TEST_DATABASE_URL) {
     });
     assert.equal(claimed?.signingMode, "private");
     return claimed;
+  }
+
+  async function claimManualSigning(
+    attempt: ImmutableSharedIssuanceTransactionAttempt,
+  ) {
+    const claimed = await repository.claimSigningMode({
+      attemptId: attempt.attemptId,
+      transactionHash: attempt.transactionHash,
+      signingMode: "manual",
+    });
+    assert.equal(claimed?.signingMode, "manual");
+    return claimed!;
+  }
+
+  async function insertRecoveryAuthorization(
+    intent: ImmutableSharedIssuanceIntent,
+    attempt: ImmutableSharedIssuanceTransactionAttempt,
+  ) {
+    await admin`
+      INSERT INTO project_issuance_recovery_authorizations (
+        issuance_request_id, project_id, owner_public_key,
+        superseded_attempt_id, superseded_transaction_hash,
+        next_attempt_number, network, issuer_public_key,
+        destination_public_key, asset_code, amount,
+        authorization_policy_version, authorized_at
+      ) VALUES (
+        ${intent.issuanceRequestId}, ${intent.projectId},
+        ${intent.ownerPublicKey}, ${attempt.attemptId},
+        ${attempt.transactionHash}, 2, 'testnet',
+        ${intent.issuerPublicKey}, ${intent.destinationPublicKey},
+        ${intent.assetCode}, ${intent.amount},
+        'db-test-bounded-recovery-v1',
+        ${new Date((attempt.validUntil + 1) * 1_000)}
+      )
+    `;
+  }
+
+  function recoveryReaderFor(
+    attempt: ImmutableSharedIssuanceTransactionAttempt,
+    sequence = attempt.sourceSequence,
+  ): StellarTestnetLedgerReader {
+    const afterExpiry = new Date((attempt.validUntil + 1) * 1_000).toISOString();
+    return {
+      authority: "official_testnet_horizon",
+      async lookupTransaction(transactionHash) {
+        return {
+          status: "not_found",
+          network: "testnet",
+          networkPassphrase: Networks.TESTNET,
+          transactionHash,
+          observedLedger: 900,
+          observedAt: afterExpiry,
+          observedLedgerClosedAt: afterExpiry,
+        };
+      },
+      async readAccountSequence(accountPublicKey) {
+        return {
+          network: "testnet",
+          networkPassphrase: Networks.TESTNET,
+          accountPublicKey,
+          sequence,
+          observedLedger: 900,
+          observedAt: afterExpiry,
+          observedLedgerClosedAt: afterExpiry,
+        };
+      },
+    };
+  }
+
+  function buildRecoveryAttempt(
+    intent: ImmutableSharedIssuanceIntent,
+    previous: ImmutableSharedIssuanceTransactionAttempt,
+  ): ImmutableSharedIssuanceTransactionAttempt {
+    const validFrom = previous.validUntil + 10;
+    const plan = buildSharedIssuerIssuancePlan(
+      {
+        projectId: intent.projectId,
+        assetCode: intent.assetCode,
+        issuerPublicKey: intent.issuerPublicKey,
+        destinationPublicKey: intent.destinationPublicKey,
+        amount: intent.amount,
+        network: "testnet",
+        networkPassphrase: Networks.TESTNET,
+        validFrom,
+        validUntil: validFrom + 300,
+      },
+      {
+        assetCodeReservedForProject: true,
+        issuerSequence: previous.sourceSequence,
+        issuerSpendableNativeStroops: "1000",
+        feeStroops: previous.feeStroops,
+        destinationTrustline: {
+          network: "testnet",
+          networkPassphrase: Networks.TESTNET,
+          destinationPublicKey: intent.destinationPublicKey,
+          assetCode: intent.assetCode,
+          issuerPublicKey: intent.issuerPublicKey,
+          observedLedger: 901,
+          exists: true,
+          authorized: true,
+          balance: "0.0000000",
+          limit: "1000.0000000",
+          buyingLiabilities: "0.0000000",
+        },
+      },
+    );
+    return {
+      attemptId: randomUUID(),
+      issuanceRequestId: intent.issuanceRequestId,
+      issuanceIntentFingerprint: intent.issuanceIntentFingerprint,
+      attemptNumber: 2,
+      transactionHash: plan.transactionHash,
+      envelopeXdrSha256: createHash("sha256")
+        .update(plan.unsignedEnvelopeXdr)
+        .digest("hex"),
+      sourceSequence: plan.sourceSequence,
+      feeStroops: plan.feeStroops,
+      validFrom: plan.validFrom,
+      validUntil: plan.validUntil,
+      transactionSourcePublicKey: intent.issuerPublicKey,
+      operationCount: 1,
+      operationType: "payment",
+      operationSourcePublicKey: intent.issuerPublicKey,
+      assetCode: intent.assetCode,
+      issuerPublicKey: intent.issuerPublicKey,
+      destinationPublicKey: intent.destinationPublicKey,
+      amount: intent.amount,
+      createdAt: new Date(validFrom * 1_000).toISOString(),
+    };
   }
 
   test("application and trusted-writer identities are mutually isolated from the migration owner", async () => {
@@ -657,6 +787,151 @@ if (!TEST_DATABASE_URL) {
       /append-only/,
     );
   });
+  test("bounded recovery requires protected evidence, permits exactly attempt 2, and PostgreSQL rejects attempt 3", async () => {
+    const { intent, attempt } = await createFixture();
+    await repository.appendIntent(intent);
+    const previous = await repository.appendAttempt(attempt);
+    await claimManualSigning(previous);
+    await insertRecoveryAuthorization(intent, previous);
+    const recovery = buildRecoveryAttempt(intent, previous);
+
+    await assert.rejects(
+      repository.appendAttempt(recovery),
+      SharedIssuancePersistenceConflictError,
+    );
+
+    await assert.rejects(
+      appSql`
+        INSERT INTO project_issuance_recovery_evidence (
+          issuance_request_id, superseded_attempt_id,
+          issuance_intent_fingerprint, superseded_transaction_hash,
+          network, lookup_status, lookup_observed_ledger,
+          lookup_observed_ledger_closed_at, sequence_observed_ledger,
+          sequence_observed_ledger_closed_at, issuer_public_key,
+          issuer_sequence, verifier_identity, verification_policy_version,
+          verified_at
+        ) VALUES (
+          ${intent.issuanceRequestId}, ${previous.attemptId},
+          ${intent.issuanceIntentFingerprint}, ${previous.transactionHash},
+          'testnet', 'not_found', 900,
+          ${new Date((previous.validUntil + 1) * 1_000)}, 900,
+          ${new Date((previous.validUntil + 1) * 1_000)},
+          ${intent.issuerPublicKey}, ${previous.sourceSequence},
+          'forged-app', 'forged-app',
+          ${new Date((previous.validUntil + 2) * 1_000)}
+        )
+      `,
+    );
+
+    const evidence = await validateBoundedSharedIssuanceRecoveryEvidence({
+      reader: recoveryReaderFor(previous),
+      intent,
+      attempt: previous,
+      nowUnix: previous.validUntil + 2,
+      verifierIdentity: "official-stellar-testnet-horizon",
+      verificationPolicyVersion: "db-test-bounded-recovery-v1",
+    });
+    await writer.appendRecoveryEvidence(evidence);
+
+    const storedRecovery = await repository.appendAttempt(recovery);
+    assert.equal(storedRecovery.attemptNumber, 2);
+    assert.equal(
+      (await repository.listAttempts(intent.issuanceRequestId)).length,
+      2,
+    );
+
+    await assert.rejects(
+      repository.claimSigningMode({
+        attemptId: recovery.attemptId,
+        transactionHash: recovery.transactionHash,
+        signingMode: "private",
+      }),
+    );
+    const manualClaim = await repository.claimSigningMode({
+      attemptId: recovery.attemptId,
+      transactionHash: recovery.transactionHash,
+      signingMode: "manual",
+    });
+    assert.equal(manualClaim?.signingMode, "manual");
+
+    await assert.rejects(
+      appSql`
+        INSERT INTO project_issuance_transaction_attempts (
+          attempt_id, issuance_request_id, issuance_intent_fingerprint,
+          attempt_number, transaction_hash, envelope_xdr_sha256,
+          source_sequence, fee_stroops, valid_from, valid_until,
+          transaction_source_public_key, operation_count, operation_type,
+          operation_source_public_key, asset_code, issuer_public_key,
+          destination_public_key, amount, created_at
+        ) VALUES (
+          ${randomUUID()}, ${intent.issuanceRequestId},
+          ${intent.issuanceIntentFingerprint}, 3, ${"9".repeat(64)},
+          ${"8".repeat(64)}, ${previous.sourceSequence},
+          ${previous.feeStroops}, ${recovery.validUntil + 10},
+          ${recovery.validUntil + 310}, ${intent.issuerPublicKey},
+          1, 'payment', ${intent.issuerPublicKey}, ${intent.assetCode},
+          ${intent.issuerPublicKey}, ${intent.destinationPublicKey},
+          ${intent.amount}, ${new Date((recovery.validUntil + 10) * 1_000)}
+        )
+      `,
+      (error: unknown) =>
+        (error as { constraint_name?: string }).constraint_name ===
+        "project_issuance_attempt_number_bounded_recovery",
+    );
+  });
+
+  test("bounded recovery evidence fails closed for signed attempt 1, confirmation, or changed sequence", async () => {
+    const signedFixture = await createFixture();
+    await repository.appendIntent(signedFixture.intent);
+    const signedAttempt = await repository.appendAttempt(signedFixture.attempt);
+    await claimManualSigning(signedAttempt);
+    await repository.recordSignedEnvelope({
+      attemptId: signedAttempt.attemptId,
+      transactionHash: signedAttempt.transactionHash,
+      signedEnvelopeXdrSha256: signedFixture.signedEnvelopeXdrSha256,
+    });
+    await insertRecoveryAuthorization(signedFixture.intent, signedAttempt);
+
+    await assert.rejects(
+      validateBoundedSharedIssuanceRecoveryEvidence({
+        reader: recoveryReaderFor(signedAttempt),
+        intent: signedFixture.intent,
+        attempt: (await repository.getAttempt(signedAttempt.attemptId))!,
+        nowUnix: signedAttempt.validUntil + 2,
+        verifierIdentity: "official-stellar-testnet-horizon",
+        verificationPolicyVersion: "db-test-bounded-recovery-v1",
+      }),
+      (error: unknown) =>
+        error instanceof Error &&
+        "code" in error &&
+        error.code === "recovery_not_eligible",
+    );
+
+    await admin.unsafe(
+      "TRUNCATE project_issuance_recovery_evidence, project_issuance_ledger_confirmations, project_issuance_transaction_attempts, project_issuance_full_intents, project_issuance_intents, project_profile_owners, project_profiles, workflow_intents, audit_events CASCADE",
+    );
+    const changed = await createFixture();
+    await repository.appendIntent(changed.intent);
+    const previous = await repository.appendAttempt(changed.attempt);
+    await claimManualSigning(previous);
+    await insertRecoveryAuthorization(changed.intent, previous);
+
+    await assert.rejects(
+      validateBoundedSharedIssuanceRecoveryEvidence({
+        reader: recoveryReaderFor(previous, "124"),
+        intent: changed.intent,
+        attempt: previous,
+        nowUnix: previous.validUntil + 2,
+        verifierIdentity: "official-stellar-testnet-horizon",
+        verificationPolicyVersion: "db-test-bounded-recovery-v1",
+      }),
+      (error: unknown) =>
+        error instanceof Error &&
+        "code" in error &&
+        error.code === "recovery_sequence_changed",
+    );
+  });
+
 }
 
 function roleUrl(source: string, username: string, password: string): string {
