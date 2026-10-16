@@ -10,10 +10,8 @@ import {
 } from "../lib/projects/pending-customer-trustline";
 
 const PROJECT = "cabb5cec-0140-4d7f-93a5-d37d7b7a5f13";
-const DESTINATION =
-  "GBJIM6BH2WYV3BLAFR4F6KW6Y7XZV36FBXZFICMWQ5Y7DVL4RGV2CYPB";
-const ISSUER =
-  "GBW4IKGPC5Q4YRKGRMNNXTVRZNQZ3DFWFHXSQUAMWLXES75MWTY3TWOV";
+const DESTINATION = "GBJIM6BH2WYV3BLAFR4F6KW6Y7XZV36FBXZFICMWQ5Y7DVL4RGV2CYPB";
+const ISSUER = "GBW4IKGPC5Q4YRKGRMNNXTVRZNQZ3DFWFHXSQUAMWLXES75MWTY3TWOV";
 const HASH = "a".repeat(64);
 
 const EVIDENCE: PendingCustomerTrustline = {
@@ -48,17 +46,11 @@ function fakeStorage() {
 test("unknown Albedo submission keeps exact hash, unsigned XDR and guard over refresh and reload", () => {
   const storage = fakeStorage();
   assert.equal(storePendingCustomerTrustline(storage, EVIDENCE), true);
-  assert.equal(
-    readPendingCustomerTrustline(storage, PROJECT).kind,
-    "pending",
-  );
+  assert.equal(readPendingCustomerTrustline(storage, PROJECT).kind, "pending");
   // A refreshed not-ready trustline must not touch the pending record.
   const refreshed = { status: "signature_required" };
   assert.equal(refreshed.status, "signature_required");
-  assert.equal(
-    readPendingCustomerTrustline(storage, PROJECT).kind,
-    "pending",
-  );
+  assert.equal(readPendingCustomerTrustline(storage, PROJECT).kind, "pending");
   // Simulate a new page/component loading the same persistent browser store.
   const afterReload = readPendingCustomerTrustline(storage, PROJECT);
   assert.deepEqual(afterReload, { kind: "pending", value: EVIDENCE });
@@ -69,10 +61,7 @@ test("unknown Albedo submission keeps exact hash, unsigned XDR and guard over re
     }),
     false,
   );
-  assert.equal(
-    storePendingCustomerTrustline(storage, EVIDENCE),
-    false,
-  );
+  assert.equal(storePendingCustomerTrustline(storage, EVIDENCE), false);
   assert.equal(
     storage.values.get(pendingCustomerTrustlineKey(PROJECT)),
     JSON.stringify(EVIDENCE),
@@ -109,9 +98,15 @@ test("corrupt or inaccessible browser storage fails closed before Albedo", () =>
       throw new Error("storage blocked");
     },
   };
-  assert.equal(readPendingCustomerTrustline(unavailable, PROJECT).kind, "blocked");
+  assert.equal(
+    readPendingCustomerTrustline(unavailable, PROJECT).kind,
+    "blocked",
+  );
   assert.equal(storePendingCustomerTrustline(unavailable, EVIDENCE), false);
-  assert.equal(clearResolvedCustomerTrustline(unavailable, PROJECT, HASH), false);
+  assert.equal(
+    clearResolvedCustomerTrustline(unavailable, PROJECT, HASH),
+    false,
+  );
 });
 
 test("different reviewed amounts on the same project cannot bypass pending signing state", () => {

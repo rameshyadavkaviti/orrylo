@@ -493,7 +493,10 @@ export async function reconcileCustomerTrustline(
       await readJson(fetchImpl, "/transactions/" + input.transactionHash),
     );
   } catch (error) {
-    if (!(error instanceof CustomerTrustlineError) || error.code !== "not_found") {
+    if (
+      !(error instanceof CustomerTrustlineError) ||
+      error.code !== "not_found"
+    ) {
       throw error;
     }
 

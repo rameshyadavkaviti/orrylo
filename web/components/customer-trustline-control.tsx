@@ -45,7 +45,6 @@ export function CustomerTrustlineControl({
   const busy = useRef(false);
   const finishing = useRef(false);
 
-
   function matchesReview(value: CustomerTrustlineState): boolean {
     return (
       value.network === "testnet" &&
@@ -76,7 +75,10 @@ export function CustomerTrustlineControl({
     try {
       // Reconcile the persisted exact hash before any ordinary readiness
       // refresh. A not-ready trustline is NEVER proof of failed submission.
-      const previous = readPendingCustomerTrustline(window.localStorage, projectId);
+      const previous = readPendingCustomerTrustline(
+        window.localStorage,
+        projectId,
+      );
       if (previous.kind === "blocked") {
         setPlan(null);
         setPending(true);
@@ -93,7 +95,9 @@ export function CustomerTrustlineControl({
           unresolved.assetCode !== assetCode ||
           unresolved.network !== "testnet"
         ) {
-          setError("An earlier ChangeTrust for this project must be reconciled before another signing action.");
+          setError(
+            "An earlier ChangeTrust for this project must be reconciled before another signing action.",
+          );
           return;
         }
         const response = await fetch(
@@ -110,7 +114,11 @@ export function CustomerTrustlineControl({
           },
         );
         const result = await readReconciliation(response);
-        if (!response.ok || !result?.ok || result.reconciliation.status === "pending") {
+        if (
+          !response.ok ||
+          !result?.ok ||
+          result.reconciliation.status === "pending"
+        ) {
           setError(
             "The exact ChangeTrust transaction is unresolved. No new signature is permitted; check the same transaction again.",
           );
@@ -139,7 +147,9 @@ export function CustomerTrustlineControl({
             unresolved.transactionHash,
           )
         ) {
-          setError("Previous ChangeTrust evidence could not be safely released.");
+          setError(
+            "Previous ChangeTrust evidence could not be safely released.",
+          );
           return;
         }
         setPlan(fresh);
@@ -152,7 +162,10 @@ export function CustomerTrustlineControl({
       setPending(false);
     } catch {
       setPlan(null);
-      const prior = readPendingCustomerTrustline(window.localStorage, projectId);
+      const prior = readPendingCustomerTrustline(
+        window.localStorage,
+        projectId,
+      );
       setPending(prior.kind !== "none");
       setError(
         prior.kind === "none"
@@ -186,11 +199,14 @@ export function CustomerTrustlineControl({
       !plan.transactionHash ||
       plan.status !== "signature_required" ||
       !plan.validUntil ||
-      readPendingCustomerTrustline(window.localStorage, projectId).kind !== "none"
+      readPendingCustomerTrustline(window.localStorage, projectId).kind !==
+        "none"
     )
       return;
     if (Math.floor(Date.now() / 1000) >= plan.validUntil) {
-      setError("The wallet signing window expired. Refresh trustline readiness.");
+      setError(
+        "The wallet signing window expired. Refresh trustline readiness.",
+      );
       return;
     }
 
@@ -214,7 +230,9 @@ export function CustomerTrustlineControl({
     if (!storePendingCustomerTrustline(window.localStorage, evidence)) {
       setPending(true);
       setPlan(null);
-      setError("Cannot persist the exact ChangeTrust hash. Wallet signing is blocked.");
+      setError(
+        "Cannot persist the exact ChangeTrust hash. Wallet signing is blocked.",
+      );
       busy.current = false;
       setWorking(false);
       return;
@@ -257,8 +275,10 @@ export function CustomerTrustlineControl({
       finishing.current ||
       pending ||
       plan?.status !== "ready" ||
-      readPendingCustomerTrustline(window.localStorage, projectId).kind !== "none"
-    ) return;
+      readPendingCustomerTrustline(window.localStorage, projectId).kind !==
+        "none"
+    )
+      return;
     finishing.current = true;
     setWorking(true);
     try {
@@ -335,7 +355,8 @@ export function CustomerTrustlineControl({
         <p role="status">
           An exact ChangeTrust transaction may already have reached Testnet.
           Another wallet signature stays disabled until this transaction is
-          authoritatively resolved or the trustline is independently verified ready.
+          authoritatively resolved or the trustline is independently verified
+          ready.
         </p>
       ) : null}
       {plan?.status === "signature_required" && !pending ? (

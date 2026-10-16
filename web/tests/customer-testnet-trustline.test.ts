@@ -326,7 +326,11 @@ const EXPIRED_TIME = () => Date.parse("2026-10-16T08:40:00Z");
 
 test("uncertain ChangeTrust is pending even if the trustline still does not exist", async () => {
   const fx = fixture({ ledgerClosedAt: "2026-10-16T08:43:00Z" });
-  const unsigned = await inspectCustomerTrustline(args(), fx.fetchImpl, EXPIRED_TIME);
+  const unsigned = await inspectCustomerTrustline(
+    args(),
+    fx.fetchImpl,
+    EXPIRED_TIME,
+  );
   const result = await reconcileCustomerTrustline(
     {
       ...args(),
@@ -336,13 +340,20 @@ test("uncertain ChangeTrust is pending even if the trustline still does not exis
     fx.fetchImpl,
   );
   assert.equal(result.status, "pending");
-  assert.ok(fx.calls.some((url) =>
-    url.endsWith("/transactions/" + unsigned.transactionHash)));
+  assert.ok(
+    fx.calls.some((url) =>
+      url.endsWith("/transactions/" + unsigned.transactionHash),
+    ),
+  );
 });
 
 test("exact-hash 404 resolves terminal only after expiry and unchanged customer sequence", async () => {
   const fx = fixture();
-  const unsigned = await inspectCustomerTrustline(args(), fx.fetchImpl, EXPIRED_TIME);
+  const unsigned = await inspectCustomerTrustline(
+    args(),
+    fx.fetchImpl,
+    EXPIRED_TIME,
+  );
   const result = await reconcileCustomerTrustline(
     {
       ...args(),
@@ -367,7 +378,11 @@ test("exact-hash 404 resolves terminal only after expiry and unchanged customer 
 
 test("eventually verified trustline readiness permits progress with unresolved callback", async () => {
   const fx = fixture();
-  const unsigned = await inspectCustomerTrustline(args(), fx.fetchImpl, EXPIRED_TIME);
+  const unsigned = await inspectCustomerTrustline(
+    args(),
+    fx.fetchImpl,
+    EXPIRED_TIME,
+  );
   fx.setTrustline("1000.0000000");
   const result = await reconcileCustomerTrustline(
     {
@@ -386,8 +401,15 @@ test("eventually verified trustline readiness permits progress with unresolved c
 
 test("authoritatively failed exact-hash transaction permits only fresh planning", async () => {
   const fx = fixture();
-  const unsigned = await inspectCustomerTrustline(args(), fx.fetchImpl, EXPIRED_TIME);
-  const tx = TransactionBuilder.fromXDR(unsigned.unsignedXdr!, Networks.TESTNET);
+  const unsigned = await inspectCustomerTrustline(
+    args(),
+    fx.fetchImpl,
+    EXPIRED_TIME,
+  );
+  const tx = TransactionBuilder.fromXDR(
+    unsigned.unsignedXdr!,
+    Networks.TESTNET,
+  );
   assert.ok(tx instanceof Transaction);
   tx.sign(WALLET);
   const failure = fixture({
@@ -411,7 +433,11 @@ test("authoritatively failed exact-hash transaction permits only fresh planning"
 
 test("changed hash or XDR cannot fabricate terminal proof", async () => {
   const fx = fixture();
-  const unsigned = await inspectCustomerTrustline(args(), fx.fetchImpl, EXPIRED_TIME);
+  const unsigned = await inspectCustomerTrustline(
+    args(),
+    fx.fetchImpl,
+    EXPIRED_TIME,
+  );
   await assert.rejects(
     reconcileCustomerTrustline(
       {
