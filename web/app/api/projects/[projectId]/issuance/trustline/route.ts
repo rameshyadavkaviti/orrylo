@@ -15,6 +15,7 @@ import {
   confirmCustomerTrustline,
   CustomerTrustlineError,
   inspectCustomerTrustline,
+  reconcileCustomerTrustline,
   readCustomerTrustlineConfiguration,
   type CustomerTrustlinePlan,
 } from "../../../../../../lib/server/projects/customer-testnet-trustline";
@@ -42,6 +43,12 @@ export interface CustomerTrustlineRouteDependencies {
     amount: string,
     hash: string,
   ): Promise<CustomerTrustlinePlan>;
+  reconcile?(input: {
+    project: ManagedProjectProfile;
+    amount: string;
+    transactionHash: string;
+    unsignedXdr: string;
+  }): ReturnType<typeof reconcileCustomerTrustline>;
 }
 
 function dependencies(): CustomerTrustlineRouteDependencies {
@@ -65,6 +72,15 @@ function dependencies(): CustomerTrustlineRouteDependencies {
         assetCode: project.assetCode,
         initialSupply: amount,
         transactionHash: hash,
+      }),
+    reconcile: ({ project, amount, transactionHash, unsignedXdr }) =>
+      reconcileCustomerTrustline({
+        configuration: readCustomerTrustlineConfiguration(),
+        destinationPublicKey: project.ownerPublicKey,
+        assetCode: project.assetCode,
+        initialSupply: amount,
+        transactionHash,
+        unsignedXdr,
       }),
   };
 }
@@ -142,14 +158,36 @@ export async function handleConfirmTrustline(
     if (!body || typeof body !== "object" || Array.isArray(body))
       return failure("invalid_request", 400);
     const fields = body as Record<string, unknown>;
+    const keys = Object.keys(fields).sort().join(",");
     if (
-      Object.keys(fields).sort().join(",") !== "amount,transactionHash" ||
+      (keys !== "amount,transactionHash" &&
+        keys !== "amount,transactionHash,unsignedXdr") ||
       typeof fields.amount !== "string" ||
       !validateInitialSupply(fields.amount).valid ||
       typeof fields.transactionHash !== "string" ||
       !/^[0-9a-f]{64}$/.test(fields.transactionHash)
     ) {
       return failure("invalid_request", 400);
+    }
+    if (keys === "amount,transactionHash,unsignedXdr") {
+      if (
+        typeof fields.unsignedXdr !== "string" ||
+        fields.unsignedXdr.length === 0 ||
+        fields.unsignedXdr.length > 4096 ||
+        !deps.reconcile
+      ) {
+        return failure("invalid_request", 400);
+      }
+      const reconciliation = await deps.reconcile({
+        project: authorized.project,
+        amount: fields.amount,
+        transactionHash: fields.transactionHash,
+        unsignedXdr: fields.unsignedXdr,
+      });
+      return NextResponse.json(
+        { ok: true, reconciliation },
+        { headers: { "Cache-Control": "no-store" } },
+      );
     }
     const plan = await deps.confirm(
       authorized.project,
