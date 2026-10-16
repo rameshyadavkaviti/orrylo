@@ -6,6 +6,7 @@ import {
   pendingCustomerTrustlineKey,
   readPendingCustomerTrustline,
   storePendingCustomerTrustline,
+  withCustomerTrustlineHandoff,
   type PendingCustomerTrustline,
 } from "../lib/projects/pending-customer-trustline";
 
@@ -26,6 +27,51 @@ const EVIDENCE: PendingCustomerTrustline = {
   unsignedXdr: "AAAAAgAAA...",
   validUntil: 1792140000,
 };
+
+test("concurrent tabs serialize the persisted guard and wallet handoff", async () => {
+  const storage = fakeStorage();
+  let locked = false;
+  const locks = {
+    async request(
+      _name: string,
+      _options: unknown,
+      action: (lock: object | null) => Promise<boolean>,
+    ) {
+      if (locked) return action(null);
+      locked = true;
+      try {
+        return await action({});
+      } finally {
+        locked = false;
+      }
+    },
+  };
+  let walletCalls = 0;
+  const handoff = async () => {
+    walletCalls++;
+    await Promise.resolve();
+  };
+  const results = await Promise.all([
+    withCustomerTrustlineHandoff(storage, EVIDENCE, locks, handoff),
+    withCustomerTrustlineHandoff(
+      storage,
+      { ...EVIDENCE, transactionHash: "b".repeat(64) },
+      locks,
+      handoff,
+    ),
+  ]);
+  assert.deepEqual(results, [true, false]);
+  assert.equal(walletCalls, 1);
+  assert.deepEqual(readPendingCustomerTrustline(storage, PROJECT), {
+    kind: "pending",
+    value: EVIDENCE,
+  });
+  assert.equal(
+    await withCustomerTrustlineHandoff(storage, EVIDENCE, undefined, handoff),
+    false,
+  );
+  assert.equal(walletCalls, 1);
+});
 
 function fakeStorage() {
   const values = new Map<string, string>();

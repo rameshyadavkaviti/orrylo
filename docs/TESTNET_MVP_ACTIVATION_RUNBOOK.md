@@ -1,5 +1,13 @@
 # ORRYLO Testnet MVP Live Activation Runbook
 
+For the owner-approved separate operational signer, use the 2026-10-16 signer
+policy in `SOURCE_OF_TRUTH.md`: unchanged issuer, master weight and thresholds,
+and exactly the master plus approved operational key (weight 1 each). Set
+`ORRYLO_TESTNET_SHARED_ISSUER_SIGNER_PUBLIC_KEY` on web, private signer and the
+activation verifier. This supersedes master-only signer-set checks below.
+Official Horizon must prove this exact policy before automated issuance.
+A new issuance needs its own authorization; do not reuse historical attempts.
+
 Status: **Readiness package only — no live activation authorized**
 
 Reviewed baseline: `main` at

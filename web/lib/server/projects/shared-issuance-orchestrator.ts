@@ -204,6 +204,8 @@ export class SharedIssuanceOrchestrator {
         preflight = await this.dependencies.preflight.readIssuancePreconditions(
           {
             issuerPublicKey: intent.issuerPublicKey,
+            signerPublicKey:
+              this.dependencies.authorization.signers[0]?.publicKey,
             destinationPublicKey: intent.destinationPublicKey,
             assetCode: intent.assetCode,
             assetCodeReservedForProject: true,
@@ -298,7 +300,11 @@ export class SharedIssuanceOrchestrator {
         reader: this.dependencies.store,
         attemptId: claimedAttempt.attemptId,
         plan,
-        policy: { issuerPublicKey: intent.issuerPublicKey },
+        policy: {
+          issuerPublicKey: intent.issuerPublicKey,
+          signerPublicKey:
+            this.dependencies.authorization.signers[0]?.publicKey,
+        },
         primitive: this.dependencies.primitive,
       });
       await persistAndSubmitSharedIssuerEnvelope({
@@ -394,6 +400,8 @@ export class SharedIssuanceOrchestrator {
         preflight = await this.dependencies.preflight.readIssuancePreconditions(
           {
             issuerPublicKey: intent.issuerPublicKey,
+            signerPublicKey:
+              this.dependencies.authorization.signers[0]?.publicKey,
             destinationPublicKey: intent.destinationPublicKey,
             assetCode: intent.assetCode,
             assetCodeReservedForProject: true,
@@ -629,6 +637,7 @@ export class SharedIssuanceOrchestrator {
     const preflight =
       await this.dependencies.preflight.readIssuancePreconditions({
         issuerPublicKey: intent.issuerPublicKey,
+        signerPublicKey: this.dependencies.authorization.signers[0]?.publicKey,
         destinationPublicKey: intent.destinationPublicKey,
         assetCode: intent.assetCode,
         assetCodeReservedForProject: true,

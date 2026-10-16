@@ -15,6 +15,7 @@ import {
 } from "../../../../../../lib/server/persistence/database";
 import { TrustedConfirmationWriterDatabaseBoundary } from "../../../../../../lib/server/persistence/issuance-database-boundaries";
 import {
+  bindPersistedCustomerTrustline,
   PostgresCustomerTrustlineGuard,
   PostgresCustomerTrustlineResolutionWriter,
 } from "../../../../../../lib/server/projects/customer-trustline-guard";
@@ -100,29 +101,24 @@ function dependencies(): CustomerTrustlineRouteDependencies {
         initialSupply: amount,
         transactionHash: hash,
       }),
-    async reconcile({ project, amount, transactionHash, unsignedXdr }) {
+    async reconcile({ project, transactionHash, unsignedXdr }) {
       const prior = await guard.latest(
         project.projectId,
         project.ownerPublicKey,
       );
-      if (
-        !prior ||
-        prior.transactionHash !== transactionHash ||
-        prior.amount !== amount ||
-        prior.assetCode !== project.assetCode ||
-        prior.destinationPublicKey !== project.ownerPublicKey ||
-        (unsignedXdr !== undefined && prior.unsignedXdr !== unsignedXdr)
-      ) {
+      const bound = bindPersistedCustomerTrustline(prior, {
+        projectId: project.projectId,
+        ownerPublicKey: project.ownerPublicKey,
+        assetCode: project.assetCode,
+        transactionHash,
+        unsignedXdr,
+      });
+      if (!prior)
         throw new CustomerTrustlineError("trustline_transaction_mismatch");
-      }
       if (prior.resolution !== null) return { status: "terminal" };
       const evidence = await reconcileCustomerTrustline({
         configuration: readCustomerTrustlineConfiguration(),
-        destinationPublicKey: project.ownerPublicKey,
-        assetCode: project.assetCode,
-        initialSupply: amount,
-        transactionHash,
-        unsignedXdr: prior.unsignedXdr,
+        ...bound,
       });
       if (evidence.status !== "terminal") return evidence;
       const url = process.env.ORRYLO_CONFIRMATION_WRITER_DATABASE_URL?.trim();

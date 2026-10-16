@@ -8,6 +8,7 @@ import {
 
 import type { DatabaseClient } from "../persistence/database";
 import type { CustomerTrustlinePlan } from "./customer-testnet-trustline";
+import { CustomerTrustlineError } from "./customer-testnet-trustline";
 import { validateInitialSupply } from "../../validation/initial-supply";
 
 type Resolution = "failed" | "expired_not_found";
@@ -48,6 +49,37 @@ export interface CustomerTrustlineHandoff {
   sourceSequence: string;
   validUntil: number;
   resolution: Resolution | null;
+}
+
+/** Browser amount is not authority for an already persisted handoff. */
+export function bindPersistedCustomerTrustline(
+  prior: CustomerTrustlineHandoff | null,
+  input: {
+    projectId: string;
+    ownerPublicKey: string;
+    assetCode: string;
+    transactionHash: string;
+    unsignedXdr?: string;
+  },
+) {
+  if (
+    !prior ||
+    prior.projectId !== input.projectId ||
+    prior.ownerPublicKey !== input.ownerPublicKey ||
+    prior.destinationPublicKey !== input.ownerPublicKey ||
+    prior.assetCode !== input.assetCode ||
+    prior.transactionHash !== input.transactionHash ||
+    (input.unsignedXdr !== undefined && input.unsignedXdr !== prior.unsignedXdr)
+  ) {
+    throw new CustomerTrustlineError("trustline_transaction_mismatch");
+  }
+  return {
+    destinationPublicKey: prior.destinationPublicKey,
+    assetCode: prior.assetCode,
+    initialSupply: prior.amount,
+    transactionHash: prior.transactionHash,
+    unsignedXdr: prior.unsignedXdr,
+  };
 }
 
 function mapHandoff(row: HandoffRow): CustomerTrustlineHandoff {

@@ -26,6 +26,33 @@ type ReconciliationStorage = Pick<
   "getItem" | "setItem" | "removeItem"
 >;
 
+interface HandoffLocks {
+  request(
+    name: string,
+    options: { mode: "exclusive"; ifAvailable: true },
+    action: (lock: object | null) => Promise<boolean>,
+  ): Promise<boolean>;
+}
+
+/** Serialize guard persistence through wallet completion across same-origin tabs. */
+export async function withCustomerTrustlineHandoff(
+  storage: ReconciliationStorage,
+  value: PendingCustomerTrustline,
+  locks: HandoffLocks | undefined,
+  handoff: () => Promise<void>,
+): Promise<boolean> {
+  if (!locks) return false;
+  return locks.request(
+    pendingCustomerTrustlineKey(value.projectId),
+    { mode: "exclusive", ifAvailable: true },
+    async (lock) => {
+      if (!lock || !storePendingCustomerTrustline(storage, value)) return false;
+      await handoff();
+      return true;
+    },
+  );
+}
+
 export function pendingCustomerTrustlineKey(projectId: string): string {
   return `orrylo:pending-testnet-change-trust:v1:${projectId}`;
 }

@@ -92,6 +92,8 @@ async function main() {
     const report = await verifyTestnetActivationReadiness(
       {
         issuerPublicKey,
+        signerPublicKey:
+          process.env.ORRYLO_TESTNET_SHARED_ISSUER_SIGNER_PUBLIC_KEY,
         destinationPublicKey: args.destinationPublicKey,
         assetCode: args.assetCode,
         amount: args.amount,

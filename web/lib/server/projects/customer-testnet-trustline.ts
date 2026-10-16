@@ -31,6 +31,7 @@ export class CustomerTrustlineError extends Error {
 
 export interface CustomerTrustlineConfiguration {
   issuerPublicKey: string;
+  signerPublicKey?: string;
   issuerFeeStroops: string;
   maxCustomerFeeStroops: string;
 }
@@ -52,6 +53,7 @@ export function readCustomerTrustlineConfiguration(
   }
   return {
     issuerPublicKey: APPROVED_ISSUER,
+    signerPublicKey: env.ORRYLO_TESTNET_SHARED_ISSUER_SIGNER_PUBLIC_KEY,
     issuerFeeStroops: env.ORRYLO_TESTNET_SHARED_ISSUER_FEE_STROOPS,
     maxCustomerFeeStroops:
       env.ORRYLO_TESTNET_CUSTOMER_TRUSTLINE_MAX_FEE_STROOPS,
@@ -232,6 +234,7 @@ export async function inspectCustomerTrustline(
     fetchImpl,
   ).readIssuancePreconditions({
     issuerPublicKey: APPROVED_ISSUER,
+    signerPublicKey: configuration.signerPublicKey,
     destinationPublicKey: destination,
     assetCode: input.assetCode,
     assetCodeReservedForProject: true,

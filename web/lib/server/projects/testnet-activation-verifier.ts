@@ -38,6 +38,7 @@ export class TestnetActivationVerificationError extends Error {
 
 export interface TestnetActivationVerificationInput {
   issuerPublicKey: string;
+  signerPublicKey?: string;
   destinationPublicKey: string;
   assetCode: string;
   amount: string;
@@ -118,6 +119,7 @@ export async function verifyTestnetActivationReadiness(
 
   const preflight = await dependencies.readPreflight({
     issuerPublicKey: input.issuerPublicKey,
+    signerPublicKey: input.signerPublicKey,
     destinationPublicKey: input.destinationPublicKey,
     assetCode: input.assetCode,
     assetCodeReservedForProject: true,

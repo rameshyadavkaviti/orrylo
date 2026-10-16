@@ -24,6 +24,23 @@ The signer is a primitive only. It does not decide token parameters, build a
 replacement transaction, access issuance intent/database state, or submit to
 Horizon.
 
+Set `ORRYLO_TESTNET_SHARED_ISSUER_SIGNER_PUBLIC_KEY` on both web and signer to
+the owner-approved operational public key. The seed must derive that key while
+transaction source and asset issuer remain the configured Shared Issuer.
+Preflight requires exactly the issuer master plus operational key, each weight
+1, thresholds 1/1/1 and all flags OFF. The adapter and durable signing boundary
+verify exactly one signature from the pinned key. Omitting this setting retains
+the historical master-only policy; an unexpected on-chain signer set fails
+before attempt creation. `/healthz` reports both non-secret public identities.
+
+Existing owner-provisioned Railway secrets can be referenced without reading
+values: set `ORRYLO_TESTNET_SHARED_ISSUER_SIGNER_SEED` to
+`${{ORRYLO_SIGNER_SECRET_SEED}}` and `ORRYLO_TESTNET_SIGNER_REQUEST_AUTH_SECRET`
+to `${{ORRYLO_SIGNER_REQUEST_SECRET}}` on the signer. Keep the source secrets
+there. Web may reference the signer's request-auth variable, never either seed.
+Build with development dependencies so TypeScript is available:
+`npm ci --include=dev --no-audit --no-fund && npm run signer:build`.
+
 ## Railway layout
 
 Use two services in the same Railway project and environment.

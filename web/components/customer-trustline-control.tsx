@@ -7,7 +7,7 @@ import {
   clearResolvedCustomerTrustline,
   pendingCustomerTrustlineKey,
   readPendingCustomerTrustline,
-  storePendingCustomerTrustline,
+  withCustomerTrustlineHandoff,
   type PendingCustomerTrustline,
 } from "../lib/projects/pending-customer-trustline";
 
@@ -192,7 +192,9 @@ export function CustomerTrustlineControl({
           return;
         }
         const checked =
-          result.reconciliation.status === "ready"
+          result.reconciliation.status === "ready" &&
+          result.reconciliation.trustline &&
+          matchesReview(result.reconciliation.trustline)
             ? result.reconciliation.trustline
             : await inspectFresh();
         if (
@@ -277,35 +279,39 @@ export function CustomerTrustlineControl({
     setError(null);
     // Persist BEFORE invoking Albedo: wallet rejection, unknown HTTP response,
     // reload and process interruption must all retain the same hash.
-    if (!storePendingCustomerTrustline(window.localStorage, evidence)) {
-      setPending(true);
-      setPlan(null);
-      setError(
-        "Cannot persist the exact ChangeTrust hash. Wallet signing is blocked.",
-      );
-      busy.current = false;
-      setWorking(false);
-      return;
-    }
     setPending(true);
     setPlan(null);
     try {
-      const { default: albedo } = await import("@albedo-link/intent");
-      const signed = await albedo.tx({
-        xdr: evidence.unsignedXdr,
-        pubkey: evidence.destinationPublicKey,
-        network: "testnet",
-        submit: true,
-        description: "Authorize the exact Orrylo Testnet trustline",
-      });
-      if (
-        signed.tx_hash?.toLowerCase() !== evidence.transactionHash ||
-        signed.network !== "testnet"
-      ) {
-        throw new Error("Albedo did not prove this exact Testnet submission.");
+      const handedOff = await withCustomerTrustlineHandoff(
+        window.localStorage,
+        evidence,
+        navigator.locks,
+        async () => {
+          const { default: albedo } = await import("@albedo-link/intent");
+          const signed = await albedo.tx({
+            xdr: evidence.unsignedXdr,
+            pubkey: evidence.destinationPublicKey,
+            network: "testnet",
+            submit: true,
+            description: "Authorize the exact Orrylo Testnet trustline",
+          });
+          if (
+            signed.tx_hash?.toLowerCase() !== evidence.transactionHash ||
+            signed.network !== "testnet"
+          ) {
+            throw new Error(
+              "Albedo did not prove this exact Testnet submission.",
+            );
+          }
+          // The callback is not ledger confirmation; the reconciliation request
+          // below is the only mechanism allowed to release this pending hash.
+        },
+      );
+      if (!handedOff) {
+        setError(
+          "Another tab owns this handoff, or secure browser locking is unavailable. No wallet action was started.",
+        );
       }
-      // The callback is not ledger confirmation; the reconciliation request
-      // below is the only mechanism allowed to release this pending hash.
     } catch (cause) {
       setError(
         classifyWalletIntentError(cause) === "rejected"

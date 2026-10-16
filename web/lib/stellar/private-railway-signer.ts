@@ -20,6 +20,7 @@ export class PrivateRailwaySignerPrimitiveError extends Error {
 export class PrivateRailwaySharedIssuerSigningPrimitive implements SharedIssuerSigningPrimitive {
   private readonly endpoint: URL;
   private readonly issuerPublicKey: string;
+  private readonly signerPublicKey: string;
   private readonly requestAuthSecret: string;
 
   constructor(
@@ -27,11 +28,15 @@ export class PrivateRailwaySharedIssuerSigningPrimitive implements SharedIssuerS
       privateBaseUrl: string;
       requestAuthSecret: string;
       issuerPublicKey: string;
+      signerPublicKey?: string;
     },
     private readonly fetchImpl: typeof fetch = globalThis.fetch,
   ) {
     this.endpoint = normalizePrivateRailwayEndpoint(input.privateBaseUrl);
     this.issuerPublicKey = normalizeAllowedIssuer(input.issuerPublicKey);
+    this.signerPublicKey = normalizeAllowedIssuer(
+      input.signerPublicKey ?? input.issuerPublicKey,
+    );
 
     if (
       Buffer.byteLength(input.requestAuthSecret, "utf8") < MIN_AUTH_SECRET_BYTES
@@ -88,6 +93,7 @@ export class PrivateRailwaySharedIssuerSigningPrimitive implements SharedIssuerS
         value,
         input.transactionHash,
         this.issuerPublicKey,
+        this.signerPublicKey,
       ),
     };
   }
@@ -97,6 +103,7 @@ function assertSignerResponse(
   value: unknown,
   transactionHash: string,
   issuerPublicKey: string,
+  signerPublicKey: string,
 ): string {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new PrivateRailwaySignerPrimitiveError("signer_response_mismatch");
@@ -108,7 +115,7 @@ function assertSignerResponse(
       "network,ok,signedEnvelopeXdr,signerPublicKey" ||
     fields.ok !== true ||
     fields.network !== "testnet" ||
-    fields.signerPublicKey !== issuerPublicKey ||
+    fields.signerPublicKey !== signerPublicKey ||
     typeof fields.signedEnvelopeXdr !== "string"
   ) {
     throw new PrivateRailwaySignerPrimitiveError("signer_response_mismatch");
@@ -126,7 +133,7 @@ function assertSignerResponse(
     throw new PrivateRailwaySignerPrimitiveError("signer_response_mismatch");
   }
 
-  const issuer = Keypair.fromPublicKey(issuerPublicKey);
+  const issuer = Keypair.fromPublicKey(signerPublicKey);
   const signature = transaction.signatures[0];
 
   if (

@@ -43,6 +43,38 @@ const DESTINATION = Keypair.fromRawEd25519Seed(
 ).publicKey();
 const ISSUER = ISSUER_KEYPAIR.publicKey();
 
+test("durable signing accepts only the explicitly authorized separate signer", async () => {
+  const plan = createPlan();
+  const records = durableRecords(plan);
+  const policy = {
+    issuerPublicKey: ISSUER,
+    signerPublicKey: WRONG_SIGNER.publicKey(),
+  };
+  const authorization = createSharedIssuerMvpLiteSignerAuthorization(
+    ISSUER,
+    WRONG_SIGNER.publicKey(),
+  );
+  assert.deepEqual(authorization.signers, [
+    { publicKey: WRONG_SIGNER.publicKey(), weight: 1 },
+  ]);
+  assert.equal(authorization.issuerPublicKey, ISSUER);
+  for (const key of [WRONG_SIGNER, ISSUER_KEYPAIR]) {
+    const result = signDurableSharedIssuerTestnetEnvelope({
+      reader: readerFor(records),
+      attemptId: records.attempt.attemptId,
+      plan,
+      policy,
+      primitive: signingPrimitive(key, []),
+    });
+    if (key === WRONG_SIGNER) assert.ok((await result).signedEnvelopeXdr);
+    else
+      await assert.rejects(
+        result,
+        (e: unknown) => errorCode(e) === "signing_primitive_mismatch",
+      );
+  }
+});
+
 const PRECONDITIONS: SharedIssuerIssuancePreconditions = {
   assetCodeReservedForProject: true,
   issuerSequence: "123456",

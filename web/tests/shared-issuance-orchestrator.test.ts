@@ -169,6 +169,7 @@ function fixture(
     submissionUncertain?: boolean;
     confirmationMismatch?: boolean;
     primitive?: SharedIssuerSigningPrimitive;
+    signerPublicKey?: string;
     appendFailures?: number;
   } = {},
 ) {
@@ -192,7 +193,11 @@ function fixture(
   const orchestrator = new SharedIssuanceOrchestrator({
     store,
     preflight: {
-      async readIssuancePreconditions() {
+      async readIssuancePreconditions(request) {
+        assert.equal(
+          request.signerPublicKey,
+          options.signerPublicKey ?? ISSUER,
+        );
         calls.push("preflight");
         return {
           network: "testnet" as const,
@@ -248,7 +253,7 @@ function fixture(
       networkPassphrase: Networks.TESTNET,
       issuerPublicKey: ISSUER,
       requiredWeight: 1,
-      signers: [{ publicKey: ISSUER, weight: 1 }],
+      signers: [{ publicKey: options.signerPublicKey ?? ISSUER, weight: 1 }],
     },
     confirmationValidator: {
       async validate(input) {
@@ -434,20 +439,25 @@ test("successful mocked path preserves the required order and returns durable co
   );
 });
 
-test("private Railway primitive reaches the existing one-shot issuance path", async () => {
+test("separate private Railway signer reaches one-shot issuance without changing issuer and replay never signs again", async () => {
   const requestAuthSecret = "d".repeat(48);
+  let signingCalls = 0;
+  const signerPublicKey = OTHER_ISSUER_KEYPAIR.publicKey();
   const signerRuntime = createPrivateTestnetSignerRuntime({
     issuerPublicKey: ISSUER,
+    signerPublicKey,
     requestAuthSecret,
-    signer: ISSUER_KEYPAIR,
+    signer: OTHER_ISSUER_KEYPAIR,
   });
   const primitive = new PrivateRailwaySharedIssuerSigningPrimitive(
     {
       privateBaseUrl: "http://orrylo-testnet-signer.railway.internal:8080",
       requestAuthSecret,
       issuerPublicKey: ISSUER,
+      signerPublicKey,
     },
     (async (input, init) => {
+      signingCalls++;
       const request = new Request(input, init);
       const result = await handlePrivateTestnetSignerRequest(
         {
@@ -462,7 +472,7 @@ test("private Railway primitive reaches the existing one-shot issuance path", as
     }) as typeof fetch,
   );
 
-  const fx = fixture({ primitive });
+  const fx = fixture({ primitive, signerPublicKey });
   const result = await fx.orchestrator.startOrResume(input);
 
   assert.equal(result.status, "confirmed");
@@ -470,6 +480,13 @@ test("private Railway primitive reaches the existing one-shot issuance path", as
   assert.equal(fx.store.attempts.length, 1);
   assert.equal(fx.store.attempts[0]!.attemptNumber, 1);
   assert.equal(fx.store.attempts[0]!.signingMode, "private");
+  assert.equal(fx.store.attempts[0]!.issuerPublicKey, ISSUER);
+  assert.equal(
+    (await fx.orchestrator.startOrResume(input)).status,
+    "confirmed",
+  );
+  assert.equal(signingCalls, 1);
+  assert.equal(fx.submissions(), 1);
 });
 
 test("private Railway signer failure causes zero submissions", async () => {

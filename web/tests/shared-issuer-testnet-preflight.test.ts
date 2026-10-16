@@ -20,6 +20,45 @@ const DESTINATION = Keypair.fromRawEd25519Seed(
 ).publicKey();
 const LEDGER_CLOSED_AT = "2026-10-13T08:00:00.000Z";
 
+test("separate authorized signer requires the exact master plus pinned signer, both weight one", async () => {
+  const signerPublicKey = Keypair.fromRawEd25519Seed(
+    Buffer.alloc(32, 103),
+  ).publicKey();
+  const master = { key: ISSUER, weight: 1, type: "ed25519_public_key" };
+  const signer = {
+    key: signerPublicKey,
+    weight: 1,
+    type: "ed25519_public_key",
+  };
+  for (const signers of [
+    [signer, master],
+    [master],
+    [master, { ...signer, weight: 0 }],
+    [master, signer, signer],
+    [signer],
+  ]) {
+    const { fetchImpl } = createStableFetch({
+      issuer: issuerAccount({ signers }),
+    });
+    const read = new OfficialStellarTestnetIssuancePreflightReader(
+      fetchImpl,
+    ).readIssuancePreconditions({
+      issuerPublicKey: ISSUER,
+      signerPublicKey,
+      destinationPublicKey: DESTINATION,
+      assetCode: "NOVA",
+      assetCodeReservedForProject: true,
+      feeStroops: "100",
+    });
+    if (signers.length === 2 && signers[0] === signer) await read;
+    else
+      await assert.rejects(
+        read,
+        (e: unknown) => preflightErrorCode(e) === "issuer_policy_mismatch",
+      );
+  }
+});
+
 interface FetchCall {
   url: string;
   init?: RequestInit;
