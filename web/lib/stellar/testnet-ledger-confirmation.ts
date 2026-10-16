@@ -174,6 +174,14 @@ export interface ValidatedSharedIssuanceRecoveryEvidenceRecord {
   sequenceObservedLedgerClosedAt: string;
   issuerPublicKey: string;
   issuerSequence: string;
+  recoveryAttemptId: string;
+  recoveryTransactionHash: string;
+  recoveryEnvelopeXdrSha256: string;
+  recoverySourceSequence: string;
+  recoveryFeeStroops: string;
+  recoveryValidFrom: number;
+  recoveryValidUntil: number;
+  recoveryCreatedAt: string;
   verifierIdentity: string;
   verificationPolicyVersion: string;
   verifiedAt: string;
@@ -350,6 +358,7 @@ export async function validateBoundedSharedIssuanceRecoveryEvidence(input: {
   reader: StellarTestnetLedgerReader;
   intent: ImmutableSharedIssuanceIntent;
   attempt: ImmutableSharedIssuanceTransactionAttempt;
+  recoveryAttempt: ImmutableSharedIssuanceTransactionAttempt;
   nowUnix: number;
   verifierIdentity: string;
   verificationPolicyVersion: string;
@@ -368,6 +377,22 @@ export async function validateBoundedSharedIssuanceRecoveryEvidence(input: {
   }
   if (input.reader.authority !== "official_testnet_horizon") {
     throw new StellarLedgerEvidenceError("non_authoritative_evidence");
+  }
+
+  assertIntentAttemptMatch(input.intent, input.recoveryAttempt);
+  if (
+    input.recoveryAttempt.attemptNumber !== 2 ||
+    input.recoveryAttempt.attemptId === input.attempt.attemptId ||
+    input.recoveryAttempt.transactionHash === input.attempt.transactionHash ||
+    input.recoveryAttempt.envelopeXdrSha256 === input.attempt.envelopeXdrSha256 ||
+    input.recoveryAttempt.signingMode !== undefined ||
+    input.recoveryAttempt.signedEnvelopeXdrSha256 !== undefined ||
+    input.recoveryAttempt.validFrom !== input.nowUnix ||
+    input.recoveryAttempt.validFrom <= input.attempt.validUntil ||
+    input.recoveryAttempt.validUntil <= input.recoveryAttempt.validFrom ||
+    parseTimestamp(input.recoveryAttempt.createdAt) < input.nowUnix * 1_000
+  ) {
+    throw new StellarLedgerEvidenceError("recovery_not_eligible");
   }
 
   const [lookup, sequence] = await Promise.all([
@@ -396,7 +421,10 @@ export async function validateBoundedSharedIssuanceRecoveryEvidence(input: {
   if (lookupClosedAtMs <= expiryMs || sequenceClosedAtMs <= expiryMs) {
     throw new StellarLedgerEvidenceError("stale_ledger_evidence");
   }
-  if (sequence.sequence !== input.attempt.sourceSequence) {
+  if (
+    sequence.sequence !== input.attempt.sourceSequence ||
+    input.recoveryAttempt.sourceSequence !== sequence.sequence
+  ) {
     throw new StellarLedgerEvidenceError("recovery_sequence_changed");
   }
 
@@ -426,6 +454,14 @@ export async function validateBoundedSharedIssuanceRecoveryEvidence(input: {
       ).toISOString(),
       issuerPublicKey: input.intent.issuerPublicKey,
       issuerSequence: sequence.sequence,
+      recoveryAttemptId: input.recoveryAttempt.attemptId,
+      recoveryTransactionHash: input.recoveryAttempt.transactionHash,
+      recoveryEnvelopeXdrSha256: input.recoveryAttempt.envelopeXdrSha256,
+      recoverySourceSequence: input.recoveryAttempt.sourceSequence,
+      recoveryFeeStroops: input.recoveryAttempt.feeStroops,
+      recoveryValidFrom: input.recoveryAttempt.validFrom,
+      recoveryValidUntil: input.recoveryAttempt.validUntil,
+      recoveryCreatedAt: input.recoveryAttempt.createdAt,
       verifierIdentity: input.verifierIdentity.trim(),
       verificationPolicyVersion: input.verificationPolicyVersion.trim(),
       verifiedAt: new Date(verifiedAtMs).toISOString(),
