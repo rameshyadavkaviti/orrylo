@@ -4,6 +4,7 @@ import { Networks, Transaction, TransactionBuilder } from "@stellar/stellar-sdk"
 
 import type { DatabaseClient } from "../persistence/database";
 import type { CustomerTrustlinePlan } from "./customer-testnet-trustline";
+import { validateInitialSupply } from "../../validation/initial-supply";
 
 type Resolution = "failed" | "expired_not_found";
 
@@ -53,7 +54,11 @@ function mapHandoff(row: HandoffRow): CustomerTrustlineHandoff {
     assetCode: row.asset_code,
     issuerPublicKey: row.issuer_public_key.trim(),
     destinationPublicKey: row.destination_public_key.trim(),
-    amount: row.amount,
+    amount: (() => {
+      const value = validateInitialSupply(row.amount);
+      if (!value.valid) throw new CustomerTrustlineGuardError("Corrupt persisted trustline amount.");
+      return value.normalized;
+    })(),
     transactionHash: row.transaction_hash.trim(),
     unsignedXdr: row.unsigned_envelope_xdr,
     sourceSequence: row.source_sequence,
