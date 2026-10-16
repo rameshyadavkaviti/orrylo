@@ -75,7 +75,7 @@ export function CustomerTrustlineControl({
   }
 
   useEffect(() => {
-    void loadReadiness();
+    queueMicrotask(() => void loadReadiness());
     // Remount this control when the reviewed amount or project changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, amount, assetCode]);
