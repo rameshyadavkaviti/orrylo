@@ -251,7 +251,7 @@ test("configured fee cap is mandatory; no uncontrolled or Mainnet trustline", ()
     },
   ]) {
     assert.throws(
-      () => readCustomerTrustlineConfiguration(overrides),
+      () => readCustomerTrustlineConfiguration({ NODE_ENV: "test", ...overrides }),
       (error: unknown) =>
         error instanceof CustomerTrustlineError &&
         error.code === "trustline_configuration_unavailable",
