@@ -6,6 +6,7 @@ import type {
   ImmutableSharedIssuanceTransactionAttempt,
   SharedIssuanceSigningMode,
   TrustedLedgerConfirmationWriter,
+  TrustedRecoveryEvidenceWriter,
 } from "./shared-issuance-persistence";
 import {
   SHARED_ISSUER_TESTNET_PASSPHRASE,
@@ -30,8 +31,14 @@ import type {
 import {
   AuthoritativeSharedIssuanceConfirmationValidator,
   StellarLedgerEvidenceError,
+  validateBoundedSharedIssuanceRecoveryEvidence,
+  type StellarTestnetLedgerReader,
   type ValidatedSharedIssuanceLedgerConfirmation,
 } from "../../stellar/testnet-ledger-confirmation";
+import {
+  TEST8926_BOUNDED_RECOVERY_POLICY,
+  isExactTest8926RecoveryIntent,
+} from "./shared-issuance-recovery-policy";
 import type { TestnetIssuanceStatus } from "./testnet-issuance-service";
 
 type DurableStatus = Exclude<TestnetIssuanceStatus, "not_started">;
@@ -112,6 +119,10 @@ export class SharedIssuanceOrchestrationError extends Error {
       | "manual_signing_already_consumed"
       | "manual_signing_window_expired"
       | "manual_issuer_mismatch"
+      | "manual_recovery_not_authorized"
+      | "manual_recovery_not_ready"
+      | "manual_recovery_attempt_mismatch"
+      | "manual_recovery_sequence_changed"
       | "signing_mode_already_claimed",
   ) {
     super(code);
@@ -136,6 +147,8 @@ export class SharedIssuanceOrchestrator {
       authorization: SharedIssuerSignerAuthorization;
       confirmationValidator: ConfirmationValidator;
       confirmationWriter: TrustedLedgerConfirmationWriter;
+      recoveryReader: StellarTestnetLedgerReader;
+      recoveryEvidenceWriter: TrustedRecoveryEvidenceWriter;
       feeStroops: string;
       validitySeconds: number;
       now?: () => number;
@@ -493,6 +506,264 @@ export class SharedIssuanceOrchestrator {
   }
 
   /**
+   * Exact one-off owner-authorized recovery preparation for TEST8926.
+   * It proves the expired attempt 1 was not found after expiry, persists that
+   * evidence through the trusted writer, performs a fresh preflight, appends
+   * exactly attempt 2, claims manual signing, and returns only unsigned XDR.
+   */
+  async prepareManualRecoverySigningHandoff(input: {
+    requestId: string;
+    projectId: string;
+    ownerPublicKey: string;
+  }): Promise<ManualSharedIssuanceSigningHandoff> {
+    const intent = await this.dependencies.store.getIntent(input.requestId);
+    if (!intent) throw new SharedIssuanceOrchestrationError("intent_not_found");
+    assertAuthenticatedIntent(input, intent);
+    this.assertManualIssuer(intent);
+
+    const attempts = await this.dependencies.store.listAttempts(input.requestId);
+    if (attempts.length !== 1 || attempts[0]!.attemptNumber !== 1) {
+      throw new SharedIssuanceOrchestrationError("manual_recovery_not_ready");
+    }
+    const previous = attempts[0]!;
+    if (!isExactTest8926RecoveryIntent(intent, previous)) {
+      throw new SharedIssuanceOrchestrationError(
+        "manual_recovery_not_authorized",
+      );
+    }
+    if (
+      previous.signingMode !== "manual" ||
+      previous.signedEnvelopeXdrSha256 !== undefined
+    ) {
+      throw new SharedIssuanceOrchestrationError("manual_recovery_not_ready");
+    }
+    if (await this.dependencies.store.getConfirmation(input.requestId)) {
+      throw new SharedIssuanceOrchestrationError("manual_recovery_not_ready");
+    }
+
+    const lifecycle = await this.dependencies.store.getLifecycle(
+      input.requestId,
+    );
+    if (!lifecycle || lifecycle.status !== "pending_execution") {
+      throw new SharedIssuanceOrchestrationError("manual_recovery_not_ready");
+    }
+
+    const now = this.dependencies.now?.() ?? Date.now();
+    const nowUnix = Math.floor(now / 1_000);
+    if (nowUnix <= previous.validUntil) {
+      throw new SharedIssuanceOrchestrationError("manual_recovery_not_ready");
+    }
+
+    const validatedEvidence =
+      await validateBoundedSharedIssuanceRecoveryEvidence({
+        reader: this.dependencies.recoveryReader,
+        intent,
+        attempt: previous,
+        nowUnix,
+        verifierIdentity: "official-stellar-testnet-horizon",
+        verificationPolicyVersion:
+          TEST8926_BOUNDED_RECOVERY_POLICY.policyVersion,
+      });
+
+    const preflight =
+      await this.dependencies.preflight.readIssuancePreconditions({
+        issuerPublicKey: intent.issuerPublicKey,
+        destinationPublicKey: intent.destinationPublicKey,
+        assetCode: intent.assetCode,
+        assetCodeReservedForProject: true,
+        feeStroops: this.dependencies.feeStroops,
+      });
+    if (
+      preflight.preconditions.issuerSequence !==
+      validatedEvidence.record.issuerSequence
+    ) {
+      throw new SharedIssuanceOrchestrationError(
+        "manual_recovery_sequence_changed",
+      );
+    }
+
+    const validFrom = nowUnix;
+    const plan = buildSharedIssuerIssuancePlan(
+      {
+        projectId: intent.projectId,
+        assetCode: intent.assetCode,
+        issuerPublicKey: intent.issuerPublicKey,
+        destinationPublicKey: intent.destinationPublicKey,
+        amount: intent.amount,
+        network: "testnet",
+        networkPassphrase: preflight.networkPassphrase,
+        validFrom,
+        validUntil: validFrom + this.dependencies.validitySeconds,
+      },
+      preflight.preconditions,
+    );
+    const candidate: ImmutableSharedIssuanceTransactionAttempt = {
+      attemptId: (this.dependencies.randomUuid ?? randomUUID)(),
+      issuanceRequestId: intent.issuanceRequestId,
+      issuanceIntentFingerprint: intent.issuanceIntentFingerprint,
+      attemptNumber: 2,
+      transactionHash: plan.transactionHash,
+      envelopeXdrSha256: sha256(plan.unsignedEnvelopeXdr),
+      sourceSequence: plan.sourceSequence,
+      feeStroops: plan.feeStroops,
+      validFrom: plan.validFrom,
+      validUntil: plan.validUntil,
+      transactionSourcePublicKey: intent.issuerPublicKey,
+      operationCount: 1,
+      operationType: "payment",
+      operationSourcePublicKey: intent.issuerPublicKey,
+      assetCode: intent.assetCode,
+      issuerPublicKey: intent.issuerPublicKey,
+      destinationPublicKey: intent.destinationPublicKey,
+      amount: intent.amount,
+      createdAt: new Date(now).toISOString(),
+    };
+
+    await this.dependencies.recoveryEvidenceWriter.appendRecoveryEvidence(
+      validatedEvidence,
+    );
+    const attempt = await this.dependencies.store.appendAttempt(candidate);
+    const claimedAttempt = await this.dependencies.store.claimSigningMode({
+      attemptId: attempt.attemptId,
+      transactionHash: attempt.transactionHash,
+      signingMode: "manual",
+    });
+    if (!claimedAttempt) {
+      throw new SharedIssuanceOrchestrationError(
+        "manual_recovery_attempt_mismatch",
+      );
+    }
+
+    await loadAndAssertDurableSharedIssuerPlan({
+      reader: this.dependencies.store,
+      attemptId: claimedAttempt.attemptId,
+      plan,
+      expectedAttemptNumber: 2,
+    });
+    return manualHandoff(intent, claimedAttempt, plan);
+  }
+
+  async submitManualRecoverySignedEnvelope(input: {
+    requestId: string;
+    projectId: string;
+    ownerPublicKey: string;
+    attemptId: string;
+    signedEnvelopeXdr: string;
+  }): Promise<SharedIssuanceOrchestrationResult> {
+    const intent = await this.dependencies.store.getIntent(input.requestId);
+    if (!intent) throw new SharedIssuanceOrchestrationError("intent_not_found");
+    assertAuthenticatedIntent(input, intent);
+    this.assertManualIssuer(intent);
+
+    const attempts = await this.dependencies.store.listAttempts(input.requestId);
+    const { previous, recovery } = selectExactRecoveryAttempts(
+      intent,
+      attempts,
+      input.attemptId,
+    );
+    void previous;
+
+    if (await this.dependencies.store.getConfirmation(input.requestId)) {
+      throw new SharedIssuanceOrchestrationError(
+        "manual_signing_already_consumed",
+      );
+    }
+    if (
+      recovery.signingMode !== "manual" ||
+      recovery.signedEnvelopeXdrSha256 !== undefined
+    ) {
+      throw new SharedIssuanceOrchestrationError(
+        "manual_signing_already_consumed",
+      );
+    }
+
+    const lifecycle = await this.dependencies.store.getLifecycle(
+      input.requestId,
+    );
+    if (!lifecycle || lifecycle.status !== "pending_execution") {
+      throw new SharedIssuanceOrchestrationError("manual_recovery_not_ready");
+    }
+
+    const plan = await this.loadCurrentPlan(intent, recovery, 2);
+    try {
+      await persistAndSubmitSharedIssuerEnvelope({
+        writer: this.dependencies.store,
+        attemptId: recovery.attemptId,
+        plan,
+        signedEnvelopeXdr: input.signedEnvelopeXdr,
+        authorization: this.dependencies.authorization,
+        submission: this.dependencies.submission,
+        expectedAttemptNumber: 2,
+      });
+      await this.dependencies.store.transition(input.requestId, "submitted");
+    } catch (error) {
+      const stored = await this.dependencies.store.getAttempt(
+        recovery.attemptId,
+      );
+      if (stored?.signedEnvelopeXdrSha256) {
+        await this.dependencies.store.transition(
+          input.requestId,
+          "reconciliation_required",
+          "submission_reconciliation_required",
+        );
+        return {
+          status: "reconciliation_required",
+          transactionHash: stored.transactionHash,
+        };
+      }
+      throw error;
+    }
+
+    const persistedAttempt = await this.dependencies.store.getAttempt(
+      recovery.attemptId,
+    );
+    if (!persistedAttempt) {
+      throw new SharedIssuanceOrchestrationError("invalid_attempt_history");
+    }
+    return this.reconcile(intent, persistedAttempt);
+  }
+
+  async reconcileManualRecoveryAttempt(input: {
+    requestId: string;
+    projectId: string;
+    ownerPublicKey: string;
+    attemptId: string;
+  }): Promise<SharedIssuanceOrchestrationResult> {
+    const intent = await this.dependencies.store.getIntent(input.requestId);
+    if (!intent) throw new SharedIssuanceOrchestrationError("intent_not_found");
+    assertAuthenticatedIntent(input, intent);
+    this.assertManualIssuer(intent);
+
+    const attempts = await this.dependencies.store.listAttempts(input.requestId);
+    const { recovery } = selectExactRecoveryAttempts(
+      intent,
+      attempts,
+      input.attemptId,
+    );
+
+    const durableConfirmation = await this.dependencies.store.getConfirmation(
+      input.requestId,
+    );
+    if (durableConfirmation) {
+      if (durableConfirmation.attemptId !== recovery.attemptId) {
+        throw new SharedIssuanceOrchestrationError(
+          "manual_recovery_attempt_mismatch",
+        );
+      }
+      await this.dependencies.store.transition(input.requestId, "confirmed");
+      return confirmed(durableConfirmation);
+    }
+
+    if (
+      recovery.signingMode !== "manual" ||
+      !recovery.signedEnvelopeXdrSha256
+    ) {
+      throw new SharedIssuanceOrchestrationError("manual_recovery_not_ready");
+    }
+    return this.reconcile(intent, recovery);
+  }
+
+  /**
    * Accepts one operator-supplied signed envelope for the already-persisted
    * attempt. The existing authorization boundary validates the exact Testnet
    * transaction and signer, persists the signed digest, and only then performs
@@ -616,6 +887,7 @@ export class SharedIssuanceOrchestrator {
   private async loadCurrentPlan(
     intent: ImmutableSharedIssuanceIntent,
     attempt: ImmutableSharedIssuanceTransactionAttempt,
+    expectedAttemptNumber: 1 | 2 = 1,
   ): Promise<SharedIssuerIssuancePlan> {
     const nowUnix = Math.floor(
       (this.dependencies.now?.() ?? Date.now()) / 1_000,
@@ -652,6 +924,7 @@ export class SharedIssuanceOrchestrator {
       reader: this.dependencies.store,
       attemptId: attempt.attemptId,
       plan,
+      expectedAttemptNumber,
     });
     return plan;
   }
@@ -752,6 +1025,48 @@ function assertSingleAttemptHistory(
   if (attempts.length > 1 || (attempts[0] && attempts[0].attemptNumber !== 1)) {
     throw new SharedIssuanceOrchestrationError("invalid_attempt_history");
   }
+}
+
+function selectExactRecoveryAttempts(
+  intent: ImmutableSharedIssuanceIntent,
+  attempts: ImmutableSharedIssuanceTransactionAttempt[],
+  expectedRecoveryAttemptId: string,
+): {
+  previous: ImmutableSharedIssuanceTransactionAttempt;
+  recovery: ImmutableSharedIssuanceTransactionAttempt;
+} {
+  if (
+    attempts.length !== 2 ||
+    attempts[0]!.attemptNumber !== 1 ||
+    attempts[1]!.attemptNumber !== 2
+  ) {
+    throw new SharedIssuanceOrchestrationError("invalid_attempt_history");
+  }
+  const previous = attempts[0]!;
+  const recovery = attempts[1]!;
+  if (!isExactTest8926RecoveryIntent(intent, previous)) {
+    throw new SharedIssuanceOrchestrationError(
+      "manual_recovery_not_authorized",
+    );
+  }
+  if (
+    recovery.attemptId !== expectedRecoveryAttemptId ||
+    recovery.issuanceRequestId !== intent.issuanceRequestId ||
+    recovery.issuanceIntentFingerprint !== intent.issuanceIntentFingerprint ||
+    recovery.transactionSourcePublicKey !== intent.issuerPublicKey ||
+    recovery.operationSourcePublicKey !== intent.issuerPublicKey ||
+    recovery.assetCode !== intent.assetCode ||
+    recovery.issuerPublicKey !== intent.issuerPublicKey ||
+    recovery.destinationPublicKey !== intent.destinationPublicKey ||
+    recovery.amount !== intent.amount ||
+    recovery.operationCount !== 1 ||
+    recovery.operationType !== "payment"
+  ) {
+    throw new SharedIssuanceOrchestrationError(
+      "manual_recovery_attempt_mismatch",
+    );
+  }
+  return { previous, recovery };
 }
 
 function assertAuthenticatedIntent(
