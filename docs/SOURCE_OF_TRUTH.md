@@ -294,6 +294,8 @@ The product owner approved **exactly five persistent Orrylo-operated Stellar acc
 4. **Finance/operations checkpoint — owner approval required.** Approve transfer limits, XLM payment destination, RYLO delivery/failure handling, Treasury/Operations/Liquidity movement policy, monitoring and emergency response before enabling purchase, payout or liquidity operations. Keep personal secure records of account-to-role mapping, signing-device locations, recovery custodians and protected ceremony instructions.
 5. **Activation checkpoint — separate authorization required.** A reviewed runbook must remind the owner at the exact point of each manual action, what to verify, and what confidential data to safeguard. Require explicit approval before any Mainnet account mutation, funding, key/threshold/flag change, signing, transfer, pool operation or deployment. Documentation approval does **not** authorize those operations.
 
+**Owner-facing execution reference:** `docs/MAINNET_ACCOUNT_SETUP_RUNBOOK.md` provides the mandatory manual verification, secret-custody and per-action approval checkpoints for the five-account Mainnet rollout. It is a procedural draft, not authorization to create accounts, change signers or execute any transaction.
+
 ### 10.2 Approved Mainnet signing and recovery policy for five infrastructure accounts
 
 The owner approves the **authorization topology** below for Orrylo's five distinct Mainnet infrastructure accounts. This is policy approval only; no signer key, threshold, custody device, account flag, transfer limit, or Mainnet account state is deployed or verified by this document.
