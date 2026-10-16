@@ -12,6 +12,7 @@ import {
   CustomerTrustlineError,
   inspectCustomerTrustline,
   confirmCustomerTrustline,
+  reconcileCustomerTrustline,
   readCustomerTrustlineConfiguration,
 } from "../lib/server/projects/customer-testnet-trustline";
 
@@ -55,11 +56,12 @@ function customerAccount(input?: {
   limit?: string;
   authorized?: boolean;
   nativeBalance?: string;
+  sequence?: string;
 }) {
   const trustline = input?.trustline ?? false;
   return {
     account_id: CUSTOMER,
-    sequence: "123",
+    sequence: input?.sequence ?? "123",
     subentry_count: trustline ? 1 : 0,
     num_sponsoring: 0,
     num_sponsored: 0,
@@ -101,6 +103,8 @@ function fixture(input?: {
   authorized?: boolean;
   nativeBalance?: string;
   baseFee?: number;
+  ledgerClosedAt?: string;
+  customerSequence?: string;
   transaction?: (hash: string) => unknown;
 }) {
   let trust = input?.trustline ?? false;
@@ -116,7 +120,7 @@ function fixture(input?: {
           records: [
             {
               sequence: 900,
-              closed_at: "2026-10-16T09:00:00Z",
+              closed_at: input?.ledgerClosedAt ?? "2026-10-16T09:00:00Z",
               base_fee_in_stroops: input?.baseFee ?? 100,
               base_reserve_in_stroops: 5_000_000,
             },
@@ -131,6 +135,7 @@ function fixture(input?: {
         limit: trustLimit,
         authorized: input?.authorized,
         nativeBalance: input?.nativeBalance,
+        sequence: input?.customerSequence,
       });
     } else if (path.includes("/transactions/")) {
       const hash = path.split("/").at(-1)!;
@@ -314,5 +319,110 @@ test("only an official exact-hash successful ChangeTrust followed by usable capa
       },
       missing.fetchImpl,
     ),
+  );
+});
+
+const EXPIRED_TIME = () => Date.parse("2026-10-16T08:40:00Z");
+
+test("uncertain ChangeTrust is pending even if the trustline still does not exist", async () => {
+  const fx = fixture({ ledgerClosedAt: "2026-10-16T08:43:00Z" });
+  const unsigned = await inspectCustomerTrustline(args(), fx.fetchImpl, EXPIRED_TIME);
+  const result = await reconcileCustomerTrustline(
+    {
+      ...args(),
+      transactionHash: unsigned.transactionHash!,
+      unsignedXdr: unsigned.unsignedXdr!,
+    },
+    fx.fetchImpl,
+  );
+  assert.equal(result.status, "pending");
+  assert.ok(fx.calls.some((url) =>
+    url.endsWith("/transactions/" + unsigned.transactionHash)));
+});
+
+test("exact-hash 404 resolves terminal only after expiry and unchanged customer sequence", async () => {
+  const fx = fixture();
+  const unsigned = await inspectCustomerTrustline(args(), fx.fetchImpl, EXPIRED_TIME);
+  const result = await reconcileCustomerTrustline(
+    {
+      ...args(),
+      transactionHash: unsigned.transactionHash!,
+      unsignedXdr: unsigned.unsignedXdr!,
+    },
+    fx.fetchImpl,
+  );
+  assert.equal(result.status, "terminal");
+
+  const advancedSequence = fixture({ customerSequence: "124" });
+  const unresolved = await reconcileCustomerTrustline(
+    {
+      ...args(),
+      transactionHash: unsigned.transactionHash!,
+      unsignedXdr: unsigned.unsignedXdr!,
+    },
+    advancedSequence.fetchImpl,
+  );
+  assert.equal(unresolved.status, "pending");
+});
+
+test("eventually verified trustline readiness permits progress with unresolved callback", async () => {
+  const fx = fixture();
+  const unsigned = await inspectCustomerTrustline(args(), fx.fetchImpl, EXPIRED_TIME);
+  fx.setTrustline("1000.0000000");
+  const result = await reconcileCustomerTrustline(
+    {
+      ...args(),
+      transactionHash: unsigned.transactionHash!,
+      unsignedXdr: unsigned.unsignedXdr!,
+    },
+    fx.fetchImpl,
+  );
+  assert.equal(result.status, "ready");
+  if (result.status === "ready") {
+    assert.equal(result.trustline.status, "ready");
+    assert.equal(result.trustline.destinationPublicKey, CUSTOMER);
+  }
+});
+
+test("authoritatively failed exact-hash transaction permits only fresh planning", async () => {
+  const fx = fixture();
+  const unsigned = await inspectCustomerTrustline(args(), fx.fetchImpl, EXPIRED_TIME);
+  const tx = TransactionBuilder.fromXDR(unsigned.unsignedXdr!, Networks.TESTNET);
+  assert.ok(tx instanceof Transaction);
+  tx.sign(WALLET);
+  const failure = fixture({
+    transaction: () => ({
+      hash: unsigned.transactionHash,
+      successful: false,
+      ledger: 901,
+      envelope_xdr: tx.toXDR(),
+    }),
+  });
+  const result = await reconcileCustomerTrustline(
+    {
+      ...args(),
+      transactionHash: unsigned.transactionHash!,
+      unsignedXdr: unsigned.unsignedXdr!,
+    },
+    failure.fetchImpl,
+  );
+  assert.equal(result.status, "terminal");
+});
+
+test("changed hash or XDR cannot fabricate terminal proof", async () => {
+  const fx = fixture();
+  const unsigned = await inspectCustomerTrustline(args(), fx.fetchImpl, EXPIRED_TIME);
+  await assert.rejects(
+    reconcileCustomerTrustline(
+      {
+        ...args(),
+        transactionHash: "b".repeat(64),
+        unsignedXdr: unsigned.unsignedXdr!,
+      },
+      fx.fetchImpl,
+    ),
+    (error: unknown) =>
+      error instanceof CustomerTrustlineError &&
+      error.code === "trustline_transaction_mismatch",
   );
 });
