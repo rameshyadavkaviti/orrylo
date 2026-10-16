@@ -12,7 +12,7 @@ import {
 } from "../lib/projects/pending-customer-trustline";
 
 export interface CustomerTrustlineState {
-  status: "ready" | "signature_required";
+  status: "ready" | "signature_required" | "pending";
   network: "testnet";
   issuerPublicKey: string;
   destinationPublicKey: string;
@@ -152,12 +152,47 @@ export function CustomerTrustlineControl({
           );
           return;
         }
-        setPlan(fresh);
-        setPending(false);
+        setPlan(fresh.status === "pending" ? null : fresh);
+        setPending(fresh.status === "pending");
         return;
       }
 
       const fresh = await inspectFresh();
+      if (fresh.status === "pending") {
+        // A different authenticated browser may own the one durable handoff.
+        // Never expose its XDR or enable another signature on this session.
+        setPlan(null);
+        setPending(true);
+        if (!fresh.transactionHash) {
+          setError("A pending ChangeTrust could not be reconciled.");
+          return;
+        }
+        const response = await fetch(`/api/projects/${projectId}/issuance/trustline`, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount,
+            transactionHash: fresh.transactionHash,
+            reconcile: true,
+          }),
+        });
+        const result = await readReconciliation(response);
+        if (!response.ok || !result?.ok || result.reconciliation.status === "pending") {
+          setError("The server-authoritative ChangeTrust transaction is unresolved. Do not sign again.");
+          return;
+        }
+        const checked = result.reconciliation.status === "ready"
+          ? result.reconciliation.trustline
+          : await inspectFresh();
+        if (!checked || !matchesReview(checked) || checked.status === "pending") {
+          setError("Another pending ChangeTrust still blocks signing.");
+          return;
+        }
+        setPlan(checked);
+        setPending(false);
+        return;
+      }
       setPlan(fresh);
       setPending(false);
     } catch {
@@ -195,6 +230,7 @@ export function CustomerTrustlineControl({
     if (
       busy.current ||
       pending ||
+      plan?.status !== "signature_required" ||
       !plan?.unsignedXdr ||
       !plan.transactionHash ||
       plan.status !== "signature_required" ||
