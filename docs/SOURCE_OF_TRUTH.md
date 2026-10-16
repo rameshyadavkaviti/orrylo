@@ -513,6 +513,43 @@ The approved NOVA mockup is the visual reference for this free template. NOVA-sp
 
 Multiple template variants, custom-domain pricing, exact custom-domain verification, final media storage, exact slug mutation policy, exact metadata edit permissions, and the exact TOML deployment mechanism remain unresolved unless separately canonicalized.
 
+## 15.3 Approved product visual identity — Orbital Noir v1.0
+
+**Decision status: APPROVED visual direction; implementation is not implied.**
+
+The product Architect approved **Orbital Noir v1.0** on 2026-10-12 as the final visual identity reference for the Orrylo product interface. The approved dashboard concept image supplied by the Architect is the visual reference; this decision supersedes the earlier proposed *Orbital Precision* direction. The image is a design target, not evidence of implemented UI, real project balances, activity, issuer configuration, network metrics, or deployed functionality.
+
+Required visual characteristics:
+
+- Near-black navy canvas, deep-indigo layered surfaces, and restrained electric-blue/ultraviolet accents with occasional cyan.
+- Modular floating dark-glass panels, fine illuminated outlines, rounded corners, ample negative space, and selective glow. Strong illumination belongs to active/important controls, not every panel.
+- Left-side navigation and top utility bar for desktop authenticated views, with responsive tablet/mobile equivalents.
+- Modern legible typography and clear hierarchy; accessible contrast, keyboard/focus behavior, and reduced-motion support take precedence over visual effects.
+- Orbital imagery and subtle motion as distinctive brand language; reuse existing approved Orrylo/RYLO logo assets rather than substituting mockup-generated marks.
+- Consistent visual treatment across homepage, project creation, managed-project dashboard, and public project profiles. Preserve the approved Create → Publish → Manage → Grow product lifecycle.
+
+**Design reference palette (initial implementation tokens, subject to contrast testing):**
+
+| Token | Hex |
+| --- | --- |
+| Void / canvas | `#050716` |
+| Nightglass / base surface | `#0D1028` |
+| Panel | `#151936` |
+| Border | `#303A65` |
+| Electric Blue | `#789AFF` |
+| Ultraviolet | `#955DFF` |
+| Ice / primary text | `#F3F5FF` |
+| Muted / secondary text | `#A8B3D0` |
+
+**Product integrity requirements:**
+
+- Mockup values, example assets, account names, charts, and network indicators must never appear as genuine application data.
+- Issuance intent, submitted transaction, ledger-confirmed asset, and published TOML metadata remain distinct independently verifiable states. Visual styling must not imply completion prematurely.
+- Preserve existing Stellar issuer separation, security gates, authentication, persistence, and deployment boundaries.
+- Implement through bounded Full-stack UI changes with responsive/accessibility checks and no unreviewed financial-flow changes. Existing UI infrastructure should be reused where possible.
+
+The approved image reference must be supplied to implementing agents through the design handoff or added to the repository as a separately reviewed asset; this document alone does not embed or establish a canonical image-file path.
+
 ## 16. Current RYLO issuer candidate
 
 A vanity Stellar public key has been generated and is reserved as the current RYLO issuer candidate:
