@@ -504,9 +504,72 @@ test("rejects evidence when issuer, asset, or amount differs from the immutable 
   }
 });
 
+function recoveryCandidate(
+  intent: ImmutableSharedIssuanceIntent,
+  previous: ImmutableSharedIssuanceTransactionAttempt,
+  validFrom: number,
+): ImmutableSharedIssuanceTransactionAttempt {
+  const plan = buildSharedIssuerIssuancePlan(
+    {
+      projectId: intent.projectId,
+      assetCode: intent.assetCode,
+      issuerPublicKey: intent.issuerPublicKey,
+      destinationPublicKey: intent.destinationPublicKey,
+      amount: intent.amount,
+      network: "testnet",
+      networkPassphrase: Networks.TESTNET,
+      validFrom,
+      validUntil: validFrom + 300,
+    },
+    {
+      assetCodeReservedForProject: true,
+      issuerSequence: previous.sourceSequence,
+      issuerSpendableNativeStroops: "1000",
+      feeStroops: previous.feeStroops,
+      destinationTrustline: {
+        network: "testnet",
+        networkPassphrase: Networks.TESTNET,
+        destinationPublicKey: intent.destinationPublicKey,
+        assetCode: intent.assetCode,
+        issuerPublicKey: intent.issuerPublicKey,
+        observedLedger: 601,
+        exists: true,
+        authorized: true,
+        balance: "0.0000000",
+        limit: "1000.0000000",
+        buyingLiabilities: "0.0000000",
+      },
+    },
+  );
+  return {
+    attemptId: "00000000-0000-4000-8000-000000000314",
+    issuanceRequestId: intent.issuanceRequestId,
+    issuanceIntentFingerprint: intent.issuanceIntentFingerprint,
+    attemptNumber: 2,
+    transactionHash: plan.transactionHash,
+    envelopeXdrSha256: createHash("sha256")
+      .update(plan.unsignedEnvelopeXdr)
+      .digest("hex"),
+    sourceSequence: plan.sourceSequence,
+    feeStroops: plan.feeStroops,
+    validFrom: plan.validFrom,
+    validUntil: plan.validUntil,
+    transactionSourcePublicKey: intent.issuerPublicKey,
+    operationCount: 1,
+    operationType: "payment",
+    operationSourcePublicKey: intent.issuerPublicKey,
+    assetCode: intent.assetCode,
+    issuerPublicKey: intent.issuerPublicKey,
+    destinationPublicKey: intent.destinationPublicKey,
+    amount: intent.amount,
+    createdAt: new Date(validFrom * 1_000).toISOString(),
+  };
+}
+
 test("bounded recovery validates exact post-expiry not-found evidence for an unsigned manual attempt", async () => {
   const { intent, attempt } = unsignedFixture();
   const recoveryAttempt = { ...attempt, signingMode: "manual" as const };
+  const recovery = recoveryCandidate(intent, attempt, attempt.validUntil + 2);
   const afterExpiry = new Date((attempt.validUntil + 1) * 1_000).toISOString();
   const lookup: StellarTestnetTransactionLookup = {
     status: "not_found",
@@ -525,6 +588,7 @@ test("bounded recovery validates exact post-expiry not-found evidence for an uns
     }),
     intent,
     attempt: recoveryAttempt,
+    recoveryAttempt: recovery,
     nowUnix: attempt.validUntil + 2,
     verifierIdentity: "official-stellar-testnet-horizon",
     verificationPolicyVersion: "test8926-owner-bounded-recovery-v1",
@@ -542,6 +606,8 @@ test("bounded recovery validates exact post-expiry not-found evidence for an uns
 test("bounded recovery rejects non-expired or signed-digest attempt 1", async () => {
   const { intent, attempt } = unsignedFixture();
   const recoveryAttempt = { ...attempt, signingMode: "manual" as const };
+  const recoveryAtExpiry = recoveryCandidate(intent, attempt, attempt.validUntil);
+  const recovery = recoveryCandidate(intent, attempt, attempt.validUntil + 2);
   const afterExpiry = new Date((attempt.validUntil + 1) * 1_000).toISOString();
   const lookup: StellarTestnetTransactionLookup = {
     status: "not_found",
@@ -562,6 +628,7 @@ test("bounded recovery rejects non-expired or signed-digest attempt 1", async ()
       reader,
       intent,
       attempt: recoveryAttempt,
+      recoveryAttempt: recoveryAtExpiry,
       nowUnix: attempt.validUntil,
       verifierIdentity: "official-stellar-testnet-horizon",
       verificationPolicyVersion: "test8926-owner-bounded-recovery-v1",
@@ -579,6 +646,7 @@ test("bounded recovery rejects non-expired or signed-digest attempt 1", async ()
         ...recoveryAttempt,
         signedEnvelopeXdrSha256: "a".repeat(64),
       },
+      recoveryAttempt: recovery,
       nowUnix: attempt.validUntil + 2,
       verifierIdentity: "official-stellar-testnet-horizon",
       verificationPolicyVersion: "test8926-owner-bounded-recovery-v1",
@@ -592,6 +660,7 @@ test("bounded recovery rejects non-expired or signed-digest attempt 1", async ()
 test("bounded recovery rejects missing exact-hash not-found proof and changed issuer sequence", async () => {
   const { intent, attempt, lookup: confirmed } = unsignedFixture();
   const recoveryAttempt = { ...attempt, signingMode: "manual" as const };
+  const recovery = recoveryCandidate(intent, attempt, attempt.validUntil + 2);
   const afterExpiry = new Date((attempt.validUntil + 1) * 1_000).toISOString();
 
   await assert.rejects(
@@ -610,6 +679,7 @@ test("bounded recovery rejects missing exact-hash not-found proof and changed is
       ),
       intent,
       attempt: recoveryAttempt,
+      recoveryAttempt: recovery,
       nowUnix: attempt.validUntil + 2,
       verifierIdentity: "official-stellar-testnet-horizon",
       verificationPolicyVersion: "test8926-owner-bounded-recovery-v1",
@@ -636,6 +706,7 @@ test("bounded recovery rejects missing exact-hash not-found proof and changed is
       }),
       intent,
       attempt: recoveryAttempt,
+      recoveryAttempt: recovery,
       nowUnix: attempt.validUntil + 2,
       verifierIdentity: "official-stellar-testnet-horizon",
       verificationPolicyVersion: "test8926-owner-bounded-recovery-v1",
