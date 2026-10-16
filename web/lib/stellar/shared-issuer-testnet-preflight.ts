@@ -23,7 +23,6 @@ export type SharedIssuerTestnetPreflightErrorCode =
   | "destination_not_found"
   | "horizon_unavailable"
   | "malformed_horizon_response"
-  | "preflight_ledger_advanced"
   | "issuer_policy_mismatch"
   | "fee_below_network_minimum"
   | "insufficient_issuer_native_balance";
@@ -112,7 +111,7 @@ interface HorizonAccountRecord {
   balances: HorizonBalance[];
 }
 
-interface StableLedgerCheckpoint {
+interface LedgerCheckpoint {
   sequence: number;
   closedAt: string;
   baseFeeStroops: bigint;
@@ -123,9 +122,12 @@ interface StableLedgerCheckpoint {
  * Reads the Testnet state needed to prepare one Shared Issuer issuance without
  * mutating either the issuer or the customer wallet.
  *
- * The reader brackets account reads with the same latest-ledger checkpoint.
- * If a ledger closes during the preflight window, the whole observation fails
- * closed and can be repeated before any transaction is built or signed.
+ * The reader brackets account reads with latest-ledger checkpoints. If the
+ * ledger advances, it deterministically re-reads the two accounts exactly once
+ * after the later checkpoint instead of waiting for a quiet ledger. The later
+ * checkpoint supplies network fee/reserve parameters and the observation
+ * ledger; only an impossible regression or conflicting metadata for the same
+ * ledger fails closed.
  */
 export class OfficialStellarTestnetIssuancePreflightReader {
   constructor(private readonly fetchImpl: FetchLike = globalThis.fetch) {}
@@ -159,36 +161,32 @@ export class OfficialStellarTestnetIssuancePreflightReader {
     const feeStroops = parsePositiveInteger(request.feeStroops, "invalid_fee");
 
     const before = await this.readLatestLedger();
-    const [issuer, destination] = await Promise.all([
+    let [issuer, destination] = await Promise.all([
       this.readAccount(issuerPublicKey, "issuer_not_found"),
       this.readAccount(destinationPublicKey, "destination_not_found"),
     ]);
     const after = await this.readLatestLedger();
+    assertMonotonicLedgerWindow(before, after);
 
-    if (
-      after.sequence !== before.sequence ||
-      after.closedAt !== before.closedAt ||
-      after.baseFeeStroops !== before.baseFeeStroops ||
-      after.baseReserveStroops !== before.baseReserveStroops
-    ) {
-      throw new SharedIssuerTestnetPreflightError(
-        "preflight_ledger_advanced",
-        "The Testnet ledger changed during preflight; discard this observation and read a fresh snapshot before construction.",
-      );
+    if (after.sequence > before.sequence) {
+      [issuer, destination] = await Promise.all([
+        this.readAccount(issuerPublicKey, "issuer_not_found"),
+        this.readAccount(destinationPublicKey, "destination_not_found"),
+      ]);
     }
 
     assertIssuerPolicy(issuer, issuerPublicKey);
 
-    if (feeStroops < before.baseFeeStroops) {
+    if (feeStroops < after.baseFeeStroops) {
       throw new SharedIssuerTestnetPreflightError(
         "fee_below_network_minimum",
-        "Configured transaction fee is below the stable Testnet ledger base fee.",
+        "Configured transaction fee is below the observed Testnet ledger base fee.",
       );
     }
 
     const issuerSpendableNativeStroops = computeSpendableNativeStroops(
       issuer,
-      before.baseReserveStroops,
+      after.baseReserveStroops,
     );
     if (issuerSpendableNativeStroops < feeStroops) {
       throw new SharedIssuerTestnetPreflightError(
@@ -202,16 +200,16 @@ export class OfficialStellarTestnetIssuancePreflightReader {
       destinationPublicKey,
       assetCode,
       issuerPublicKey,
-      before.sequence,
+      after.sequence,
     );
 
     return {
       network: SHARED_ISSUER_TESTNET_NETWORK,
       networkPassphrase: Networks.TESTNET,
-      observedLedger: before.sequence,
-      observedLedgerClosedAt: before.closedAt,
-      baseFeeStroops: before.baseFeeStroops.toString(),
-      baseReserveStroops: before.baseReserveStroops.toString(),
+      observedLedger: after.sequence,
+      observedLedgerClosedAt: after.closedAt,
+      baseFeeStroops: after.baseFeeStroops.toString(),
+      baseReserveStroops: after.baseReserveStroops.toString(),
       preconditions: {
         assetCodeReservedForProject: request.assetCodeReservedForProject,
         issuerSequence: normalizeSequence(issuer.sequence),
@@ -222,7 +220,7 @@ export class OfficialStellarTestnetIssuancePreflightReader {
     };
   }
 
-  private async readLatestLedger(): Promise<StableLedgerCheckpoint> {
+  private async readLatestLedger(): Promise<LedgerCheckpoint> {
     const response = await this.request("/ledgers?order=desc&limit=1");
 
     if (!response.ok) {
@@ -301,6 +299,24 @@ export class OfficialStellarTestnetIssuancePreflightReader {
         "Official Stellar Testnet Horizon could not be reached.",
       );
     }
+  }
+}
+
+function assertMonotonicLedgerWindow(
+  before: LedgerCheckpoint,
+  after: LedgerCheckpoint,
+): void {
+  if (
+    after.sequence < before.sequence ||
+    Date.parse(after.closedAt) < Date.parse(before.closedAt) ||
+    (after.sequence === before.sequence &&
+      (after.closedAt !== before.closedAt ||
+        after.baseFeeStroops !== before.baseFeeStroops ||
+        after.baseReserveStroops !== before.baseReserveStroops))
+  ) {
+    throw malformed(
+      "Official Horizon returned an inconsistent Testnet ledger observation window.",
+    );
   }
 }
 
