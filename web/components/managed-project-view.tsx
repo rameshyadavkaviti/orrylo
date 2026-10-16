@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { TestnetIssuanceSection } from "./testnet-issuance-section";
+import type { TestnetIssuanceRecord } from "../lib/server/projects/testnet-issuance-service";
+
 import type { MetadataPublicationState } from "../lib/projects/metadata-publication";
 import { buildMetadataReadiness } from "../lib/projects/metadata-readiness";
 import {
@@ -13,9 +16,13 @@ import { PublishProjectControl } from "./publish-project-control";
 export function ManagedProjectView({
   project,
   publication = null,
+  issuance = null,
+  intentConfigurationAvailable = false,
 }: {
   project: ManagedProjectProfile;
   publication?: MetadataPublicationState | null;
+  issuance?: TestnetIssuanceRecord | null;
+  intentConfigurationAvailable?: boolean;
 }) {
   const publicPath = projectPublicPath(project.slug);
   const published = project.publicStatus === "published";
@@ -119,7 +126,7 @@ export function ManagedProjectView({
             </div>
             <div>
               <dt>Stellar asset</dt>
-              <dd>Not created</dd>
+              <dd>{issuance?.status === "confirmed" ? "Ledger verified" : "Not confirmed"}</dd>
             </div>
           </dl>
 
@@ -132,6 +139,12 @@ export function ManagedProjectView({
           )}
         </article>
       </section>
+
+      <TestnetIssuanceSection
+        project={project}
+        issuance={issuance}
+        intentConfigurationAvailable={intentConfigurationAvailable}
+      />
 
       <ManagedProjectMetadataForm
         projectId={project.projectId}
