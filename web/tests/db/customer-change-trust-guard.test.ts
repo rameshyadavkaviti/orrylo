@@ -20,7 +20,7 @@ import {
 } from "../../lib/server/projects/customer-trustline-guard";
 import type { CustomerTrustlinePlan } from "../../lib/server/projects/customer-testnet-trustline";
 
-const URL = process.env.TEST_DATABASE_URL?.trim();
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL?.trim();
 const ISSUER = "GBW4IKGPC5Q4YRKGRMNNXTVRZNQZ3DFWFHXSQUAMWLXES75MWTY3TWOV";
 const OWNER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 213)).publicKey();
 
@@ -31,16 +31,16 @@ function roleUrl(base: string, role: string, password: string) {
   return url.toString();
 }
 
-if (!URL) {
+if (!TEST_DATABASE_URL) {
   test(
     "customer ChangeTrust interlock PostgreSQL suite",
     { skip: true },
     () => {},
   );
 } else {
-  const admin = createDatabaseClient(URL);
+  const admin = createDatabaseClient(TEST_DATABASE_URL);
   const appA = createDatabaseClient(
-    roleUrl(URL, "orrylo_app", "trustline-app-test"),
+    roleUrl(TEST_DATABASE_URL, "orrylo_app", "trustline-app-test"),
   );
   const appB = createDatabaseClient(
     roleUrl(URL, "orrylo_app", "trustline-app-test"),
@@ -54,7 +54,7 @@ if (!URL) {
   let projectId = "";
 
   before(async () => {
-    if (!/test/i.test(new URL(URL).pathname.slice(1)))
+    if (!/test/i.test(new URL(TEST_DATABASE_URL).pathname.slice(1)))
       throw new Error("Test DB only.");
     await admin.unsafe("DROP SCHEMA public CASCADE; CREATE SCHEMA public");
     await admin.unsafe(`
@@ -148,6 +148,9 @@ if (!URL) {
     assert.deepEqual([a.status, b.status].sort(), ["claimed", "pending"]);
     const claimed = a.status === "claimed" ? a : b;
     const pending = a.status === "pending" ? a : b;
+    if (claimed.status !== "claimed" || pending.status !== "pending") {
+      throw new Error("Expected exactly one signable plan.");
+    }
     assert.equal(pending.transactionHash, claimed.plan.transactionHash);
     const [{ total }] = await admin<{ total: number }[]>`
       SELECT count(*)::integer AS total FROM project_customer_change_trust_handoffs
