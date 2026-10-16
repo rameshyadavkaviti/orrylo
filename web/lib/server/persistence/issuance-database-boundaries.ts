@@ -21,8 +21,8 @@ interface DatabaseIdentityRow {
   can_set_role_to_unexpected_role: boolean;
 }
 
-const EXPECTED_PROTECTED_TABLE_COUNT = 5;
-const EXPECTED_PROTECTED_FUNCTION_COUNT = 8;
+const EXPECTED_PROTECTED_TABLE_COUNT = 7;
+const EXPECTED_PROTECTED_FUNCTION_COUNT = 10;
 
 export class IssuanceDatabaseIdentityError extends Error {
   readonly code = "issuance_database_identity_rejected";
@@ -136,7 +136,9 @@ async function readIdentity(
           'project_issuance_intents',
           'project_issuance_full_intents',
           'project_issuance_transaction_attempts',
-          'project_issuance_ledger_confirmations'
+          'project_issuance_ledger_confirmations',
+          'project_issuance_recovery_authorizations',
+          'project_issuance_recovery_evidence'
         )
     ),
     protected_functions AS (
@@ -153,7 +155,9 @@ async function readIdentity(
           'assert_trusted_confirmation_writer',
           'protect_issuance_transaction_attempt',
           'prevent_issuance_evidence_mutation',
-          'assert_metadata_reachability_signed_confirmation'
+          'assert_metadata_reachability_signed_confirmation',
+          'assert_trusted_recovery_evidence_writer',
+          'assert_bounded_recovery_attempt_insert'
         )
     ),
     sensitive_roles AS (
