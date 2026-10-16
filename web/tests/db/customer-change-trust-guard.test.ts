@@ -79,6 +79,8 @@ if (!TEST_DATABASE_URL) {
       GRANT orrylo_confirmation_writer TO orrylo_trustline_writer_test;
       GRANT USAGE ON SCHEMA public TO orrylo_app, orrylo_trustline_writer_test;
       GRANT SELECT ON public.project_profiles, public.project_profile_owners TO orrylo_app;
+      GRANT UPDATE (signed_envelope_xdr_sha256) ON TABLE
+        public.project_issuance_transaction_attempts TO orrylo_app;
     `);
   });
 
