@@ -424,6 +424,22 @@ Rules:
 
 This rule exists specifically to prevent repeated debugging loops, duplicate implementation, stale-state recovery, and contradictory agent handoffs.
 
+### 13.1 Mandatory pre-implementation safety and automation-parity gate (owner approved 2026-10-16)
+
+**Principle:** Before authorizing an implementation handoff, the Product Architect and assigned engineer must establish that the proposed change preserves already-proven behavior and identify foreseeable failure modes **before writing code**. Passing CI or a previous manual on-chain transaction is not proof that a new automated orchestration is safe. Avoid repeated reactive fixes to risks that should have been modeled in advance; do not claim zero risk.
+
+For every change touching wallet authorization, trustlines, transaction construction, signing, submission, reconciliation, issuer state or financial operations:
+
+1. **Reconcile evidence first:** Inspect current GitHub main and actual implementation, canonical policy, existing durable database constraints, deployment topology, and the exact successful manual sequence. Separate verified behavior from assumptions.
+2. **Map the full automatic sequence:** Specify identities, ownership and network binding; state transitions; where each action is signed/submitted; which components can retry; and the exact ledger/database evidence that permits moving forward. Reuse proven components rather than inventing parallel execution paths.
+3. **Threat-model all relevant boundaries before implementation:** Include concurrent calls, multiple browser tabs, different browsers/devices with the same authenticated wallet, refresh/reload, cancellation, wallet rejection, lost callbacks, process restarts, network latency/unavailability, transaction expiration, uncertain submission and replay. Browser-local state is never the sole security authority for a cross-session financial operation.
+4. **Define server-side invariants:** Durable, transactional ownership and serialization of pending operations; exact transaction hash and immutable owner/project/asset/issuer binding; single authorized sign/submit attempt; authoritative exact-hash reconciliation. Do not issue another signable plan while a previous operation remains unresolved; a not-yet-ready trustline is not proof of failed submission. Require a fresh authoritative readiness/eligibility check after terminal resolution.
+5. **Write adversarial acceptance tests up front:** Cover each relevant failure path across authenticated sessions and browsers, including true concurrent requests and recovery. Check database permissions, signer isolation, fee/reserve bounds, network binding, honest UI statuses and no fabricated success. State tests and expected results in the implementation handoff.
+6. **Bound and stage execution:** Require narrow, reversible reviewed PRs; successful exact-head CI and independent Security review; then explicit owner authorization for deployment, credentials and live transaction testing. No blind retries, implicit attempt-2, production mutation or Mainnet activation.
+7. **Report evidence and blockers:** An agent must distinguish implemented, tested, deployed and ledger-confirmed behavior. If any invariant or dependency is not verified, mark the operation blocked and resolve it before execution rather than declaring readiness.
+
+**Current application:** The self-service Testnet `ChangeTrust → Issuance → Confirmation` work must satisfy this gate, especially a PostgreSQL-backed cross-browser pending-operation guard, before merge or live activation. Preserve the already-proven manual Testnet issuance semantics and current approved Testnet `1-of-1` policy. This rule does not authorize unreviewed redesign, signer deployment or Mainnet activity.
+
 ## 14. Prototype launch and UX objective
 
 The immediate execution goal is to reach a **simple public prototype on the Orrylo domain as quickly as practical without bypassing correctness or security gates**.
