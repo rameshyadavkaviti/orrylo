@@ -171,6 +171,7 @@ if (!TEST_DATABASE_URL) {
       const upgraded = await migrateDatabase(sql, directory);
       assert.deepEqual(upgraded.applied, [
         "011_shared_issuance_signing_mode.sql",
+        "012_customer_change_trust_interlock.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 10));
 
@@ -390,6 +391,7 @@ if (!TEST_DATABASE_URL) {
         "009_signed_envelope_digest.sql",
         "010_mvp_lite_db_security_hardening.sql",
         "011_shared_issuance_signing_mode.sql",
+        "012_customer_change_trust_interlock.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 5));
       const after = await sql<{ name: string; checksum: string }[]>`
@@ -457,6 +459,7 @@ if (!TEST_DATABASE_URL) {
         "009_signed_envelope_digest.sql",
         "010_mvp_lite_db_security_hardening.sql",
         "011_shared_issuance_signing_mode.sql",
+        "012_customer_change_trust_interlock.sql",
       ]);
       const [legacy] = await sql<
         {
@@ -495,6 +498,7 @@ if (!TEST_DATABASE_URL) {
         "009_signed_envelope_digest.sql",
         "010_mvp_lite_db_security_hardening.sql",
         "011_shared_issuance_signing_mode.sql",
+        "012_customer_change_trust_interlock.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 7));
       const after = await sql<{ name: string; checksum: string }[]>`
@@ -521,6 +525,7 @@ if (!TEST_DATABASE_URL) {
         "009_signed_envelope_digest.sql",
         "010_mvp_lite_db_security_hardening.sql",
         "011_shared_issuance_signing_mode.sql",
+        "012_customer_change_trust_interlock.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 8));
       const after = await sql<{ name: string; checksum: string }[]>`
@@ -769,6 +774,7 @@ if (!TEST_DATABASE_URL) {
       assert.deepEqual(upgraded.applied, [
         "010_mvp_lite_db_security_hardening.sql",
         "011_shared_issuance_signing_mode.sql",
+        "012_customer_change_trust_interlock.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 9));
 
