@@ -74,6 +74,14 @@ export interface ImmutableSharedIssuanceRecoveryEvidence {
   sequenceObservedLedgerClosedAt: string;
   issuerPublicKey: string;
   issuerSequence: string;
+  recoveryAttemptId: string;
+  recoveryTransactionHash: string;
+  recoveryEnvelopeXdrSha256: string;
+  recoverySourceSequence: string;
+  recoveryFeeStroops: string;
+  recoveryValidFrom: number;
+  recoveryValidUntil: number;
+  recoveryCreatedAt: string;
   verifierIdentity: string;
   verificationPolicyVersion: string;
   verifiedAt: string;
@@ -228,6 +236,14 @@ interface RecoveryEvidenceRow {
   sequence_observed_ledger_closed_at: Date;
   issuer_public_key: string;
   issuer_sequence: string;
+  recovery_attempt_id: string;
+  recovery_transaction_hash: string;
+  recovery_envelope_xdr_sha256: string;
+  recovery_source_sequence: string;
+  recovery_fee_stroops: string;
+  recovery_valid_from: string;
+  recovery_valid_until: string;
+  recovery_created_at: Date;
   verifier_identity: string;
   verification_policy_version: string;
   verified_at: Date;
@@ -513,7 +529,10 @@ export class PostgresTrustedLedgerConfirmationWriter
         network, lookup_status, lookup_observed_ledger,
         lookup_observed_ledger_closed_at, sequence_observed_ledger,
         sequence_observed_ledger_closed_at, issuer_public_key,
-        issuer_sequence, verifier_identity, verification_policy_version,
+        issuer_sequence, recovery_attempt_id, recovery_transaction_hash,
+        recovery_envelope_xdr_sha256, recovery_source_sequence,
+        recovery_fee_stroops, recovery_valid_from, recovery_valid_until,
+        recovery_created_at, verifier_identity, verification_policy_version,
         verified_at
       ) VALUES (
         ${record.issuanceRequestId}, ${record.supersededAttemptId},
@@ -524,6 +543,10 @@ export class PostgresTrustedLedgerConfirmationWriter
         ${record.sequenceObservedLedger},
         ${new Date(record.sequenceObservedLedgerClosedAt)},
         ${record.issuerPublicKey}, ${record.issuerSequence},
+        ${record.recoveryAttemptId}, ${record.recoveryTransactionHash},
+        ${record.recoveryEnvelopeXdrSha256}, ${record.recoverySourceSequence},
+        ${record.recoveryFeeStroops}, ${record.recoveryValidFrom},
+        ${record.recoveryValidUntil}, ${new Date(record.recoveryCreatedAt)},
         ${record.verifierIdentity}, ${record.verificationPolicyVersion},
         ${new Date(record.verifiedAt)}
       )
@@ -673,6 +696,14 @@ function mapRecoveryEvidence(
       row.sequence_observed_ledger_closed_at.toISOString(),
     issuerPublicKey: row.issuer_public_key.trim(),
     issuerSequence: row.issuer_sequence,
+    recoveryAttemptId: row.recovery_attempt_id,
+    recoveryTransactionHash: row.recovery_transaction_hash.trim(),
+    recoveryEnvelopeXdrSha256: row.recovery_envelope_xdr_sha256.trim(),
+    recoverySourceSequence: row.recovery_source_sequence,
+    recoveryFeeStroops: row.recovery_fee_stroops,
+    recoveryValidFrom: Number(row.recovery_valid_from),
+    recoveryValidUntil: Number(row.recovery_valid_until),
+    recoveryCreatedAt: row.recovery_created_at.toISOString(),
     verifierIdentity: row.verifier_identity,
     verificationPolicyVersion: row.verification_policy_version,
     verifiedAt: row.verified_at.toISOString(),
@@ -805,6 +836,14 @@ function sameRecoveryEvidence(
     left.lookupStatus === right.lookupStatus &&
     left.issuerPublicKey === right.issuerPublicKey &&
     left.issuerSequence === right.issuerSequence &&
+    left.recoveryAttemptId === right.recoveryAttemptId &&
+    left.recoveryTransactionHash === right.recoveryTransactionHash &&
+    left.recoveryEnvelopeXdrSha256 === right.recoveryEnvelopeXdrSha256 &&
+    left.recoverySourceSequence === right.recoverySourceSequence &&
+    left.recoveryFeeStroops === right.recoveryFeeStroops &&
+    left.recoveryValidFrom === right.recoveryValidFrom &&
+    left.recoveryValidUntil === right.recoveryValidUntil &&
+    left.recoveryCreatedAt === right.recoveryCreatedAt &&
     left.verifierIdentity === right.verifierIdentity &&
     left.verificationPolicyVersion === right.verificationPolicyVersion
   );
