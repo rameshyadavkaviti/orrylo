@@ -147,8 +147,8 @@ export class SharedIssuanceOrchestrator {
       authorization: SharedIssuerSignerAuthorization;
       confirmationValidator: ConfirmationValidator;
       confirmationWriter: TrustedLedgerConfirmationWriter;
-      recoveryReader: StellarTestnetLedgerReader;
-      recoveryEvidenceWriter: TrustedRecoveryEvidenceWriter;
+      recoveryReader?: StellarTestnetLedgerReader;
+      recoveryEvidenceWriter?: TrustedRecoveryEvidenceWriter;
       feeStroops: string;
       validitySeconds: number;
       now?: () => number;
@@ -551,6 +551,13 @@ export class SharedIssuanceOrchestrator {
     const now = this.dependencies.now?.() ?? Date.now();
     const nowUnix = Math.floor(now / 1_000);
     if (nowUnix <= previous.validUntil) {
+      throw new SharedIssuanceOrchestrationError("manual_recovery_not_ready");
+    }
+
+    if (
+      !this.dependencies.recoveryReader ||
+      !this.dependencies.recoveryEvidenceWriter
+    ) {
       throw new SharedIssuanceOrchestrationError("manual_recovery_not_ready");
     }
 
