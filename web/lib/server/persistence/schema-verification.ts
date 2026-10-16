@@ -23,6 +23,8 @@ const EXPECTED_TABLES = [
   "project_issuance_full_intents",
   "project_issuance_transaction_attempts",
   "project_issuance_ledger_confirmations",
+  "project_customer_change_trust_handoffs",
+  "project_customer_change_trust_resolutions",
 ] as const;
 
 const EXPECTED_CONSTRAINTS = [
@@ -60,6 +62,11 @@ const EXPECTED_CONSTRAINTS = [
   "project_issuance_attempt_signing_mode",
   "project_metadata_publications_confirmation_scope_fk",
   "project_metadata_publications_owner_required",
+  "customer_change_trust_handoff_hash_unique",
+  "customer_change_trust_resolution_exact_hash",
+  "customer_change_trust_resolution_observation",
+  "project_customer_change_trust_handoffs_pkey",
+  "project_customer_change_trust_resolutions_pkey",
 ] as const;
 
 export interface ExpectedMigrationEvidence {
@@ -321,6 +328,69 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
     throw new Error("Unexpected trusted confirmation writer ACL.");
   }
 
+  // The ordinary application identity has no direct write privileges over
+  // cross-browser ChangeTrust evidence. Only the trusted writer can append
+  // terminal proof; the transactional reservation is migration-owned.
+  const [trustlineAcl] = await sql<{
+    app_handoff_write: boolean;
+    app_resolution_write: boolean;
+    writer_handoff_write: boolean;
+    writer_resolution_insert: boolean;
+    writer_resolution_mutate: boolean;
+    app_reserve_execute: boolean;
+    public_reserve_execute: boolean;
+    reserve_security_definer: boolean;
+    reserve_search_path: string[] | null;
+  }[]>`
+    SELECT
+      (SELECT bool_or(pg_catalog.has_table_privilege(
+        'orrylo_app','public.project_customer_change_trust_handoffs',p
+      )) FROM unnest(ARRAY['INSERT','UPDATE','DELETE','TRUNCATE']) p)
+        AS app_handoff_write,
+      (SELECT bool_or(pg_catalog.has_table_privilege(
+        'orrylo_app','public.project_customer_change_trust_resolutions',p
+      )) FROM unnest(ARRAY['INSERT','UPDATE','DELETE','TRUNCATE']) p)
+        AS app_resolution_write,
+      (SELECT bool_or(pg_catalog.has_table_privilege(
+        'orrylo_confirmation_writer','public.project_customer_change_trust_handoffs',p
+      )) FROM unnest(ARRAY['INSERT','UPDATE','DELETE','TRUNCATE']) p)
+        AS writer_handoff_write,
+      pg_catalog.has_table_privilege(
+        'orrylo_confirmation_writer',
+        'public.project_customer_change_trust_resolutions','INSERT'
+      ) AS writer_resolution_insert,
+      (SELECT bool_or(pg_catalog.has_table_privilege(
+        'orrylo_confirmation_writer','public.project_customer_change_trust_resolutions',p
+      )) FROM unnest(ARRAY['UPDATE','DELETE','TRUNCATE']) p)
+        AS writer_resolution_mutate,
+      pg_catalog.has_function_privilege(
+        'orrylo_app','public.reserve_customer_change_trust_handoff(uuid,uuid,character,character varying,character,character,numeric,character,text,numeric,timestamp with time zone)','EXECUTE'
+      ) AS app_reserve_execute,
+      pg_catalog.has_function_privilege(
+        'public','public.reserve_customer_change_trust_handoff(uuid,uuid,character,character varying,character,character,numeric,character,text,numeric,timestamp with time zone)','EXECUTE'
+      ) AS public_reserve_execute,
+      (SELECT fn.prosecdef FROM pg_catalog.pg_proc fn
+       WHERE fn.oid = 'public.reserve_customer_change_trust_handoff(uuid,uuid,character,character varying,character,character,numeric,character,text,numeric,timestamp with time zone)'::regprocedure
+      ) AS reserve_security_definer,
+      (SELECT fn.proconfig FROM pg_catalog.pg_proc fn
+       WHERE fn.oid = 'public.reserve_customer_change_trust_handoff(uuid,uuid,character,character varying,character,character,numeric,character,text,numeric,timestamp with time zone)'::regprocedure
+      ) AS reserve_search_path
+  `;
+  if (
+    !trustlineAcl ||
+    trustlineAcl.app_handoff_write ||
+    trustlineAcl.app_resolution_write ||
+    trustlineAcl.writer_handoff_write ||
+    !trustlineAcl.writer_resolution_insert ||
+    trustlineAcl.writer_resolution_mutate ||
+    !trustlineAcl.app_reserve_execute ||
+    trustlineAcl.public_reserve_execute ||
+    !trustlineAcl.reserve_security_definer ||
+    !trustlineAcl.reserve_search_path?.includes("search_path=pg_catalog, public")
+  ) {
+    throw new Error("Unexpected protected customer ChangeTrust database authority.");
+  }
+
   const ownershipRows = await sql<
     { object_name: string; owner_name: string }[]
   >`
@@ -333,7 +403,9 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
       AND relation.relname IN (
         'project_issuance_full_intents',
         'project_issuance_transaction_attempts',
-        'project_issuance_ledger_confirmations'
+        'project_issuance_ledger_confirmations',
+        'project_customer_change_trust_handoffs',
+        'project_customer_change_trust_resolutions'
       )
     UNION ALL
     SELECT procedure.proname AS object_name,
@@ -347,7 +419,9 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
         'assert_trusted_confirmation_writer',
         'protect_issuance_transaction_attempt',
         'prevent_issuance_evidence_mutation',
-        'assert_metadata_reachability_signed_confirmation'
+        'assert_metadata_reachability_signed_confirmation',
+        'reserve_customer_change_trust_handoff',
+        'assert_trusted_customer_change_trust_resolution'
       )
   `;
   const [migrationIdentity] = await sql<{ role_name: string }[]>`
@@ -356,7 +430,7 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
   const wrongOwners = ownershipRows.filter(
     (row) => row.owner_name !== migrationIdentity?.role_name,
   );
-  if (ownershipRows.length !== 8 || wrongOwners.length > 0) {
+  if (ownershipRows.length !== 12 || wrongOwners.length > 0) {
     throw new Error(
       "Sensitive issuance tables and enforcement functions must be owned by the migration identity.",
     );
