@@ -368,8 +368,16 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
       pg_catalog.has_function_privilege(
         'orrylo_app','public.reserve_customer_change_trust_handoff(uuid,uuid,character,character varying,character,character,numeric,character,text,numeric,timestamp with time zone)','EXECUTE'
       ) AS app_reserve_execute,
-      pg_catalog.has_function_privilege(
-        'public','public.reserve_customer_change_trust_handoff(uuid,uuid,character,character varying,character,character,numeric,character,text,numeric,timestamp with time zone)','EXECUTE'
+      EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_proc fn
+        CROSS JOIN LATERAL pg_catalog.aclexplode(
+          COALESCE(fn.proacl, pg_catalog.acldefault('f', fn.proowner))
+        ) AS acl
+        WHERE fn.oid =
+          'public.reserve_customer_change_trust_handoff(uuid,uuid,character,character varying,character,character,numeric,character,text,numeric,timestamp with time zone)'::regprocedure
+          AND acl.grantee = 0
+          AND acl.privilege_type = 'EXECUTE'
       ) AS public_reserve_execute,
       (SELECT fn.prosecdef FROM pg_catalog.pg_proc fn
        WHERE fn.oid = 'public.reserve_customer_change_trust_handoff(uuid,uuid,character,character varying,character,character,numeric,character,text,numeric,timestamp with time zone)'::regprocedure
