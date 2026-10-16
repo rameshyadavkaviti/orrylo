@@ -416,11 +416,9 @@ function errorCode(error: unknown): string | undefined {
     : undefined;
 }
 
-const RECOVERY_ATTEMPT_2_ID =
-  "20000000-0000-4000-8000-000000000002";
+const RECOVERY_ATTEMPT_2_ID = "20000000-0000-4000-8000-000000000002";
 const RECOVERY_SIGNER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 126));
-const RECOVERY_NOW =
-  (1_792_101_682 + 120) * 1_000;
+const RECOVERY_NOW = (1_792_101_682 + 120) * 1_000;
 
 function recoveryIntent(): ImmutableSharedIssuanceIntent {
   const policy = TEST8926_BOUNDED_RECOVERY_POLICY;
@@ -458,8 +456,7 @@ function recoveryAttempt1(): ImmutableSharedIssuanceTransactionAttempt {
   return {
     attemptId: policy.supersededAttemptId,
     issuanceRequestId: policy.requestId,
-    issuanceIntentFingerprint:
-      recoveryIntentRecord.issuanceIntentFingerprint,
+    issuanceIntentFingerprint: recoveryIntentRecord.issuanceIntentFingerprint,
     attemptNumber: 1,
     transactionHash: policy.supersededTransactionHash,
     envelopeXdrSha256: "d".repeat(64),
@@ -549,10 +546,7 @@ class RecoveryMemoryStore implements SharedIssuanceOrchestrationStore {
     status: DurableStatus,
     failureCode: string | null = null,
   ) {
-    assert.equal(
-      issuanceRequestId,
-      TEST8926_BOUNDED_RECOVERY_POLICY.requestId,
-    );
+    assert.equal(issuanceRequestId, TEST8926_BOUNDED_RECOVERY_POLICY.requestId);
     if (this.status === status) return false;
     this.status = status;
     this.failureCode = failureCode;
@@ -560,18 +554,19 @@ class RecoveryMemoryStore implements SharedIssuanceOrchestrationStore {
   }
 }
 
-function recoveryFixture(options: {
-  recoverySequence?: string;
-  preflightSequence?: string;
-  confirmationExists?: boolean;
-} = {}) {
+function recoveryFixture(
+  options: {
+    recoverySequence?: string;
+    preflightSequence?: string;
+    confirmationExists?: boolean;
+  } = {},
+) {
   const policy = TEST8926_BOUNDED_RECOVERY_POLICY;
   const store = new RecoveryMemoryStore();
   const calls: string[] = [];
   let submissions = 0;
   let persistedRecoveryEvidence:
-    | ImmutableSharedIssuanceRecoveryEvidence
-    | undefined;
+    ImmutableSharedIssuanceRecoveryEvidence | undefined;
 
   if (options.confirmationExists) {
     store.confirmation = {
@@ -747,9 +742,7 @@ test("owner-authorized recovery creates exactly one fresh manual attempt 2 after
     fx.store.attempts[1]!.amount,
     TEST8926_BOUNDED_RECOVERY_POLICY.amount,
   );
-  assert.ok(
-    fx.store.attempts[1]!.validFrom > fx.store.attempts[0]!.validUntil,
-  );
+  assert.ok(fx.store.attempts[1]!.validFrom > fx.store.attempts[0]!.validUntil);
   assert.equal(fx.store.attempts[1]!.sourceSequence, "123");
   assert.equal(fx.persistedRecoveryEvidence()?.lookupStatus, "not_found");
   assert.deepEqual(fx.calls, [
@@ -798,8 +791,7 @@ test("recovery refuses confirmation, authorization drift, or issuer-sequence dri
     preflightMoved.orchestrator.prepareManualRecoverySigningHandoff(
       recoveryInput,
     ),
-    (error: unknown) =>
-      errorCode(error) === "manual_recovery_sequence_changed",
+    (error: unknown) => errorCode(error) === "manual_recovery_sequence_changed",
   );
   assert.equal(preflightMoved.store.attempts.length, 1);
 });
@@ -825,8 +817,7 @@ test("attempt 2 persists signed provenance before exactly one Horizon POST and b
   assert.ok(fx.store.attempts[1]!.signedEnvelopeXdrSha256);
   assert.equal(fx.submissions(), 1);
   assert.ok(
-    fx.calls.indexOf("submit") >
-      fx.calls.indexOf("persist_recovery_evidence"),
+    fx.calls.indexOf("submit") > fx.calls.indexOf("persist_recovery_evidence"),
   );
 
   await assert.rejects(
@@ -835,8 +826,7 @@ test("attempt 2 persists signed provenance before exactly one Horizon POST and b
       attemptId: handoff.attemptId,
       signedEnvelopeXdr,
     }),
-    (error: unknown) =>
-      errorCode(error) === "manual_signing_already_consumed",
+    (error: unknown) => errorCode(error) === "manual_signing_already_consumed",
   );
   assert.equal(fx.submissions(), 1);
 
@@ -845,8 +835,7 @@ test("attempt 2 persists signed provenance before exactly one Horizon POST and b
       ...recoveryInput,
       attemptId: "20000000-0000-4000-8000-000000000099",
     }),
-    (error: unknown) =>
-      errorCode(error) === "manual_recovery_attempt_mismatch",
+    (error: unknown) => errorCode(error) === "manual_recovery_attempt_mismatch",
   );
 });
 
