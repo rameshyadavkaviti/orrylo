@@ -23,6 +23,7 @@ const ALL_MIGRATIONS = [
   "009_signed_envelope_digest.sql",
   "010_mvp_lite_db_security_hardening.sql",
   "011_shared_issuance_signing_mode.sql",
+  "012_test8926_bounded_recovery_attempt.sql",
 ];
 
 if (!TEST_DATABASE_URL) {
@@ -92,7 +93,7 @@ if (!TEST_DATABASE_URL) {
     await verifyDatabaseSchemaReadOnly(sql, directory);
   }
 
-  test("fresh bootstrap applies 001-011 and repeated runs verify without changes", async () => {
+  test("fresh bootstrap applies 001-012 and repeated runs verify without changes", async () => {
     const first = await migrateDatabase(sql, directory);
     assert.deepEqual(first.applied, ALL_MIGRATIONS);
     assert.deepEqual(first.reconciled, []);
@@ -170,6 +171,7 @@ if (!TEST_DATABASE_URL) {
       const upgraded = await migrateDatabase(sql, directory);
       assert.deepEqual(upgraded.applied, [
         "011_shared_issuance_signing_mode.sql",
+        "012_test8926_bounded_recovery_attempt.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 10));
 
@@ -276,6 +278,78 @@ if (!TEST_DATABASE_URL) {
     }
   });
 
+  test("existing 001-011 production schema upgrades through exact bounded recovery migration 012", async () => {
+    const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-recovery-"));
+    try {
+      for (const migration of ALL_MIGRATIONS.slice(0, 11)) {
+        await copyFile(join(directory, migration), join(temporary, migration));
+      }
+      const initial = await migrateDatabase(sql, temporary);
+      assert.deepEqual(initial.applied, ALL_MIGRATIONS.slice(0, 11));
+
+      await sql`
+        GRANT UPDATE (signed_envelope_xdr_sha256)
+          ON project_issuance_transaction_attempts TO orrylo_app
+      `;
+
+      const upgraded = await migrateDatabase(sql, directory);
+      assert.deepEqual(upgraded.applied, [
+        "012_test8926_bounded_recovery_attempt.sql",
+      ]);
+      assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 11));
+
+      const [authorization] = await sql<{ count: string }[]>`
+        SELECT count(*)::text AS count
+        FROM project_issuance_recovery_authorizations
+        WHERE issuance_request_id =
+          'cda25e25-322b-46fa-9081-fe4c382b5614'
+          AND superseded_attempt_id =
+          '96708101-1afc-4897-b141-fa6839fe6307'
+          AND next_attempt_number = 2
+      `;
+      assert.equal(authorization.count, "1");
+
+      const [acl] = await sql<
+        {
+          app_authorization_insert: boolean;
+          app_evidence_insert: boolean;
+          writer_evidence_insert: boolean;
+          writer_evidence_select: boolean;
+        }[]
+      >`
+        SELECT
+          pg_catalog.has_table_privilege(
+            'orrylo_app',
+            'public.project_issuance_recovery_authorizations',
+            'INSERT'
+          ) AS app_authorization_insert,
+          pg_catalog.has_table_privilege(
+            'orrylo_app',
+            'public.project_issuance_recovery_evidence',
+            'INSERT'
+          ) AS app_evidence_insert,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_recovery_evidence',
+            'INSERT'
+          ) AS writer_evidence_insert,
+          pg_catalog.has_table_privilege(
+            'orrylo_confirmation_writer',
+            'public.project_issuance_recovery_evidence',
+            'SELECT'
+          ) AS writer_evidence_select
+      `;
+      assert.equal(acl.app_authorization_insert, false);
+      assert.equal(acl.app_evidence_insert, false);
+      assert.equal(acl.writer_evidence_insert, true);
+      assert.equal(acl.writer_evidence_select, true);
+
+      await assert.doesNotReject(verifyCurrentSchemaReadOnly());
+    } finally {
+      await rm(temporary, { recursive: true, force: true });
+    }
+  });
+
   test("read-only schema verification accepts the exact trusted confirmation trigger binding", async () => {
     await migrateDatabase(sql, directory);
 
@@ -360,7 +434,7 @@ if (!TEST_DATABASE_URL) {
     );
   });
 
-  test("existing 001-005 database upgrades with 006-011 without rewriting earlier checksums or project rows", async () => {
+  test("existing 001-005 database upgrades with 006-012 without rewriting earlier checksums or project rows", async () => {
     const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-metadata-"));
     try {
       for (const migration of ALL_MIGRATIONS.slice(0, 5)) {
@@ -389,6 +463,7 @@ if (!TEST_DATABASE_URL) {
         "009_signed_envelope_digest.sql",
         "010_mvp_lite_db_security_hardening.sql",
         "011_shared_issuance_signing_mode.sql",
+        "012_test8926_bounded_recovery_attempt.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 5));
       const after = await sql<{ name: string; checksum: string }[]>`
@@ -408,7 +483,7 @@ if (!TEST_DATABASE_URL) {
     }
   });
 
-  test("existing 001-006 publication rows are retained but fail closed during 007-011 upgrade", async () => {
+  test("existing 001-006 publication rows are retained but fail closed during 007-012 upgrade", async () => {
     const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-confirmation-"));
     try {
       for (const migration of ALL_MIGRATIONS.slice(0, 6)) {
@@ -456,6 +531,7 @@ if (!TEST_DATABASE_URL) {
         "009_signed_envelope_digest.sql",
         "010_mvp_lite_db_security_hardening.sql",
         "011_shared_issuance_signing_mode.sql",
+        "012_test8926_bounded_recovery_attempt.sql",
       ]);
       const [legacy] = await sql<
         {
@@ -494,6 +570,7 @@ if (!TEST_DATABASE_URL) {
         "009_signed_envelope_digest.sql",
         "010_mvp_lite_db_security_hardening.sql",
         "011_shared_issuance_signing_mode.sql",
+        "012_test8926_bounded_recovery_attempt.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 7));
       const after = await sql<{ name: string; checksum: string }[]>`
@@ -520,6 +597,7 @@ if (!TEST_DATABASE_URL) {
         "009_signed_envelope_digest.sql",
         "010_mvp_lite_db_security_hardening.sql",
         "011_shared_issuance_signing_mode.sql",
+        "012_test8926_bounded_recovery_attempt.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 8));
       const after = await sql<{ name: string; checksum: string }[]>`
@@ -531,7 +609,7 @@ if (!TEST_DATABASE_URL) {
     }
   });
 
-  test("existing 001-009 successor attempts survive 010-011 while new successor writes fail closed", async () => {
+  test("existing 001-009 successor attempts survive 010-012 while new successor writes fail closed", async () => {
     const temporary = await mkdtemp(join(tmpdir(), "orrylo-pre-db-hardening-"));
     try {
       for (const migration of ALL_MIGRATIONS.slice(0, 9)) {
@@ -768,6 +846,7 @@ if (!TEST_DATABASE_URL) {
       assert.deepEqual(upgraded.applied, [
         "010_mvp_lite_db_security_hardening.sql",
         "011_shared_issuance_signing_mode.sql",
+        "012_test8926_bounded_recovery_attempt.sql",
       ]);
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 9));
 
@@ -787,11 +866,11 @@ if (!TEST_DATABASE_URL) {
         SELECT pg_get_constraintdef(oid) AS definition,
           convalidated AS validated
         FROM pg_constraint
-        WHERE conname = 'project_issuance_attempt_number_mvp_lite'
+        WHERE conname = 'project_issuance_attempt_number_bounded_recovery'
       `;
       assert.equal(
         constraint.definition,
-        "CHECK ((attempt_number = 1)) NOT VALID",
+        "CHECK ((attempt_number = ANY (ARRAY[1, 2]))) NOT VALID",
       );
       assert.equal(constraint.validated, false);
       const [writerHardening] = await sql<
@@ -866,7 +945,7 @@ if (!TEST_DATABASE_URL) {
           `,
           (error: unknown) =>
             (error as { constraint_name?: string }).constraint_name ===
-            "project_issuance_attempt_number_mvp_lite",
+            "project_issuance_bounded_recovery_gate",
         );
         const [{ fresh_count: freshCount }] = await appSql<
           { fresh_count: string }[]
