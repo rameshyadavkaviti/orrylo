@@ -454,6 +454,29 @@ This decision applies to the **normal customer-created Shared Issuer asset issua
 - **Not in v1:** sponsored reserves, platform-paid account bootstrap for this flow, and claimable-balance issuance delivery. Those can be considered later under separately approved financial, abuse-prevention and security policies.
 - This is **product policy**, not evidence that the wallet-integrated trustline creation or automatic protected issuance is already implemented/deployed. Roll out first on Testnet. Mainnet activation, fee caps, issuer custody and signer authorization remain separately gated. Existing RYLO reward/trustline policies and unresolved direct-sale fee-funding decisions are not changed by this customer-asset policy.
 
+### 14.2 Next delivery milestone — customer self-service token creation to wallet (owner approved 2026-10-16)
+
+**P0 next product goal:** An ordinary customer visits `orrylo.com`, authenticates their Stellar wallet, configures a Shared Issuer token, confirms creation, and receives the exact issued asset in that same wallet **without manual operator intervention**. This is a product milestone for a complete customer journey, not merely a token draft, an operator CLI ceremony, or a transaction hash.
+
+Customer experience:
+
+```
+Visit Orrylo → Connect and authenticate Albedo wallet
+→ Configure token and initial supply → Review issuer, network, costs and destination
+→ Check trustline → (if needed) customer approves ChangeTrust in Albedo
+→ Verify trustline on ledger → Confirm Create Token
+→ protected platform issuer signing + one-shot submission
+→ authoritative confirmation → token balance in customer's wallet + project result
+```
+
+- User wallet is the project owner and default receiving destination; binding is server-authoritative. Do not silently substitute another wallet or edit an immutable issuance intent to change destination. The user must explicitly approve the initial issuance and trustline authorization, but should not run terminal commands, visit an external playground, exchange XDR files or contact an Orrylo operator.
+- **Trustline v1:** follow section 14.1's customer-funded, Albedo-integrated `ChangeTrust` policy. Recheck authorization and remaining capacity after the wallet transaction is confirmed. Do not sponsor customer reserves or use claimable balances for routine issuance.
+- **Issuer automation:** extend/reuse the existing protected Shared Issuer signing abstraction and isolated private signer rather than putting any issuer secret in browser, public web runtime or database. The private signer verifies the exact approved network, issuer, immutable intent/transaction and bounded fee/operation policy before signing. Backend executes at most one permitted submission per durable attempt; no blind retries. Distinguish the current Testnet manual signing proof from a deployed, tested automatic signer.
+- **Completion criterion:** exact official-ledger confirmation of correct network, issuer, asset code, destination and amount, durable confirmation, and the recipient's on-chain balance reflecting the issuance. Show honest in-progress, wallet-action-needed, expired, failed and reconciliation-required states; never claim success based only on Albedo callback, XDR signing or a pending hash.
+- **Safety and Mainnet readiness:** show fee payer, account reserve requirement, operation count and maximum transaction fee before user approval. Compute fees/reserves from current network evidence, enforce bounded caps, fail closed on unexpected costs, maintain immutable intent and issuer-scoped uniqueness. Mainnet requires its separately approved 2-of-3 signer/custody and explicit activation; Testnet automation must not silently promote its single-signer policy to Mainnet.
+- **Acceptance:** one independent non-operator customer completes the full UI journey on Testnet, including a missing-trustline case, with verified token receipt, correct project status and no operator signature or shell interaction. Test the already-ready-trustline branch too. Record authoritative transaction and durable application evidence.
+- **Execution boundary:** approval sets the next product priority and authorizes preparation/implementation in reviewed PRs, **not** live deployment, secret provisioning, irreversible account or Mainnet mutations, unrestricted signing, or automatic attempt replacement. Minimize new infrastructure and avoid broad recovery redesign.
+
 ## 15. Domain and publication architecture
 
 Approved prototype public structure:
