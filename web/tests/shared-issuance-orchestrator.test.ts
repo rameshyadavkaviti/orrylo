@@ -753,9 +753,9 @@ test("owner-authorized recovery creates exactly one fresh manual attempt 2 after
   assert.equal(fx.store.attempts[1]!.sourceSequence, "123");
   assert.equal(fx.persistedRecoveryEvidence()?.lookupStatus, "not_found");
   assert.deepEqual(fx.calls, [
+    "preflight",
     "recovery_lookup",
     "recovery_sequence",
-    "preflight",
     "persist_recovery_evidence",
   ]);
 
