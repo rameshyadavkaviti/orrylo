@@ -44,7 +44,7 @@ type SaveState =
   | { status: "persisting_intent" }
   | { status: "preparing_issuance" }
   | { status: "confirming" }
-  | { status: "confirmed"; transactionHash: string }
+  | { status: "confirmed"; transactionHash: string; managePath: string; assetCode: string; supply: string }
   | { status: "reconciliation_required"; managePath: string }
   | { status: "needs_wallet" }
   | { status: "wallet_session_changed" }
@@ -330,6 +330,9 @@ export function CreateSharedTokenForm() {
         setSaveState({
           status: "confirmed",
           transactionHash: executionResult.execution.transactionHash,
+          managePath,
+          assetCode,
+          supply,
         });
         return;
       }
@@ -869,6 +872,8 @@ export function CreateSharedTokenForm() {
               <p role="status">
                 Confirmed on Stellar Testnet with durable exact-hash evidence:{" "}
                 <code>{saveState.transactionHash}</code>
+                <span> · {saveState.supply} {saveState.assetCode} delivered to the receiving wallet.</span>
+                <a href={saveState.managePath}> Open verified token project</a>
               </p>
             ) : null}
 
