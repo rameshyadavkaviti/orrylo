@@ -23,6 +23,8 @@ const EXPECTED_TABLES = [
   "project_issuance_full_intents",
   "project_issuance_transaction_attempts",
   "project_issuance_ledger_confirmations",
+  "project_issuance_recovery_authorizations",
+  "project_issuance_recovery_evidence",
 ] as const;
 
 const EXPECTED_CONSTRAINTS = [
@@ -56,7 +58,8 @@ const EXPECTED_CONSTRAINTS = [
   "project_issuance_confirmation_publication_identity_unique",
   "project_issuance_attempt_signed_envelope_hash",
   "project_issuance_confirmation_signed_envelope_hash",
-  "project_issuance_attempt_number_mvp_lite",
+  "project_issuance_attempt_number_bounded_recovery",
+  "project_issuance_attempt_2_manual_mode",
   "project_issuance_attempt_signing_mode",
   "project_metadata_publications_confirmation_scope_fk",
   "project_metadata_publications_owner_required",
@@ -321,6 +324,121 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
     throw new Error("Unexpected trusted confirmation writer ACL.");
   }
 
+  const [recoveryAcl] = await sql<
+    {
+      app_authorization_any: boolean;
+      app_evidence_any: boolean;
+      writer_authorization_any: boolean;
+      writer_evidence_select: boolean;
+      writer_evidence_insert: boolean;
+      writer_evidence_update: boolean;
+      writer_evidence_delete: boolean;
+      writer_evidence_truncate: boolean;
+    }[]
+  >`
+    SELECT
+      COALESCE((
+        SELECT bool_or(
+          pg_catalog.has_table_privilege(
+            role.oid,
+            'public.project_issuance_recovery_authorizations',
+            privilege
+          )
+        )
+        FROM pg_catalog.pg_roles AS role
+        CROSS JOIN unnest(ARRAY[
+          'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'
+        ]) AS privilege
+        WHERE role.rolname = 'orrylo_app'
+      ), false) AS app_authorization_any,
+      COALESCE((
+        SELECT bool_or(
+          pg_catalog.has_table_privilege(
+            role.oid,
+            'public.project_issuance_recovery_evidence',
+            privilege
+          )
+        )
+        FROM pg_catalog.pg_roles AS role
+        CROSS JOIN unnest(ARRAY[
+          'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'
+        ]) AS privilege
+        WHERE role.rolname = 'orrylo_app'
+      ), false) AS app_evidence_any,
+      COALESCE((
+        SELECT bool_or(
+          pg_catalog.has_table_privilege(
+            role.oid,
+            'public.project_issuance_recovery_authorizations',
+            privilege
+          )
+        )
+        FROM pg_catalog.pg_roles AS role
+        CROSS JOIN unnest(ARRAY[
+          'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'
+        ]) AS privilege
+        WHERE role.rolname = 'orrylo_confirmation_writer'
+      ), false) AS writer_authorization_any,
+      COALESCE((
+        SELECT pg_catalog.has_table_privilege(
+          role.oid,
+          'public.project_issuance_recovery_evidence',
+          'SELECT'
+        )
+        FROM pg_catalog.pg_roles AS role
+        WHERE role.rolname = 'orrylo_confirmation_writer'
+      ), false) AS writer_evidence_select,
+      COALESCE((
+        SELECT pg_catalog.has_table_privilege(
+          role.oid,
+          'public.project_issuance_recovery_evidence',
+          'INSERT'
+        )
+        FROM pg_catalog.pg_roles AS role
+        WHERE role.rolname = 'orrylo_confirmation_writer'
+      ), false) AS writer_evidence_insert,
+      COALESCE((
+        SELECT pg_catalog.has_table_privilege(
+          role.oid,
+          'public.project_issuance_recovery_evidence',
+          'UPDATE'
+        )
+        FROM pg_catalog.pg_roles AS role
+        WHERE role.rolname = 'orrylo_confirmation_writer'
+      ), false) AS writer_evidence_update,
+      COALESCE((
+        SELECT pg_catalog.has_table_privilege(
+          role.oid,
+          'public.project_issuance_recovery_evidence',
+          'DELETE'
+        )
+        FROM pg_catalog.pg_roles AS role
+        WHERE role.rolname = 'orrylo_confirmation_writer'
+      ), false) AS writer_evidence_delete,
+      COALESCE((
+        SELECT pg_catalog.has_table_privilege(
+          role.oid,
+          'public.project_issuance_recovery_evidence',
+          'TRUNCATE'
+        )
+        FROM pg_catalog.pg_roles AS role
+        WHERE role.rolname = 'orrylo_confirmation_writer'
+      ), false) AS writer_evidence_truncate
+  `;
+
+  if (
+    recoveryAcl?.app_authorization_any ||
+    recoveryAcl?.app_evidence_any ||
+    recoveryAcl?.writer_authorization_any ||
+    !recoveryAcl?.writer_evidence_select ||
+    !recoveryAcl.writer_evidence_insert ||
+    recoveryAcl.writer_evidence_update ||
+    recoveryAcl.writer_evidence_delete ||
+    recoveryAcl.writer_evidence_truncate
+  ) {
+    throw new Error("Unexpected bounded recovery ACL.");
+  }
+
   const ownershipRows = await sql<
     { object_name: string; owner_name: string }[]
   >`
@@ -333,7 +451,9 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
       AND relation.relname IN (
         'project_issuance_full_intents',
         'project_issuance_transaction_attempts',
-        'project_issuance_ledger_confirmations'
+        'project_issuance_ledger_confirmations',
+        'project_issuance_recovery_authorizations',
+        'project_issuance_recovery_evidence'
       )
     UNION ALL
     SELECT procedure.proname AS object_name,
@@ -347,7 +467,9 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
         'assert_trusted_confirmation_writer',
         'protect_issuance_transaction_attempt',
         'prevent_issuance_evidence_mutation',
-        'assert_metadata_reachability_signed_confirmation'
+        'assert_metadata_reachability_signed_confirmation',
+        'assert_trusted_recovery_evidence_writer',
+        'assert_bounded_recovery_attempt_insert'
       )
   `;
   const [migrationIdentity] = await sql<{ role_name: string }[]>`
@@ -356,7 +478,7 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
   const wrongOwners = ownershipRows.filter(
     (row) => row.owner_name !== migrationIdentity?.role_name,
   );
-  if (ownershipRows.length !== 8 || wrongOwners.length > 0) {
+  if (ownershipRows.length !== 12 || wrongOwners.length > 0) {
     throw new Error(
       "Sensitive issuance tables and enforcement functions must be owned by the migration identity.",
     );
@@ -381,7 +503,7 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
         SELECT pg_get_constraintdef(constraint_row.oid)
         FROM pg_catalog.pg_constraint AS constraint_row
         WHERE constraint_row.conname =
-          'project_issuance_attempt_number_mvp_lite'
+          'project_issuance_attempt_number_bounded_recovery'
           AND constraint_row.conrelid =
             'project_issuance_transaction_attempts'::regclass
       ) AS attempt_constraint,
@@ -389,7 +511,7 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
         SELECT constraint_row.convalidated
         FROM pg_catalog.pg_constraint AS constraint_row
         WHERE constraint_row.conname =
-          'project_issuance_attempt_number_mvp_lite'
+          'project_issuance_attempt_number_bounded_recovery'
           AND constraint_row.conrelid =
             'project_issuance_transaction_attempts'::regclass
       ) AS attempt_constraint_validated,
@@ -491,7 +613,7 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
   `;
   if (
     hardening?.attempt_constraint !==
-      "CHECK ((attempt_number = 1)) NOT VALID" ||
+      "CHECK ((attempt_number = ANY (ARRAY[1, 2]))) NOT VALID" ||
     hardening.attempt_constraint_validated !== false ||
     hardening.trusted_writer_function_security_definer ||
     !hardening.trusted_writer_function_search_path?.includes(
@@ -509,5 +631,188 @@ async function verifyCatalogState(sql: postgres.TransactionSql) {
     throw new Error(
       "Missing or unsafe MVP Lite database hardening for attempt count, trusted confirmation writing/trigger binding, or metadata reachability.",
     );
+  }
+
+  const [recoveryHardening] = await sql<
+    {
+      manual_constraint: string | null;
+      manual_constraint_validated: boolean | null;
+      evidence_writer_security_definer: boolean;
+      evidence_writer_search_path: string[] | null;
+      evidence_writer_public_execute: boolean;
+      evidence_trigger_binding: boolean;
+      recovery_attempt_security_definer: boolean;
+      recovery_attempt_search_path: string[] | null;
+      recovery_attempt_public_execute: boolean;
+      recovery_attempt_trigger_binding: boolean;
+      exact_authorization_count: number;
+    }[]
+  >`
+    SELECT
+      (
+        SELECT pg_get_constraintdef(constraint_row.oid)
+        FROM pg_catalog.pg_constraint AS constraint_row
+        WHERE constraint_row.conname =
+          'project_issuance_attempt_2_manual_mode'
+          AND constraint_row.conrelid =
+            'project_issuance_transaction_attempts'::regclass
+      ) AS manual_constraint,
+      (
+        SELECT constraint_row.convalidated
+        FROM pg_catalog.pg_constraint AS constraint_row
+        WHERE constraint_row.conname =
+          'project_issuance_attempt_2_manual_mode'
+          AND constraint_row.conrelid =
+            'project_issuance_transaction_attempts'::regclass
+      ) AS manual_constraint_validated,
+      COALESCE((
+        SELECT procedure.prosecdef
+        FROM pg_catalog.pg_proc AS procedure
+        JOIN pg_catalog.pg_namespace AS namespace
+          ON namespace.oid = procedure.pronamespace
+        WHERE namespace.nspname = 'public'
+          AND procedure.proname =
+            'assert_trusted_recovery_evidence_writer'
+        LIMIT 1
+      ), false) AS evidence_writer_security_definer,
+      (
+        SELECT procedure.proconfig
+        FROM pg_catalog.pg_proc AS procedure
+        JOIN pg_catalog.pg_namespace AS namespace
+          ON namespace.oid = procedure.pronamespace
+        WHERE namespace.nspname = 'public'
+          AND procedure.proname =
+            'assert_trusted_recovery_evidence_writer'
+        LIMIT 1
+      ) AS evidence_writer_search_path,
+      COALESCE((
+        SELECT bool_or(
+          acl.grantee = 0
+          AND acl.privilege_type = 'EXECUTE'
+        )
+        FROM pg_catalog.pg_proc AS procedure
+        JOIN pg_catalog.pg_namespace AS namespace
+          ON namespace.oid = procedure.pronamespace
+        CROSS JOIN LATERAL pg_catalog.aclexplode(
+          COALESCE(
+            procedure.proacl,
+            pg_catalog.acldefault('f', procedure.proowner)
+          )
+        ) AS acl
+        WHERE namespace.nspname = 'public'
+          AND procedure.proname =
+            'assert_trusted_recovery_evidence_writer'
+      ), false) AS evidence_writer_public_execute,
+      EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_trigger AS trigger_row
+        JOIN pg_catalog.pg_class AS relation
+          ON relation.oid = trigger_row.tgrelid
+        JOIN pg_catalog.pg_proc AS procedure
+          ON procedure.oid = trigger_row.tgfoid
+        WHERE trigger_row.tgname =
+            'project_issuance_recovery_evidence_trusted_writer'
+          AND NOT trigger_row.tgisinternal
+          AND relation.relname = 'project_issuance_recovery_evidence'
+          AND procedure.proname =
+            'assert_trusted_recovery_evidence_writer'
+      ) AS evidence_trigger_binding,
+      COALESCE((
+        SELECT procedure.prosecdef
+        FROM pg_catalog.pg_proc AS procedure
+        JOIN pg_catalog.pg_namespace AS namespace
+          ON namespace.oid = procedure.pronamespace
+        WHERE namespace.nspname = 'public'
+          AND procedure.proname =
+            'assert_bounded_recovery_attempt_insert'
+        LIMIT 1
+      ), false) AS recovery_attempt_security_definer,
+      (
+        SELECT procedure.proconfig
+        FROM pg_catalog.pg_proc AS procedure
+        JOIN pg_catalog.pg_namespace AS namespace
+          ON namespace.oid = procedure.pronamespace
+        WHERE namespace.nspname = 'public'
+          AND procedure.proname =
+            'assert_bounded_recovery_attempt_insert'
+        LIMIT 1
+      ) AS recovery_attempt_search_path,
+      COALESCE((
+        SELECT bool_or(
+          acl.grantee = 0
+          AND acl.privilege_type = 'EXECUTE'
+        )
+        FROM pg_catalog.pg_proc AS procedure
+        JOIN pg_catalog.pg_namespace AS namespace
+          ON namespace.oid = procedure.pronamespace
+        CROSS JOIN LATERAL pg_catalog.aclexplode(
+          COALESCE(
+            procedure.proacl,
+            pg_catalog.acldefault('f', procedure.proowner)
+          )
+        ) AS acl
+        WHERE namespace.nspname = 'public'
+          AND procedure.proname =
+            'assert_bounded_recovery_attempt_insert'
+      ), false) AS recovery_attempt_public_execute,
+      EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_trigger AS trigger_row
+        JOIN pg_catalog.pg_class AS relation
+          ON relation.oid = trigger_row.tgrelid
+        JOIN pg_catalog.pg_proc AS procedure
+          ON procedure.oid = trigger_row.tgfoid
+        WHERE trigger_row.tgname =
+            'project_issuance_bounded_recovery_attempt_insert'
+          AND NOT trigger_row.tgisinternal
+          AND relation.relname = 'project_issuance_transaction_attempts'
+          AND procedure.proname =
+            'assert_bounded_recovery_attempt_insert'
+      ) AS recovery_attempt_trigger_binding,
+      (
+        SELECT count(*)::integer
+        FROM project_issuance_recovery_authorizations AS authorization
+        WHERE authorization.issuance_request_id =
+            'cda25e25-322b-46fa-9081-fe4c382b5614'
+          AND authorization.project_id =
+            'cabb5cec-0140-4d7f-93a5-d37d7b7a5f13'
+          AND authorization.owner_public_key =
+            'GBJIM6BH2WYV3BLAFR4F6KW6Y7XZV36FBXZFICMWQ5Y7DVL4RGV2CYPB'
+          AND authorization.superseded_attempt_id =
+            '96708101-1afc-4897-b141-fa6839fe6307'
+          AND authorization.superseded_transaction_hash =
+            '478da69fea287435c93ae284dad2d0de90993c2f92dd758f5f706f77f0eac124'
+          AND authorization.next_attempt_number = 2
+          AND authorization.network = 'testnet'
+          AND authorization.issuer_public_key =
+            'GBW4IKGPC5Q4YRKGRMNNXTVRZNQZ3DFWFHXSQUAMWLXES75MWTY3TWOV'
+          AND authorization.destination_public_key =
+            'GBJIM6BH2WYV3BLAFR4F6KW6Y7XZV36FBXZFICMWQ5Y7DVL4RGV2CYPB'
+          AND authorization.asset_code = 'TEST8926'
+          AND authorization.amount = 991100.0000000
+          AND authorization.authorization_policy_version =
+            'test8926-owner-bounded-recovery-v1'
+      ) AS exact_authorization_count
+  `;
+
+  if (
+    recoveryHardening?.manual_constraint !==
+      "CHECK (((attempt_number <> 2) OR (signing_mode IS NULL) OR (signing_mode = 'manual'::text))) NOT VALID" ||
+    recoveryHardening.manual_constraint_validated !== false ||
+    !recoveryHardening.evidence_writer_security_definer ||
+    !recoveryHardening.evidence_writer_search_path?.includes(
+      "search_path=pg_catalog, public",
+    ) ||
+    recoveryHardening.evidence_writer_public_execute ||
+    !recoveryHardening.evidence_trigger_binding ||
+    !recoveryHardening.recovery_attempt_security_definer ||
+    !recoveryHardening.recovery_attempt_search_path?.includes(
+      "search_path=pg_catalog, public",
+    ) ||
+    recoveryHardening.recovery_attempt_public_execute ||
+    !recoveryHardening.recovery_attempt_trigger_binding ||
+    recoveryHardening.exact_authorization_count !== 1
+  ) {
+    throw new Error("Missing or unsafe bounded TEST8926 recovery hardening.");
   }
 }
