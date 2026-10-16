@@ -23,6 +23,7 @@ const ALL_MIGRATIONS = [
   "009_signed_envelope_digest.sql",
   "010_mvp_lite_db_security_hardening.sql",
   "011_shared_issuance_signing_mode.sql",
+  "012_customer_change_trust_interlock.sql",
 ];
 
 if (!TEST_DATABASE_URL) {
