@@ -442,6 +442,18 @@ The first public-facing experience should:
 
 Prototype speed should come from constrained scope and clear UX, not from weakening security, data integrity, deployment evidence, or canonical policy.
 
+### 14.1 Approved customer-funded Trustline v1 (owner approved 2026-10-16)
+
+This decision applies to the **normal customer-created Shared Issuer asset issuance experience in v1**. The receiving customer wallet pays the Stellar reserve required for its own trustline and authorizes the trustline transaction. Orrylo does **not** sponsor the customer's trustline reserve, automatically fund the customer's account, or use a claimable balance as the default issuance-delivery mechanism in v1.
+
+- After Albedo wallet authentication and token configuration, Orrylo checks the exact `network + asset code + issuer + receiving account` trustline with authoritative Stellar network evidence. Verify that it exists, is authorized where required, and has sufficient available capacity for the full approved initial amount.
+- If the trustline is already ready, bypass trustline setup. If missing or insufficient, offer a wallet-integrated `ChangeTrust` step with the exact issuer/asset/limit, showing the required XLM reserve and transaction fee before approval. **The customer must authorize/sign using their own wallet**; no customer secret or silent signature is permitted.
+- The application may orchestrate the flow and resume only **after** authoritative network confirmation and renewed trustline/capacity validation. A submitted wallet intent, popup completion or client callback alone is not proof of readiness.
+- After verified readiness, perform the already-approved protected issuer signing and one-shot submission flow, with immutable issuance intent, fee checks, exact-hash reconciliation and independently verified confirmation unchanged. Do not show `confirmed` until the issued asset and amount have been authoritatively confirmed and durably recorded.
+- Customer-paid trustline reserves and network fees are distinct from the platform's issuer transaction fee and any product/service price. Make the payer and current estimated cost clear. Never assume static Mainnet base fees or reserves; impose bounded, policy-approved maximum fees and fail closed on excessive/unexpected costs.
+- **Not in v1:** sponsored reserves, platform-paid account bootstrap for this flow, and claimable-balance issuance delivery. Those can be considered later under separately approved financial, abuse-prevention and security policies.
+- This is **product policy**, not evidence that the wallet-integrated trustline creation or automatic protected issuance is already implemented/deployed. Roll out first on Testnet. Mainnet activation, fee caps, issuer custody and signer authorization remain separately gated. Existing RYLO reward/trustline policies and unresolved direct-sale fee-funding decisions are not changed by this customer-asset policy.
+
 ## 15. Domain and publication architecture
 
 Approved prototype public structure:
