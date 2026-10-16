@@ -2,7 +2,10 @@ import type {
   SharedIssuanceApplicationDatabaseBoundary,
   TrustedConfirmationWriterDatabaseBoundary,
 } from "../persistence/issuance-database-boundaries";
-import type { ValidatedSharedIssuanceLedgerConfirmation } from "../../stellar/testnet-ledger-confirmation";
+import type {
+  ValidatedSharedIssuanceLedgerConfirmation,
+  ValidatedSharedIssuanceRecoveryEvidence,
+} from "../../stellar/testnet-ledger-confirmation";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -56,6 +59,24 @@ export interface ImmutableSharedIssuanceTransactionAttempt {
   destinationPublicKey: string;
   amount: string;
   createdAt: string;
+}
+
+export interface ImmutableSharedIssuanceRecoveryEvidence {
+  issuanceRequestId: string;
+  supersededAttemptId: string;
+  issuanceIntentFingerprint: string;
+  supersededTransactionHash: string;
+  network: "testnet";
+  lookupStatus: "not_found";
+  lookupObservedLedger: number;
+  lookupObservedLedgerClosedAt: string;
+  sequenceObservedLedger: number;
+  sequenceObservedLedgerClosedAt: string;
+  issuerPublicKey: string;
+  issuerSequence: string;
+  verifierIdentity: string;
+  verificationPolicyVersion: string;
+  verifiedAt: string;
 }
 
 export interface ImmutableSharedIssuanceLedgerConfirmation {
@@ -124,6 +145,12 @@ export interface SharedIssuancePersistenceRepository {
 export type SharedIssuancePersistenceWriter =
   SharedIssuancePersistenceRepository;
 
+export interface TrustedRecoveryEvidenceWriter {
+  appendRecoveryEvidence(
+    evidence: ValidatedSharedIssuanceRecoveryEvidence,
+  ): Promise<ImmutableSharedIssuanceRecoveryEvidence>;
+}
+
 export interface TrustedLedgerConfirmationWriter {
   appendConfirmation(
     confirmation: ValidatedSharedIssuanceLedgerConfirmation,
@@ -186,6 +213,24 @@ interface AttemptRow {
   destination_public_key: string;
   amount: string;
   created_at: Date;
+}
+
+interface RecoveryEvidenceRow {
+  issuance_request_id: string;
+  superseded_attempt_id: string;
+  issuance_intent_fingerprint: string;
+  superseded_transaction_hash: string;
+  network: "testnet";
+  lookup_status: "not_found";
+  lookup_observed_ledger: string;
+  lookup_observed_ledger_closed_at: Date;
+  sequence_observed_ledger: string;
+  sequence_observed_ledger_closed_at: Date;
+  issuer_public_key: string;
+  issuer_sequence: string;
+  verifier_identity: string;
+  verification_policy_version: string;
+  verified_at: Date;
 }
 
 interface ConfirmationRow {
@@ -401,7 +446,9 @@ export class PostgresSharedIssuancePersistenceRepository implements SharedIssuan
   }
 }
 
-export class PostgresTrustedLedgerConfirmationWriter implements TrustedLedgerConfirmationWriter {
+export class PostgresTrustedLedgerConfirmationWriter
+  implements TrustedLedgerConfirmationWriter, TrustedRecoveryEvidenceWriter
+{
   constructor(
     private readonly boundary: TrustedConfirmationWriterDatabaseBoundary,
   ) {
@@ -449,6 +496,47 @@ export class PostgresTrustedLedgerConfirmationWriter implements TrustedLedgerCon
     `;
     const stored = row ? mapConfirmation(row) : null;
     if (!stored || !sameRecord(stored, record)) {
+      throw new SharedIssuancePersistenceConflictError();
+    }
+    return stored;
+  }
+  async appendRecoveryEvidence(
+    evidence: ValidatedSharedIssuanceRecoveryEvidence,
+  ): Promise<ImmutableSharedIssuanceRecoveryEvidence> {
+    evidence.assertValidated();
+    const record = evidence.record;
+    const sql = this.boundary.sql;
+    await sql`
+      INSERT INTO project_issuance_recovery_evidence (
+        issuance_request_id, superseded_attempt_id,
+        issuance_intent_fingerprint, superseded_transaction_hash,
+        network, lookup_status, lookup_observed_ledger,
+        lookup_observed_ledger_closed_at, sequence_observed_ledger,
+        sequence_observed_ledger_closed_at, issuer_public_key,
+        issuer_sequence, verifier_identity, verification_policy_version,
+        verified_at
+      ) VALUES (
+        ${record.issuanceRequestId}, ${record.supersededAttemptId},
+        ${record.issuanceIntentFingerprint},
+        ${record.supersededTransactionHash}, 'testnet', 'not_found',
+        ${record.lookupObservedLedger},
+        ${new Date(record.lookupObservedLedgerClosedAt)},
+        ${record.sequenceObservedLedger},
+        ${new Date(record.sequenceObservedLedgerClosedAt)},
+        ${record.issuerPublicKey}, ${record.issuerSequence},
+        ${record.verifierIdentity}, ${record.verificationPolicyVersion},
+        ${new Date(record.verifiedAt)}
+      )
+      ON CONFLICT DO NOTHING
+    `;
+    const [row] = await sql<RecoveryEvidenceRow[]>`
+      SELECT *
+      FROM project_issuance_recovery_evidence
+      WHERE issuance_request_id = ${record.issuanceRequestId}
+        AND superseded_attempt_id = ${record.supersededAttemptId}
+    `;
+    const stored = row ? mapRecoveryEvidence(row) : null;
+    if (!stored || !sameRecoveryEvidence(stored, record)) {
       throw new SharedIssuancePersistenceConflictError();
     }
     return stored;
@@ -567,6 +655,30 @@ function mapAttempt(
   return attempt;
 }
 
+function mapRecoveryEvidence(
+  row: RecoveryEvidenceRow,
+): ImmutableSharedIssuanceRecoveryEvidence {
+  return {
+    issuanceRequestId: row.issuance_request_id,
+    supersededAttemptId: row.superseded_attempt_id,
+    issuanceIntentFingerprint: row.issuance_intent_fingerprint.trim(),
+    supersededTransactionHash: row.superseded_transaction_hash.trim(),
+    network: row.network,
+    lookupStatus: row.lookup_status,
+    lookupObservedLedger: Number(row.lookup_observed_ledger),
+    lookupObservedLedgerClosedAt:
+      row.lookup_observed_ledger_closed_at.toISOString(),
+    sequenceObservedLedger: Number(row.sequence_observed_ledger),
+    sequenceObservedLedgerClosedAt:
+      row.sequence_observed_ledger_closed_at.toISOString(),
+    issuerPublicKey: row.issuer_public_key.trim(),
+    issuerSequence: row.issuer_sequence,
+    verifierIdentity: row.verifier_identity,
+    verificationPolicyVersion: row.verification_policy_version,
+    verifiedAt: row.verified_at.toISOString(),
+  };
+}
+
 function mapConfirmation(
   row: ConfirmationRow,
 ): ImmutableSharedIssuanceLedgerConfirmation {
@@ -643,7 +755,7 @@ function assertAttempt(
     (attempt.signedEnvelopeXdrSha256 !== undefined &&
       !HASH_PATTERN.test(attempt.signedEnvelopeXdrSha256)) ||
     !Number.isSafeInteger(attempt.attemptNumber) ||
-    attempt.attemptNumber !== 1 ||
+    (attempt.attemptNumber !== 1 && attempt.attemptNumber !== 2) ||
     !INTEGER_PATTERN.test(attempt.sourceSequence) ||
     !INTEGER_PATTERN.test(attempt.feeStroops) ||
     BigInt(attempt.feeStroops) <= 0n ||
@@ -677,6 +789,24 @@ function attemptMatchesIntent(
     attempt.issuerPublicKey === intent.issuerPublicKey &&
     attempt.destinationPublicKey === intent.destinationPublicKey &&
     attempt.amount === intent.amount
+  );
+}
+
+function sameRecoveryEvidence(
+  left: ImmutableSharedIssuanceRecoveryEvidence,
+  right: Readonly<ImmutableSharedIssuanceRecoveryEvidence>,
+): boolean {
+  return (
+    left.issuanceRequestId === right.issuanceRequestId &&
+    left.supersededAttemptId === right.supersededAttemptId &&
+    left.issuanceIntentFingerprint === right.issuanceIntentFingerprint &&
+    left.supersededTransactionHash === right.supersededTransactionHash &&
+    left.network === right.network &&
+    left.lookupStatus === right.lookupStatus &&
+    left.issuerPublicKey === right.issuerPublicKey &&
+    left.issuerSequence === right.issuerSequence &&
+    left.verifierIdentity === right.verifierIdentity &&
+    left.verificationPolicyVersion === right.verificationPolicyVersion
   );
 }
 
