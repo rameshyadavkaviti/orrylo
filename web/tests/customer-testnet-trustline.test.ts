@@ -224,7 +224,10 @@ test("insufficient capacity produces a new limit; unauthorized trustline fails c
 
 test("customer fee cap and reserve safety reject before wallet signing", async () => {
   await assert.rejects(
-    inspectCustomerTrustline(args(), fixture({ baseFee: 201 }).fetchImpl),
+    inspectCustomerTrustline(
+      { ...args(), configuration: { ...CONFIG, issuerFeeStroops: "300" } },
+      fixture({ baseFee: 201 }).fetchImpl,
+    ),
     (error: unknown) =>
       error instanceof CustomerTrustlineError &&
       error.code === "trustline_fee_cap_exceeded",
