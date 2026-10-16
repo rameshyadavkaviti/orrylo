@@ -94,6 +94,7 @@ export async function loadAndAssertDurableSharedIssuerPlan(input: {
   reader: SharedIssuerDurableExecutionReader;
   attemptId: string;
   plan: SharedIssuerIssuancePlan;
+  expectedAttemptNumber?: 1 | 2;
 }): Promise<{
   intent: ImmutableSharedIssuanceIntent;
   attempt: ImmutableSharedIssuanceTransactionAttempt;
@@ -115,6 +116,7 @@ export async function loadAndAssertDurableSharedIssuerPlan(input: {
     attempt,
     attemptId: input.attemptId,
     plan: input.plan,
+    expectedAttemptNumber: input.expectedAttemptNumber,
   });
 
   return { intent, attempt };
@@ -129,11 +131,13 @@ export async function signPersistedSharedIssuerEnvelope(input: {
   attemptId: string;
   plan: SharedIssuerIssuancePlan;
   signer: SharedIssuerSigner;
+  expectedAttemptNumber?: 1 | 2;
 }): Promise<{ signedEnvelopeXdr: string }> {
   await loadAndAssertDurableSharedIssuerPlan({
     reader: input.reader,
     attemptId: input.attemptId,
     plan: input.plan,
+    expectedAttemptNumber: input.expectedAttemptNumber,
   });
 
   const signed = await input.signer.signCanonicalEnvelope(
@@ -156,11 +160,13 @@ export async function persistAndSubmitSharedIssuerEnvelope(input: {
   signedEnvelopeXdr: string;
   authorization: SharedIssuerSignerAuthorization;
   submission: SharedIssuerSubmissionAdapter;
+  expectedAttemptNumber?: 1 | 2;
 }): Promise<SharedIssuerSubmissionResult> {
   const { intent } = await loadAndAssertDurableSharedIssuerPlan({
     reader: input.writer,
     attemptId: input.attemptId,
     plan: input.plan,
+    expectedAttemptNumber: input.expectedAttemptNumber,
   });
   assertSignedEnvelopeAuthorizedForSubmission(
     input.signedEnvelopeXdr,
@@ -180,6 +186,7 @@ export async function persistAndSubmitSharedIssuerEnvelope(input: {
     attempt: persisted,
     attemptId: input.attemptId,
     plan: input.plan,
+    expectedAttemptNumber: input.expectedAttemptNumber,
   });
   if (persisted.signedEnvelopeXdrSha256 !== signedEnvelopeXdrSha256) {
     throw new SharedIssuerIssuanceError(
@@ -200,6 +207,7 @@ function assertDurableRecordsMatchPlan(input: {
   attempt: ImmutableSharedIssuanceTransactionAttempt;
   attemptId: string;
   plan: SharedIssuerIssuancePlan;
+  expectedAttemptNumber?: 1 | 2;
 }): void {
   const { intent, attempt, plan } = input;
   const networkPassphraseHash = createHash("sha256")
@@ -220,7 +228,7 @@ function assertDurableRecordsMatchPlan(input: {
 
   if (
     attempt.attemptId !== input.attemptId ||
-    attempt.attemptNumber !== 1 ||
+    attempt.attemptNumber !== (input.expectedAttemptNumber ?? 1) ||
     attempt.issuanceRequestId !== intent.issuanceRequestId ||
     attempt.issuanceIntentFingerprint !== intent.issuanceIntentFingerprint ||
     intent.issuanceIntentFingerprint !== durableIntentFingerprint ||
