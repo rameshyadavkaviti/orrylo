@@ -16,12 +16,14 @@ import {
 import type {
   ImmutableSharedIssuanceIntent,
   ImmutableSharedIssuanceLedgerConfirmation,
+  ImmutableSharedIssuanceRecoveryEvidence,
   ImmutableSharedIssuanceTransactionAttempt,
 } from "../lib/server/projects/shared-issuance-persistence";
 import {
   SharedIssuanceOrchestrator,
   type SharedIssuanceOrchestrationStore,
 } from "../lib/server/projects/shared-issuance-orchestrator";
+import { TEST8926_BOUNDED_RECOVERY_POLICY } from "../lib/server/projects/shared-issuance-recovery-policy";
 import { PrivateRailwaySharedIssuerSigningPrimitive } from "../lib/stellar/private-railway-signer";
 import type { SharedIssuerSigningPrimitive } from "../lib/stellar/shared-issuer-signing-policy";
 import {
@@ -413,6 +415,440 @@ function errorCode(error: unknown): string | undefined {
     ? String(error.code)
     : undefined;
 }
+
+const RECOVERY_ATTEMPT_2_ID =
+  "20000000-0000-4000-8000-000000000002";
+const RECOVERY_SIGNER = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 126));
+const RECOVERY_NOW =
+  (1_792_101_682 + 120) * 1_000;
+
+function recoveryIntent(): ImmutableSharedIssuanceIntent {
+  const policy = TEST8926_BOUNDED_RECOVERY_POLICY;
+  const issuanceIntentFingerprint = hashSharedIssuerIssuanceIntent({
+    policyVersion: SHARED_ISSUANCE_POLICY_VERSION,
+    projectId: policy.projectId,
+    network: "testnet",
+    assetCode: policy.assetCode,
+    issuerPublicKey: policy.issuerPublicKey,
+    destinationPublicKey: policy.destinationPublicKey,
+    amount: policy.amount,
+  });
+  return {
+    issuanceRequestId: policy.requestId,
+    issuanceIntentFingerprint,
+    reservationFingerprint: "c".repeat(64),
+    projectId: policy.projectId,
+    ownerPublicKey: policy.ownerPublicKey,
+    network: "testnet",
+    networkPassphraseHash: createHash("sha256")
+      .update(Networks.TESTNET)
+      .digest("hex"),
+    assetCode: policy.assetCode,
+    issuerPublicKey: policy.issuerPublicKey,
+    destinationPublicKey: policy.destinationPublicKey,
+    amount: policy.amount,
+    policyVersion: SHARED_ISSUANCE_POLICY_VERSION,
+    createdAt: new Date((1_792_101_382 - 10) * 1_000).toISOString(),
+  };
+}
+
+function recoveryAttempt1(): ImmutableSharedIssuanceTransactionAttempt {
+  const policy = TEST8926_BOUNDED_RECOVERY_POLICY;
+  const recoveryIntentRecord = recoveryIntent();
+  return {
+    attemptId: policy.supersededAttemptId,
+    issuanceRequestId: policy.requestId,
+    issuanceIntentFingerprint:
+      recoveryIntentRecord.issuanceIntentFingerprint,
+    attemptNumber: 1,
+    transactionHash: policy.supersededTransactionHash,
+    envelopeXdrSha256: "d".repeat(64),
+    signingMode: "manual",
+    sourceSequence: "123",
+    feeStroops: "100",
+    validFrom: 1_792_101_382,
+    validUntil: 1_792_101_682,
+    transactionSourcePublicKey: policy.issuerPublicKey,
+    operationCount: 1,
+    operationType: "payment",
+    operationSourcePublicKey: policy.issuerPublicKey,
+    assetCode: policy.assetCode,
+    issuerPublicKey: policy.issuerPublicKey,
+    destinationPublicKey: policy.destinationPublicKey,
+    amount: policy.amount,
+    createdAt: new Date(1_792_101_382 * 1_000).toISOString(),
+  };
+}
+
+class RecoveryMemoryStore implements SharedIssuanceOrchestrationStore {
+  readonly intent = recoveryIntent();
+  readonly attempts: ImmutableSharedIssuanceTransactionAttempt[] = [
+    recoveryAttempt1(),
+  ];
+  confirmation: ImmutableSharedIssuanceLedgerConfirmation | null = null;
+  status: DurableStatus = "pending_execution";
+  failureCode: string | null = null;
+
+  async getIntent(requestId: string) {
+    return requestId === this.intent.issuanceRequestId ? this.intent : null;
+  }
+  async listAttempts(requestId: string) {
+    return this.attempts.filter((item) => item.issuanceRequestId === requestId);
+  }
+  async appendAttempt(attempt: ImmutableSharedIssuanceTransactionAttempt) {
+    if (
+      attempt.attemptNumber !== 2 ||
+      this.attempts.some((item) => item.attemptNumber === 2)
+    ) {
+      throw new Error("attempt 3 or duplicate recovery rejected");
+    }
+    this.attempts.push(attempt);
+    return attempt;
+  }
+  async getAttempt(attemptId: string) {
+    return this.attempts.find((item) => item.attemptId === attemptId) ?? null;
+  }
+  async claimSigningMode(input: {
+    attemptId: string;
+    transactionHash: string;
+    signingMode: "private" | "manual";
+  }) {
+    const attempt = await this.getAttempt(input.attemptId);
+    assert.ok(attempt);
+    assert.equal(attempt.transactionHash, input.transactionHash);
+    if (attempt.signingMode || attempt.signedEnvelopeXdrSha256) return null;
+    if (attempt.attemptNumber === 2 && input.signingMode !== "manual") {
+      throw new Error("recovery must remain manual");
+    }
+    attempt.signingMode = input.signingMode;
+    return attempt;
+  }
+  async recordSignedEnvelope(input: {
+    attemptId: string;
+    transactionHash: string;
+    signedEnvelopeXdrSha256: string;
+  }) {
+    const attempt = await this.getAttempt(input.attemptId);
+    assert.ok(attempt);
+    assert.equal(attempt.transactionHash, input.transactionHash);
+    assert.equal(attempt.signingMode, "manual");
+    if (attempt.signedEnvelopeXdrSha256) {
+      throw new Error("signed envelope already claimed");
+    }
+    attempt.signedEnvelopeXdrSha256 = input.signedEnvelopeXdrSha256;
+    return attempt;
+  }
+  async getConfirmation() {
+    return this.confirmation;
+  }
+  async getLifecycle() {
+    return { status: this.status, failureCode: this.failureCode };
+  }
+  async transition(
+    issuanceRequestId: string,
+    status: DurableStatus,
+    failureCode: string | null = null,
+  ) {
+    assert.equal(
+      issuanceRequestId,
+      TEST8926_BOUNDED_RECOVERY_POLICY.requestId,
+    );
+    if (this.status === status) return false;
+    this.status = status;
+    this.failureCode = failureCode;
+    return true;
+  }
+}
+
+function recoveryFixture(options: {
+  recoverySequence?: string;
+  preflightSequence?: string;
+  confirmationExists?: boolean;
+} = {}) {
+  const policy = TEST8926_BOUNDED_RECOVERY_POLICY;
+  const store = new RecoveryMemoryStore();
+  const calls: string[] = [];
+  let submissions = 0;
+  let persistedRecoveryEvidence:
+    | ImmutableSharedIssuanceRecoveryEvidence
+    | undefined;
+
+  if (options.confirmationExists) {
+    store.confirmation = {
+      attemptId: policy.supersededAttemptId,
+      transactionHash: policy.supersededTransactionHash,
+      ledgerSequence: 1,
+    } as ImmutableSharedIssuanceLedgerConfirmation;
+  }
+
+  const afterExpiry = new Date(
+    (store.attempts[0]!.validUntil + 1) * 1_000,
+  ).toISOString();
+
+  const orchestrator = new SharedIssuanceOrchestrator({
+    store,
+    preflight: {
+      async readIssuancePreconditions() {
+        calls.push("preflight");
+        return {
+          network: "testnet" as const,
+          networkPassphrase: Networks.TESTNET,
+          observedLedger: 700,
+          observedLedgerClosedAt: afterExpiry,
+          baseFeeStroops: "100",
+          baseReserveStroops: "5000000",
+          preconditions: {
+            assetCodeReservedForProject: true,
+            issuerSequence: options.preflightSequence ?? "123",
+            issuerSpendableNativeStroops: "1000000",
+            feeStroops: "100",
+            destinationTrustline: {
+              network: "testnet" as const,
+              networkPassphrase: Networks.TESTNET,
+              destinationPublicKey: policy.destinationPublicKey,
+              assetCode: policy.assetCode,
+              issuerPublicKey: policy.issuerPublicKey,
+              observedLedger: 700,
+              exists: true,
+              authorized: true,
+              balance: "0.0000000",
+              limit: "1000000.0000000",
+              buyingLiabilities: "0.0000000",
+            },
+          },
+        };
+      },
+    },
+    primitive: {
+      async signCanonicalEnvelope() {
+        throw new Error("recovery must never invoke automatic signing");
+      },
+    },
+    submission: {
+      async submitSignedEnvelope(signedEnvelopeXdr) {
+        calls.push("submit");
+        submissions += 1;
+        assert.ok(store.attempts[1]?.signedEnvelopeXdrSha256);
+        const transaction = TransactionBuilder.fromXDR(
+          signedEnvelopeXdr,
+          Networks.TESTNET,
+        );
+        assert.ok(transaction instanceof Transaction);
+        return { hash: Buffer.from(transaction.hash()).toString("hex") };
+      },
+    },
+    authorization: {
+      network: "testnet",
+      networkPassphrase: Networks.TESTNET,
+      issuerPublicKey: policy.issuerPublicKey,
+      requiredWeight: 1,
+      signers: [{ publicKey: RECOVERY_SIGNER.publicKey(), weight: 1 }],
+    },
+    confirmationValidator: {
+      async validate(input) {
+        calls.push("confirm");
+        return {
+          record: {
+            attemptId: input.attempt.attemptId,
+            transactionHash: input.attempt.transactionHash,
+          },
+        } as never;
+      },
+    },
+    confirmationWriter: {
+      async appendConfirmation(value) {
+        calls.push("persist_confirmation");
+        const record = (
+          value as never as {
+            record: {
+              attemptId: string;
+              transactionHash: string;
+            };
+          }
+        ).record;
+        store.confirmation = {
+          attemptId: record.attemptId,
+          transactionHash: record.transactionHash,
+          ledgerSequence: 701,
+        } as ImmutableSharedIssuanceLedgerConfirmation;
+        return store.confirmation;
+      },
+    },
+    recoveryReader: {
+      authority: "official_testnet_horizon",
+      async lookupTransaction(transactionHash) {
+        calls.push("recovery_lookup");
+        return {
+          status: "not_found" as const,
+          network: "testnet" as const,
+          networkPassphrase: Networks.TESTNET,
+          transactionHash,
+          observedLedger: 699,
+          observedAt: afterExpiry,
+          observedLedgerClosedAt: afterExpiry,
+        };
+      },
+      async readAccountSequence(accountPublicKey) {
+        calls.push("recovery_sequence");
+        return {
+          network: "testnet" as const,
+          networkPassphrase: Networks.TESTNET,
+          accountPublicKey,
+          sequence: options.recoverySequence ?? "123",
+          observedLedger: 699,
+          observedAt: afterExpiry,
+          observedLedgerClosedAt: afterExpiry,
+        };
+      },
+    },
+    recoveryEvidenceWriter: {
+      async appendRecoveryEvidence(evidence) {
+        calls.push("persist_recovery_evidence");
+        evidence.assertValidated();
+        persistedRecoveryEvidence = {
+          ...evidence.record,
+        };
+        return persistedRecoveryEvidence;
+      },
+    },
+    now: () => RECOVERY_NOW,
+    randomUuid: () => RECOVERY_ATTEMPT_2_ID,
+    feeStroops: "100",
+    validitySeconds: 300,
+  });
+
+  return {
+    orchestrator,
+    store,
+    calls,
+    submissions: () => submissions,
+    persistedRecoveryEvidence: () => persistedRecoveryEvidence,
+  };
+}
+
+const recoveryInput = {
+  requestId: TEST8926_BOUNDED_RECOVERY_POLICY.requestId,
+  projectId: TEST8926_BOUNDED_RECOVERY_POLICY.projectId,
+  ownerPublicKey: TEST8926_BOUNDED_RECOVERY_POLICY.ownerPublicKey,
+};
+
+test("owner-authorized recovery creates exactly one fresh manual attempt 2 after protected evidence", async () => {
+  const fx = recoveryFixture();
+  const handoff =
+    await fx.orchestrator.prepareManualRecoverySigningHandoff(recoveryInput);
+
+  assert.equal(handoff.attemptId, RECOVERY_ATTEMPT_2_ID);
+  assert.equal(fx.store.attempts.length, 2);
+  assert.equal(fx.store.attempts[0]!.attemptNumber, 1);
+  assert.equal(fx.store.attempts[1]!.attemptNumber, 2);
+  assert.equal(fx.store.attempts[1]!.signingMode, "manual");
+  assert.equal(fx.store.attempts[1]!.assetCode, "TEST8926");
+  assert.equal(
+    fx.store.attempts[1]!.amount,
+    TEST8926_BOUNDED_RECOVERY_POLICY.amount,
+  );
+  assert.ok(
+    fx.store.attempts[1]!.validFrom > fx.store.attempts[0]!.validUntil,
+  );
+  assert.equal(fx.store.attempts[1]!.sourceSequence, "123");
+  assert.equal(fx.persistedRecoveryEvidence()?.lookupStatus, "not_found");
+  assert.deepEqual(fx.calls, [
+    "recovery_lookup",
+    "recovery_sequence",
+    "preflight",
+    "persist_recovery_evidence",
+  ]);
+
+  await assert.rejects(
+    fx.orchestrator.prepareManualRecoverySigningHandoff(recoveryInput),
+    (error: unknown) => errorCode(error) === "manual_recovery_not_ready",
+  );
+  assert.equal(fx.store.attempts.length, 2);
+});
+
+test("recovery refuses confirmation, authorization drift, or issuer-sequence drift before attempt 2", async () => {
+  const confirmed = recoveryFixture({ confirmationExists: true });
+  await assert.rejects(
+    confirmed.orchestrator.prepareManualRecoverySigningHandoff(recoveryInput),
+    (error: unknown) => errorCode(error) === "manual_recovery_not_ready",
+  );
+  assert.equal(confirmed.store.attempts.length, 1);
+
+  const unauthorized = recoveryFixture();
+  unauthorized.store.attempts[0]!.transactionHash = "f".repeat(64);
+  await assert.rejects(
+    unauthorized.orchestrator.prepareManualRecoverySigningHandoff(
+      recoveryInput,
+    ),
+    (error: unknown) => errorCode(error) === "manual_recovery_not_authorized",
+  );
+  assert.equal(unauthorized.store.attempts.length, 1);
+
+  const sequenceChanged = recoveryFixture({ recoverySequence: "124" });
+  await assert.rejects(
+    sequenceChanged.orchestrator.prepareManualRecoverySigningHandoff(
+      recoveryInput,
+    ),
+    (error: unknown) => errorCode(error) === "recovery_sequence_changed",
+  );
+  assert.equal(sequenceChanged.store.attempts.length, 1);
+
+  const preflightMoved = recoveryFixture({ preflightSequence: "124" });
+  await assert.rejects(
+    preflightMoved.orchestrator.prepareManualRecoverySigningHandoff(
+      recoveryInput,
+    ),
+    (error: unknown) =>
+      errorCode(error) === "manual_recovery_sequence_changed",
+  );
+  assert.equal(preflightMoved.store.attempts.length, 1);
+});
+
+test("attempt 2 persists signed provenance before exactly one Horizon POST and binds submit to its ID", async () => {
+  const fx = recoveryFixture();
+  const handoff =
+    await fx.orchestrator.prepareManualRecoverySigningHandoff(recoveryInput);
+  const transaction = TransactionBuilder.fromXDR(
+    handoff.unsignedEnvelopeXdr,
+    Networks.TESTNET,
+  );
+  assert.ok(transaction instanceof Transaction);
+  transaction.sign(RECOVERY_SIGNER);
+  const signedEnvelopeXdr = transaction.toXDR();
+
+  const result = await fx.orchestrator.submitManualRecoverySignedEnvelope({
+    ...recoveryInput,
+    attemptId: handoff.attemptId,
+    signedEnvelopeXdr,
+  });
+  assert.equal(result.status, "confirmed");
+  assert.ok(fx.store.attempts[1]!.signedEnvelopeXdrSha256);
+  assert.equal(fx.submissions(), 1);
+  assert.ok(
+    fx.calls.indexOf("submit") >
+      fx.calls.indexOf("persist_recovery_evidence"),
+  );
+
+  await assert.rejects(
+    fx.orchestrator.submitManualRecoverySignedEnvelope({
+      ...recoveryInput,
+      attemptId: handoff.attemptId,
+      signedEnvelopeXdr,
+    }),
+    (error: unknown) =>
+      errorCode(error) === "manual_signing_already_consumed",
+  );
+  assert.equal(fx.submissions(), 1);
+
+  await assert.rejects(
+    fx.orchestrator.reconcileManualRecoveryAttempt({
+      ...recoveryInput,
+      attemptId: "20000000-0000-4000-8000-000000000099",
+    }),
+    (error: unknown) =>
+      errorCode(error) === "manual_recovery_attempt_mismatch",
+  );
+});
 
 test("successful mocked path preserves the required order and returns durable confirmation", async () => {
   const fx = fixture();
