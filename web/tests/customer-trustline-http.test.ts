@@ -139,3 +139,79 @@ test("trustline confirmation enforces same-origin, exact inputs, and verified re
   );
   assert.equal(changed.status, 400);
 });
+
+test("uncertain exact-hash reconciliation is authenticated, owner-scoped, and never silently unlocks", async () => {
+  let called = 0;
+  const supplied = deps();
+  supplied.reconcile = async ({ project, amount, transactionHash, unsignedXdr }) => {
+    called += 1;
+    assert.equal(project.ownerPublicKey, OWNER);
+    assert.equal(project.assetCode, "TESTNEW");
+    assert.equal(amount, "50");
+    assert.equal(transactionHash, HASH);
+    assert.equal(unsignedXdr, "UNSIGNED_NONSECRET_XDR");
+    return { status: "pending" };
+  };
+  const request = () => new NextRequest(URL, {
+    method: "POST",
+    headers: { origin: "https://orrylo.com" },
+    body: JSON.stringify({
+      amount: "50",
+      transactionHash: HASH,
+      unsignedXdr: "UNSIGNED_NONSECRET_XDR",
+    }),
+  });
+  const pending = await handleConfirmTrustline(request(), context, supplied);
+  assert.equal(pending.status, 200);
+  assert.equal((await pending.json()).reconciliation.status, "pending");
+  assert.equal(called, 1);
+
+  const wrongOwner = await handleConfirmTrustline(
+    request(), context, {
+      ...supplied,
+      getOwnedProject: async () => null,
+    },
+  );
+  assert.equal(wrongOwner.status, 404);
+  assert.equal(called, 1);
+});
+
+test("reconciliation rejects injected authority, forged origin, and malformed XDR", async () => {
+  let called = false;
+  const supplied = deps();
+  supplied.reconcile = async () => {
+    called = true;
+    return { status: "terminal" };
+  };
+  for (const body of [
+    { amount: "50", transactionHash: HASH, unsignedXdr: "X", issuer: ISSUER },
+    { amount: "50", transactionHash: HASH, unsignedXdr: "" },
+    { amount: "50", transactionHash: "nohash", unsignedXdr: "X" },
+  ]) {
+    const result = await handleConfirmTrustline(
+      new NextRequest(URL, {
+        method: "POST",
+        headers: { origin: "https://orrylo.com" },
+        body: JSON.stringify(body),
+      }),
+      context,
+      supplied,
+    );
+    assert.equal(result.status, 400);
+  }
+  const crossOrigin = await handleConfirmTrustline(
+    new NextRequest(URL, {
+      method: "POST",
+      headers: { origin: "https://evil.example" },
+      body: JSON.stringify({
+        amount: "50",
+        transactionHash: HASH,
+        unsignedXdr: "X",
+      }),
+    }),
+    context,
+    supplied,
+  );
+  assert.equal(crossOrigin.status, 403);
+  assert.equal(called, false);
+});
