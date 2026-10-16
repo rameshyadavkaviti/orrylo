@@ -280,7 +280,9 @@ if (!TEST_DATABASE_URL) {
     attempt: ImmutableSharedIssuanceTransactionAttempt,
     sequence = attempt.sourceSequence,
   ): StellarTestnetLedgerReader {
-    const afterExpiry = new Date((attempt.validUntil + 1) * 1_000).toISOString();
+    const afterExpiry = new Date(
+      (attempt.validUntil + 1) * 1_000,
+    ).toISOString();
     return {
       authority: "official_testnet_horizon",
       async lookupTransaction(transactionHash) {
@@ -938,7 +940,6 @@ if (!TEST_DATABASE_URL) {
         error.code === "recovery_sequence_changed",
     );
   });
-
 }
 
 function roleUrl(source: string, username: string, password: string): string {
