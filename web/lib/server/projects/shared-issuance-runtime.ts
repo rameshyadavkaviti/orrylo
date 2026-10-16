@@ -59,6 +59,9 @@ export async function createServerSharedIssuanceOrchestrator(input: {
       confirmationDatabase,
     );
   const reader = new OfficialStellarTestnetHorizonReader();
+  const trustedWriter = new PostgresTrustedLedgerConfirmationWriter(
+    confirmationBoundary,
+  );
 
   return new SharedIssuanceOrchestrator({
     store: new PostgresSharedIssuanceOrchestrationStore(applicationBoundary),
@@ -71,9 +74,9 @@ export async function createServerSharedIssuanceOrchestrator(input: {
     confirmationValidator: new AuthoritativeSharedIssuanceConfirmationValidator(
       reader,
     ),
-    confirmationWriter: new PostgresTrustedLedgerConfirmationWriter(
-      confirmationBoundary,
-    ),
+    confirmationWriter: trustedWriter,
+    recoveryReader: reader,
+    recoveryEvidenceWriter: trustedWriter,
     feeStroops: input.feeStroops,
     validitySeconds: 300,
   });
