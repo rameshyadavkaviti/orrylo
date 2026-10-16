@@ -442,6 +442,42 @@ The first public-facing experience should:
 
 Prototype speed should come from constrained scope and clear UX, not from weakening security, data integrity, deployment evidence, or canonical policy.
 
+### 14.1 Approved customer-funded Trustline v1 (owner approved 2026-10-16)
+
+This decision applies to the **normal customer-created Shared Issuer asset issuance experience in v1**. The receiving customer wallet pays the Stellar reserve required for its own trustline and authorizes the trustline transaction. Orrylo does **not** sponsor the customer's trustline reserve, automatically fund the customer's account, or use a claimable balance as the default issuance-delivery mechanism in v1.
+
+- After Albedo wallet authentication and token configuration, Orrylo checks the exact `network + asset code + issuer + receiving account` trustline with authoritative Stellar network evidence. Verify that it exists, is authorized where required, and has sufficient available capacity for the full approved initial amount.
+- If the trustline is already ready, bypass trustline setup. If missing or insufficient, offer a wallet-integrated `ChangeTrust` step with the exact issuer/asset/limit, showing the required XLM reserve and transaction fee before approval. **The customer must authorize/sign using their own wallet**; no customer secret or silent signature is permitted.
+- The application may orchestrate the flow and resume only **after** authoritative network confirmation and renewed trustline/capacity validation. A submitted wallet intent, popup completion or client callback alone is not proof of readiness.
+- After verified readiness, perform the already-approved protected issuer signing and one-shot submission flow, with immutable issuance intent, fee checks, exact-hash reconciliation and independently verified confirmation unchanged. Do not show `confirmed` until the issued asset and amount have been authoritatively confirmed and durably recorded.
+- Customer-paid trustline reserves and network fees are distinct from the platform's issuer transaction fee and any product/service price. Make the payer and current estimated cost clear. Never assume static Mainnet base fees or reserves; impose bounded, policy-approved maximum fees and fail closed on excessive/unexpected costs.
+- **Not in v1:** sponsored reserves, platform-paid account bootstrap for this flow, and claimable-balance issuance delivery. Those can be considered later under separately approved financial, abuse-prevention and security policies.
+- This is **product policy**, not evidence that the wallet-integrated trustline creation or automatic protected issuance is already implemented/deployed. Roll out first on Testnet. Mainnet activation, fee caps, issuer custody and signer authorization remain separately gated. Existing RYLO reward/trustline policies and unresolved direct-sale fee-funding decisions are not changed by this customer-asset policy.
+
+### 14.2 Next delivery milestone — customer self-service token creation to wallet (owner approved 2026-10-16)
+
+**P0 next product goal:** An ordinary customer visits `orrylo.com`, authenticates their Stellar wallet, configures a Shared Issuer token, confirms creation, and receives the exact issued asset in that same wallet **without manual operator intervention**. This is a product milestone for a complete customer journey, not merely a token draft, an operator CLI ceremony, or a transaction hash.
+
+Customer experience:
+
+```
+Visit Orrylo → Connect and authenticate Albedo wallet
+→ Configure token and initial supply → Review issuer, network, costs and destination
+→ Check trustline → (if needed) customer approves ChangeTrust in Albedo
+→ Verify trustline on ledger → Confirm Create Token
+→ protected platform issuer signing + one-shot submission
+→ authoritative confirmation → token balance in customer's wallet + project result
+```
+
+- User wallet is the project owner and default receiving destination; binding is server-authoritative. Do not silently substitute another wallet or edit an immutable issuance intent to change destination. The user must explicitly approve the initial issuance and trustline authorization, but should not run terminal commands, visit an external playground, exchange XDR files or contact an Orrylo operator.
+- **Trustline v1:** follow section 14.1's customer-funded, Albedo-integrated `ChangeTrust` policy. Recheck authorization and remaining capacity after the wallet transaction is confirmed. Do not sponsor customer reserves or use claimable balances for routine issuance.
+- **Issuer automation:** extend/reuse the existing protected Shared Issuer signing abstraction and isolated private signer rather than putting any issuer secret in browser, public web runtime or database. The private signer verifies the exact approved network, issuer, immutable intent/transaction and bounded fee/operation policy before signing. Backend executes at most one permitted submission per durable attempt; no blind retries. Distinguish the current Testnet manual signing proof from a deployed, tested automatic signer.
+- **Completion criterion:** exact official-ledger confirmation of correct network, issuer, asset code, destination and amount, durable confirmation, and the recipient's on-chain balance reflecting the issuance. Show honest in-progress, wallet-action-needed, expired, failed and reconciliation-required states; never claim success based only on Albedo callback, XDR signing or a pending hash.
+- **Safety and Mainnet readiness:** show fee payer, account reserve requirement, operation count and maximum transaction fee before user approval. Compute fees/reserves from current network evidence, enforce bounded caps, fail closed on unexpected costs, maintain immutable intent and issuer-scoped uniqueness. Mainnet requires its separately approved 2-of-3 signer/custody and explicit activation; Testnet automation must not silently promote its single-signer policy to Mainnet.
+- **Mainnet-parity signing gate (owner approved 2026-10-16):** Before any Mainnet issuance activation, validate the complete automatic issuer-signing and customer-to-wallet issuance workflow on Testnet with the approved Mainnet-equivalent **2-of-3** authorization architecture, using separately controlled signing authorities. Verify threshold configuration, signer isolation, exact transaction authorization, quorum collection, fees, one-shot submission, ledger reconciliation, failure/unavailability behavior and end-to-end token delivery. The present single-signer Testnet proof may remain as a development baseline, but is **not** sufficient evidence of Mainnet operational readiness. Do not change Mainnet keys, thresholds or custody, deploy signer services, or activate issuance solely on the basis of this policy entry.
+- **Acceptance:** one independent non-operator customer completes the full UI journey on Testnet, including a missing-trustline case, with verified token receipt, correct project status and no operator signature or shell interaction. Test the already-ready-trustline branch too. Record authoritative transaction and durable application evidence.
+- **Execution boundary:** approval sets the next product priority and authorizes preparation/implementation in reviewed PRs, **not** live deployment, secret provisioning, irreversible account or Mainnet mutations, unrestricted signing, or automatic attempt replacement. Minimize new infrastructure and avoid broad recovery redesign.
+
 ## 15. Domain and publication architecture
 
 Approved prototype public structure:
