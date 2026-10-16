@@ -28,6 +28,7 @@ test("loads exact ordered migration names and SHA-256 checksums", async () => {
       "009_signed_envelope_digest.sql",
       "010_mvp_lite_db_security_hardening.sql",
       "011_shared_issuance_signing_mode.sql",
+      "012_customer_change_trust_interlock.sql",
     ],
   );
   for (const migration of evidence) {
@@ -111,6 +112,19 @@ function fakeDatabase(
         },
       ];
     }
+    if (query.includes("app_handoff_write")) {
+      return [{
+        app_handoff_write: false,
+        app_resolution_write: false,
+        writer_handoff_write: false,
+        writer_resolution_insert: true,
+        writer_resolution_mutate: false,
+        app_reserve_execute: true,
+        public_reserve_execute: false,
+        reserve_security_definer: true,
+        reserve_search_path: ["search_path=pg_catalog, public"],
+      }];
+    }
     if (query.includes("FROM pg_roles")) return [{ exists: true }];
     if (query.includes("UNION ALL")) {
       return [
@@ -122,6 +136,10 @@ function fakeDatabase(
         "protect_issuance_transaction_attempt",
         "prevent_issuance_evidence_mutation",
         "assert_metadata_reachability_signed_confirmation",
+        "project_customer_change_trust_handoffs",
+        "project_customer_change_trust_resolutions",
+        "reserve_customer_change_trust_handoff",
+        "assert_trusted_customer_change_trust_resolution",
       ].map((object_name) => ({ object_name, owner_name: "schema_owner" }));
     }
     if (query.includes("current_user AS role_name")) {
