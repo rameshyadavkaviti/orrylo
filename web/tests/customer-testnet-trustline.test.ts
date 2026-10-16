@@ -4,7 +4,6 @@ import test from "node:test";
 import {
   Keypair,
   Networks,
-  Operation,
   Transaction,
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
