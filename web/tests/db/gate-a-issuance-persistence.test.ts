@@ -312,7 +312,7 @@ if (!TEST_DATABASE_URL) {
     intent: ImmutableSharedIssuanceIntent,
     previous: ImmutableSharedIssuanceTransactionAttempt,
   ): ImmutableSharedIssuanceTransactionAttempt {
-    const validFrom = previous.validUntil + 10;
+    const validFrom = previous.validUntil + 2;
     const plan = buildSharedIssuerIssuancePlan(
       {
         projectId: intent.projectId,
