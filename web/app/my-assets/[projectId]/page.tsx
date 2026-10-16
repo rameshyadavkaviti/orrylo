@@ -7,6 +7,7 @@ import { getWalletAuthService } from "../../../lib/auth/runtime";
 import { getDatabaseClient } from "../../../lib/server/persistence/database";
 import { PostgresMetadataPublicationRepository } from "../../../lib/server/persistence/metadata-publication-repository";
 import { PostgresProjectProfileRepository } from "../../../lib/server/persistence/project-profile-repository";
+import { TestnetIssuanceService } from "../../../lib/server/projects/testnet-issuance-service";
 
 export const dynamic = "force-dynamic";
 
@@ -39,10 +40,20 @@ export default async function ManagedProjectPage({
 
   const publicationRepository = new PostgresMetadataPublicationRepository(sql);
   const publication = await publicationRepository.getByProjectId(projectId);
+  const issuance = await new TestnetIssuanceService(sql, {
+    network: project.network,
+    approvedIssuerPublicKey: process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY,
+  }).getOwnedStatus(projectId, session.publicKey);
   return (
     <ManagedProjectView
       project={{ ...project, issuerPublicKey: null }}
       publication={publication}
+      issuance={issuance}
+      intentConfigurationAvailable={
+        project.network === "testnet" &&
+        Boolean(process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY) &&
+        Boolean(process.env.ORRYLO_TESTNET_CUSTOMER_TRUSTLINE_MAX_FEE_STROOPS)
+      }
     />
   );
 }
