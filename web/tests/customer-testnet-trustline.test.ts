@@ -453,6 +453,9 @@ test("authoritatively failed exact-hash transaction permits only fresh planning"
   assert.ok(tx instanceof Transaction);
   tx.sign(WALLET);
   const failure = fixture({
+    // Exact-hash failure must be resolvable even if the wallet can no longer
+    // pass a fresh reserve/fee preflight after paying for the failed attempt.
+    nativeBalance: "1.0000000",
     transaction: () => ({
       hash: unsigned.transactionHash,
       successful: false,

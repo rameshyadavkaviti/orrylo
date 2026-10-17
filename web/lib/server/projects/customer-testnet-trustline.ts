@@ -499,10 +499,6 @@ export async function reconcileCustomerTrustline(
     throw new CustomerTrustlineError("trustline_transaction_mismatch");
   }
 
-  // Capacity is necessary but does not itself release the persisted exact hash.
-  // Release requires durable exact-hash success (below), or terminal evidence.
-  const current = await inspectCustomerTrustline(input, fetchImpl);
-
   let record: Record<string, unknown>;
   try {
     record = recordFromExactHash(
@@ -576,6 +572,10 @@ export async function reconcileCustomerTrustline(
     throw new CustomerTrustlineError("trustline_transaction_mismatch");
   }
   if (record.successful === true) {
+    // Capacity is necessary for a successful receipt, but does not itself
+    // release the persisted hash. Failed/expired evidence must remain
+    // reconcilable even when the wallet cannot pass a fresh preflight.
+    const current = await inspectCustomerTrustline(input, fetchImpl);
     if (current.status !== "ready") return { status: "pending" };
     if (
       typeof record.created_at !== "string" ||
