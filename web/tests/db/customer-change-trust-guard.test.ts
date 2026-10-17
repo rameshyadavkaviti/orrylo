@@ -334,7 +334,7 @@ if (!TEST_DATABASE_URL) {
     const latest = await first.latest(projectId, OWNER);
     assert.equal(historical?.handoffId, oldRow.handoffId);
     assert.equal(historical?.transactionHash, old.transactionHash);
-    assert.equal(historical?.amount, "250.0000000");
+    assert.equal(historical?.amount, "250");
     assert.equal(historical?.resolution, "failed");
     assert.equal(latest?.transactionHash, next.transactionHash);
     assert.equal(latest?.resolution, null);
