@@ -52,6 +52,7 @@ export interface CustomerTrustlineRouteDependencies {
     destinationPublicKey: string;
     assetCode: string;
     transactionHash: string;
+    amount: string;
   } | null>;
   reserve?(input: {
     project: ManagedProjectProfile;
@@ -111,6 +112,7 @@ function dependencies(): CustomerTrustlineRouteDependencies {
         destinationPublicKey: prior.destinationPublicKey,
         assetCode: prior.assetCode,
         transactionHash: prior.transactionHash,
+        amount: prior.amount,
       };
     },
     reserve: ({ project, plan }) =>
@@ -128,9 +130,10 @@ function dependencies(): CustomerTrustlineRouteDependencies {
         transactionHash: hash,
       }),
     async reconcile({ project, transactionHash, unsignedXdr }) {
-      const prior = await guard.latest(
+      const prior = await guard.byHash(
         project.projectId,
         project.ownerPublicKey,
+        transactionHash,
       );
       const bound = bindPersistedCustomerTrustline(prior, {
         projectId: project.projectId,
@@ -233,31 +236,23 @@ export async function handleInspectTrustline(
             status: "pending",
             network: "testnet",
             ...pending,
-            amount,
           },
         },
         { headers: { "Cache-Control": "no-store" } },
       );
     }
     const plan = await deps.inspect(authorized.project, amount);
-    let trustline:
-      | CustomerTrustlinePlan
-      | (Omit<CustomerTrustlinePlan, "status"> & { status: "pending" }) = plan;
-    if (plan.status === "signature_required") {
-      if (!deps.reserve) return failure("trustline_guard_unavailable", 503);
-      const claim = await deps.reserve({ project: authorized.project, plan });
-      if (claim.status === "claimed") {
-        trustline = claim.plan;
-      } else {
-        trustline = {
-          ...plan,
-          status: "pending",
-          transactionHash: claim.transactionHash,
-          unsignedXdr: undefined,
-          validUntil: undefined,
-        };
-      }
-    }
+    // Inspection is read-only. Only an origin-checked POST may reserve and
+    // return the XDR that can be handed to Albedo for signing.
+    const trustline =
+      plan.status === "signature_required"
+        ? {
+            ...plan,
+            unsignedXdr: undefined,
+            transactionHash: undefined,
+            validUntil: undefined,
+          }
+        : plan;
     return NextResponse.json(
       { ok: true, trustline },
       {
@@ -285,6 +280,52 @@ export async function handleConfirmTrustline(
       return failure("invalid_request", 400);
     const fields = body as Record<string, unknown>;
     const keys = Object.keys(fields).sort().join(",");
+    if (keys === "amount,reserve") {
+      if (
+        fields.reserve !== true ||
+        typeof fields.amount !== "string" ||
+        !validateInitialSupply(fields.amount).valid
+      ) {
+        return failure("invalid_request", 400);
+      }
+      // A prior unresolved handoff wins before any potentially failing fresh
+      // preflight. Neither a new amount nor a second browser can replace it.
+      const pending = await deps.pending?.(authorized.project);
+      if (pending) {
+        return NextResponse.json(
+          {
+            ok: true,
+            trustline: { status: "pending", network: "testnet", ...pending },
+          },
+          { headers: { "Cache-Control": "no-store" } },
+        );
+      }
+      const plan = await deps.inspect(authorized.project, fields.amount);
+      if (plan.status !== "signature_required") {
+        return NextResponse.json(
+          { ok: true, trustline: plan },
+          { headers: { "Cache-Control": "no-store" } },
+        );
+      }
+      if (!deps.reserve) return failure("trustline_guard_unavailable", 503);
+      const claim = await deps.reserve({ project: authorized.project, plan });
+      return NextResponse.json(
+        {
+          ok: true,
+          trustline:
+            claim.status === "claimed"
+              ? claim.plan
+              : {
+                  ...plan,
+                  status: "pending",
+                  transactionHash: claim.transactionHash,
+                  unsignedXdr: undefined,
+                  validUntil: undefined,
+                },
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
     if (
       (keys !== "amount,transactionHash" &&
         keys !== "amount,reconcile,transactionHash" &&
