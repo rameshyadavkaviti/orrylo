@@ -29,6 +29,7 @@ export class PrivateTestnetSignerError extends Error {
 
 export interface PrivateTestnetSignerRuntime {
   readonly issuerPublicKey: string;
+  readonly signerPublicKey: string;
   isAuthorized(authorizationHeader: string | null): boolean;
   signCanonicalRequest(input: unknown): {
     network: "testnet";
@@ -51,14 +52,18 @@ export interface PrivateTestnetSignerHttpResult {
 
 export function createPrivateTestnetSignerRuntime(input: {
   issuerPublicKey: string;
+  signerPublicKey?: string;
   requestAuthSecret: string;
   signer: Keypair;
   signEnvelope?: (transaction: Transaction, signer: Keypair) => void;
 }): PrivateTestnetSignerRuntime {
   const issuerPublicKey = normalizeAllowedIssuer(input.issuerPublicKey);
+  const signerPublicKey = normalizeAllowedIssuer(
+    input.signerPublicKey ?? issuerPublicKey,
+  );
   const authSecret = normalizeAuthSecret(input.requestAuthSecret);
 
-  if (input.signer.publicKey() !== issuerPublicKey) {
+  if (input.signer.publicKey() !== signerPublicKey) {
     throw new PrivateTestnetSignerError("signer_key_mismatch");
   }
 
@@ -71,6 +76,7 @@ export function createPrivateTestnetSignerRuntime(input: {
 
   return {
     issuerPublicKey,
+    signerPublicKey,
     isAuthorized(authorizationHeader) {
       if (!authorizationHeader?.startsWith("Bearer ")) return false;
       const candidate = authorizationHeader.slice("Bearer ".length);
@@ -124,7 +130,7 @@ export function createPrivateTestnetSignerRuntime(input: {
 
       return {
         network: "testnet",
-        signerPublicKey: issuerPublicKey,
+        signerPublicKey,
         signedEnvelopeXdr,
       };
     },
@@ -153,6 +159,7 @@ export function readPrivateTestnetSignerRuntime(
 
   return createPrivateTestnetSignerRuntime({
     issuerPublicKey,
+    signerPublicKey: env.ORRYLO_TESTNET_SHARED_ISSUER_SIGNER_PUBLIC_KEY,
     requestAuthSecret,
     signer,
   });
@@ -170,6 +177,7 @@ export async function handlePrivateTestnetSignerRequest(
         service: "orrylo-private-testnet-signer",
         network: "testnet",
         issuerPublicKey: runtime.issuerPublicKey,
+        signerPublicKey: runtime.signerPublicKey,
         ready: true,
       },
     };

@@ -29,6 +29,39 @@ const DESTINATION = Keypair.fromRawEd25519Seed(
 ).publicKey();
 const AUTH = "a".repeat(48);
 
+test("separate pinned signer signs for the unchanged issuer and reports its own identity", () => {
+  const runtime = createPrivateTestnetSignerRuntime({
+    issuerPublicKey: ISSUER,
+    signerPublicKey: OTHER_KEYPAIR.publicKey(),
+    requestAuthSecret: AUTH,
+    signer: OTHER_KEYPAIR,
+  });
+  const unsigned = unsignedTransaction();
+  const result = runtime.signCanonicalRequest(
+    JSON.parse(requestBody(unsigned)),
+  );
+  assert.equal(result.signerPublicKey, OTHER_KEYPAIR.publicKey());
+  const signed = TransactionBuilder.fromXDR(
+    result.signedEnvelopeXdr,
+    Networks.TESTNET,
+  ) as Transaction;
+  assert.equal(signed.source, ISSUER);
+  assert.equal(signed.signatures.length, 1);
+  assert.ok(
+    OTHER_KEYPAIR.verify(signed.hash(), signed.signatures[0]!.signature),
+  );
+  assert.throws(
+    () =>
+      createPrivateTestnetSignerRuntime({
+        issuerPublicKey: ISSUER,
+        signerPublicKey: OTHER_KEYPAIR.publicKey(),
+        requestAuthSecret: AUTH,
+        signer: ISSUER_KEYPAIR,
+      }),
+    /signer_key_mismatch/,
+  );
+});
+
 function unsignedTransaction(
   source = ISSUER,
   networkPassphrase = Networks.TESTNET,
@@ -242,6 +275,7 @@ test("health endpoint proves readiness without invoking signing", async () => {
     service: "orrylo-private-testnet-signer",
     network: "testnet",
     issuerPublicKey: ISSUER,
+    signerPublicKey: ISSUER,
     ready: true,
   });
   assert.equal(signCalls, 0);

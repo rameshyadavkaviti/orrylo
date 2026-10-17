@@ -40,6 +40,7 @@ export class SharedIssuerTestnetPreflightError extends Error {
 
 export interface SharedIssuerTestnetPreflightRequest {
   issuerPublicKey: string;
+  signerPublicKey?: string;
   destinationPublicKey: string;
   assetCode: string;
   assetCodeReservedForProject: boolean;
@@ -175,7 +176,7 @@ export class OfficialStellarTestnetIssuancePreflightReader {
       ]);
     }
 
-    assertIssuerPolicy(issuer, issuerPublicKey);
+    assertIssuerPolicy(issuer, issuerPublicKey, request.signerPublicKey);
 
     if (feeStroops < after.baseFeeStroops) {
       throw new SharedIssuerTestnetPreflightError(
@@ -323,10 +324,15 @@ function assertMonotonicLedgerWindow(
 function assertIssuerPolicy(
   account: HorizonAccountRecord,
   issuerPublicKey: string,
+  configuredSignerPublicKey?: string,
 ): void {
   const flags = account.flags;
   const thresholds = account.thresholds;
-  const signer = account.signers[0];
+  const signerPublicKey =
+    configuredSignerPublicKey === undefined
+      ? issuerPublicKey
+      : normalizePublicKey(configuredSignerPublicKey, "invalid_issuer");
+  const expectedKeys = new Set([issuerPublicKey, signerPublicKey]);
 
   if (
     flags.auth_required !== false ||
@@ -336,11 +342,15 @@ function assertIssuerPolicy(
     thresholds.low_threshold !== 1 ||
     thresholds.med_threshold !== 1 ||
     thresholds.high_threshold !== 1 ||
-    account.signers.length !== 1 ||
-    !signer ||
-    signer.key !== issuerPublicKey ||
-    signer.weight !== 1 ||
-    signer.type !== "ed25519_public_key"
+    account.signers.length !== expectedKeys.size ||
+    new Set(account.signers.map((signer) => signer.key)).size !==
+      expectedKeys.size ||
+    account.signers.some(
+      (signer) =>
+        !expectedKeys.has(signer.key) ||
+        signer.weight !== 1 ||
+        signer.type !== "ed25519_public_key",
+    )
   ) {
     throw new SharedIssuerTestnetPreflightError(
       "issuer_policy_mismatch",

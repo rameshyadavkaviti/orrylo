@@ -36,6 +36,8 @@ export class SharedIssuanceRuntimeUnavailableError extends Error {
 export async function createServerSharedIssuanceOrchestrator(input: {
   primitive: SharedIssuerSigningPrimitive;
   issuerPublicKey: string;
+  signerPublicKey?: string;
+  expectedOperationalSignerPublicKey?: string;
   feeStroops: string;
   confirmationWriterDatabaseUrl: string;
   applicationDatabase?: DatabaseClient;
@@ -67,7 +69,10 @@ export async function createServerSharedIssuanceOrchestrator(input: {
     submission: new OfficialStellarTestnetHorizonSubmissionAdapter(),
     authorization: createSharedIssuerMvpLiteSignerAuthorization(
       input.issuerPublicKey,
+      input.signerPublicKey,
     ),
+    expectedOperationalSignerPublicKey:
+      input.expectedOperationalSignerPublicKey ?? input.signerPublicKey,
     confirmationValidator: new AuthoritativeSharedIssuanceConfirmationValidator(
       reader,
     ),
@@ -81,6 +86,7 @@ export async function createServerSharedIssuanceOrchestrator(input: {
 
 export interface SharedIssuanceRuntimeConfig {
   issuerPublicKey: string;
+  signerPublicKey?: string;
   feeStroops: string;
   signerPrivateUrl: string;
   signerRequestAuthSecret: string;
@@ -97,6 +103,7 @@ export function readSharedIssuanceRuntimeConfig(
   }
 
   const config = {
+    signerPublicKey: env.ORRYLO_TESTNET_SHARED_ISSUER_SIGNER_PUBLIC_KEY,
     issuerPublicKey: required(
       env,
       "ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY",
@@ -131,6 +138,7 @@ export function createSharedIssuanceRuntimeSigningPrimitive(
         privateBaseUrl: config.signerPrivateUrl,
         requestAuthSecret: config.signerRequestAuthSecret,
         issuerPublicKey: config.issuerPublicKey,
+        signerPublicKey: config.signerPublicKey,
       },
       fetchImpl,
     );
@@ -151,6 +159,8 @@ export async function getServerSharedIssuanceOrchestrator(): Promise<SharedIssua
     serverOrchestrator = createServerSharedIssuanceOrchestrator({
       primitive,
       issuerPublicKey: config.issuerPublicKey,
+      signerPublicKey: config.signerPublicKey,
+      expectedOperationalSignerPublicKey: config.signerPublicKey,
       feeStroops: config.feeStroops,
       confirmationWriterDatabaseUrl: config.confirmationWriterDatabaseUrl,
     });

@@ -25,6 +25,34 @@ const DESTINATION = Keypair.fromRawEd25519Seed(
 const AUTH = "b".repeat(48);
 const PRIVATE_URL = "http://orrylo-testnet-signer.railway.internal:8080";
 
+test("adapter verifies the explicitly pinned separate signer without substituting issuer", async () => {
+  const unsigned = transaction();
+  const input = {
+    transactionHash: Buffer.from(unsigned.hash()).toString("hex"),
+    unsignedEnvelopeXdr: unsigned.toXDR(),
+  };
+  for (const key of [WRONG_KEYPAIR, ISSUER_KEYPAIR]) {
+    const primitive = new PrivateRailwaySharedIssuerSigningPrimitive(
+      {
+        privateBaseUrl: PRIVATE_URL,
+        requestAuthSecret: AUTH,
+        issuerPublicKey: ISSUER,
+        signerPublicKey: WRONG_KEYPAIR.publicKey(),
+      },
+      (async () => signedResponse(key)) as typeof fetch,
+    );
+    if (key === WRONG_KEYPAIR)
+      assert.ok(
+        (await primitive.signCanonicalEnvelope(input)).signedEnvelopeXdr,
+      );
+    else
+      await assert.rejects(
+        primitive.signCanonicalEnvelope(input),
+        /signer_response_mismatch/,
+      );
+  }
+});
+
 function transaction(): Transaction {
   return new TransactionBuilder(new Account(ISSUER, "123"), {
     fee: "100",

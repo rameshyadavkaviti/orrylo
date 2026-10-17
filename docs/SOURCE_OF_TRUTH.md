@@ -374,6 +374,20 @@ Authenticated Albedo wallet
 - These bounded Testnet approvals do **not** authorize the exact issuer account/key, account creation/funding, signer secret generation/import/storage, signer deployment, account mutation, trustline creation, transaction signing/submission, or any Mainnet action. Those remain explicit owner/live-action gates. Mainnet signer/custody policy and the broader RYLO signer architecture remain governed by their separate canonical sections and are not changed by the Testnet MVP signer decision.
 - First prove a repeatable, authorized Testnet demonstration and record exact transaction/asset/network evidence; broader publicly available Testnet release remains subject to security, abuse and deployment gates.
 
+**Owner-approved Testnet signer addition (2026-10-16):** retain issuer
+`GBW4IKGPC5Q4YRKGRMNNXTVRZNQZ3DFWFHXSQUAMWLXES75MWTY3TWOV` and its master
+at weight 1; add operational signer
+`GDVOMNCVFH5OET7TJZWSIM5GSSYXZDEC3QBYSOINM7DL7ILFSKY77OAG` at weight 1 for
+the existing private Railway service. Preserve thresholds `1/1/1`, all flags
+OFF, and home domain. This supersedes the master-only signer set above and
+remains a one-signature Testnet policy with two independently capable account
+keys, not a two-signature quorum. Web verification pins the operational key
+separately from the transaction source and asset issuer; official-Horizon
+preflight must prove the exact master-plus-operational signer set before any
+attempt. The master seed remains owner-local. Approval is not evidence of
+on-chain authorization or deployment. No Mainnet/RYLO change or new token
+issuance is implied.
+
 **Delivery order:** (1) reconcile the reviewed execution adapters onto the merged Gate A foundation; (2) obtain the separately authorized Testnet issuer/account/signer activation and verify destination trustline readiness; (3) run one explicitly authorized one-attempt issuance; (4) independently confirm the exact hash and persist truthful result evidence. Keep parallel Mainnet/RYLO economy, growth features and styling work outside the Lite critical path.
 
 ### 12.2 Later milestone — complete RYLO Testnet ecosystem demonstration

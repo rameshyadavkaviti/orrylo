@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { validateInitialSupply } from "../lib/validation/initial-supply";
+import { CustomerTrustlineControl } from "./customer-trustline-control";
 
 /**
  * Only commits an application issuance intent. Signing/submission remain
@@ -25,6 +26,8 @@ export function ConfirmInitialSupplyIntent({
     fingerprint: string;
     amount: string;
     requestId: string;
+    executionStatus: string;
+    transactionHash?: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -109,10 +112,36 @@ export function ConfirmInitialSupplyIntent({
         } catch {
           // Browser-only handoff cleanup is best effort.
         }
+        // Issuance automation uses the same durable one-attempt signer and
+        // one-shot submission path as the existing execution API.
+        let executionStatus = "pending";
+        let transactionHash: string | undefined;
+        try {
+          const executionResponse = await fetch(
+            `/api/projects/${projectId}/issuance/execution`,
+            {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ requestId: result.issuance.requestId }),
+            },
+          );
+          const execution = await executionResponse.json();
+          if (executionResponse.ok && execution.ok) {
+            executionStatus = execution.execution.status;
+            transactionHash = execution.execution.transactionHash;
+          } else {
+            executionStatus = execution.code ?? "signer_unavailable";
+          }
+        } catch {
+          executionStatus = "execution_unavailable";
+        }
         setConfirmed({
           fingerprint: result.issuance.completeIntent.fingerprint,
           amount: result.issuance.completeIntent.initialSupply,
           requestId: result.issuance.requestId,
+          executionStatus,
+          transactionHash,
         });
         return;
       }
@@ -144,13 +173,24 @@ export function ConfirmInitialSupplyIntent({
       <div role="status">
         <p>
           Immutable application intent committed for {confirmed.amount} tokens.
-          No transaction has been submitted or confirmed.
+          Status: {confirmed.executionStatus}. Success requires durable
+          authoritative ledger confirmation.
         </p>
         <p>
           Request ID: <code>{confirmed.requestId}</code>
         </p>
         <p>
           Intent fingerprint: <code>{confirmed.fingerprint}</code>
+        </p>
+        {confirmed.transactionHash ? (
+          <p>
+            Exact transaction hash: <code>{confirmed.transactionHash}</code>
+          </p>
+        ) : null}
+        <p>
+          <a href={`/my-assets/${projectId}`}>
+            Open this project to check exact issuance status
+          </a>
         </p>
       </div>
     );
@@ -224,16 +264,13 @@ export function ConfirmInitialSupplyIntent({
               <dd>Unavailable — intent only</dd>
             </div>
           </dl>
-          <button
-            className="button button-secondary"
-            type="button"
-            disabled={busy || !isCurrent}
-            onClick={() => void confirm()}
-          >
-            {busy
-              ? "Saving immutable intent…"
-              : "Confirm immutable issuance intent"}
-          </button>
+          <CustomerTrustlineControl
+            key={`${projectId}:${validated.valid ? validated.normalized : amount}`}
+            projectId={projectId}
+            assetCode={assetCode}
+            amount={validated.valid ? validated.normalized : amount}
+            onConfirmed={confirm}
+          />
         </div>
       )}
       {error ? (

@@ -4,6 +4,13 @@ Status: **Target architecture, not implementation evidence**
 
 This document defines the intended system boundaries for the first Orrylo architecture.
 
+The bounded Testnet signer addition approved on 2026-10-16 is recorded in
+`SOURCE_OF_TRUTH.md`. The issuer remains the transaction source and asset issuer;
+a separately pinned operational key supplies the single issuance signature.
+The issuer master remains weight 1, thresholds remain 1/1/1, and preflight
+requires exactly those two weight-1 keys when the separate signer is configured.
+This does not alter the Mainnet 2-of-3 design.
+
 ## 1. High-level system
 
 ```

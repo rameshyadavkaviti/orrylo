@@ -16,6 +16,9 @@ const VALID_ENV: NodeJS.ProcessEnv = {
   NODE_ENV: "test",
   NEXT_PUBLIC_STELLAR_NETWORK: "testnet",
   ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY: ISSUER,
+  ORRYLO_TESTNET_SHARED_ISSUER_SIGNER_PUBLIC_KEY: Keypair.fromRawEd25519Seed(
+    Buffer.alloc(32, 222),
+  ).publicKey(),
   ORRYLO_TESTNET_SHARED_ISSUER_FEE_STROOPS: "100",
   ORRYLO_TESTNET_SIGNER_PRIVATE_URL:
     "http://orrylo-testnet-signer.railway.internal:8080",
@@ -58,6 +61,10 @@ test("runtime has no silent network, issuer, or fee activation defaults", () => 
 test("valid production config constructs only the private Railway primitive", async () => {
   const config = readSharedIssuanceRuntimeConfig(VALID_ENV);
   assert.equal(config.issuerPublicKey, ISSUER);
+  assert.equal(
+    config.signerPublicKey,
+    VALID_ENV.ORRYLO_TESTNET_SHARED_ISSUER_SIGNER_PUBLIC_KEY,
+  );
   assert.equal(config.feeStroops, "100");
 
   let fetchCalls = 0;

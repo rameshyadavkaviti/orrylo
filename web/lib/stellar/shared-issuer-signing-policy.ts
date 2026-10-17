@@ -42,6 +42,7 @@ export interface SharedIssuerSigningPrimitive {
 
 export interface SharedIssuerMvpLiteSigningPolicy {
   issuerPublicKey: string;
+  signerPublicKey?: string;
 }
 
 /**
@@ -72,6 +73,7 @@ export async function signDurableSharedIssuerTestnetEnvelope(input: {
 
 export function createSharedIssuerMvpLiteSignerAuthorization(
   issuerPublicKey: string,
+  signerPublicKey: string = issuerPublicKey,
 ): SharedIssuerSignerAuthorization {
   const normalizedIssuer = normalizePublicKey(issuerPublicKey);
   return {
@@ -79,18 +81,22 @@ export function createSharedIssuerMvpLiteSignerAuthorization(
     networkPassphrase: SHARED_ISSUER_TESTNET_PASSPHRASE,
     issuerPublicKey: normalizedIssuer,
     requiredWeight: 1,
-    signers: [{ publicKey: normalizedIssuer, weight: 1 }],
+    signers: [{ publicKey: normalizePublicKey(signerPublicKey), weight: 1 }],
   };
 }
 
 class PrimitiveBackedSharedIssuerTestnetSigner implements SharedIssuerSigner {
   private readonly issuerPublicKey: string;
+  private readonly signerPublicKey: string;
 
   constructor(
     policy: SharedIssuerMvpLiteSigningPolicy,
     private readonly primitive: SharedIssuerSigningPrimitive,
   ) {
     this.issuerPublicKey = normalizePublicKey(policy.issuerPublicKey);
+    this.signerPublicKey = normalizePublicKey(
+      policy.signerPublicKey ?? policy.issuerPublicKey,
+    );
   }
 
   async signCanonicalEnvelope(
@@ -122,7 +128,7 @@ class PrimitiveBackedSharedIssuerTestnetSigner implements SharedIssuerSigner {
     assertPrimitiveOutput(
       signed.signedEnvelopeXdr,
       request.transactionHash,
-      this.issuerPublicKey,
+      this.signerPublicKey,
     );
     return signed;
   }

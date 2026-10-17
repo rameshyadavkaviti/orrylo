@@ -159,6 +159,13 @@ These decisions approve policy only. They do **not** authorize account creation/
 - this approval is Testnet-only and does not authorize deployment, real secret provisioning, real signing/submission, or any Mainnet/RYLO action;
 - Mainnet signer/custody decisions and the broader RYLO signer architecture remain separate and unchanged.
 
+**Resolved 2026-10-16 — separate Testnet operational signer:** the owner approved
+adding the operational key recorded in `SOURCE_OF_TRUTH.md` to the existing
+Shared Issuer, retaining the master and thresholds. This supersedes the
+master-only signer-set requirement above, preserves a one-signature quorum,
+and does not change Mainnet or RYLO. On-chain authorization and private signer
+deployment still require verified evidence; no further issuance is implied.
+
 **Still open / owner-gated before live activation:**
 - exact public key of the newly created Testnet Shared Issuer and evidence that the approved flags/thresholds are actually configured;
 - actual provisioning/deployment of the approved private Railway signer and its service-scoped secret material;
