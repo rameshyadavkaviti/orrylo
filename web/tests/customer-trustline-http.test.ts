@@ -260,3 +260,39 @@ test("a second authenticated browser receives pending without a signable XDR", a
   assert.equal(secondResult.unsignedXdr, undefined);
   assert.equal(claims, 2);
 });
+
+test("durable pending hash is surfaced before a failing fresh preflight", async () => {
+  let inspectCalls = 0;
+  const fixture = {
+    ...deps(),
+    pending: async () => ({
+      issuerPublicKey: ISSUER,
+      destinationPublicKey: OWNER,
+      assetCode: "TESTNEW",
+      transactionHash: HASH,
+    }),
+    inspect: async () => {
+      inspectCalls += 1;
+      throw Object.assign(new Error("insufficient_customer_xlm"), {
+        code: "insufficient_customer_xlm",
+      });
+    },
+  } as CustomerTrustlineRouteDependencies;
+
+  const response = await handleInspectTrustline(
+    new NextRequest(URL + "?amount=75"),
+    context,
+    fixture,
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).trustline, {
+    status: "pending",
+    network: "testnet",
+    issuerPublicKey: ISSUER,
+    destinationPublicKey: OWNER,
+    assetCode: "TESTNEW",
+    amount: "75",
+    transactionHash: HASH,
+  });
+  assert.equal(inspectCalls, 0);
+});

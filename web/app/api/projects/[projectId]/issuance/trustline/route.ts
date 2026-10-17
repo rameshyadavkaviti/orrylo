@@ -47,6 +47,12 @@ export interface CustomerTrustlineRouteDependencies {
     project: ManagedProjectProfile,
     amount: string,
   ): Promise<CustomerTrustlinePlan>;
+  pending?(project: ManagedProjectProfile): Promise<{
+    issuerPublicKey: string;
+    destinationPublicKey: string;
+    assetCode: string;
+    transactionHash: string;
+  } | null>;
   reserve?(input: {
     project: ManagedProjectProfile;
     plan: CustomerTrustlinePlan;
@@ -87,6 +93,26 @@ function dependencies(): CustomerTrustlineRouteDependencies {
         assetCode: project.assetCode,
         initialSupply: amount,
       }),
+    async pending(project) {
+      const prior = await guard.unresolved(
+        project.projectId,
+        project.ownerPublicKey,
+      );
+      if (!prior) return null;
+      if (
+        prior.ownerPublicKey !== project.ownerPublicKey ||
+        prior.destinationPublicKey !== project.ownerPublicKey ||
+        prior.assetCode !== project.assetCode
+      ) {
+        throw new CustomerTrustlineError("trustline_transaction_mismatch");
+      }
+      return {
+        issuerPublicKey: prior.issuerPublicKey,
+        destinationPublicKey: prior.destinationPublicKey,
+        assetCode: prior.assetCode,
+        transactionHash: prior.transactionHash,
+      };
+    },
     reserve: ({ project, plan }) =>
       guard.reserve({
         projectId: project.projectId,
@@ -197,6 +223,21 @@ export async function handleInspectTrustline(
       [...request.nextUrl.searchParams.keys()].some((key) => key !== "amount")
     ) {
       return failure("invalid_request", 400);
+    }
+    const pending = await deps.pending?.(authorized.project);
+    if (pending) {
+      return NextResponse.json(
+        {
+          ok: true,
+          trustline: {
+            status: "pending",
+            network: "testnet",
+            ...pending,
+            amount,
+          },
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
     }
     const plan = await deps.inspect(authorized.project, amount);
     let trustline:

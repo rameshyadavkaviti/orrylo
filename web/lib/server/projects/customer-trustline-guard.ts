@@ -109,6 +109,29 @@ function mapHandoff(row: HandoffRow): CustomerTrustlineHandoff {
 export class PostgresCustomerTrustlineGuard {
   constructor(private readonly sql: DatabaseClient) {}
 
+  async unresolved(
+    projectId: string,
+    owner: string,
+  ): Promise<CustomerTrustlineHandoff | null> {
+    const [row] = await this.sql<HandoffRow[]>`
+      SELECT h.*, NULL::text AS resolution
+      FROM public.project_customer_change_trust_handoffs AS h
+      JOIN public.project_profile_owners AS o
+        ON o.project_id = h.project_id
+      WHERE h.project_id = ${projectId}
+        AND h.owner_public_key = ${owner}
+        AND o.owner_public_key = ${owner}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM public.project_customer_change_trust_resolutions AS resolution
+          WHERE resolution.handoff_id = h.handoff_id
+        )
+      ORDER BY h.created_at DESC, h.handoff_id DESC
+      LIMIT 1
+    `;
+    return row ? mapHandoff(row) : null;
+  }
+
   async latest(
     projectId: string,
     owner: string,

@@ -270,12 +270,17 @@ if (!TEST_DATABASE_URL) {
     );
     const handoff = await first.latest(projectId, OWNER);
     assert.ok(handoff);
+    assert.equal(
+      (await second.unresolved(projectId, OWNER))?.handoffId,
+      handoff.handoffId,
+    );
     await writer.terminal({
       handoff,
       kind: "ready",
       observedLedger: 901,
       observedLedgerClosedAt: new Date().toISOString(),
     });
+    assert.equal(await second.unresolved(projectId, OWNER), null);
     assert.equal(
       (
         await second.reserve({
