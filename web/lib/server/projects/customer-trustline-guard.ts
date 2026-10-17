@@ -132,6 +132,28 @@ export class PostgresCustomerTrustlineGuard {
     return row ? mapHandoff(row) : null;
   }
 
+  /** Match historical evidence by its immutable exact hash, not recency. */
+  async byHash(
+    projectId: string,
+    owner: string,
+    transactionHash: string,
+  ): Promise<CustomerTrustlineHandoff | null> {
+    const [row] = await this.sql<HandoffRow[]>`
+      SELECT h.*, resolution.resolution
+      FROM public.project_customer_change_trust_handoffs AS h
+      JOIN public.project_profile_owners AS o
+        ON o.project_id = h.project_id
+      LEFT JOIN public.project_customer_change_trust_resolutions AS resolution
+        ON resolution.handoff_id = h.handoff_id
+      WHERE h.project_id = ${projectId}
+        AND h.owner_public_key = ${owner}
+        AND o.owner_public_key = ${owner}
+        AND h.transaction_hash = ${transactionHash}::char(64)
+      LIMIT 1
+    `;
+    return row ? mapHandoff(row) : null;
+  }
+
   async latest(
     projectId: string,
     owner: string,
