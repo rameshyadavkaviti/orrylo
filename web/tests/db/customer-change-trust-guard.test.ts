@@ -294,6 +294,54 @@ if (!TEST_DATABASE_URL) {
     assert.equal((await first.latest(projectId, OWNER))?.resolution, null);
   });
 
+  test("exact historical hash lookup remains stable after later authorized handoff", async () => {
+    const old = plan("123");
+    assert.equal(
+      (await first.reserve({
+        projectId,
+        ownerPublicKey: OWNER,
+        plan: old,
+      })).status,
+      "claimed",
+    );
+    const oldRow = await first.byHash(projectId, OWNER, old.transactionHash!);
+    assert.ok(oldRow);
+    await writer.terminal({
+      handoff: oldRow,
+      kind: "failed",
+      observedLedger: 901,
+      observedLedgerClosedAt: new Date().toISOString(),
+    });
+
+    const next = plan("124");
+    assert.equal(
+      (await second.reserve({
+        projectId,
+        ownerPublicKey: OWNER,
+        plan: next,
+      })).status,
+      "claimed",
+    );
+    const historical = await first.byHash(projectId, OWNER, old.transactionHash!);
+    const latest = await first.latest(projectId, OWNER);
+    assert.equal(historical?.handoffId, oldRow.handoffId);
+    assert.equal(historical?.transactionHash, old.transactionHash);
+    assert.equal(historical?.amount, "250.0000000");
+    assert.equal(historical?.resolution, "failed");
+    assert.equal(latest?.transactionHash, next.transactionHash);
+    assert.equal(latest?.resolution, null);
+    assert.equal(
+      (await second.unresolved(projectId, OWNER))?.transactionHash,
+      next.transactionHash,
+    );
+    assert.equal(await second.byHash(projectId, OWNER, "f".repeat(64)), null);
+    const alien = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 214)).publicKey();
+    assert.equal(
+      await second.byHash(projectId, alien, old.transactionHash!),
+      null,
+    );
+  });
+
   test("post-expiry not-found proof requires later ledger and unchanged account sequence", async () => {
     await first.reserve({
       projectId,
