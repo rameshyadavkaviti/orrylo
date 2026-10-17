@@ -376,8 +376,52 @@ test("exact-hash 404 resolves terminal only after expiry and unchanged customer 
   assert.equal(unresolved.status, "pending");
 });
 
-test("eventually verified trustline readiness permits progress with unresolved callback", async () => {
+test("exact-hash success plus verified trustline readiness produces durable release evidence", async () => {
   const fx = fixture();
+  const unsigned = await inspectCustomerTrustline(
+    args(),
+    fx.fetchImpl,
+    EXPIRED_TIME,
+  );
+  const tx = TransactionBuilder.fromXDR(
+    unsigned.unsignedXdr!,
+    Networks.TESTNET,
+  );
+  assert.ok(tx instanceof Transaction);
+  tx.sign(WALLET);
+  const confirmed = fixture({
+    trustline: true,
+    limit: "1000.0000000",
+    transaction: () => ({
+      hash: unsigned.transactionHash,
+      successful: true,
+      ledger: 901,
+      created_at: "2026-10-16T09:00:00Z",
+      envelope_xdr: tx.toXDR(),
+    }),
+  });
+  const result = await reconcileCustomerTrustline(
+    {
+      ...args(),
+      transactionHash: unsigned.transactionHash!,
+      unsignedXdr: unsigned.unsignedXdr!,
+    },
+    confirmed.fetchImpl,
+  );
+  assert.equal(result.status, "ready");
+  if (result.status === "ready") {
+    assert.equal(result.trustline.status, "ready");
+    assert.equal(result.trustline.destinationPublicKey, CUSTOMER);
+    assert.deepEqual(result.evidence, {
+      kind: "ready",
+      observedLedger: 901,
+      observedLedgerClosedAt: "2026-10-16T09:00:00Z",
+    });
+  }
+});
+
+test("independent readiness does not release an exact hash before terminal evidence", async () => {
+  const fx = fixture({ ledgerClosedAt: "2026-10-16T08:43:00Z" });
   const unsigned = await inspectCustomerTrustline(
     args(),
     fx.fetchImpl,
@@ -392,11 +436,7 @@ test("eventually verified trustline readiness permits progress with unresolved c
     },
     fx.fetchImpl,
   );
-  assert.equal(result.status, "ready");
-  if (result.status === "ready") {
-    assert.equal(result.trustline.status, "ready");
-    assert.equal(result.trustline.destinationPublicKey, CUSTOMER);
-  }
+  assert.equal(result.status, "pending");
 });
 
 test("authoritatively failed exact-hash transaction permits only fresh planning", async () => {

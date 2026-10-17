@@ -257,6 +257,38 @@ if (!TEST_DATABASE_URL) {
     assert.equal(resolutions, 1);
   });
 
+  test("trusted exact-hash ready evidence durably releases the old amount before replanning", async () => {
+    assert.equal(
+      (
+        await first.reserve({
+          projectId,
+          ownerPublicKey: OWNER,
+          plan: plan("123"),
+        })
+      ).status,
+      "claimed",
+    );
+    const handoff = await first.latest(projectId, OWNER);
+    assert.ok(handoff);
+    await writer.terminal({
+      handoff,
+      kind: "ready",
+      observedLedger: 901,
+      observedLedgerClosedAt: new Date().toISOString(),
+    });
+    assert.equal(
+      (
+        await second.reserve({
+          projectId,
+          ownerPublicKey: OWNER,
+          plan: plan("124"),
+        })
+      ).status,
+      "claimed",
+    );
+    assert.equal((await first.latest(projectId, OWNER))?.resolution, null);
+  });
+
   test("post-expiry not-found proof requires later ledger and unchanged account sequence", async () => {
     await first.reserve({
       projectId,

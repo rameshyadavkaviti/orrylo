@@ -417,7 +417,7 @@ function parseAmountString(value: string): bigint {
 
 /**
  * Reconcile an Albedo handoff before a browser may produce another ChangeTrust.
- * A successful exact-hash result OR independently ready trustline permits
+ * A successful exact-hash result plus independently ready trustline permits
  * progression; a proven terminal result permits a *fresh* server plan.
  * A 404 or missing trustline alone never releases the pending signing guard.
  */
@@ -432,7 +432,15 @@ export async function reconcileCustomerTrustline(
   },
   fetchImpl: typeof fetch = globalThis.fetch,
 ): Promise<
-  | { status: "ready"; trustline: CustomerTrustlinePlan }
+  | {
+      status: "ready";
+      trustline: CustomerTrustlinePlan;
+      evidence: {
+        kind: "ready";
+        observedLedger: number;
+        observedLedgerClosedAt: string;
+      };
+    }
   | {
       status: "terminal";
       evidence: {
@@ -491,12 +499,9 @@ export async function reconcileCustomerTrustline(
     throw new CustomerTrustlineError("trustline_transaction_mismatch");
   }
 
-  // Authoritative readiness can independently establish that the destination
-  // is already able to receive the full amount, without another wallet action.
+  // Capacity is necessary but does not itself release the persisted exact hash.
+  // Release requires durable exact-hash success (below), or terminal evidence.
   const current = await inspectCustomerTrustline(input, fetchImpl);
-  if (current.status === "ready") {
-    return { status: "ready", trustline: current };
-  }
 
   let record: Record<string, unknown>;
   try {
@@ -570,7 +575,24 @@ export async function reconcileCustomerTrustline(
   ) {
     throw new CustomerTrustlineError("trustline_transaction_mismatch");
   }
-  if (record.successful !== false) return { status: "pending" };
+  if (record.successful === true) {
+    if (current.status !== "ready") return { status: "pending" };
+    if (
+      typeof record.created_at !== "string" ||
+      !Number.isFinite(Date.parse(record.created_at))
+    ) {
+      throw new CustomerTrustlineError("malformed_horizon_response");
+    }
+    return {
+      status: "ready",
+      trustline: current,
+      evidence: {
+        kind: "ready",
+        observedLedger: record.ledger as number,
+        observedLedgerClosedAt: record.created_at,
+      },
+    };
+  }
   if (
     typeof record.created_at !== "string" ||
     !Number.isFinite(Date.parse(record.created_at))

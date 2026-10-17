@@ -29,7 +29,7 @@ CREATE INDEX customer_change_trust_project_history_idx
   ON public.project_customer_change_trust_handoffs
   (project_id, created_at DESC, handoff_id DESC);
 
--- Append-only terminal reconciliation, written through the same independently
+-- Append-only authoritative resolution, written through the same independently
 -- provisioned confirmation-writer identity already required for issuer proof.
 CREATE TABLE public.project_customer_change_trust_resolutions (
   handoff_id uuid PRIMARY KEY
@@ -37,7 +37,7 @@ CREATE TABLE public.project_customer_change_trust_resolutions (
   transaction_hash char(64) NOT NULL
     CHECK (transaction_hash ~ '^[0-9a-f]{64}$'),
   resolution text NOT NULL
-    CHECK (resolution IN ('failed', 'expired_not_found')),
+    CHECK (resolution IN ('ready', 'failed', 'expired_not_found')),
   observed_ledger bigint NOT NULL CHECK (observed_ledger > 0),
   observed_ledger_closed_at timestamptz NOT NULL,
   observed_source_sequence numeric(20, 0),
@@ -48,7 +48,7 @@ CREATE TABLE public.project_customer_change_trust_resolutions (
       (handoff_id, transaction_hash),
   CONSTRAINT customer_change_trust_resolution_observation
     CHECK (
-      (resolution = 'failed' AND observed_source_sequence IS NULL)
+      (resolution IN ('ready', 'failed') AND observed_source_sequence IS NULL)
       OR
       (resolution = 'expired_not_found' AND observed_source_sequence IS NOT NULL)
     )

@@ -120,7 +120,7 @@ function dependencies(): CustomerTrustlineRouteDependencies {
         configuration: readCustomerTrustlineConfiguration(),
         ...bound,
       });
-      if (evidence.status !== "terminal") return evidence;
+      if (evidence.status === "pending") return evidence;
       const url = process.env.ORRYLO_CONFIRMATION_WRITER_DATABASE_URL?.trim();
       if (!url)
         throw new CustomerTrustlineError(
@@ -137,12 +137,17 @@ function dependencies(): CustomerTrustlineRouteDependencies {
           kind: evidence.evidence.kind,
           observedLedger: evidence.evidence.observedLedger,
           observedLedgerClosedAt: evidence.evidence.observedLedgerClosedAt,
-          observedSourceSequence: evidence.evidence.observedSourceSequence,
+          observedSourceSequence:
+            "observedSourceSequence" in evidence.evidence
+              ? evidence.evidence.observedSourceSequence
+              : undefined,
         });
       } finally {
         await trustedSql.end({ timeout: 5 });
       }
-      return { status: "terminal" };
+      return evidence.status === "ready"
+        ? { status: "ready", trustline: evidence.trustline }
+        : { status: "terminal" };
     },
   };
 }

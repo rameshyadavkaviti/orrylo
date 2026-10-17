@@ -11,7 +11,7 @@ import type { CustomerTrustlinePlan } from "./customer-testnet-trustline";
 import { CustomerTrustlineError } from "./customer-testnet-trustline";
 import { validateInitialSupply } from "../../validation/initial-supply";
 
-type Resolution = "failed" | "expired_not_found";
+type Resolution = "ready" | "failed" | "expired_not_found";
 
 interface HandoffRow {
   handoff_id: string;
@@ -221,7 +221,7 @@ export class PostgresCustomerTrustlineResolutionWriter {
             handoff.validUntil * 1000))
     ) {
       throw new CustomerTrustlineGuardError(
-        "Missing authoritative terminal reconciliation evidence.",
+        "Missing authoritative trustline resolution evidence.",
       );
     }
     await this.sql`
