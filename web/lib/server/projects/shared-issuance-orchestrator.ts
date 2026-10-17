@@ -134,6 +134,8 @@ export class SharedIssuanceOrchestrator {
       primitive: SharedIssuerSigningPrimitive;
       submission: SharedIssuerSubmissionAdapter;
       authorization: SharedIssuerSignerAuthorization;
+      /** Expected additional on-chain signer; independent of the key selected to sign. */
+      expectedOperationalSignerPublicKey?: string;
       confirmationValidator: ConfirmationValidator;
       confirmationWriter: TrustedLedgerConfirmationWriter;
       feeStroops: string;
@@ -204,8 +206,7 @@ export class SharedIssuanceOrchestrator {
         preflight = await this.dependencies.preflight.readIssuancePreconditions(
           {
             issuerPublicKey: intent.issuerPublicKey,
-            signerPublicKey:
-              this.dependencies.authorization.signers[0]?.publicKey,
+            signerPublicKey: this.expectedPreflightSignerPublicKey(),
             destinationPublicKey: intent.destinationPublicKey,
             assetCode: intent.assetCode,
             assetCodeReservedForProject: true,
@@ -400,8 +401,7 @@ export class SharedIssuanceOrchestrator {
         preflight = await this.dependencies.preflight.readIssuancePreconditions(
           {
             issuerPublicKey: intent.issuerPublicKey,
-            signerPublicKey:
-              this.dependencies.authorization.signers[0]?.publicKey,
+            signerPublicKey: this.expectedPreflightSignerPublicKey(),
             destinationPublicKey: intent.destinationPublicKey,
             assetCode: intent.assetCode,
             assetCodeReservedForProject: true,
@@ -637,7 +637,7 @@ export class SharedIssuanceOrchestrator {
     const preflight =
       await this.dependencies.preflight.readIssuancePreconditions({
         issuerPublicKey: intent.issuerPublicKey,
-        signerPublicKey: this.dependencies.authorization.signers[0]?.publicKey,
+        signerPublicKey: this.expectedPreflightSignerPublicKey(),
         destinationPublicKey: intent.destinationPublicKey,
         assetCode: intent.assetCode,
         assetCodeReservedForProject: true,
@@ -683,6 +683,13 @@ export class SharedIssuanceOrchestrator {
     }
     const current = await this.dependencies.store.getLifecycle(requestId);
     return current?.status === "pending_execution";
+  }
+
+  private expectedPreflightSignerPublicKey(): string | undefined {
+    return (
+      this.dependencies.expectedOperationalSignerPublicKey ??
+      this.dependencies.authorization.signers[0]?.publicKey
+    );
   }
 
   private assertManualIssuer(intent: ImmutableSharedIssuanceIntent): void {

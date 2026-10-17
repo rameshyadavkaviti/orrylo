@@ -186,6 +186,9 @@ architecture, or Mainnet facility. It never loads a Stellar secret key. The
 owner's Stellar CLI identity remains entirely in the local Stellar secure store.
 The operator bridge is hard-pinned to the approved live Testnet Shared Issuer
 `GBW4IKGPC5Q4YRKGRMNNXTVRZNQZ3DFWFHXSQUAMWLXES75MWTY3TWOV`; any different configured issuer fails closed.
+It also requires `ORRYLO_TESTNET_SHARED_ISSUER_SIGNER_PUBLIC_KEY` so preflight
+can verify the exact master-plus-operational on-chain signer set independently
+of the issuer master key selected for the owner-local manual signature.
 
 Before this manual path is used, the deployment database must be at the exact
 `001–011` migration baseline. Migration `011` extends the existing

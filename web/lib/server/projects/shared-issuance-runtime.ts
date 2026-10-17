@@ -37,6 +37,7 @@ export async function createServerSharedIssuanceOrchestrator(input: {
   primitive: SharedIssuerSigningPrimitive;
   issuerPublicKey: string;
   signerPublicKey?: string;
+  expectedOperationalSignerPublicKey?: string;
   feeStroops: string;
   confirmationWriterDatabaseUrl: string;
   applicationDatabase?: DatabaseClient;
@@ -70,6 +71,8 @@ export async function createServerSharedIssuanceOrchestrator(input: {
       input.issuerPublicKey,
       input.signerPublicKey,
     ),
+    expectedOperationalSignerPublicKey:
+      input.expectedOperationalSignerPublicKey ?? input.signerPublicKey,
     confirmationValidator: new AuthoritativeSharedIssuanceConfirmationValidator(
       reader,
     ),
@@ -157,6 +160,7 @@ export async function getServerSharedIssuanceOrchestrator(): Promise<SharedIssua
       primitive,
       issuerPublicKey: config.issuerPublicKey,
       signerPublicKey: config.signerPublicKey,
+      expectedOperationalSignerPublicKey: config.signerPublicKey,
       feeStroops: config.feeStroops,
       confirmationWriterDatabaseUrl: config.confirmationWriterDatabaseUrl,
     });

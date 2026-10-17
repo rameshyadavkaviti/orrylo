@@ -107,6 +107,7 @@ function usage(): string {
     "Required server-only environment:",
     "  NEXT_PUBLIC_STELLAR_NETWORK=testnet",
     "  ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY",
+    "  ORRYLO_TESTNET_SHARED_ISSUER_SIGNER_PUBLIC_KEY",
     "  ORRYLO_TESTNET_SHARED_ISSUER_FEE_STROOPS",
     "  DATABASE_URL",
     "  ORRYLO_CONFIRMATION_WRITER_DATABASE_URL",
@@ -130,6 +131,9 @@ async function main() {
     );
   }
   const feeStroops = requiredEnv("ORRYLO_TESTNET_SHARED_ISSUER_FEE_STROOPS");
+  const expectedOperationalSignerPublicKey = requiredEnv(
+    "ORRYLO_TESTNET_SHARED_ISSUER_SIGNER_PUBLIC_KEY",
+  );
   const applicationDatabase = createDatabaseClient(requiredEnv("DATABASE_URL"));
   const confirmationWriterDatabaseUrl = requiredEnv(
     "ORRYLO_CONFIRMATION_WRITER_DATABASE_URL",
@@ -142,6 +146,7 @@ async function main() {
     const orchestrator = await createServerSharedIssuanceOrchestrator({
       primitive: manualOnlyPrimitive,
       issuerPublicKey,
+      expectedOperationalSignerPublicKey,
       feeStroops,
       confirmationWriterDatabaseUrl,
       applicationDatabase,

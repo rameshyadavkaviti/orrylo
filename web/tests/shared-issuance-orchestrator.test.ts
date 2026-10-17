@@ -170,6 +170,7 @@ function fixture(
     confirmationMismatch?: boolean;
     primitive?: SharedIssuerSigningPrimitive;
     signerPublicKey?: string;
+    expectedOperationalSignerPublicKey?: string;
     appendFailures?: number;
   } = {},
 ) {
@@ -196,7 +197,9 @@ function fixture(
       async readIssuancePreconditions(request) {
         assert.equal(
           request.signerPublicKey,
-          options.signerPublicKey ?? ISSUER,
+          options.expectedOperationalSignerPublicKey ??
+            options.signerPublicKey ??
+            ISSUER,
         );
         calls.push("preflight");
         return {
@@ -229,6 +232,8 @@ function fixture(
       },
     },
     primitive,
+    expectedOperationalSignerPublicKey:
+      options.expectedOperationalSignerPublicKey,
     submission: {
       async submitSignedEnvelope(signedEnvelopeXdr) {
         calls.push("submit");
@@ -599,6 +604,17 @@ test("manual handoff persists attempt 1 and exposes exact unsigned XDR without s
   assert.equal(fx.store.attempts[0]!.signedEnvelopeXdrSha256, undefined);
 });
 
+test("manual master signing validates the separate expected operational signer set", async () => {
+  const fx = fixture({
+    expectedOperationalSignerPublicKey: OTHER_ISSUER_KEYPAIR.publicKey(),
+  });
+  const handoff = await fx.orchestrator.prepareManualSigningHandoff(input);
+
+  assert.equal(handoff.status, "awaiting_manual_signature");
+  assert.deepEqual(fx.calls, ["preflight"]);
+  assert.equal(fx.submissions(), 0);
+});
+
 test("private signing mode claimed first rejects manual export before a second signer can begin", async () => {
   let releaseSigner!: () => void;
   let signerEntered!: () => void;
@@ -778,7 +794,9 @@ test("legacy pending execution without an attempt remains recoverable after appe
 });
 
 test("manual signed-envelope bridge accepts only the exact persisted Testnet transaction", async () => {
-  const fx = fixture();
+  const fx = fixture({
+    expectedOperationalSignerPublicKey: OTHER_ISSUER_KEYPAIR.publicKey(),
+  });
   const handoff = await fx.orchestrator.prepareManualSigningHandoff(input);
   const canonicalPlan = buildVariantPlan();
 
