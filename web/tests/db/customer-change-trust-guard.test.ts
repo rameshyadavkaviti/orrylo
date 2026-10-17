@@ -294,14 +294,16 @@ if (!TEST_DATABASE_URL) {
     assert.equal((await first.latest(projectId, OWNER))?.resolution, null);
   });
 
-  test("exact historical hash lookup remains stable after later authorized handoff", async () => {
+  test("historical hash lookup remains stable after a later handoff", async () => {
     const old = plan("123");
     assert.equal(
-      (await first.reserve({
-        projectId,
-        ownerPublicKey: OWNER,
-        plan: old,
-      })).status,
+      (
+        await first.reserve({
+          projectId,
+          ownerPublicKey: OWNER,
+          plan: old,
+        })
+      ).status,
       "claimed",
     );
     const oldRow = await first.byHash(projectId, OWNER, old.transactionHash!);
@@ -315,14 +317,20 @@ if (!TEST_DATABASE_URL) {
 
     const next = plan("124");
     assert.equal(
-      (await second.reserve({
-        projectId,
-        ownerPublicKey: OWNER,
-        plan: next,
-      })).status,
+      (
+        await second.reserve({
+          projectId,
+          ownerPublicKey: OWNER,
+          plan: next,
+        })
+      ).status,
       "claimed",
     );
-    const historical = await first.byHash(projectId, OWNER, old.transactionHash!);
+    const historical = await first.byHash(
+      projectId,
+      OWNER,
+      old.transactionHash!,
+    );
     const latest = await first.latest(projectId, OWNER);
     assert.equal(historical?.handoffId, oldRow.handoffId);
     assert.equal(historical?.transactionHash, old.transactionHash);
