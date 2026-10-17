@@ -49,7 +49,7 @@ export function CustomerTrustlineControl({
     return (
       value.network === "testnet" &&
       value.assetCode === assetCode &&
-      value.amount === amount &&
+      (value.status === "pending" || value.amount === amount) &&
       /^G[A-Z2-7]{55}$/.test(value.destinationPublicKey) &&
       /^G[A-Z2-7]{55}$/.test(value.issuerPublicKey)
     );
@@ -247,41 +247,69 @@ export function CustomerTrustlineControl({
       busy.current ||
       pending ||
       plan?.status !== "signature_required" ||
-      !plan?.unsignedXdr ||
-      !plan.transactionHash ||
-      plan.status !== "signature_required" ||
-      !plan.validUntil ||
       readPendingCustomerTrustline(window.localStorage, projectId).kind !==
         "none"
     )
       return;
-    if (Math.floor(Date.now() / 1000) >= plan.validUntil) {
-      setError(
-        "The wallet signing window expired. Refresh trustline readiness.",
-      );
-      return;
-    }
 
-    const evidence: PendingCustomerTrustline = {
-      version: 1,
-      network: "testnet",
-      projectId,
-      assetCode: plan.assetCode,
-      destinationPublicKey: plan.destinationPublicKey,
-      issuerPublicKey: plan.issuerPublicKey,
-      amount: plan.amount,
-      transactionHash: plan.transactionHash,
-      unsignedXdr: plan.unsignedXdr,
-      validUntil: plan.validUntil,
-    };
     busy.current = true;
     setWorking(true);
     setError(null);
-    // Persist BEFORE invoking Albedo: wallet rejection, unknown HTTP response,
-    // reload and process interruption must all retain the same hash.
-    setPending(true);
+    // The POST claim is the only way to obtain signable XDR; GET inspection
+    // never holds a reservation or hands a transaction to Albedo.
     setPlan(null);
+    setPending(true);
     try {
+      const reservation = await fetch(
+        `/api/projects/${projectId}/issuance/trustline`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount, reserve: true }),
+        },
+      );
+      const result = await readResponse(reservation);
+      if (!reservation.ok || !result?.ok || !matchesReview(result.trustline)) {
+        throw new Error(result?.code ?? "trustline_reservation_unavailable");
+      }
+      const reserved = result.trustline;
+      if (reserved.status === "pending") {
+        setError(
+          "An earlier ChangeTrust is unresolved. Reconcile its exact hash before another signature.",
+        );
+        return;
+      }
+      if (reserved.status === "ready") {
+        setPending(false);
+        setPlan(reserved);
+        return;
+      }
+      if (
+        reserved.status !== "signature_required" ||
+        !reserved.unsignedXdr ||
+        !reserved.transactionHash ||
+        !reserved.validUntil ||
+        Math.floor(Date.now() / 1000) >= reserved.validUntil
+      ) {
+        throw new Error("trustline_transaction_mismatch");
+      }
+
+      const evidence: PendingCustomerTrustline = {
+        version: 1,
+        network: "testnet",
+        projectId,
+        assetCode: reserved.assetCode,
+        destinationPublicKey: reserved.destinationPublicKey,
+        issuerPublicKey: reserved.issuerPublicKey,
+        amount: reserved.amount,
+        transactionHash: reserved.transactionHash,
+        unsignedXdr: reserved.unsignedXdr,
+        validUntil: reserved.validUntil,
+      };
+      // Persist the exact winning server reservation BEFORE opening Albedo.
+      // If the browser closes in between, another session can recover the
+      // durable pending hash without generating a second signable plan.
       const handedOff = await withCustomerTrustlineHandoff(
         window.localStorage,
         evidence,
@@ -303,8 +331,8 @@ export function CustomerTrustlineControl({
               "Albedo did not prove this exact Testnet submission.",
             );
           }
-          // The callback is not ledger confirmation; the reconciliation request
-          // below is the only mechanism allowed to release this pending hash.
+          // Wallet callback is not ledger confirmation. Exact-hash
+          // reconciliation below is the only release mechanism.
         },
       );
       if (!handedOff) {
@@ -316,7 +344,7 @@ export function CustomerTrustlineControl({
       setError(
         classifyWalletIntentError(cause) === "rejected"
           ? "Wallet cancelled. The saved exact hash must still be reconciled before another signing action."
-          : "Wallet submission may be uncertain. The original transaction hash is retained; do not sign again.",
+          : "The ChangeTrust reservation or submission may be uncertain. No further signature is allowed until reconciliation.",
       );
     } finally {
       busy.current = false;
