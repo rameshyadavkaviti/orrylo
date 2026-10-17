@@ -100,6 +100,42 @@ test("malformed or extra readiness fields cannot select arbitrary issuer or dest
   }
 });
 
+test("reservation rejects malformed or injected body and unrelated owner", async () => {
+  let called = 0;
+  const fixture = deps({ status: "signature_required" });
+  fixture.reserve = async () => {
+    called += 1;
+    throw Error("no reservation expected");
+  };
+  for (const body of [
+    { amount: "50", reserve: false },
+    { amount: "50", reserve: true, issuerPublicKey: ISSUER },
+    { amount: "invalid", reserve: true },
+  ]) {
+    const response = await handleConfirmTrustline(
+      new NextRequest(URL, {
+        method: "POST",
+        headers: { origin: "https://orrylo.com" },
+        body: JSON.stringify(body),
+      }),
+      context,
+      fixture,
+    );
+    assert.equal(response.status, 400);
+  }
+  const other = await handleConfirmTrustline(
+    new NextRequest(URL, {
+      method: "POST",
+      headers: { origin: "https://orrylo.com" },
+      body: JSON.stringify({ amount: "50", reserve: true }),
+    }),
+    context,
+    { ...fixture, getOwnedProject: async () => null },
+  );
+  assert.equal(other.status, 404);
+  assert.equal(called, 0);
+});
+
 test("trustline confirmation enforces same-origin, exact inputs, and verified readiness", async () => {
   const denied = await handleConfirmTrustline(
     new NextRequest(URL, {
@@ -220,7 +256,7 @@ test("reconciliation rejects injected authority, forged origin, and malformed XD
   assert.equal(called, false);
 });
 
-test("a second authenticated browser receives pending without a signable XDR", async () => {
+test("GET remains read-only; origin-checked POST is the only signable reservation", async () => {
   let claims = 0;
   const fixture = deps();
   const signable = {
@@ -237,28 +273,95 @@ test("a second authenticated browser receives pending without a signable XDR", a
       ? { status: "claimed", plan: signable }
       : { status: "pending", transactionHash: HASH };
   };
-  const first = await handleInspectTrustline(
-    new NextRequest(URL + "?amount=50"),
+
+  for (let n = 0; n < 2; n += 1) {
+    const inspected = await handleInspectTrustline(
+      new NextRequest(URL + "?amount=50"),
+      context,
+      fixture,
+    );
+    assert.equal(inspected.status, 200);
+    const value = (await inspected.json()).trustline;
+    assert.equal(value.status, "signature_required");
+    assert.equal(value.unsignedXdr, undefined);
+    assert.equal(value.transactionHash, undefined);
+    assert.equal(value.validUntil, undefined);
+  }
+  assert.equal(claims, 0);
+
+  const forbidden = await handleConfirmTrustline(
+    new NextRequest(URL, {
+      method: "POST",
+      headers: { origin: "https://evil.example" },
+      body: JSON.stringify({ amount: "50", reserve: true }),
+    }),
     context,
     fixture,
   );
+  assert.equal(forbidden.status, 403);
+  assert.equal(claims, 0);
+
+  const claim = () =>
+    handleConfirmTrustline(
+      new NextRequest(URL, {
+        method: "POST",
+        headers: { origin: "https://orrylo.com" },
+        body: JSON.stringify({ amount: "50", reserve: true }),
+      }),
+      context,
+      fixture,
+    );
+  const first = await claim();
   assert.equal(first.status, 200);
   const firstResult = (await first.json()).trustline;
-  assert.equal(firstResult.status, "signature_required");
   assert.equal(firstResult.unsignedXdr, signable.unsignedXdr);
+  assert.equal(firstResult.transactionHash, HASH);
 
-  // Same authenticated wallet in another browser/server session.
-  const second = await handleInspectTrustline(
-    new NextRequest(URL + "?amount=50"),
-    context,
-    fixture,
-  );
+  const second = await claim();
   assert.equal(second.status, 200);
   const secondResult = (await second.json()).trustline;
   assert.equal(secondResult.status, "pending");
   assert.equal(secondResult.transactionHash, HASH);
   assert.equal(secondResult.unsignedXdr, undefined);
   assert.equal(claims, 2);
+});
+
+test("pending handoff wins over changed amount and failed preflight on reservation POST", async () => {
+  let inspected = 0;
+  let reserved = 0;
+  const fixture = deps();
+  fixture.pending = async () => ({
+    issuerPublicKey: ISSUER,
+    destinationPublicKey: OWNER,
+    assetCode: "TESTNEW",
+    transactionHash: HASH,
+    amount: "50.0000000",
+  });
+  fixture.inspect = async () => {
+    inspected += 1;
+    throw Error("insufficient_customer_xlm");
+  };
+  fixture.reserve = async () => {
+    reserved += 1;
+    throw Error("must not reserve again");
+  };
+  const response = await handleConfirmTrustline(
+    new NextRequest(URL, {
+      method: "POST",
+      headers: { origin: "https://orrylo.com" },
+      body: JSON.stringify({ amount: "75", reserve: true }),
+    }),
+    context,
+    fixture,
+  );
+  assert.equal(response.status, 200);
+  const value = (await response.json()).trustline;
+  assert.equal(value.status, "pending");
+  assert.equal(value.amount, "50.0000000");
+  assert.equal(value.transactionHash, HASH);
+  assert.equal(value.unsignedXdr, undefined);
+  assert.equal(inspected, 0);
+  assert.equal(reserved, 0);
 });
 
 test("durable pending hash is surfaced before a failing fresh preflight", async () => {
@@ -270,6 +373,7 @@ test("durable pending hash is surfaced before a failing fresh preflight", async 
       destinationPublicKey: OWNER,
       assetCode: "TESTNEW",
       transactionHash: HASH,
+      amount: "50.0000000",
     }),
     inspect: async () => {
       inspectCalls += 1;
@@ -291,7 +395,7 @@ test("durable pending hash is surfaced before a failing fresh preflight", async 
     issuerPublicKey: ISSUER,
     destinationPublicKey: OWNER,
     assetCode: "TESTNEW",
-    amount: "75",
+    amount: "50.0000000",
     transactionHash: HASH,
   });
   assert.equal(inspectCalls, 0);
