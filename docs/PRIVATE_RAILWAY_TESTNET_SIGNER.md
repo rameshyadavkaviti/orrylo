@@ -57,6 +57,13 @@ evidence of a successful live issuance or proof that the deployed configuration
 is correct. The existing exact-body/hash/signature and durable confirmation
 checks still determine whether signing/submission can proceed.
 
+When the web Node server starts with a configured private signer URL, it runs
+the same non-signing check once and emits only
+`{"event":"private_signer_readiness","ok":true,"code":"signer_ready"}`
+or a bounded local failure code. It never logs configuration, response bodies,
+headers or credentials. Startup remains available for existing projects even
+when the signer is unavailable; the execution gate still rejects new signing.
+
 ## Railway layout
 
 Use two services in the same Railway project and environment.
