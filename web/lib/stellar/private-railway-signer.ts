@@ -8,7 +8,12 @@ const HASH_PATTERN = /^[0-9a-f]{64}$/;
 const MIN_AUTH_SECRET_BYTES = 32;
 
 export type PrivateRailwaySignerPrimitiveErrorCode =
-  "invalid_configuration" | "signer_unavailable" | "signer_response_mismatch";
+  | "invalid_configuration"
+  | "signer_unavailable"
+  | "signer_response_mismatch"
+  | "signer_identity_mismatch"
+  | "signer_authentication_failed"
+  | "signer_request_rejected";
 
 export class PrivateRailwaySignerPrimitiveError extends Error {
   constructor(readonly code: PrivateRailwaySignerPrimitiveErrorCode) {
@@ -46,6 +51,63 @@ export class PrivateRailwaySharedIssuerSigningPrimitive implements SharedIssuerS
     this.requestAuthSecret = input.requestAuthSecret;
   }
 
+  /** No envelope is constructed or sent. Run before consuming attempt 1. */
+  async assertReady(): Promise<void> {
+    try {
+      const response = await this.fetchImpl(
+        new URL("/healthz", this.endpoint),
+        {
+          method: "GET",
+          cache: "no-store",
+          redirect: "error",
+          signal: AbortSignal.timeout(5_000),
+        },
+      );
+      if (!response.ok)
+        throw new PrivateRailwaySignerPrimitiveError("signer_unavailable");
+      const health = await response.json();
+      if (
+        !health ||
+        health.ok !== true ||
+        health.ready !== true ||
+        health.service !== "orrylo-private-testnet-signer" ||
+        health.network !== "testnet" ||
+        health.issuerPublicKey !== this.issuerPublicKey ||
+        health.signerPublicKey !== this.signerPublicKey
+      ) {
+        throw new PrivateRailwaySignerPrimitiveError(
+          "signer_identity_mismatch",
+        );
+      }
+      // The reviewed service authenticates, then rejects this missing-field body
+      // before XDR parsing or signing. Never send an envelope as a health probe.
+      const probe = await this.fetchImpl(new URL("/v1/sign", this.endpoint), {
+        method: "POST",
+        cache: "no-store",
+        redirect: "error",
+        signal: AbortSignal.timeout(5_000),
+        headers: {
+          authorization: `Bearer ${this.requestAuthSecret}`,
+          "content-type": "application/json",
+        },
+        body: "{}",
+      });
+      if (probe.status === 401)
+        throw new PrivateRailwaySignerPrimitiveError(
+          "signer_authentication_failed",
+        );
+      if (probe.status !== 400)
+        throw new PrivateRailwaySignerPrimitiveError("signer_unavailable");
+      const rejection = await probe.json();
+      if (rejection?.ok !== false || rejection?.code !== "invalid_request") {
+        throw new PrivateRailwaySignerPrimitiveError("signer_unavailable");
+      }
+    } catch (error) {
+      if (error instanceof PrivateRailwaySignerPrimitiveError) throw error;
+      throw new PrivateRailwaySignerPrimitiveError("signer_unavailable");
+    }
+  }
+
   async signCanonicalEnvelope(input: {
     transactionHash: string;
     unsignedEnvelopeXdr: string;
@@ -78,6 +140,12 @@ export class PrivateRailwaySharedIssuerSigningPrimitive implements SharedIssuerS
     }
 
     if (!response.ok) {
+      if (response.status === 401)
+        throw new PrivateRailwaySignerPrimitiveError(
+          "signer_authentication_failed",
+        );
+      if (response.status === 400)
+        throw new PrivateRailwaySignerPrimitiveError("signer_request_rejected");
       throw new PrivateRailwaySignerPrimitiveError("signer_unavailable");
     }
 

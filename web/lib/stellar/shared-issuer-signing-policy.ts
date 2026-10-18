@@ -1,6 +1,7 @@
 import { Keypair, Transaction, TransactionBuilder } from "@stellar/stellar-sdk";
 
 import { isKnownRyloIssuerPublicKey } from "../product/constants";
+import { PrivateRailwaySignerPrimitiveError } from "./private-railway-signer";
 import {
   signPersistedSharedIssuerEnvelope,
   type SharedIssuerDurableExecutionReader,
@@ -34,6 +35,8 @@ export class SharedIssuerSigningPolicyError extends Error {
 }
 
 export interface SharedIssuerSigningPrimitive {
+  /** Optional for injected/manual primitives; the production private adapter implements it. */
+  assertReady?(): Promise<void>;
   signCanonicalEnvelope(input: {
     transactionHash: string;
     unsignedEnvelopeXdr: string;
@@ -110,7 +113,9 @@ class PrimitiveBackedSharedIssuerTestnetSigner implements SharedIssuerSigner {
         transactionHash: request.transactionHash,
         unsignedEnvelopeXdr: request.unsignedEnvelopeXdr,
       });
-    } catch {
+    } catch (error) {
+      // Preserve only our bounded, secret-free classification; never remote bodies.
+      if (error instanceof PrivateRailwaySignerPrimitiveError) throw error;
       throw new SharedIssuerSigningPolicyError(
         "signing_primitive_unavailable",
         "The isolated Testnet signing primitive could not complete the authorized request.",

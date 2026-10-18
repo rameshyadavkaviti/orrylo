@@ -95,6 +95,14 @@ export async function handleStartOrResumeIssuance(
     if (code === "owner_intent_mismatch") return failure(code, 403);
     if (code === "intent_not_found") return failure(code, 404);
     if (code === "issuer_integration_unavailable") return failure(code, 503);
+    if (
+      [
+        "signer_unavailable",
+        "signer_identity_mismatch",
+        "signer_authentication_failed",
+      ].includes(code)
+    )
+      return failure(code, 503);
     return failure(code, 409);
   }
 }
