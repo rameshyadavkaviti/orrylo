@@ -41,6 +41,29 @@ there. Web may reference the signer's request-auth variable, never either seed.
 Build with development dependencies so TypeScript is available:
 `npm ci --include=dev --no-audit --no-fund && npm run signer:build`.
 
+Before constructing a timed envelope or claiming an unclaimed private attempt,
+the application now checks `/healthz` for the exact configured issuer, signer,
+Testnet network and service identity. It then sends the reviewed non-signing
+authentication probe (`POST /v1/sign` with literal `{}`), requiring
+`400 invalid_request`. Each readiness request has a five-second timeout and
+rejects redirects. Failure leaves the intent and attempt allowance unchanged;
+there is no automatic retry. Already claimed, failed or signed attempts do not
+enter this gate or acquire a second signing opportunity.
+
+Signing failures preserve bounded local codes (`signer_authentication_failed`,
+`signer_request_rejected`, `signer_response_mismatch`, `signer_unavailable`)
+without disclosing response bodies, credentials or envelopes. This guard is not
+evidence of a successful live issuance or proof that the deployed configuration
+is correct. The existing exact-body/hash/signature and durable confirmation
+checks still determine whether signing/submission can proceed.
+
+When the web Node server starts with a configured private signer URL, it runs
+the same non-signing check once and emits only
+`{"event":"private_signer_readiness","ok":true,"code":"signer_ready"}`
+or a bounded local failure code. It never logs configuration, response bodies,
+headers or credentials. Startup remains available for existing projects even
+when the signer is unavailable; the execution gate still rejects new signing.
+
 ## Railway layout
 
 Use two services in the same Railway project and environment.

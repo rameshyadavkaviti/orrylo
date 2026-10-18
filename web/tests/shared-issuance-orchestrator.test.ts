@@ -299,6 +299,26 @@ const input = {
   ownerPublicKey: OWNER,
 };
 
+test("signer readiness failure leaves intent and attempt allowance untouched", async () => {
+  const primitive = {
+    async assertReady() {
+      throw new Error("signer_identity_mismatch");
+    },
+    async signCanonicalEnvelope() {
+      assert.fail("must not sign");
+    },
+  };
+  const fx = fixture({ primitive });
+  await assert.rejects(
+    fx.orchestrator.startOrResume(input),
+    /signer_identity_mismatch/,
+  );
+  assert.equal(fx.store.attempts.length, 0);
+  assert.equal(fx.store.status, "awaiting_issuer_integration");
+  assert.deepEqual(fx.calls, []);
+  assert.equal(fx.submissions(), 0);
+});
+
 function buildVariantPlan(
   overrides: Partial<{
     assetCode: string;
@@ -453,6 +473,10 @@ test("separate private Railway signer reaches one-shot issuance without changing
     signerPublicKey,
     requestAuthSecret,
     signer: OTHER_ISSUER_KEYPAIR,
+    signEnvelope(transaction, signer) {
+      signingCalls++;
+      transaction.sign(signer);
+    },
   });
   const primitive = new PrivateRailwaySharedIssuerSigningPrimitive(
     {
@@ -462,7 +486,6 @@ test("separate private Railway signer reaches one-shot issuance without changing
       signerPublicKey,
     },
     (async (input, init) => {
-      signingCalls++;
       const request = new Request(input, init);
       const result = await handlePrivateTestnetSignerRequest(
         {
@@ -494,7 +517,7 @@ test("separate private Railway signer reaches one-shot issuance without changing
   assert.equal(fx.submissions(), 1);
 });
 
-test("private Railway signer failure causes zero submissions", async () => {
+test("private Railway signer outage causes zero attempts and zero submissions", async () => {
   let signerCalls = 0;
   const primitive = new PrivateRailwaySharedIssuerSigningPrimitive(
     {
@@ -509,12 +532,56 @@ test("private Railway signer failure causes zero submissions", async () => {
   );
 
   const fx = fixture({ primitive });
-  const result = await fx.orchestrator.startOrResume(input);
-
-  assert.equal(result.status, "failed_before_submission");
+  await assert.rejects(
+    fx.orchestrator.startOrResume(input),
+    /signer_unavailable/,
+  );
   assert.equal(signerCalls, 1);
   assert.equal(fx.submissions(), 0);
+  assert.equal(fx.store.attempts.length, 0);
+});
+
+test("a signing response failure retains its safe cause and never retries the claimed attempt", async () => {
+  let envelopeRequests = 0;
+  const primitive = new PrivateRailwaySharedIssuerSigningPrimitive(
+    {
+      privateBaseUrl: "http://orrylo-testnet-signer.railway.internal:8080",
+      requestAuthSecret: "a".repeat(48),
+      issuerPublicKey: ISSUER,
+    },
+    (async (url, init) => {
+      if (String(url).endsWith("/healthz"))
+        return Response.json({
+          ok: true,
+          ready: true,
+          network: "testnet",
+          service: "orrylo-private-testnet-signer",
+          issuerPublicKey: ISSUER,
+          signerPublicKey: ISSUER,
+        });
+      if (init?.body === "{}")
+        return Response.json(
+          { ok: false, code: "invalid_request" },
+          { status: 400 },
+        );
+      envelopeRequests++;
+      return Response.json(
+        { ok: false, code: "unauthorized", details: "private data" },
+        { status: 401 },
+      );
+    }) as typeof fetch,
+  );
+  const fx = fixture({ primitive });
+  const result = await fx.orchestrator.startOrResume(input);
+  assert.deepEqual(result, {
+    status: "failed_before_submission",
+    failureCode: "signer_authentication_failed",
+  });
   assert.equal(fx.store.attempts.length, 1);
+  assert.equal(fx.store.attempts[0]?.signingMode, "private");
+  assert.equal(fx.submissions(), 0);
+  assert.deepEqual(await fx.orchestrator.startOrResume(input), result);
+  assert.equal(envelopeRequests, 1);
 });
 
 test("wrong owner fails before preflight and signing", async () => {

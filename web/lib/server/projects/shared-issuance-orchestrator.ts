@@ -194,6 +194,11 @@ export class SharedIssuanceOrchestrator {
 
     let plan: SharedIssuerIssuancePlan;
 
+    // Check runtime identity/auth before building a timed envelope or claiming
+    // signing. A readiness outage must not consume attempt 1 or fail the intent.
+    // Existing signed/claimed/failed attempts returned above are never probed.
+    await this.dependencies.primitive.assertReady?.();
+
     if (attempt) {
       try {
         plan = await this.loadCurrentPlan(intent, attempt);

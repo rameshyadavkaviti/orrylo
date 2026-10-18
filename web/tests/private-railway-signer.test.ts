@@ -25,6 +25,103 @@ const DESTINATION = Keypair.fromRawEd25519Seed(
 const AUTH = "b".repeat(48);
 const PRIVATE_URL = "http://orrylo-testnet-signer.railway.internal:8080";
 
+function health() {
+  return {
+    ok: true,
+    ready: true,
+    service: "orrylo-private-testnet-signer",
+    network: "testnet",
+    issuerPublicKey: ISSUER,
+    signerPublicKey: WRONG_KEYPAIR.publicKey(),
+  };
+}
+
+test("readiness checks exact identity and authentication without an envelope", async () => {
+  const requests: string[] = [];
+  const primitive = new PrivateRailwaySharedIssuerSigningPrimitive(
+    {
+      privateBaseUrl: PRIVATE_URL,
+      requestAuthSecret: AUTH,
+      issuerPublicKey: ISSUER,
+      signerPublicKey: WRONG_KEYPAIR.publicKey(),
+    },
+    (async (url, init) => {
+      requests.push(String(url));
+      assert.equal(init?.redirect, "error");
+      assert.ok(init?.signal);
+      if (String(url).endsWith("/healthz")) return Response.json(health());
+      assert.equal(init?.body, "{}");
+      assert.equal(
+        new Headers(init?.headers).get("authorization"),
+        `Bearer ${AUTH}`,
+      );
+      return Response.json(
+        { ok: false, code: "invalid_request" },
+        { status: 400 },
+      );
+    }) as typeof fetch,
+  );
+  await primitive.assertReady();
+  assert.deepEqual(requests, [
+    `${PRIVATE_URL}/healthz`,
+    `${PRIVATE_URL}/v1/sign`,
+  ]);
+});
+
+test("readiness rejects mismatched identity before sending authentication", async () => {
+  for (const change of [
+    { issuerPublicKey: WRONG_KEYPAIR.publicKey() },
+    { signerPublicKey: ISSUER },
+    { network: "public" },
+    { ready: false },
+    { service: "other" },
+  ]) {
+    let calls = 0;
+    const primitive = new PrivateRailwaySharedIssuerSigningPrimitive(
+      {
+        privateBaseUrl: PRIVATE_URL,
+        requestAuthSecret: AUTH,
+        issuerPublicKey: ISSUER,
+        signerPublicKey: WRONG_KEYPAIR.publicKey(),
+      },
+      (async () => {
+        calls++;
+        return Response.json({ ...health(), ...change });
+      }) as typeof fetch,
+    );
+    await assert.rejects(primitive.assertReady(), /signer_identity_mismatch/);
+    assert.equal(calls, 1);
+  }
+});
+
+test("readiness fails closed on auth rejection or unexpected success without retry", async () => {
+  for (const status of [401, 200, 503]) {
+    let calls = 0;
+    const primitive = new PrivateRailwaySharedIssuerSigningPrimitive(
+      {
+        privateBaseUrl: PRIVATE_URL,
+        requestAuthSecret: AUTH,
+        issuerPublicKey: ISSUER,
+        signerPublicKey: WRONG_KEYPAIR.publicKey(),
+      },
+      (async () =>
+        ++calls === 1
+          ? Response.json(health())
+          : Response.json(
+              { ok: false, code: "unauthorized", secret: "must never escape" },
+              { status },
+            )) as typeof fetch,
+    );
+    await assert.rejects(
+      primitive.assertReady(),
+      status === 401
+        ? /^PrivateRailwaySignerPrimitiveError: signer_authentication_failed$/
+        : /^PrivateRailwaySignerPrimitiveError: signer_unavailable$/,
+    );
+    assert.equal(calls, 2);
+  }
+});
+
 test("adapter verifies the explicitly pinned separate signer without substituting issuer", async () => {
   const unsigned = transaction();
   const input = {
