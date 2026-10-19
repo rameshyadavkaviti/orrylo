@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { DeleteDraftButton } from "../../components/delete-draft-button";
 
 import { SESSION_COOKIE_NAME } from "../../lib/auth/constants";
 import { getWalletAuthService } from "../../lib/auth/runtime";
@@ -96,12 +95,6 @@ export async function MyAssetsPage() {
               >
                 Manage project
               </Link>
-              {project.publicStatus === "draft" ? (
-                <DeleteDraftButton
-                  projectId={project.projectId}
-                  projectName={project.displayName}
-                />
-              ) : null}
             </article>
           ))}
         </section>
