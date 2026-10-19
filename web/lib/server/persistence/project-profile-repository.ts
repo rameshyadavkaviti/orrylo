@@ -120,6 +120,7 @@ export class PostgresProjectProfileRepository {
       FROM project_profiles
       WHERE slug = ${slug}
         AND public_status = 'published'
+        AND deleted_at IS NULL
       LIMIT 1
     `;
 
@@ -142,6 +143,7 @@ export class PostgresProjectProfileRepository {
         ON o.project_id = p.project_id
       WHERE p.project_id = ${projectId}
         AND o.owner_public_key = ${owner}
+        AND p.deleted_at IS NULL
       LIMIT 1
     `;
 
@@ -158,6 +160,7 @@ export class PostgresProjectProfileRepository {
       INNER JOIN project_profile_owners AS o
         ON o.project_id = p.project_id
       WHERE o.owner_public_key = ${owner}
+        AND p.deleted_at IS NULL
       ORDER BY p.created_at DESC, p.project_id
     `;
 
@@ -188,6 +191,7 @@ export class PostgresProjectProfileRepository {
       WHERE p.project_id = ${projectId}
         AND o.project_id = p.project_id
         AND o.owner_public_key = ${owner}
+        AND p.deleted_at IS NULL
       RETURNING p.*, o.owner_public_key
     `;
 
@@ -221,6 +225,39 @@ export class PostgresProjectProfileRepository {
 
     return row ? mapManagedProjectProfile(row) : null;
   }
+  async archiveOwnedDraft(
+    projectId: string,
+    ownerPublicKey: string,
+  ): Promise<boolean> {
+    if (!isValidProjectId(projectId)) return false;
+    const owner = normalizeWalletPublicKey(ownerPublicKey);
+    const rows = await this.sql<{ project_id: string }[]>`
+      UPDATE project_profiles AS p
+      SET deleted_at = NOW()
+      WHERE p.project_id = ${projectId}
+        AND p.public_status = 'draft'
+        AND p.deleted_at IS NULL
+        AND EXISTS (
+          SELECT 1 FROM project_profile_owners AS o
+          WHERE o.project_id = p.project_id AND o.owner_public_key = ${owner}
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM project_issuance_intents AS i
+          WHERE i.project_id = p.project_id
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM project_customer_change_trust_handoffs AS h
+          WHERE h.project_id = p.project_id
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM project_metadata_publications AS m
+          WHERE m.project_id = p.project_id
+        )
+      RETURNING p.project_id
+    `;
+    return rows.length === 1;
+  }
+
 }
 
 function mapProjectProfile(row: ProjectProfileRow): ProjectProfile {
