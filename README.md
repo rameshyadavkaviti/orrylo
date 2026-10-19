@@ -1,44 +1,28 @@
-# Orrylo
+# Orrylo — Clean MVP Rebuild
 
-Orrylo is a Stellar-focused product company and platform for creating assets, contract-controlled token infrastructure, and higher-level products.
+This branch is a **clean architectural restart**, not a release. It starts at original main commit `3197e9492fc5001891e08cb5e8e1ac7deb967a66` and deliberately keeps all legacy files until they can be evaluated or replaced safely. Its ancestry is shared with main; **existing files do not define the new design**.
 
-## Canonical project documentation
+## Goal
+One customer connects Albedo, requests a Stellar Testnet Shared Issuer token, and sees actual issuer, code, amount, destination, transaction hash and explorer link after independent ledger confirmation.
 
-The repository's current source of truth is:
+## Development status
+**Documentation and branch preparation only.** The fresh implementation has not replaced the inherited legacy web stack, and end-to-end Testnet success has not been demonstrated by this rebuild branch. Do not confuse inherited code or previous Testnet exercises with successful clean-rebuild delivery.
 
-- [docs/SOURCE_OF_TRUTH.md](docs/SOURCE_OF_TRUTH.md) — canonical product and architecture decisions
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system boundaries and intended architecture
-- [docs/RYLO_POLICY.md](docs/RYLO_POLICY.md) — RYLO ecosystem-token rules
-- [docs/OPEN_DECISIONS.md](docs/OPEN_DECISIONS.md) — unresolved decisions that must not be treated as final
-- [docs/CONTRACT_INTERFACE.md](docs/CONTRACT_INTERFACE.md) — stable application-facing Soroban interface
-- [AGENTS.md](AGENTS.md) — rules for developers and AI agents working in this repository
+## First implementation milestone
+1. Define a tiny typed API to validate a creation request and prepare an immutable issuance intent.
+2. Implement Albedo session and owner binding with the minimum persistence needed for safe replay.
+3. Check exact known issuer/signer identities and destination trustline readiness.
+4. Integrate the protected signer and Stellar SDK transaction submission.
+5. Independently reconcile exact Testnet transaction and display the verified result.
 
-## Current status
+Start with a thin vertical slice. Reuse known-good pieces only after checking dependencies, tests and operational assumptions.
 
-**Public prototype application / pre-execution Stellar workflows.**
+## Minimal documentation
+- [Source of truth](docs/SOURCE_OF_TRUTH.md): active scope and safety invariants
+- [Architecture](docs/ARCHITECTURE.md): proposed small component layout
+- [Roadmap](docs/ROADMAP.md): steps and objective completion gates
+- [Agent rules](AGENTS.md): concise workflow
+- [Legacy backup branch](https://github.com/rameshyadavkaviti/orrylo/tree/legacy/pre-rebuild): original full history, implementation and policies
 
-The repository contains the security-reviewed Soroban foundation interface plus
-a customer-facing Next.js prototype under `web/`. Visitors can understand
-Orrylo, authenticate with Albedo, create and validate a local Shared Issuer token
-draft, preview it safely, and explore current RYLO policy and future products.
-
-Token issuance remains unavailable: the application does not perform issuer,
-contract, trustline, RYLO execution, liquidity, testnet issuance, or mainnet
-mutations. The server-side eligibility/reward preparation foundation also remains
-inactive until a reviewed qualifying-event producer and later execution layers
-exist.
-
-See [docs/CONTRACT_INTERFACE.md](docs/CONTRACT_INTERFACE.md) for the exact stable
-contract surface, [contracts/README.md](contracts/README.md) for reproducible
-contract verification, and [web/README.md](web/README.md) for application setup
-and current mock/live boundaries.
-
-No production contract, issuer, testnet/mainnet deployment, or token economics
-parameter should be inferred as implemented unless the repository contains
-explicit implementation evidence and the source-of-truth documents say so.
-
-## Brand
-
-- Company: **Orrylo**
-- Ecosystem token: **RYLO**
-- Network: **Stellar**
+## Boundary
+`main` and live services must not be changed as part of this rebuild. Existing migrations cannot be blindly applied to shared databases. Financial/on-chain actions need separate owner approval.
