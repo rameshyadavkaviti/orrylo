@@ -375,7 +375,14 @@ export function CustomerTrustlineControl({
 
   return (
     <section className="draft-step" aria-label="Customer-funded trustline">
-      <h3>Wallet delivery and network fees</h3>
+      <div className="step-heading">
+        <span className="step-number">7</span>
+        <div>
+          <h3>Establish trustline</h3>
+          <p>Authorize your wallet to receive this exact Stellar Testnet asset before token issuance.</p>
+        </div>
+      </div>
+      <h4>Wallet delivery and network fees</h4>
       <p>
         The authenticated customer wallet receives the full initial supply.
         Orrylo controls the Shared Issuer, not your wallet. No sponsored
@@ -424,8 +431,8 @@ export function CustomerTrustlineControl({
             <dt>Trustline status</dt>
             <dd>
               {plan.status === "ready"
-                ? "Verified ready"
-                : "Customer signature required"}
+                ? "Trustline established · verified"
+                : "Trustline not established · wallet approval required"}
             </dd>
           </div>
         </dl>
@@ -451,8 +458,8 @@ export function CustomerTrustlineControl({
           onClick={() => void approveTrustline()}
         >
           {working
-            ? "Waiting for Albedo / ledger…"
-            : "Approve ChangeTrust in Albedo"}
+            ? "Establishing trustline…"
+            : "Establish Trustline in Albedo"}
         </button>
       ) : null}
       {plan?.status === "ready" ? (
