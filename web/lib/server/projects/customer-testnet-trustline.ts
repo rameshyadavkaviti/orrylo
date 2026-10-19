@@ -13,7 +13,6 @@ import {
   STELLAR_MAX_AMOUNT_STROOPS,
 } from "../../validation/initial-supply";
 import { OFFICIAL_STELLAR_TESTNET_HORIZON_URL } from "../../stellar/official-testnet-horizon";
-import { OfficialStellarTestnetIssuancePreflightReader } from "../../stellar/shared-issuer-testnet-preflight";
 
 const APPROVED_ISSUER =
   "GBW4IKGPC5Q4YRKGRMNNXTVRZNQZ3DFWFHXSQUAMWLXES75MWTY3TWOV";
@@ -229,17 +228,11 @@ export async function inspectCustomerTrustline(
   if (destination === APPROVED_ISSUER)
     throw new CustomerTrustlineError("invalid_destination");
 
-  // Reuse the issuer flag/signer/threshold, fee/reserve and exact trustline reader.
-  await new OfficialStellarTestnetIssuancePreflightReader(
-    fetchImpl,
-  ).readIssuancePreconditions({
-    issuerPublicKey: APPROVED_ISSUER,
-    signerPublicKey: configuration.signerPublicKey,
-    destinationPublicKey: destination,
-    assetCode: input.assetCode,
-    assetCodeReservedForProject: true,
-    feeStroops: configuration.issuerFeeStroops,
-  });
+  // Trustline readiness is distinct from issuer transaction readiness.
+  // Confirm the pinned issuer exists on Testnet, but leave signer/threshold
+  // policy and issuer fee checks to the issuance preflight before signing.
+  // A mismatched signer must never hide the customer's ChangeTrust step.
+  await readAccount(fetchImpl, APPROVED_ISSUER);
 
   const before = await latestLedger(fetchImpl);
   let account = await readAccount(fetchImpl, destination);
