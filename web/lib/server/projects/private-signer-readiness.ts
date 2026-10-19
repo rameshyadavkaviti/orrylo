@@ -1,13 +1,18 @@
 import {
   PrivateRailwaySharedIssuerSigningPrimitive,
   PrivateRailwaySignerPrimitiveError,
+  type PrivateRailwaySignerIdentityMismatchField,
 } from "../../stellar/private-railway-signer";
 
 /** Startup observation only: no DB, envelope, signer key or Horizon access. */
 export async function checkPrivateSignerReadiness(
   env: NodeJS.ProcessEnv = process.env,
   fetchImpl: typeof fetch = globalThis.fetch,
-): Promise<{ ok: boolean; code: string }> {
+): Promise<{
+  ok: boolean;
+  code: string;
+  mismatchField?: PrivateRailwaySignerIdentityMismatchField;
+}> {
   try {
     if (env.NEXT_PUBLIC_STELLAR_NETWORK?.trim() !== "testnet") {
       throw new PrivateRailwaySignerPrimitiveError("invalid_configuration");
@@ -26,6 +31,17 @@ export async function checkPrivateSignerReadiness(
     await primitive.assertReady();
     return { ok: true, code: "signer_ready" };
   } catch (error) {
+    if (
+      error instanceof PrivateRailwaySignerPrimitiveError &&
+      error.code === "signer_identity_mismatch" &&
+      error.mismatchField
+    ) {
+      return {
+        ok: false,
+        code: error.code,
+        mismatchField: error.mismatchField,
+      };
+    }
     return {
       ok: false,
       code:

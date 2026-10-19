@@ -53,3 +53,21 @@ test("startup diagnostic never contacts a signer outside Testnet", async () => {
   );
   assert.deepEqual(result, { ok: false, code: "invalid_configuration" });
 });
+
+test("startup diagnostic identifies the mismatched public identity field without exposing values", async () => {
+  const result = await checkPrivateSignerReadiness(env, (async () =>
+    Response.json({
+      ok: true,
+      ready: true,
+      service: "orrylo-private-testnet-signer",
+      network: "testnet",
+      issuerPublicKey: Keypair.random().publicKey(),
+      signerPublicKey: issuer,
+    })) as typeof fetch);
+
+  assert.deepEqual(result, {
+    ok: false,
+    code: "signer_identity_mismatch",
+    mismatchField: "issuer_public_key",
+  });
+});

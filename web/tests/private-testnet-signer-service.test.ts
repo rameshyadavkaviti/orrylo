@@ -18,6 +18,7 @@ import {
 import {
   PrivateTestnetSignerError,
   createPrivateTestnetSignerRuntime,
+  createPrivateTestnetSignerStartupEvidence,
   handlePrivateTestnetSignerRequest,
 } from "../signer-service/private-testnet-signer";
 
@@ -279,4 +280,21 @@ test("health endpoint proves readiness without invoking signing", async () => {
     ready: true,
   });
   assert.equal(signCalls, 0);
+});
+
+test("startup evidence contains only the public signer identity tuple", async () => {
+  const runtime = createPrivateTestnetSignerRuntime({
+    issuerPublicKey: ISSUER,
+    signerPublicKey: OTHER_KEYPAIR.publicKey(),
+    requestAuthSecret: AUTH,
+    signer: OTHER_KEYPAIR,
+  });
+
+  assert.deepEqual(createPrivateTestnetSignerStartupEvidence(runtime), {
+    event: "private_signer_ready",
+    service: "orrylo-private-testnet-signer",
+    network: "testnet",
+    issuerPublicKey: ISSUER,
+    signerPublicKey: OTHER_KEYPAIR.publicKey(),
+  });
 });
