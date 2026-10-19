@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { classifyWalletIntentError } from "../lib/wallet/errors";
+import { customerTrustlineReadinessMessage } from "../lib/projects/customer-trustline-readiness-error";
 import {
   clearResolvedCustomerTrustline,
   pendingCustomerTrustlineKey,
@@ -211,7 +212,7 @@ export function CustomerTrustlineControl({
       }
       setPlan(fresh);
       setPending(false);
-    } catch {
+    } catch (cause) {
       setPlan(null);
       const prior = readPendingCustomerTrustline(
         window.localStorage,
@@ -220,7 +221,9 @@ export function CustomerTrustlineControl({
       setPending(prior.kind !== "none");
       setError(
         prior.kind === "none"
-          ? "Could not verify the exact customer trustline. No issuance was started."
+          ? customerTrustlineReadinessMessage(
+              cause instanceof Error ? cause.message : undefined,
+            )
           : "The exact prior ChangeTrust remains unresolved. No additional signature is allowed.",
       );
     } finally {
