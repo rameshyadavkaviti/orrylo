@@ -1,0 +1,24 @@
+/* Orrylo theme layer. Keep existing route and component markup intact. */
+html[data-theme="dark"]{color-scheme:dark;--background:#0e101b;--surface:#191c2c;--surface-soft:#222539;--text:#f0effb;--muted:#b0b1c6;--line:#34364c;--violet:#a58bff;--violet-soft:#302849;--navy:#131226;--navy-soft:#22213a;--success:#6dd9aa;--warning:#f5ca78;--shadow:0 12px 30px rgba(0,0,0,.16)}
+html[data-theme="dark"],html[data-theme="dark"] body{background:var(--background);color:var(--text)}
+html[data-theme="dark"] .sidebar,html[data-theme="dark"] .topbar,html[data-theme="dark"] .status-column{background:#151727;border-color:var(--line)}
+html[data-theme="dark"] .nav-link{color:#d6d4e8}
+html[data-theme="dark"] .nav-link:hover,html[data-theme="dark"] .nav-link:focus-visible{background:var(--violet-soft);color:#e3daff}
+html[data-theme="dark"] .status-card,html[data-theme="dark"] .surface-card,html[data-theme="dark"] .metric-card,html[data-theme="dark"] .form-card,html[data-theme="dark"] .tier-card,html[data-theme="dark"] .empty-state,html[data-theme="dark"] .value-card,html[data-theme="dark"] .path-card,html[data-theme="dark"] .clean-step-grid article{background:var(--surface);border-color:var(--line);color:var(--text)}
+html[data-theme="dark"] .clean-bottom{background:#23213c;border-color:#393354;color:var(--text)}
+html[data-theme="dark"] .clean-bottom .clean-cta{background:#7356d5;color:white}
+html[data-theme="dark"] .clean-step-grid article>span,html[data-theme="dark"] .text-link{color:#bdaeff}
+html[data-theme="dark"] .button-secondary,html[data-theme="dark"] .field input,html[data-theme="dark"] .field textarea{background:#23263a;border-color:#464860;color:var(--text)}
+html[data-theme="dark"] .demo-banner,html[data-theme="dark"] .prototype-boundary,html[data-theme="dark"] .builder-assurances span,html[data-theme="dark"] .metadata-summary,html[data-theme="dark"] .readiness-item,html[data-theme="dark"] .disclosure,html[data-theme="dark"] .code-block,html[data-theme="dark"] .execution-boundary{background:var(--surface-soft);border-color:var(--line);color:var(--text)}
+html[data-theme="dark"] .draft-preview,html[data-theme="dark"] .tier-featured,html[data-theme="dark"] .infrastructure-selected{background:#25213b;border-color:#51476b;color:var(--text)}
+html[data-theme="dark"] .preview-facts dd,html[data-theme="dark"] .settings-row strong,html[data-theme="dark"] .status-row strong{color:var(--text)}
+html[data-theme="dark"] .fact-list,html[data-theme="dark"] .infrastructure-option p,html[data-theme="dark"] .demo-banner,html[data-theme="dark"] .prototype-boundary p{color:var(--muted)}
+html[data-theme="dark"] .site-footer{border-color:var(--line)}
+html[data-theme="dark"] .status-neutral{background:#34384a;color:#e4e2ee}
+html[data-theme="dark"] .status-positive{background:#143e33;color:#87e6bc}
+html[data-theme="dark"] .status-warning{background:#483821;color:#f4cd85}
+html[data-theme="dark"] .availability-badge{background:var(--violet-soft);color:#d3c7ff}
+.theme-toggle{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:9px 13px;border:1px solid var(--line);border-radius:11px;background:var(--surface);color:var(--text);font:inherit;font-size:.84rem;font-weight:700;cursor:pointer;white-space:nowrap}
+.theme-toggle:hover{border-color:var(--violet)}
+.theme-toggle>span:first-child{font-size:1.2rem;line-height:1}
+@media(max-width:620px){.topbar-actions{flex-direction:row;flex-wrap:wrap;align-items:center}.theme-toggle{width:auto}}
