@@ -5,11 +5,12 @@ import { AppShell } from "../components/app-shell";
 import "./globals.css";
 import "./prototype.css";
 import "./brand.css";
+import "./clean-mvp.css";
 
 export const metadata: Metadata = {
   title: "Orrylo — Build on Stellar",
   description:
-    "Build and preview a Stellar token without connecting a wallet, then explore Orrylo products and RYLO membership.",
+    "Design and preview a Stellar token without connecting a wallet. Explore Orrylo's clean MVP token builder.",
   icons: {
     icon: "/brand/orrylo-logo.webp",
     shortcut: "/brand/orrylo-logo.webp",
