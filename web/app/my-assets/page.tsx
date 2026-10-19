@@ -20,7 +20,7 @@ export async function MyAssetsPage() {
       <div className="page-stack">
         <div className="page-heading">
           <span className="eyebrow">My Assets</span>
-          <h1>Your managed Orrylo projects.</h1>
+          <h1>Your token projects.</h1>
           <p>
             Build anonymously first. Connect your wallet only when you want to
             save and manage a Project Profile.
@@ -49,9 +49,8 @@ export async function MyAssetsPage() {
         <span className="eyebrow">My Assets</span>
         <h1>Your managed Orrylo projects.</h1>
         <p>
-          These records are persistent Project Profiles associated with your
-          verified wallet. They are not proof that a Stellar asset has already
-          been issued.
+          Manage saved drafts and projects from your connected wallet. Check a
+          project's transaction evidence to confirm whether a token was issued.
         </p>
       </div>
 
@@ -67,7 +66,7 @@ export async function MyAssetsPage() {
           </Link>
         </div>
       ) : (
-        <section className="card-grid">
+        <section className="card-grid asset-project-grid" aria-label="Your projects">
           {projects.map((project) => (
             <article
               className="surface-card managed-project-card"
@@ -87,21 +86,19 @@ export async function MyAssetsPage() {
               <p className="muted">
                 {project.description ?? "Managed Stellar project profile."}
               </p>
-              <small>
-                Metadata: not published · Stellar asset: not created
-              </small>
-              <Link
+              <small className="project-hint">A draft status does not indicate whether on-chain issuance has completed. Open the project to review transaction evidence.</small>
+              <div className="project-card-actions"><Link
                 className="button button-primary"
                 href={projectManagePath(project.projectId)}
               >
-                Manage project
+                View project <span aria-hidden="true">↗</span>
               </Link>
               {project.publicStatus === "draft" ? (
                 <DeleteDraftButton
                   projectId={project.projectId}
                   projectName={project.displayName}
                 />
-              ) : null}
+              ) : null}</div>
             </article>
           ))}
         </section>
