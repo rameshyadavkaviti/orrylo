@@ -20,29 +20,19 @@ const DESTINATION = Keypair.fromRawEd25519Seed(
 ).publicKey();
 const LEDGER_CLOSED_AT = "2026-10-13T08:00:00.000Z";
 
-test("separate authorized signer requires the exact master plus pinned signer, both weight one", async () => {
-  const signerPublicKey = Keypair.fromRawEd25519Seed(
-    Buffer.alloc(32, 103),
-  ).publicKey();
+test("configured signer may coexist with recovery signers but must meet payment threshold", async () => {
+  const signerPublicKey = Keypair.fromRawEd25519Seed(Buffer.alloc(32, 103)).publicKey();
   const master = { key: ISSUER, weight: 1, type: "ed25519_public_key" };
-  const signer = {
-    key: signerPublicKey,
-    weight: 1,
-    type: "ed25519_public_key",
-  };
-  for (const signers of [
-    [signer, master],
-    [master],
-    [master, { ...signer, weight: 0 }],
-    [master, signer, signer],
-    [signer],
-  ]) {
-    const { fetchImpl } = createStableFetch({
-      issuer: issuerAccount({ signers }),
-    });
-    const read = new OfficialStellarTestnetIssuancePreflightReader(
-      fetchImpl,
-    ).readIssuancePreconditions({
+  const signer = { key: signerPublicKey, weight: 1, type: "ed25519_public_key" };
+  for (const [signers, valid] of [
+    [[signer, master], true],
+    [[master], false],
+    [[master, { ...signer, weight: 0 }], false],
+    [[master, signer, signer], true],
+    [[signer], true],
+  ] as const) {
+    const { fetchImpl } = createStableFetch({ issuer: issuerAccount({ signers: [...signers] }) });
+    const read = new OfficialStellarTestnetIssuancePreflightReader(fetchImpl).readIssuancePreconditions({
       issuerPublicKey: ISSUER,
       signerPublicKey,
       destinationPublicKey: DESTINATION,
@@ -50,12 +40,8 @@ test("separate authorized signer requires the exact master plus pinned signer, b
       assetCodeReservedForProject: true,
       feeStroops: "100",
     });
-    if (signers.length === 2 && signers[0] === signer) await read;
-    else
-      await assert.rejects(
-        read,
-        (e: unknown) => preflightErrorCode(e) === "issuer_policy_mismatch",
-      );
+    if (valid) await read;
+    else await assert.rejects(read, (e: unknown) => preflightErrorCode(e) === "issuer_policy_mismatch");
   }
 });
 
@@ -357,12 +343,7 @@ test("a forward ledger close during account reads remains a valid deterministic 
 
 test("an advancing checkpoint revalidates issuer policy from the bounded second account read", async () => {
   const changedIssuer = issuerAccount({
-    flags: {
-      auth_required: true,
-      auth_revocable: false,
-      auth_immutable: false,
-      auth_clawback_enabled: false,
-    },
+    thresholds: { low_threshold: 1, med_threshold: 2, high_threshold: 1 },
   });
   const { fetchImpl } = createStableFetch({
     firstLedger: 1_000,
@@ -407,26 +388,28 @@ test("the later ledger checkpoint supplies fee and reserve policy when the windo
   );
 });
 
-test("rejects an issuer whose flags, thresholds, or signer set differ from owner-approved Testnet MVP Lite policy", async () => {
-  const badIssuer = issuerAccount({
+test("authorized destination works with AUTH_REQUIRED, but missing signing authority fails", async () => {
+  const enabled = issuerAccount({
     flags: {
       auth_required: true,
-      auth_revocable: false,
+      auth_revocable: true,
       auth_immutable: false,
       auth_clawback_enabled: false,
     },
   });
-  const { fetchImpl } = createStableFetch({ issuer: badIssuer });
+  const { fetchImpl } = createStableFetch({ issuer: enabled });
+  await new OfficialStellarTestnetIssuancePreflightReader(fetchImpl).readIssuancePreconditions({
+    issuerPublicKey: ISSUER, destinationPublicKey: DESTINATION,
+    assetCode: "NOVA", assetCodeReservedForProject: true, feeStroops: "100",
+  });
 
+  const { fetchImpl: insufficient } = createStableFetch({
+    issuer: issuerAccount({ thresholds: { low_threshold: 1, med_threshold: 2, high_threshold: 1 } }),
+  });
   await assert.rejects(
-    new OfficialStellarTestnetIssuancePreflightReader(
-      fetchImpl,
-    ).readIssuancePreconditions({
-      issuerPublicKey: ISSUER,
-      destinationPublicKey: DESTINATION,
-      assetCode: "NOVA",
-      assetCodeReservedForProject: true,
-      feeStroops: "100",
+    new OfficialStellarTestnetIssuancePreflightReader(insufficient).readIssuancePreconditions({
+      issuerPublicKey: ISSUER, destinationPublicKey: DESTINATION,
+      assetCode: "NOVA", assetCodeReservedForProject: true, feeStroops: "100",
     }),
     (error: unknown) => preflightErrorCode(error) === "issuer_policy_mismatch",
   );
