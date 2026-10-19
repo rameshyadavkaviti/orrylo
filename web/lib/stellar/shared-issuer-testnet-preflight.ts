@@ -326,35 +326,31 @@ function assertIssuerPolicy(
   issuerPublicKey: string,
   configuredSignerPublicKey?: string,
 ): void {
-  const flags = account.flags;
-  const thresholds = account.thresholds;
+  // Testnet MVP: do not require an exact account-wide signer set, fixed
+  // thresholds, or unrelated mutable flags. Other recovery signers are allowed.
+  // Keep the verified configured signing identity able to authorize payments.
   const signerPublicKey =
     configuredSignerPublicKey === undefined
       ? issuerPublicKey
       : normalizePublicKey(configuredSignerPublicKey, "invalid_issuer");
-  const expectedKeys = new Set([issuerPublicKey, signerPublicKey]);
-
+  const threshold = account.thresholds?.med_threshold;
+  const signer = account.signers.find(
+    (candidate) =>
+      candidate.key === signerPublicKey &&
+      candidate.type === "ed25519_public_key",
+  );
   if (
-    flags.auth_required !== false ||
-    flags.auth_revocable !== false ||
-    flags.auth_clawback_enabled !== false ||
-    flags.auth_immutable !== false ||
-    thresholds.low_threshold !== 1 ||
-    thresholds.med_threshold !== 1 ||
-    thresholds.high_threshold !== 1 ||
-    account.signers.length !== expectedKeys.size ||
-    new Set(account.signers.map((signer) => signer.key)).size !==
-      expectedKeys.size ||
-    account.signers.some(
-      (signer) =>
-        !expectedKeys.has(signer.key) ||
-        signer.weight !== 1 ||
-        signer.type !== "ed25519_public_key",
-    )
+    account.flags?.auth_required !== false ||
+    !Number.isSafeInteger(threshold) ||
+    threshold < 1 ||
+    threshold > 255 ||
+    !signer ||
+    !Number.isSafeInteger(signer.weight) ||
+    signer.weight < threshold
   ) {
     throw new SharedIssuerTestnetPreflightError(
       "issuer_policy_mismatch",
-      "Shared Issuer account flags, thresholds, or signer set do not match the owner-approved Testnet MVP Lite policy.",
+      "Issuer must permit trustline authorization and the configured signer must satisfy the payment threshold.",
     );
   }
 }
