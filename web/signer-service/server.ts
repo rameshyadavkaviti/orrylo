@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage } from "node:http";
 
 import {
+  createPrivateTestnetSignerStartupEvidence,
   handlePrivateTestnetSignerRequest,
   readPrivateTestnetSignerRuntime,
 } from "./private-testnet-signer";
@@ -75,7 +76,13 @@ async function main() {
     socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
   });
 
-  server.listen(port, "::");
+  server.listen(port, "::", () => {
+    // Public keys are non-secret activation evidence. Never log credentials,
+    // request headers, XDR, transaction hashes or request/response bodies.
+    process.stdout.write(
+      `${JSON.stringify(createPrivateTestnetSignerStartupEvidence(runtime))}\n`,
+    );
+  });
 
   const stop = () => {
     server.close(() => process.exit(0));
