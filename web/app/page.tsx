@@ -1,120 +1,42 @@
 import Link from "next/link";
 
-export function HomePage() {
+export default function HomePage() {
   return (
-    <div className="page-stack public-home">
-      <section className="hero public-hero">
-        <div className="hero-copy">
-          <span className="hero-kicker">Build your idea on Stellar</span>
-          <h1>Create your Stellar token in minutes.</h1>
-          <p>
-            Start configuring immediately—no wallet connection required just to
-            explore. Build the identity, brand, and presentation, then see what
-            Orrylo would create before any on-chain step.
-          </p>
-          <div className="hero-actions">
-            <Link className="button button-inverted" href="/create-token">
-              Create Token
-            </Link>
-            <a className="button button-ghost" href="#wallet-connect">
-              Connect Wallet
-            </a>
+    <div className="clean-home">
+      <section className="clean-hero" aria-labelledby="home-title">
+        <div className="clean-hero-copy">
+          <span className="clean-kicker"><span className="clean-dot" /> BUILT FOR STELLAR · TESTNET PREVIEW</span>
+          <h1 id="home-title">Your token.<br /><span>Made simple.</span></h1>
+          <p>Give your idea an identity. Design and preview a Stellar token in a few easy steps—no wallet required to start.</p>
+          <div className="clean-actions">
+            <Link className="clean-cta" href="/create-token">Create your token <span aria-hidden="true">↗</span></Link>
+            <a className="clean-subtle-link" href="#how-it-works">See how it works <span aria-hidden="true">↓</span></a>
           </div>
-          <p className="hero-reassurance">
-            You can use the token builder anonymously. Wallet authentication is
-            for later identity and execution steps.
-          </p>
-          <div className="hero-links" aria-label="Explore Orrylo">
-            <Link href="/products">Products &amp; Services →</Link>
-            <Link href="/rylo">Explore RYLO →</Link>
-          </div>
+          <p className="clean-disclaimer">Free to explore · No transaction until you explicitly confirm</p>
         </div>
-        <div className="hero-orbit" aria-hidden="true">
-          <span>O</span>
+        <div className="clean-visual" aria-hidden="true">
+          <div className="clean-visual-glow" />
+          <div className="clean-token-halo clean-halo-one" />
+          <div className="clean-token-halo clean-halo-two" />
+          <div className="clean-token-core">O</div>
+          <div className="clean-visual-caption"><span className="clean-caption-dot" /> YOUR NEXT IDEA STARTS HERE</div>
         </div>
       </section>
-
-      <section className="intro-section" aria-labelledby="what-is-orrylo">
-        <span className="eyebrow">What is Orrylo?</span>
-        <h2 id="what-is-orrylo">A simpler path from token idea to Stellar.</h2>
-        <p>
-          Orrylo helps you shape a token or product first, understand the
-          infrastructure behind it, and move toward real Stellar execution only
-          when the required product and security boundaries are available.
-        </p>
-      </section>
-
-      <section className="value-grid" aria-label="How the token builder works">
-        <article className="value-card">
-          <span className="step-number">01</span>
-          <h2>Build anonymously</h2>
-          <p>
-            Choose an asset code, name, description, and logo without connecting
-            a wallet.
-          </p>
-        </article>
-        <article className="value-card">
-          <span className="step-number">02</span>
-          <h2>See it come together</h2>
-          <p>
-            Watch a live token profile update while Orrylo explains issuer and
-            metadata infrastructure.
-          </p>
-        </article>
-        <article className="value-card">
-          <span className="step-number">03</span>
-          <h2>Connect only when needed</h2>
-          <p>
-            Wallet identity and Stellar execution stay behind the later launch
-            boundary rather than blocking exploration.
-          </p>
-        </article>
-      </section>
-
-      <section className="two-column">
-        <article className="surface-card feature-card">
-          <span className="eyebrow">Products &amp; Services</span>
-          <h2>Token creation is the starting point, not the finish line.</h2>
-          <p className="muted">
-            Orrylo is designed to grow into metadata, domain, dedicated issuer,
-            and custom Stellar infrastructure as those product paths become
-            available.
-          </p>
-          <Link className="text-link" href="/products">
-            Browse Products &amp; Services
-          </Link>
-        </article>
-
-        <article className="surface-card feature-card">
-          <span className="eyebrow">RYLO ecosystem</span>
-          <h2>Membership is a benefit of building with Orrylo.</h2>
-          <p className="muted">
-            RYLO policy connects a first successful Orrylo token creation to
-            ecosystem eligibility and the approved launch-benefit path. It does
-            not need to interrupt anonymous product exploration.
-          </p>
-          <Link className="text-link" href="/rylo">
-            Understand RYLO
-          </Link>
-        </article>
-      </section>
-
-      <section
-        className="prototype-boundary"
-        aria-label="Prototype availability"
-      >
-        <div>
-          <span className="eyebrow">Try the core product now</span>
-          <strong>Anonymous token configuration and live preview</strong>
+      <section id="how-it-works" className="clean-steps" aria-labelledby="steps-heading">
+        <div className="clean-section-heading">
+          <span className="clean-kicker">THE PROCESS</span>
+          <h2 id="steps-heading">Three steps. One clear start.</h2>
         </div>
-        <p>
-          On-chain token issuance is not enabled yet. Orrylo keeps that
-          execution boundary explicit instead of presenting a preview as a
-          successful Stellar launch.
-        </p>
+        <div className="clean-step-grid">
+          <article><span>01 / DESIGN</span><h3>Make it yours.</h3><p>Choose a name, asset code and look for your token.</p></article>
+          <article><span>02 / PREVIEW</span><h3>See the result.</h3><p>Review its identity and details before taking any action.</p></article>
+          <article><span>03 / CONNECT</span><h3>Move forward safely.</h3><p>Connect your wallet when supported launch steps are ready.</p></article>
+        </div>
+      </section>
+      <section className="clean-bottom">
+        <div><span className="clean-kicker">BUILD ON STELLAR</span><h2>Start small. Build something real.</h2><p>Explore the builder today. On-chain issuance is not yet enabled in this prototype.</p></div>
+        <Link href="/create-token" className="clean-cta">Open token builder <span aria-hidden="true">↗</span></Link>
       </section>
     </div>
   );
 }
-
-export default HomePage;
