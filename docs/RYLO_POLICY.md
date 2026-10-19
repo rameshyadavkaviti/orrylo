@@ -51,7 +51,7 @@ to the abandoned Testnet candidate and is not RYLO Testnet deployment evidence.
 
 Approved model: **Hybrid minting with a hard maximum-supply cap**.
 
-- Maximum supply: **100,000,000 RYLO**
+- Maximum supply: **10,000,000,000 RYLO**
 - Initial mint: **0 RYLO**
 - Supply must never exceed the maximum cap.
 
