@@ -1,0 +1,3 @@
+/* Tailwind utilities for new components. No Preflight reset: legacy styles remain unchanged. */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
