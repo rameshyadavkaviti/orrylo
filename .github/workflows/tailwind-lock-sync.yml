@@ -1,0 +1,26 @@
+name: Synchronize Tailwind lockfile
+on:
+  push:
+    branches: [rebuild/clean-mvp]
+permissions:
+  contents: write
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Regenerate npm lockfile
+        working-directory: web
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Commit exact dependency lock
+        run: |
+          git add web/package-lock.json
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'chore(ui): lock Tailwind dependencies'
+            git push
+          fi
