@@ -13,6 +13,7 @@ Open Orrylo → connect Albedo → enter asset details and initial supply → co
 - Shared asset identity is `asset code + issuer`, and codes must not collide under that issuer.
 - A durable project identifier must be distinct from changeable public URL/slug and issuer metadata location.
 - RYLO is a separate asset/issuer and is **not** part of the first creation flow.
+- RYLO ecosystem token policy retains a **maximum supply of 100,000,000 RYLO** and **initial mint of 0 RYLO**. The proposal to raise the cap to 10,000,000,000 RYLO was rejected; no supply-policy change is authorized. This documents policy intent, not deployed on-chain enforcement.
 - No fictitious token creation, unverifiable publication claims or implied Mainnet deployment.
 
 ## Minimum security invariants
