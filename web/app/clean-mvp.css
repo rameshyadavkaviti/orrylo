@@ -44,3 +44,25 @@
 @media(max-width:900px){.sidebar{flex-wrap:wrap;gap:10px;padding:14px 20px}.sidebar .nav-list{overflow-x:auto;flex-wrap:nowrap;max-width:100%;width:100%}.clean-hero{grid-template-columns:1fr;min-height:0;padding:44px 32px}.clean-visual{min-height:240px}.clean-token-core{height:140px;width:140px;border-radius:38px;font-size:5rem}.clean-halo-one{height:210px;width:210px}.clean-halo-two{height:300px;width:300px}.clean-visual-caption{bottom:-10px}.clean-step-grid{grid-template-columns:1fr}.clean-step-grid article{min-height:0}.clean-home{gap:52px}}
 @media(max-width:620px){.topbar{padding:16px 20px;align-items:stretch}.main-content{padding:20px 16px 50px}.clean-hero{padding:40px 24px;border-radius:20px}.clean-hero h1{font-size:clamp(3.25rem,13vw,4.7rem)}.clean-actions{align-items:stretch;flex-direction:column;gap:20px}.clean-visual{min-height:210px}.clean-bottom{flex-direction:column;align-items:stretch;padding:28px 24px}.clean-bottom .clean-cta{width:100%}.site-footer{padding:24px 16px}}
 @media(prefers-reduced-motion:reduce){.button,.clean-cta{transition:none}}
+
+
+/* Usability polish: responsive project workspace, accessible states, clear actions. */
+.nav-link-active,.sidebar .nav-link[aria-current="page"]{background:var(--violet-soft);color:#5136bd}
+.sidebar .nav-link:focus-visible,.button:focus-visible,.clean-cta:focus-visible{outline:3px solid #9275f4;outline-offset:3px}
+.asset-project-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.managed-project-card{display:flex;flex-direction:column;gap:13px;min-width:0;box-shadow:0 8px 28px rgba(26,23,60,.045);transition:border-color .2s ease,box-shadow .2s ease}
+.managed-project-card:hover{border-color:#cfc5ff;box-shadow:0 12px 30px rgba(41,28,86,.08)}
+.managed-project-card .card-title-row{align-items:center}
+.managed-project-card .card-title-row>div{min-width:0}
+.managed-project-card h2{overflow-wrap:anywhere;letter-spacing:-.035em}
+.managed-project-card .muted{margin:0}
+.managed-project-card .project-hint{color:var(--muted);line-height:1.55}
+.project-card-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:auto;padding-top:12px;border-top:1px solid var(--line)}
+.project-card-actions .button{min-height:44px}
+.project-card-actions .draft-delete-action{display:grid;gap:5px}
+.project-card-actions .draft-delete-action button{border-color:#ead7dd;color:#a13750}
+.project-card-actions .draft-delete-action button:hover{background:#fff3f5;border-color:#d7a0ad}
+.button,.clean-cta{cursor:pointer}
+.button:disabled{cursor:not-allowed}
+@media(max-width:720px){.asset-project-grid{grid-template-columns:1fr}.managed-project-card{padding:20px}.project-card-actions{flex-direction:column;align-items:stretch}.project-card-actions .button{width:100%}.project-card-actions .draft-delete-action{width:100%}.topbar{flex-wrap:wrap}.topbar-actions{width:100%;justify-content:flex-start}}
+@media(prefers-reduced-motion:reduce){.managed-project-card{transition:none}}
