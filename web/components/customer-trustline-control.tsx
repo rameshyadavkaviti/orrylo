@@ -42,6 +42,7 @@ export function CustomerTrustlineControl({
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [existingTrustlineAccepted, setExistingTrustlineAccepted] = useState(false);
   const busy = useRef(false);
   const finishing = useRef(false);
 
@@ -72,6 +73,7 @@ export function CustomerTrustlineControl({
     busy.current = true;
     setWorking(true);
     setError(null);
+    setExistingTrustlineAccepted(false);
     try {
       // Reconcile the persisted exact hash before any ordinary readiness
       // refresh. A not-ready trustline is NEVER proof of failed submission.
@@ -359,6 +361,7 @@ export function CustomerTrustlineControl({
       finishing.current ||
       pending ||
       plan?.status !== "ready" ||
+      !existingTrustlineAccepted ||
       readPendingCustomerTrustline(window.localStorage, projectId).kind !==
         "none"
     )
@@ -431,7 +434,7 @@ export function CustomerTrustlineControl({
             <dt>Trustline status</dt>
             <dd>
               {plan.status === "ready"
-                ? "Trustline established · verified"
+                ? "Existing trustline verified on Testnet"
                 : "Trustline not established · wallet approval required"}
             </dd>
           </div>
@@ -462,7 +465,16 @@ export function CustomerTrustlineControl({
             : "Establish Trustline in Albedo"}
         </button>
       ) : null}
-      {plan?.status === "ready" ? (
+      {plan?.status === "ready" && !pending && !existingTrustlineAccepted ? (
+        <> 
+        <p className="builder-boundary-note">This wallet already has a valid trustline for the exact issuer and asset code. No new ChangeTrust signature is needed. Confirm that you want to use this existing trustline.</p>
+        <button type="button" className="button button-secondary" disabled={working}
+          onClick={() => setExistingTrustlineAccepted(true)}>
+          Use verified existing trustline
+        </button>
+        </>
+      ) : null}
+      {plan?.status === "ready" && !pending && existingTrustlineAccepted ? (
         <button
           type="button"
           className="button button-primary"
