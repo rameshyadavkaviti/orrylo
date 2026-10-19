@@ -69,13 +69,19 @@ test("readiness checks exact identity and authentication without an envelope", a
 });
 
 test("readiness rejects mismatched identity before sending authentication", async () => {
-  for (const change of [
-    { issuerPublicKey: WRONG_KEYPAIR.publicKey() },
-    { signerPublicKey: ISSUER },
-    { network: "public" },
-    { ready: false },
-    { service: "other" },
-  ]) {
+  for (const { change, mismatchField } of [
+    {
+      change: { issuerPublicKey: WRONG_KEYPAIR.publicKey() },
+      mismatchField: "issuer_public_key",
+    },
+    {
+      change: { signerPublicKey: ISSUER },
+      mismatchField: "signer_public_key",
+    },
+    { change: { network: "public" }, mismatchField: "network" },
+    { change: { ready: false }, mismatchField: "readiness" },
+    { change: { service: "other" }, mismatchField: "service" },
+  ] as const) {
     let calls = 0;
     const primitive = new PrivateRailwaySharedIssuerSigningPrimitive(
       {
@@ -89,7 +95,13 @@ test("readiness rejects mismatched identity before sending authentication", asyn
         return Response.json({ ...health(), ...change });
       }) as typeof fetch,
     );
-    await assert.rejects(primitive.assertReady(), /signer_identity_mismatch/);
+    await assert.rejects(
+      primitive.assertReady(),
+      (error: unknown) =>
+        error instanceof PrivateRailwaySignerPrimitiveError &&
+        error.code === "signer_identity_mismatch" &&
+        error.mismatchField === mismatchField,
+    );
     assert.equal(calls, 1);
   }
 });
