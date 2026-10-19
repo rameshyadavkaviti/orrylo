@@ -36,7 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <nav className="nav-list" aria-label="Primary navigation">
           {NAV_ITEMS.map((item) => (
-            <Link key={item.href} href={item.href} className="nav-link">
+            <Link key={item.href} href={item.href} className={`nav-link${pathname === item.href || (item.href !== "/" && pathname?.startsWith(`${item.href}/`)) ? " nav-link-active" : ""}`} aria-current={pathname === item.href ? "page" : undefined}>
               {item.label}
             </Link>
           ))}
@@ -57,7 +57,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div>
             <span className="eyebrow">Stellar made approachable</span>
             <p className="topbar-copy">
-              Build and preview a Stellar token before you connect a wallet.
+              Design freely. Connect your wallet only when ready to issue on Testnet.
             </p>
           </div>
           <div id="wallet-connect" className="topbar-actions">
@@ -69,7 +69,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main className="main-content">{children}</main>
 
         <footer className="site-footer">
-          <span>Orrylo public prototype</span>
+          <span>Orrylo · Stellar Testnet</span>
           <nav aria-label="Prototype utilities">
             {UTILITY_NAV_ITEMS.map((item) => (
               <Link key={item.href} href={item.href}>
