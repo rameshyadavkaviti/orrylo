@@ -5,11 +5,10 @@ export function CreateTokenPage() {
     <div className="page-stack">
       <div className="page-heading builder-page-heading">
         <span className="eyebrow">Create Token</span>
-        <h1>Build a Stellar token before you connect anything.</h1>
+        <h1>Create your Stellar Testnet token.</h1>
         <p>
-          Explore Orrylo anonymously: shape the identity, brand, infrastructure,
-          and metadata presentation, then see the result update live. A wallet
-          is only needed at a future identity or on-chain execution boundary.
+          Start without a wallet. Choose your token details, review the exact supply,
+          then connect Albedo to establish the trustline and confirm issuance on Testnet.
         </p>
       </div>
 
