@@ -50,6 +50,21 @@ export interface PrivateTestnetSignerHttpResult {
   body: Record<string, unknown>;
 }
 
+export function createPrivateTestnetSignerStartupEvidence(
+  runtime: Pick<
+    PrivateTestnetSignerRuntime,
+    "issuerPublicKey" | "signerPublicKey"
+  >,
+) {
+  return {
+    event: "private_signer_ready",
+    service: "orrylo-private-testnet-signer",
+    network: "testnet",
+    issuerPublicKey: runtime.issuerPublicKey,
+    signerPublicKey: runtime.signerPublicKey,
+  } as const;
+}
+
 export function createPrivateTestnetSignerRuntime(input: {
   issuerPublicKey: string;
   signerPublicKey?: string;
