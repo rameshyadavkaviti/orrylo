@@ -1,0 +1,287 @@
+# Orrylo Architecture — v1
+
+Status: **Target architecture, not implementation evidence**
+
+This document defines the intended system boundaries for the first Orrylo architecture.
+
+The bounded Testnet signer addition approved on 2026-10-16 is recorded in
+`SOURCE_OF_TRUTH.md`. The issuer remains the transaction source and asset issuer;
+a separately pinned operational key supplies the single issuance signature.
+The issuer master remains weight 1, thresholds remain 1/1/1, and preflight
+requires exactly those two weight-1 keys when the separate signer is configured.
+This does not alter the Mainnet 2-of-3 design.
+
+## 1. High-level system
+
+```
+Users
+  │
+  ▼
+Orrylo App
+  │
+  ├── Wallet authentication (initially Albedo)
+  ├── Product / service ordering
+  ├── Shared asset creation
+  ├── Dedicated asset creation
+  ├── RYLO membership / payment flows
+  └── Metadata / domain management
+       │
+       ▼
+Stellar / Soroban
+```
+
+The web application is a coordination layer. Asset ownership, issuer control, authorization, and contract policy should be anchored on Stellar wherever practical.
+
+## 2. Shared Issuer boundary
+
+The Shared Issuer is Orrylo infrastructure.
+
+It may issue multiple customer assets, but:
+
+- it is separate from the RYLO issuer;
+- it is not represented as customer-owned;
+- asset codes are unique within that issuer;
+- all assets share the issuer account's `home_domain`;
+- metadata is published under the shared asset domain;
+- issuer policy must be explicit in the UI.
+
+Expected domain:
+
+`assets.orrylo.com`
+
+A vanity address is optional. Technical correctness and key security take priority over address aesthetics.
+
+## 3. Dedicated Issuer boundary
+
+Each Dedicated Issuer belongs to one customer/project infrastructure instance.
+
+Target control model:
+
+```
+Customer intent
+     │
+     ▼
+Orrylo provisioning flow
+     │
+     ▼
+Dedicated Stellar issuer
+     │
+     ▼
+Contract / policy controller
+```
+
+The dedicated tier should not rely on Orrylo permanently holding an unrestricted issuer secret.
+
+## 4. Contract-controlled issuer principles
+
+A contract-controlled issuer may encode:
+
+- mint permissions;
+- burn permissions;
+- max supply;
+- fixed supply;
+- admin authority;
+- ownership transfer;
+- authorization policy;
+- upgrade policy.
+
+The effective authority must match the product description.
+
+If an operation is impossible according to the advertised policy, there must not be a hidden non-contract path that makes it possible.
+
+## 5. Contract templates
+
+Potential product templates:
+
+### Fixed Supply
+
+Supply is created once and no further minting is possible.
+
+### Capped Supply
+
+Minting is possible only until a declared maximum supply.
+
+### Mintable
+
+An explicitly identified authority can increase supply.
+
+### Governed
+
+Sensitive operations require a defined governance or multi-party approval policy.
+
+### Custom
+
+Project-specific rules require separate implementation and review.
+
+These are product targets, not yet implemented templates.
+
+## 6. Key custody
+
+Preferred provisioning sequence:
+
+```
+Generate account
+→ fund/configure account
+→ establish asset settings
+→ deploy/configure contract
+→ move effective authority to intended controller
+→ remove unnecessary privileged paths
+→ securely discard temporary secrets when no longer needed
+```
+
+Rules:
+
+- never commit secrets to Git;
+- never expose secrets to browser logs;
+- never include secrets in analytics or error telemetry;
+- minimize duration of backend custody;
+- document any retained emergency/admin power.
+
+## 7. RYLO boundary
+
+RYLO has a dedicated issuer and must remain separated from customer Shared Issuer infrastructure.
+
+Current reserved issuer candidate:
+
+`GCKB453UWEFLJQY4TVW7I7NZV3ZNVUCZZS6KKIKJZVF75WM2VEORRYLO`
+
+The address must not be considered active or mainnet-deployed until explicit deployment records exist.
+
+The verified RYLO **Testnet** issuer is separate:
+
+`GDNSIP2SKNJIKN6IG3XZBQMHIKKDET25J33F4R5V6DALKHIUDTVZOPKX`
+
+The prior Testnet candidate
+`GDPKHRFAGZHDJFKLBERV7IXF2XX4TGW6MYYUDGME3MIJ3HES5SGICG5H` is abandoned.
+All Testnet transaction construction and SAC derivation must use the verified
+Testnet issuer.
+
+RYLO-specific authorization and economics are defined in `RYLO_POLICY.md`.
+
+## 8. Membership authorization
+
+The intended Stellar model is a controlled-access RYLO asset using authorization semantics such as `AUTH_REQUIRED`.
+
+Target lifecycle:
+
+```
+User connects wallet
+→ creates RYLO trustline
+→ completes qualifying Orrylo action
+→ wallet becomes eligible
+→ trustline is authorized
+→ wallet may hold / receive / trade RYLO
+```
+
+The approved v1 enforcement mechanism is Stellar issuer-side trustline authorization through Orrylo's protected issuer-signing path. Eligibility is application policy; Stellar authorization is the final enforcement step. Contract-mediated authorization is not the approved v1 RYLO authorization mechanism unless canonical policy is explicitly changed later.
+
+## 9. Metadata and domains
+
+Approved prototype routing:
+
+```
+orrylo.com                     public prototype application + RYLO Testnet metadata
+assets.orrylo.com              Shared Issuer customer-asset metadata
+<project>.orrylo.com           Dedicated Issuer metadata
+<custom-domain>                optional future dedicated-domain support
+```
+
+The prototype application is intentionally served directly from `orrylo.com` to reduce launch friction and keep the first user journey simple. A future split to `app.orrylo.com` remains optional rather than required.
+
+The approved RYLO Testnet issuer `home_domain` is `orrylo.com`, so its canonical metadata endpoint is `https://orrylo.com/.well-known/stellar.toml`. This root-domain RYLO metadata is intentionally isolated from `assets.orrylo.com`, which remains the Shared Issuer metadata domain for customer assets. This repository publication decision is not evidence that the issuer's on-chain `home_domain` has been mutated, and it makes no SAC deployment claim.
+
+A wildcard domain may be used so one application can serve project-specific subdomains dynamically.
+
+## 10. Truth and observability
+
+Important product claims should be externally verifiable where possible.
+
+Expected surfaced fields include:
+
+- issuer type;
+- issuer address;
+- issuer owner/control model;
+- contract address;
+- supply policy;
+- mint policy;
+- burn policy;
+- admin policy;
+- home domain;
+- authorization requirements.
+
+The UI should distinguish clearly between:
+
+- current on-chain fact;
+- Orrylo policy;
+- configured target;
+- future roadmap.
+
+## 11. Implementation discipline
+
+Until code and deployment evidence exist, architecture documents describe intent only.
+
+No agent should state that a contract, asset policy, domain route, issuer transition, or mainnet deployment is complete based solely on this document.
+
+
+## 12. Prototype deployment baseline
+
+For the first working prototype, Orrylo uses a low-cost provider-neutral application deployment baseline:
+
+```
+Cloudflare DNS/CDN
+      │
+      ▼
+Railway app/backend
+      │
+      ▼
+Neon PostgreSQL
+```
+
+**Immediate P0 delivery milestone:** Testnet MVP Lite: one authenticated customer Shared Issuer creation path, with selected initial supply bound to immutable server-authoritative intent, protected Testnet submission, independently verified ledger outcome and a trustworthy project result. This is a constrained milestone, not a change to long-term custody, authorization or economic rules. Full RYLO reward/liquidity/swap execution, Dedicated Issuer and Mainnet activation are outside its critical path.
+
+The repository's currently recorded Stellar issuer/contract preparation evidence is on **Testnet**. Testnet is the immediate product-validation environment and must remain reproducible. **Mainnet preparation is a separate parallel/later workstream, not a dependency for Testnet MVP Lite.** No issuer, asset, SAC or application path may be described as live on any network without explicit deployment and transaction evidence. No issuer, asset, SAC, or application flow may be described as Mainnet-deployed until explicit deployment evidence is recorded.
+
+The expected starting infrastructure cost is approximately **$5/month**, driven primarily by Railway. Neon and Cloudflare are expected to remain on their free tiers for the initial prototype.
+
+This is not a permanent production-provider commitment. Application/database boundaries should remain portable.
+
+The Testnet environment should remain reproducibly bootstrappable because Testnet state is disposable/resettable.
+
+## 13. Protected issuer operations
+
+Routine protected RYLO operations use the approved two-signer path:
+
+```
+Application policy / durable intent
+→ protected operations boundary
+→ Signer A
+→ independent Signer B policy verification
+→ Stellar submission
+→ confirmation + audit
+```
+
+Routine examples include trustline authorization, approved mint execution, Treasury transfer, and liquidity additions.
+
+Critical operations such as signer rotation, threshold changes, issuer-flag changes, and recovery are intentionally excluded from the routine path and require a manual/local ceremony with recovery-capable participation and explicit audit evidence.
+
+Signer C and the Master Key are not routine operational signers.
+
+For the current Testnet issuer, the final account-level target is:
+
+```text
+Master = 0
+A      = 1
+B      = 1
+C      = 1
+low    = 2
+medium = 2
+high   = 2
+```
+
+The currently verified pre-ceremony Testnet state has Master/A/B/C at weight
+`1`, thresholds `0/0/0`, and all three RYLO authorization/clawback flags off.
+During initial configuration the Master must remain at weight `1`. After A, B,
+C and the intended thresholds are configured, the routine **A+B** authorization
+path must be successfully tested and proven. Only then may the Master weight move
+to `0`. A+C or B+C remains recovery-only and testing either recovery path does
+not satisfy the prerequisite for Master→0.
