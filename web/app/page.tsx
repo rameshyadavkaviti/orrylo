@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export default function HomePage() {
+export function HomePage() {
   return (
     <div className="clean-home">
       <section className="clean-hero" aria-labelledby="home-title">
@@ -40,3 +40,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+export default HomePage;
