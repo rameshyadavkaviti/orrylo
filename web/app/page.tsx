@@ -12,7 +12,7 @@ export function HomePage() {
             <Link className="clean-cta" href="/create-token">Create your token <span aria-hidden="true">↗</span></Link>
             <a className="clean-subtle-link" href="#how-it-works">See how it works <span aria-hidden="true">↓</span></a>
           </div>
-          <p className="clean-disclaimer">Free to explore · No transaction until you explicitly confirm</p>
+          <p className="clean-disclaimer">Free to explore · Testnet only · Wallet approval required to issue</p>
         </div>
         <div className="clean-visual" aria-hidden="true">
           <div className="clean-visual-glow" />
@@ -30,11 +30,11 @@ export function HomePage() {
         <div className="clean-step-grid">
           <article><span>01 / DESIGN</span><h3>Make it yours.</h3><p>Choose a name, asset code and look for your token.</p></article>
           <article><span>02 / PREVIEW</span><h3>See the result.</h3><p>Review its identity and details before taking any action.</p></article>
-          <article><span>03 / CONNECT</span><h3>Move forward safely.</h3><p>Connect your wallet when supported launch steps are ready.</p></article>
+          <article><span>03 / CONNECT</span><h3>Move forward safely.</h3><p>Connect Albedo, approve the exact trustline, and confirm issuance on Stellar Testnet.</p></article>
         </div>
       </section>
       <section className="clean-bottom">
-        <div><span className="clean-kicker">BUILD ON STELLAR</span><h2>Start small. Build something real.</h2><p>Explore the builder today. On-chain issuance is not yet enabled in this prototype.</p></div>
+        <div><span className="clean-kicker">BUILD ON STELLAR</span><h2>Start small. Build something real.</h2><p>Explore the builder today. Testnet issuance is available. Review the transaction and wallet approvals before confirming.</p></div>
         <Link href="/create-token" className="clean-cta">Open token builder <span aria-hidden="true">↗</span></Link>
       </section>
     </div>
