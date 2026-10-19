@@ -340,7 +340,6 @@ function assertIssuerPolicy(
       candidate.type === "ed25519_public_key",
   );
   if (
-    account.flags?.auth_required !== false ||
     !Number.isSafeInteger(threshold) ||
     threshold < 1 ||
     threshold > 255 ||
@@ -350,7 +349,7 @@ function assertIssuerPolicy(
   ) {
     throw new SharedIssuerTestnetPreflightError(
       "issuer_policy_mismatch",
-      "Issuer must permit trustline authorization and the configured signer must satisfy the payment threshold.",
+      "The configured issuer signer does not satisfy the payment threshold.",
     );
   }
 }
