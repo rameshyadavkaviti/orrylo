@@ -15,8 +15,18 @@ export type PrivateRailwaySignerPrimitiveErrorCode =
   | "signer_authentication_failed"
   | "signer_request_rejected";
 
+export type PrivateRailwaySignerIdentityMismatchField =
+  | "readiness"
+  | "service"
+  | "network"
+  | "issuer_public_key"
+  | "signer_public_key";
+
 export class PrivateRailwaySignerPrimitiveError extends Error {
-  constructor(readonly code: PrivateRailwaySignerPrimitiveErrorCode) {
+  constructor(
+    readonly code: PrivateRailwaySignerPrimitiveErrorCode,
+    readonly mismatchField?: PrivateRailwaySignerIdentityMismatchField,
+  ) {
     super(code);
     this.name = "PrivateRailwaySignerPrimitiveError";
   }
@@ -66,17 +76,15 @@ export class PrivateRailwaySharedIssuerSigningPrimitive implements SharedIssuerS
       if (!response.ok)
         throw new PrivateRailwaySignerPrimitiveError("signer_unavailable");
       const health = await response.json();
-      if (
-        !health ||
-        health.ok !== true ||
-        health.ready !== true ||
-        health.service !== "orrylo-private-testnet-signer" ||
-        health.network !== "testnet" ||
-        health.issuerPublicKey !== this.issuerPublicKey ||
-        health.signerPublicKey !== this.signerPublicKey
-      ) {
+      const mismatchField = signerIdentityMismatchField(
+        health,
+        this.issuerPublicKey,
+        this.signerPublicKey,
+      );
+      if (mismatchField) {
         throw new PrivateRailwaySignerPrimitiveError(
           "signer_identity_mismatch",
+          mismatchField,
         );
       }
       // The reviewed service authenticates, then rejects this missing-field body
@@ -165,6 +173,23 @@ export class PrivateRailwaySharedIssuerSigningPrimitive implements SharedIssuerS
       ),
     };
   }
+}
+
+function signerIdentityMismatchField(
+  health: unknown,
+  issuerPublicKey: string,
+  signerPublicKey: string,
+): PrivateRailwaySignerIdentityMismatchField | null {
+  if (!health || typeof health !== "object" || Array.isArray(health)) {
+    return "readiness";
+  }
+  const fields = health as Record<string, unknown>;
+  if (fields.ok !== true || fields.ready !== true) return "readiness";
+  if (fields.service !== "orrylo-private-testnet-signer") return "service";
+  if (fields.network !== "testnet") return "network";
+  if (fields.issuerPublicKey !== issuerPublicKey) return "issuer_public_key";
+  if (fields.signerPublicKey !== signerPublicKey) return "signer_public_key";
+  return null;
 }
 
 function assertSignerResponse(
