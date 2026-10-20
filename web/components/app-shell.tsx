@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { NAV_ITEMS, UTILITY_NAV_ITEMS } from "../lib/navigation";
 import { WalletAuthControl } from "./wallet-auth-control";
@@ -12,6 +12,7 @@ import { NetworkSelector } from "./network-selector";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   if (pathname?.startsWith("/p/")) {
     return <>{children}</>;
@@ -35,9 +36,21 @@ export function AppShell({ children }: { children: ReactNode }) {
           </span>
         </Link>
 
-        <nav className="nav-list" aria-label="Primary navigation">
+        <button
+          className="mobile-nav-toggle"
+          type="button"
+          aria-controls="orrylo-primary-navigation"
+          aria-expanded={menuOpen}
+          aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <span aria-hidden="true">{menuOpen ? "✕" : "☰"}</span>
+          <span>{menuOpen ? "Close" : "Menu"}</span>
+        </button>
+
+        <nav id="orrylo-primary-navigation" className={`nav-list${menuOpen ? " nav-list-open" : ""}`} aria-label="Primary navigation">
           {NAV_ITEMS.map((item) => (
-            <Link key={item.href} href={item.href} className={`nav-link${pathname === item.href || (item.href !== "/" && pathname?.startsWith(`${item.href}/`)) ? " nav-link-active" : ""}`} aria-current={pathname === item.href ? "page" : undefined}>
+            <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className={`nav-link${pathname === item.href || (item.href !== "/" && pathname?.startsWith(`${item.href}/`)) ? " nav-link-active" : ""}`} aria-current={pathname === item.href ? "page" : undefined}>
               {item.label}
             </Link>
           ))}
