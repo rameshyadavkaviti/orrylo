@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { NAV_ITEMS, UTILITY_NAV_ITEMS } from "../lib/navigation";
 import { WalletAuthControl } from "./wallet-auth-control";
 import { ThemeToggle } from "./theme-toggle";
+import { NetworkSelector } from "./network-selector";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -61,6 +62,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </p>
           </div>
           <div id="wallet-connect" className="topbar-actions">
+            <NetworkSelector />
             <ThemeToggle />
             <WalletAuthControl />
           </div>
