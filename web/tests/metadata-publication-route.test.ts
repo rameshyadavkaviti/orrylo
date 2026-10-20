@@ -184,3 +184,29 @@ test("unknown hosts fail closed instead of receiving either metadata namespace",
   assert.equal(response.status, 404);
   assert.equal(sharedReads, 0);
 });
+
+
+test("proxy-rewritten URL uses public Host for shared TOML without crossing domains", async () => {
+  const sample = publication({
+    projectId: "00000000-0000-4000-8000-000000000042",
+    assetCode: "PROXY",
+    currencyToml: '[[CURRENCIES]]\\ncode = "PROXY"\\n',
+  });
+  const response = await handleStellarTomlRequest(
+    new Request("https://orrylo-production.up.railway.app/.well-known/stellar.toml", {
+      headers: { host: "assets.orrylo.com" },
+    }),
+    { listPublications: async () => [sample] },
+  );
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("x-orrylo-metadata-home"), "assets.orrylo.com");
+  assert.equal(await response.text(), sample.currencyToml);
+
+  const unknown = await handleStellarTomlRequest(
+    new Request("https://assets.orrylo.com/.well-known/stellar.toml", {
+      headers: { host: "untrusted.example" },
+    }),
+    { listPublications: async () => { throw Error("Unknown host must not query publications"); } },
+  );
+  assert.equal(unknown.status, 404);
+});
