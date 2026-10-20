@@ -80,3 +80,6 @@
   .sidebar .nav-list .nav-link{display:block;padding:13px 14px;white-space:normal}
 }
 
+
+/* Homepage brand mark replaces the placeholder letter. */
+.clean-token-core .clean-token-logo{display:block;width:76%;height:76%;object-fit:contain;transform:rotate(13deg);filter:drop-shadow(0 8px 15px rgba(12,10,40,.18))}
