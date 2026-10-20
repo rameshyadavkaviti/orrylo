@@ -96,8 +96,8 @@
 .product-showcase-card>p{position:relative;margin:0;line-height:1.65;font-size:.91rem}
 .product-showcase-card>.button{position:relative;margin-top:auto;align-self:flex-start;min-height:43px}
 @media(max-width:700px){
- .product-carousel{display:flex!important;gap:14px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scroll-padding-inline:16px;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;padding:4px 16px 20px;margin-inline:-16px;scrollbar-width:thin}
- .product-showcase-card{flex:0 0 min(84vw,340px);scroll-snap-align:start;min-height:295px;padding:22px;gap:18px}
+ .product-carousel{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;overflow:visible;padding:0;margin:0}
+ .product-showcase-card{width:100%;min-height:0;padding:22px;gap:18px}
  .product-showcase-card .card-title-row{flex-direction:column;align-items:flex-start}
  .product-showcase-card .availability-badge{max-width:none}
  .product-showcase-card>.button{width:100%;justify-content:center}
