@@ -32,7 +32,12 @@ export async function handleStellarTomlRequest(
   request: Request,
   dependencies: SharedTomlRouteDependencies,
 ) {
-  const host = new URL(request.url).hostname.toLowerCase();
+  // Reverse proxies can rewrite request.url to an internal origin. Prefer the
+  // public Host header when present; retain strict known-domain allowlisting.
+  const hostHeader = request.headers.get("host")?.split(",")[0]?.trim();
+  const host = hostHeader
+    ? new URL(`http://${hostHeader}`).hostname.toLowerCase()
+    : new URL(request.url).hostname.toLowerCase();
 
   if (host === RYLO_TESTNET_HOME_DOMAIN) {
     return tomlResponse(renderRyloTestnetToml(), RYLO_TESTNET_HOME_DOMAIN);
