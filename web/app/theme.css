@@ -22,3 +22,44 @@ html[data-theme="dark"] .availability-badge{background:var(--violet-soft);color:
 .theme-toggle:hover{border-color:var(--violet)}
 .theme-toggle>span:first-child{font-size:1.2rem;line-height:1}
 @media(max-width:620px){.topbar-actions{flex-direction:row;flex-wrap:wrap;align-items:center}.theme-toggle{width:auto}}
+
+
+/* Dark theme coverage for newer clean-MVP navigation and token builder UI. */
+html[data-theme="dark"] .sidebar .nav-link-active,
+html[data-theme="dark"] .sidebar .nav-link[aria-current="page"]{background:var(--violet-soft);color:#e4dbff}
+html[data-theme="dark"] .mobile-nav-toggle{background:var(--surface);border-color:var(--line);color:var(--text)}
+html[data-theme="dark"] .sidebar .nav-list{border-color:var(--line)}
+html[data-theme="dark"] .eyebrow,
+html[data-theme="dark"] .preview-code,
+html[data-theme="dark"] .preview-network,
+html[data-theme="dark"] .step-number,
+html[data-theme="dark"] .policy-value,
+html[data-theme="dark"] .tier-icon,
+html[data-theme="dark"] .logo-field input[type="file"]::file-selector-button{color:#d3c6ff}
+html[data-theme="dark"] .builder-anonymous-note{background:#173c32;color:#94ebc2}
+html[data-theme="dark"] .infrastructure-disabled{background:var(--surface-soft);border-color:var(--line)}
+html[data-theme="dark"] .path-card-active{background:linear-gradient(180deg,#26233c,#1e2032);border-color:#51476b}
+html[data-theme="dark"] .field input,
+html[data-theme="dark"] .field textarea,
+html[data-theme="dark"] .field select,
+html[data-theme="dark"] input[type="number"],
+html[data-theme="dark"] select{background:var(--surface-soft);border-color:#55566e;color:var(--text);color-scheme:dark}
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder{color:#a8a9bf;opacity:1}
+html[data-theme="dark"] .field input:focus-visible,
+html[data-theme="dark"] .field textarea:focus-visible,
+html[data-theme="dark"] .field select:focus-visible{border-color:#ac98ff;outline-color:#ac98ff}
+html[data-theme="dark"] .button-secondary:hover{background:#31334b}
+html[data-theme="dark"] .button-primary{background:#7656ed;color:#fff}
+html[data-theme="dark"] .field-error{color:#ffadba!important}
+html[data-theme="dark"] .form-message{background:#143e33;color:#a0efce}
+html[data-theme="dark"] .project-card-actions{border-color:var(--line)}
+html[data-theme="dark"] .project-card-actions .draft-delete-action button{background:transparent;border-color:#825065;color:#ffb4c3}
+html[data-theme="dark"] .project-card-actions .draft-delete-action button:hover{background:#452838}
+html[data-theme="dark"] .site-footer a:hover,
+html[data-theme="dark"] .site-footer a:focus-visible{color:#d0bfff}
+html[data-theme="dark"] .clean-disclaimer{color:#c0bbd3}
+html[data-theme="dark"] .clean-bottom p,
+html[data-theme="dark"] .clean-step-grid p{color:var(--muted)}
+html[data-theme="dark"] .metadata-publication-action small{color:var(--muted)}
+html[data-theme="dark"] .metadata-publication-action .field-error{color:#ffb4c3!important}
