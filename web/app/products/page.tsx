@@ -40,9 +40,9 @@ export function ProductsPage() {
         </p>
       </div>
 
-      <section className="card-grid product-grid">
+      <section className="card-grid product-grid product-carousel" aria-label="Orrylo products and services">
         {PRODUCTS.map((product) => (
-          <article className="surface-card product-card" key={product.title}>
+          <article className="surface-card product-card product-showcase-card" key={product.title}>
             <div className="card-title-row">
               <h2>{product.title}</h2>
               <span className="availability-badge">{product.status}</span>
