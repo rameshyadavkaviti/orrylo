@@ -166,3 +166,55 @@
  .header-preferences-trigger{width:100%}
  .header-preferences-panel{width:100%}
 }
+
+
+/* Unified navigation: one header for links, Testnet status, appearance and wallet. */
+.sidebar{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:14px 24px;padding:14px max(24px,calc((100vw - 1200px)/2));min-height:78px}
+.sidebar .nav-list{display:flex;flex:1 1 auto;align-items:center;gap:3px;min-width:0}
+.unified-header-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-width:0;margin-left:auto}
+.unified-header-actions .header-network-status{display:inline-flex;align-items:center;gap:9px;white-space:nowrap;font-size:.79rem;font-weight:750;padding:9px 12px;border:1px solid var(--line);border-radius:11px;color:var(--text);background:var(--surface-soft)}
+.unified-header-actions .theme-toggle{width:42px;min-width:42px;height:42px;min-height:42px;padding:0}
+.unified-header-actions .wallet-authenticated{display:flex;align-items:center;gap:12px;min-width:0;max-width:280px;padding:5px 6px 5px 12px}
+.unified-header-actions .wallet-authenticated>div{min-width:0;overflow:hidden}
+.unified-header-actions .wallet-public-key{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.74rem}
+.unified-header-actions .wallet-authenticated>.button{flex:none;white-space:nowrap;min-height:38px;padding:8px 11px;font-size:.78rem}
+.unified-header-actions .wallet-auth-label{font-size:.61rem}
+.unified-header-actions .wallet-auth-control{min-width:0}
+.workspace{display:flex;flex-direction:column;min-height:calc(100vh - 78px)}
+.workspace .main-content{flex:1}
+.site-footer{width:100%;max-width:none;margin:0;padding:30px max(24px,calc((100vw - 1200px)/2));display:flex;align-items:center;justify-content:space-between;gap:24px;border-top:1px solid var(--line);background:var(--surface);box-shadow:none}
+.footer-brand{display:flex;align-items:center;gap:12px;min-width:0}
+.footer-brand img{width:34px;height:34px;object-fit:contain}
+.footer-brand>div{display:grid;gap:4px}
+.footer-brand strong{font-size:.92rem;letter-spacing:-.02em}
+.footer-brand span,.footer-network{font-size:.75rem;color:var(--muted)}
+.footer-end{display:flex;align-items:flex-end;flex-direction:column;gap:10px}
+.footer-end nav{display:flex;flex-wrap:wrap;gap:10px 20px}
+.footer-end nav a{font-size:.79rem;color:var(--muted);transition:color .15s}
+.footer-end nav a:hover,.footer-end nav a:focus-visible{color:var(--violet)}
+.footer-network{display:inline-flex;align-items:center;gap:8px}
+@media(max-width:1160px){
+ .sidebar{gap:12px 16px}
+ .sidebar .nav-list{order:3;flex:1 1 100%;justify-content:center}
+ .unified-header-actions{margin-left:auto}
+}
+@media(max-width:900px){
+ .sidebar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}
+ .sidebar .brand{grid-column:1;grid-row:1}
+ .mobile-nav-toggle{grid-column:2;grid-row:1}
+ .sidebar .nav-list{grid-column:1/-1;grid-row:3;order:initial}
+ .sidebar .nav-list.nav-list-open{display:flex}
+ .unified-header-actions{grid-column:1/-1;grid-row:2;justify-content:flex-start;margin:0;width:100%;flex-wrap:wrap}
+ .unified-header-actions .wallet-authenticated{max-width:min(100%,330px)}
+ .site-footer{align-items:flex-start}
+}
+@media(max-width:620px){
+ .unified-header-actions{gap:8px}
+ .unified-header-actions .wallet-authenticated{flex:1 1 210px;max-width:100%}
+ .unified-header-actions .wallet-authenticated>.button{padding-inline:9px}
+ .site-footer{flex-direction:column;align-items:stretch;gap:22px}
+ .footer-end{align-items:flex-start}
+}
+@media(max-width:390px){
+ .unified-header-actions .wallet-authenticated{flex:1 1 100%}
+}
