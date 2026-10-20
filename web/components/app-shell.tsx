@@ -55,29 +55,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        <div className="sidebar-note">
-          <span className="eyebrow">Early prototype</span>
-          <strong>Explore before launch</strong>
-          <p>
-            Build and explore a token without a wallet. Connect only when a
-            later identity or execution step needs it.
-          </p>
+        <div id="wallet-connect" className="unified-header-actions">
+          <span className="header-network-status" title="Mainnet is not available yet">
+            <span className="header-network-dot" aria-hidden="true" />
+            Testnet
+          </span>
+          <ThemeToggle />
+          <WalletAuthControl />
         </div>
       </aside>
 
       <div className="workspace">
-        <header className="topbar">
-          <div className="topbar-context">
-            <span className="topbar-context-label">Stellar workspace</span>
-            <strong>Build on Stellar</strong>
-          </div>
-          <div id="wallet-connect" className="topbar-actions">
-            <span className="header-network-status" title="Mainnet is not available yet"><span className="header-network-dot" aria-hidden="true" />Testnet <span className="header-network-only">only</span></span>
-            <ThemeToggle />
-            <WalletAuthControl />
-          </div>
-        </header>
-
         <main className="main-content">{children}</main>
 
         <footer className="site-footer">
