@@ -7,8 +7,7 @@ import { useState, type ReactNode } from "react";
 
 import { NAV_ITEMS, UTILITY_NAV_ITEMS } from "../lib/navigation";
 import { WalletAuthControl } from "./wallet-auth-control";
-import { ThemeToggle } from "./theme-toggle";
-import { NetworkSelector } from "./network-selector";
+import { HeaderPreferencesMenu } from "./header-preferences-menu";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -68,15 +67,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="workspace">
         <header className="topbar">
-          <div>
-            <span className="eyebrow">Stellar made approachable</span>
-            <p className="topbar-copy">
-              Design freely. Connect your wallet only when ready to issue on Testnet.
-            </p>
+          <div className="topbar-context">
+            <span className="topbar-context-label">Workspace</span>
+            <strong>Token Studio</strong>
           </div>
           <div id="wallet-connect" className="topbar-actions">
-            <NetworkSelector />
-            <ThemeToggle />
+            <HeaderPreferencesMenu />
             <WalletAuthControl />
           </div>
         </header>
