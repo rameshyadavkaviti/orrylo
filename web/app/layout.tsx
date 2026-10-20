@@ -8,6 +8,7 @@ import "./brand.css";
 import "./clean-mvp.css";
 import "./theme.css";
 import "./tailwind.css";
+import "./palette.css";
 
 export const metadata: Metadata = {
   title: "Orrylo — Build on Stellar",
