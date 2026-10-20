@@ -103,3 +103,24 @@
  .product-showcase-card>.button{width:100%;justify-content:center}
 }
 @media(prefers-reduced-motion:reduce){.product-showcase-card{transition:none}.product-showcase-card:hover{transform:none}}
+
+
+/* Header controls: prevent verified wallet details from colliding with theme/network controls. */
+.topbar{flex-wrap:wrap;column-gap:22px;row-gap:12px}
+.topbar>div:first-child{flex:1 1 245px;min-width:0}
+.topbar-actions{flex:0 1 auto;min-width:0;display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:12px}
+.topbar-actions>.wallet-auth-control{min-width:0;max-width:100%}
+.topbar-actions>.wallet-authenticated{width:min(100%,340px);max-width:340px;min-width:0;grid-template-columns:minmax(0,1fr) auto;gap:12px}
+.topbar-actions .wallet-authenticated>div{min-width:0;overflow:hidden}
+.topbar-actions .wallet-public-key{display:block;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar-actions .wallet-authenticated>.button{flex:none;white-space:nowrap}
+.topbar-actions .theme-toggle{width:44px;min-width:44px;height:44px;padding:0;flex:none}
+.topbar-actions .theme-toggle>span:first-child{font-size:1.3rem}
+@media(max-width:1100px){
+ .topbar-actions{flex:1 1 100%;justify-content:flex-start}
+}
+@media(max-width:620px){
+ .topbar-actions{width:100%;gap:10px;align-items:center}
+ .topbar-actions>.wallet-authenticated{width:100%;max-width:none}
+ .topbar-actions>.wallet-auth-control:not(.wallet-authenticated){max-width:100%}
+}
