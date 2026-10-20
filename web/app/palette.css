@@ -1,0 +1,77 @@
+/* Orrylo color system: Midnight Navy · Electric Cyan · Soft Violet.
+   Loaded last to unify legacy CSS without changing application logic. */
+:root{
+  --background:#F8FAFC;--surface:#FFFFFF;--surface-soft:#F0F7FA;
+  --text:#0B1120;--muted:#52637B;--line:#DCE6EF;
+  --violet:#0891B2;--violet-soft:#DFF8FD;
+  --navy:#0B1120;--navy-soft:#172238;
+  --accent:#0891B2;--accent-hover:#0E7490;
+  --accent-contrast:#FFFFFF;--brand-violet:#A78BFA;
+  --success:#047857;--shadow:0 12px 34px rgba(11,17,32,.065);
+}
+html[data-theme="dark"]{
+  color-scheme:dark;
+  --background:#0B1120;--surface:#172238;--surface-soft:#1F3046;
+  --text:#F1F5F9;--muted:#AAB9CD;--line:#334155;
+  --violet:#22D3EE;--violet-soft:#103943;
+  --navy:#0B1120;--navy-soft:#172238;
+  --accent:#22D3EE;--accent-hover:#67E8F9;
+  --accent-contrast:#082F49;--brand-violet:#A78BFA;
+  --success:#67E8BA;--shadow:0 12px 34px rgba(0,0,0,.20);
+}
+html,body{background:var(--background);color:var(--text)}
+.sidebar,.topbar,.site-footer{background:var(--surface);border-color:var(--line)}
+html[data-theme="dark"] .sidebar,html[data-theme="dark"] .topbar,
+html[data-theme="dark"] .status-column,html[data-theme="dark"] .site-footer{background:var(--surface);border-color:var(--line)}
+.sidebar .brand strong,.footer-brand strong{color:var(--text)}
+.sidebar .nav-link{color:var(--muted)}
+.sidebar .nav-link:hover,.sidebar .nav-link:focus-visible,
+.sidebar .nav-link-active,.sidebar .nav-link[aria-current="page"],
+html[data-theme="dark"] .sidebar .nav-link-active,
+html[data-theme="dark"] .sidebar .nav-link[aria-current="page"]{background:var(--violet-soft);color:var(--accent)}
+.button-primary,.clean-cta,.clean-bottom .clean-cta,
+html[data-theme="dark"] .button-primary,
+html[data-theme="dark"] .clean-bottom .clean-cta{background:var(--accent);border-color:transparent;color:var(--accent-contrast)}
+.button-primary:hover,.clean-cta:hover,.clean-bottom .clean-cta:hover{background:var(--accent-hover);color:var(--accent-contrast)}
+.button-secondary,.theme-toggle,.mobile-nav-toggle,
+.unified-header-actions .header-network-status{background:var(--surface-soft);border-color:var(--line);color:var(--text)}
+.button-secondary:hover,.theme-toggle:hover,.mobile-nav-toggle:hover{background:var(--violet-soft);border-color:var(--accent);color:var(--text)}
+a.text-link,.site-footer a:hover,.site-footer a:focus-visible,
+html[data-theme="dark"] .site-footer a:hover,html[data-theme="dark"] .site-footer a:focus-visible{color:var(--accent)}
+.eyebrow,.clean-kicker,.clean-step-grid article>span{color:var(--accent)}
+.availability-badge,.status-neutral,.builder-assurances span,.preview-network{background:var(--violet-soft);color:var(--accent);border-color:var(--line)}
+.clean-hero{background:radial-gradient(circle at 85% 25%,rgba(34,211,238,.18),transparent 35%),linear-gradient(135deg,#0B1120,#172238 80%);color:#F1F5F9}
+.clean-hero h1 span{color:#67E8F9}
+.clean-hero .clean-kicker{color:#67E8F9}
+.clean-token-core{background:linear-gradient(145deg,#255C76,#172238);border-color:rgba(103,232,249,.28)}
+.clean-visual-glow{background:#22D3EE;opacity:.22}
+.clean-dot,.clean-caption-dot{background:#22D3EE}
+.clean-bottom,.clean-step-grid article,
+.surface-card,.metric-card,.tier-card,.form-card,.empty-state,
+.value-card,.path-card,.product-showcase-card{border-color:var(--line)}
+.clean-bottom{background:var(--surface-soft)}
+html[data-theme="dark"] .clean-bottom{background:var(--surface-soft);border-color:var(--line)}
+.product-showcase-card{background:linear-gradient(145deg,var(--surface) 30%,var(--surface-soft))}
+.product-showcase-card:before{background:radial-gradient(circle,rgba(34,211,238,.13),transparent 72%)}
+.product-showcase-card:hover{border-color:var(--accent)}
+html[data-theme="dark"] .surface-card,
+html[data-theme="dark"] .metric-card,html[data-theme="dark"] .form-card,
+html[data-theme="dark"] .tier-card,html[data-theme="dark"] .empty-state,
+html[data-theme="dark"] .value-card,html[data-theme="dark"] .path-card,
+html[data-theme="dark"] .product-showcase-card,
+html[data-theme="dark"] .clean-step-grid article{background:var(--surface);border-color:var(--line);color:var(--text)}
+html[data-theme="dark"] .product-showcase-card{background:linear-gradient(145deg,var(--surface),var(--surface-soft))}
+html[data-theme="dark"] .demo-banner,html[data-theme="dark"] .prototype-boundary,
+html[data-theme="dark"] .builder-assurances span,html[data-theme="dark"] .metadata-summary,
+html[data-theme="dark"] .readiness-item,html[data-theme="dark"] .disclosure,
+html[data-theme="dark"] .code-block,html[data-theme="dark"] .execution-boundary,
+html[data-theme="dark"] .draft-preview,html[data-theme="dark"] .infrastructure-selected{background:var(--surface-soft);border-color:var(--line);color:var(--text)}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(34,211,238,.15)}
+html[data-theme="dark"] .field input,html[data-theme="dark"] .field textarea,
+html[data-theme="dark"] .field select{background:var(--surface-soft);border-color:var(--line);color:var(--text)}
+html[data-theme="dark"] .availability-badge,
+html[data-theme="dark"] .preview-network{background:var(--violet-soft);color:var(--accent)}
+html[data-theme="dark"] .eyebrow,html[data-theme="dark"] .text-link,
+html[data-theme="dark"] .preview-code,html[data-theme="dark"] .clean-step-grid article>span{color:var(--accent)}
+.header-network-dot{background:#22D3EE;box-shadow:0 0 0 3px rgba(34,211,238,.13)}
+::selection{background:rgba(34,211,238,.3)}
