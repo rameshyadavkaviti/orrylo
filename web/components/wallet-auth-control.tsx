@@ -187,7 +187,7 @@ export function WalletAuthControl({
       <div className="wallet-auth-control wallet-authenticated">
         <div>
           <span className="wallet-auth-label">Verified wallet</span>
-          <code className="wallet-public-key">{state.publicKey}</code>
+          <code className="wallet-public-key" title={state.publicKey}>{state.publicKey}</code>
         </div>
         <button
           type="button"
