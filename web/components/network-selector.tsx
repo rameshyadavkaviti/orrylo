@@ -2,7 +2,6 @@
 export function NetworkSelector() {
   return (
     <div role="group" aria-label="Stellar network" className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-1.5">
-      <span className="hidden px-2 text-xs font-semibold text-[var(--muted)] sm:inline">Network</span>
       <span aria-current="true" className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[var(--violet-soft)] px-3 text-sm font-bold text-[var(--text)] ring-1 ring-[var(--violet)]">
         <span aria-hidden="true" className="h-2 w-2 rounded-full bg-emerald-500" />
         Testnet
