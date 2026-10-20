@@ -79,3 +79,14 @@
   .sidebar .nav-list.nav-list-open{display:flex}
   .sidebar .nav-list .nav-link{display:block;padding:13px 14px;white-space:normal}
 }
+
+/* Small-screen navigation: collapsed by default, without affecting desktop. */
+.mobile-nav-toggle{display:none}
+@media(max-width:900px){
+  .sidebar{display:flex;justify-content:space-between;align-items:center}
+  .mobile-nav-toggle{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:44px;padding:9px 14px;border:1px solid var(--line);border-radius:11px;background:var(--surface);color:var(--text);font:inherit;font-size:.9rem;font-weight:700;cursor:pointer}
+  .mobile-nav-toggle:focus-visible{outline:3px solid #9275f4;outline-offset:3px}
+  .sidebar .nav-list{display:none;width:100%;max-width:none;overflow:visible;flex-wrap:wrap;gap:6px;padding:8px 0 2px}
+  .sidebar .nav-list.nav-list-open{display:flex}
+  .sidebar .nav-list .nav-link{flex:1 1 160px;min-height:44px;display:flex;align-items:center}
+}
