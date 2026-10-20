@@ -54,6 +54,7 @@ export function IssuanceExecutionControl({
       if (execution.status === "confirmed") {
         setTransactionHash(execution.transactionHash);
         setState("confirmed");
+        window.location.reload();
       } else if (execution.status === "preparing_issuance") {
         setState("preparing_issuance");
       } else if (execution.status === "confirming") {

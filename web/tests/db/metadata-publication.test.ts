@@ -8,6 +8,7 @@ import { Keypair } from "@stellar/stellar-sdk/base";
 import { createDatabaseClient } from "../../lib/server/persistence/database";
 import { migrateDatabase } from "../../lib/server/persistence/migrations";
 import { PostgresMetadataPublicationRepository } from "../../lib/server/persistence/metadata-publication-repository";
+import { PostgresProjectProfileRepository } from "../../lib/server/persistence/project-profile-repository";
 import { ManagedProjectService } from "../../lib/server/projects/managed-project-service";
 import {
   MetadataPublicationError,
@@ -18,6 +19,7 @@ import type {
   SharedAssetConfirmationReader,
   VerifiedSharedAssetProvenance,
 } from "../../lib/server/projects/shared-asset-provenance";
+import { PostgresSharedAssetConfirmationReader } from "../../lib/server/projects/shared-asset-provenance";
 import { TestnetIssuanceService } from "../../lib/server/projects/testnet-issuance-service";
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL?.trim();
@@ -284,6 +286,44 @@ if (!TEST_DATABASE_URL) {
     assert.equal(
       (await repository().listSharedTestnetPublications()).length,
       1,
+    );
+  });
+
+  test("durable confirmation publishes the correct landing page idempotently", async () => {
+    const { project, provenance } = await createConfirmedProject();
+    const durable = await new PostgresSharedAssetConfirmationReader(
+      sql,
+    ).findConfirmed(project.projectId, OWNER);
+    assert.deepEqual(durable, provenance);
+
+    const profiles = new PostgresProjectProfileRepository(sql);
+    const first = await profiles.publishConfirmedOwned(
+      project.projectId,
+      OWNER,
+      provenance,
+      clock,
+    );
+    const repeated = await profiles.publishConfirmedOwned(
+      project.projectId,
+      OWNER,
+      provenance,
+      clock + 1,
+    );
+
+    assert.equal(first?.publicStatus, "published");
+    assert.equal(first?.issuerPublicKey, ISSUER);
+    assert.equal(repeated?.updatedAt, first?.updatedAt);
+    assert.equal(
+      (await profiles.findPublishedBySlug(project.slug))?.projectId,
+      project.projectId,
+    );
+    assert.equal(
+      await profiles.publishConfirmedOwned(
+        project.projectId,
+        OTHER,
+        provenance,
+      ),
+      null,
     );
   });
 

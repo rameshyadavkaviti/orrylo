@@ -21,7 +21,7 @@ test("public shell renders primary product navigation and secondary utilities", 
     assert.match(html, new RegExp(item.label));
   }
 
-  assert.match(html, /Early prototype/i);
+  assert.match(html, /Stellar Testnet · Early access/i);
   assert.match(html, /Connect Wallet/i);
   assert.doesNotMatch(html, /Runtime status/i);
   assert.doesNotMatch(html, /Contract Interface v1/i);

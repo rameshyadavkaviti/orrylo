@@ -10,8 +10,6 @@ import {
   projectPublicPath,
 } from "../lib/projects/project-profile";
 import { ManagedProjectMetadataForm } from "./managed-project-metadata-form";
-import { PublishMetadataControl } from "./publish-metadata-control";
-import { PublishProjectControl } from "./publish-project-control";
 
 export function ManagedProjectView({
   project,
@@ -26,16 +24,13 @@ export function ManagedProjectView({
 }) {
   const publicPath = projectPublicPath(project.slug);
   const published = project.publicStatus === "published";
+  const issued = issuance?.status === "confirmed";
   const readiness = buildMetadataReadiness(project, publication);
-  const metadataBadge = !readiness.publicationReady
-    ? "Needs attention"
-    : readiness.toml.publishedContentCurrent
-      ? readiness.toml.reachable
-        ? "Metadata verified"
-        : "Published · verify pending"
-      : readiness.toml.published
-        ? "Update available"
-        : "Ready to publish";
+  const metadataBadge = !issued
+    ? "Draft"
+    : readiness.toml.publishedContentCurrent && readiness.toml.reachable
+      ? "Metadata Verified"
+      : "Metadata Pending / Failed";
 
   return (
     <div className="page-stack">
@@ -88,11 +83,31 @@ export function ManagedProjectView({
 
         <article className="surface-card">
           <span className="eyebrow">Publication</span>
-          <h2>{published ? "Public page live" : "Private landing draft"}</h2>
+          <h2>
+            {published
+              ? "Public page live"
+              : issued
+                ? "Automatic publication pending"
+                : "Private landing draft"}
+          </h2>
           <dl className="managed-project-facts">
             <div>
+              <dt>Project status</dt>
+              <dd>{issued ? "Issued" : "Draft"}</dd>
+            </div>
+            <div>
               <dt>Landing-page status</dt>
-              <dd>{published ? "Published" : "Draft"}</dd>
+              <dd>
+                {published
+                  ? "Published"
+                  : issued
+                    ? "Pending / Failed"
+                    : "Draft"}
+              </dd>
+            </div>
+            <div>
+              <dt>Metadata status</dt>
+              <dd>{metadataBadge}</dd>
             </div>
             <div>
               <dt>Public page path</dt>
@@ -138,9 +153,7 @@ export function ManagedProjectView({
             <Link className="button button-primary" href={publicPath}>
               View public page
             </Link>
-          ) : (
-            <PublishProjectControl projectId={project.projectId} />
-          )}
+          ) : null}
         </article>
       </section>
 
@@ -184,8 +197,9 @@ export function ManagedProjectView({
 
         {readiness.blockers.length > 0 ? (
           <p className="readiness-note">
-            Publication blockers remain. Resolve the required fields above
-            before attempting Shared Issuer Testnet publication.
+            {issued
+              ? "Automatic publication is pending or failed. Orrylo will retry safely without repeating token issuance."
+              : "This draft remains private. Publication begins automatically only after confirmed Stellar issuance."}
           </p>
         ) : null}
 
@@ -214,16 +228,6 @@ export function ManagedProjectView({
                 Last successful verification: {readiness.toml.verifiedAt}
               </small>
             ) : null}
-            <PublishMetadataControl
-              projectId={project.projectId}
-              enabled={readiness.publicationReady}
-              hasPublication={readiness.toml.published}
-              needsUpdate={
-                readiness.toml.published &&
-                !readiness.toml.publishedContentCurrent
-              }
-              reachable={readiness.toml.reachable}
-            />
           </div>
         ) : null}
 
@@ -240,10 +244,9 @@ export function ManagedProjectView({
           <strong>Metadata publication is not token issuance.</strong>
         </div>
         <p>
-          The wallet association controls this Project Profile and its metadata
-          publication action. Stellar asset creation, issuer configuration,
-          home_domain changes, trustline authorization, signing, RYLO
-          operations, and Soroban execution remain separate boundaries.
+          Confirmed issuance starts landing-page and metadata publication
+          automatically. Publication retries never sign, submit, or replace a
+          Stellar issuance. RYLO metadata remains on its separate namespace.
         </p>
       </section>
     </div>

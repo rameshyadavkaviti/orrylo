@@ -10,20 +10,19 @@ import { RyloPage } from "../app/rylo/page";
 test("homepage makes anonymous token building the dominant product journey", () => {
   const html = renderToStaticMarkup(<HomePage />);
 
-  assert.match(html, /Create your Stellar token in minutes/i);
-  assert.match(html, />Create Token</i);
-  assert.match(html, />Connect Wallet</i);
-  assert.match(html, /no wallet connection required/i);
-  assert.match(html, /use the token builder anonymously/i);
-  assert.match(html, /Products &amp; Services/i);
-  assert.match(html, /Explore RYLO/i);
-  assert.match(html, /On-chain token issuance is not enabled/i);
+  assert.match(html, /Your token.*Made simple/is);
+  assert.match(html, />Create your token/i);
+  assert.match(html, /no wallet required to start/i);
+  assert.match(html, /Free to explore/i);
+  assert.match(html, /Testnet only/i);
+  assert.match(html, /Connect Albedo/i);
+  assert.match(html, /Testnet issuance is available/i);
 });
 
 test("create-token experience offers a meaningful anonymous live builder", () => {
   const html = renderToStaticMarkup(<CreateTokenPage />);
 
-  assert.match(html, /Build a Stellar token before you connect anything/i);
+  assert.match(html, /Create your Stellar Testnet token/i);
   assert.match(html, /No wallet needed to explore/i);
   assert.match(html, /Token identity/i);
   assert.match(html, /Description/i);

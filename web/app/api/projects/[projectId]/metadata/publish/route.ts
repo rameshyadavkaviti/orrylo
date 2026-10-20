@@ -11,9 +11,9 @@ import type { PublishMetadataFailureCode } from "../../../../../../lib/projects/
 import { SHARED_METADATA_TOML_ENDPOINT } from "../../../../../../lib/projects/metadata-publication";
 import { isValidProjectId } from "../../../../../../lib/projects/project-profile";
 import { getDatabaseClient } from "../../../../../../lib/server/persistence/database";
+import { createServerMetadataPublicationService } from "../../../../../../lib/server/projects/automatic-publication-service";
 import {
   MetadataPublicationError,
-  MetadataPublicationService,
   type PublishMetadataResult,
 } from "../../../../../../lib/server/projects/metadata-publication-service";
 
@@ -37,7 +37,7 @@ export async function POST(
   context: PublishMetadataContext,
 ) {
   const config = readServerAuthConfig();
-  const service = new MetadataPublicationService(getDatabaseClient());
+  const service = createServerMetadataPublicationService(getDatabaseClient());
 
   return handlePublishMetadata(request, context, {
     authDomain: config.domain,

@@ -211,6 +211,74 @@ test("execution boundary derives owner and project from authenticated server con
   });
 });
 
+test("confirmed execution triggers best-effort automatic publication", async () => {
+  let reconciled: unknown;
+  const deps: IssuanceExecutionRouteDependencies = {
+    authDomain: "orrylo.com",
+    getSession: async () => SESSION,
+    startOrResume: async () => ({
+      status: "confirmed",
+      transactionHash: "a".repeat(64),
+      ledgerSequence: 123,
+    }),
+    reconcilePublication: async (projectId, ownerPublicKey) => {
+      reconciled = { projectId, ownerPublicKey };
+      return {
+        status: "complete",
+        landingPage: "published",
+        metadata: "verified",
+        errors: [],
+      };
+    },
+  };
+
+  const response = await handleStartOrResumeIssuance(
+    request({ requestId: ISSUANCE.requestId }),
+    CONTEXT,
+    deps,
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(reconciled, {
+    projectId: PROJECT_ID,
+    ownerPublicKey: OWNER,
+  });
+  assert.equal((await response.json()).publication.status, "complete");
+});
+
+test("publication failure cannot turn confirmed issuance into an HTTP failure", async () => {
+  const deps: IssuanceExecutionRouteDependencies = {
+    authDomain: "orrylo.com",
+    getSession: async () => SESSION,
+    startOrResume: async () => ({
+      status: "confirmed",
+      transactionHash: "a".repeat(64),
+      ledgerSequence: 123,
+    }),
+    reconcilePublication: async () => {
+      throw Object.assign(new Error("metadata offline"), {
+        code: "request_failed",
+      });
+    },
+  };
+
+  const response = await handleStartOrResumeIssuance(
+    request({ requestId: ISSUANCE.requestId }),
+    CONTEXT,
+    deps,
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.execution.status, "confirmed");
+  assert.deepEqual(payload.publication, {
+    status: "pending",
+    landingPage: "failed",
+    metadata: "failed",
+    errors: ["request_failed"],
+  });
+});
+
 test("execution boundary rejects browser authority and unavailable runtime fails closed", async () => {
   const deps: IssuanceExecutionRouteDependencies = {
     authDomain: "orrylo.com",

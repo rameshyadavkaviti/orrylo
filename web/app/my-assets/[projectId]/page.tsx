@@ -5,8 +5,11 @@ import { ManagedProjectView } from "../../../components/managed-project-view";
 import { SESSION_COOKIE_NAME } from "../../../lib/auth/constants";
 import { getWalletAuthService } from "../../../lib/auth/runtime";
 import { getDatabaseClient } from "../../../lib/server/persistence/database";
-import { PostgresMetadataPublicationRepository } from "../../../lib/server/persistence/metadata-publication-repository";
 import { PostgresProjectProfileRepository } from "../../../lib/server/persistence/project-profile-repository";
+import {
+  createServerAutomaticPublicationService,
+  createServerMetadataPublicationRepository,
+} from "../../../lib/server/projects/automatic-publication-service";
 import { TestnetIssuanceService } from "../../../lib/server/projects/testnet-issuance-service";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +32,7 @@ export default async function ManagedProjectPage({
   const { projectId } = await params;
   const sql = getDatabaseClient();
   const projectRepository = new PostgresProjectProfileRepository(sql);
-  const project = await projectRepository.findOwnedById(
+  let project = await projectRepository.findOwnedById(
     projectId,
     session.publicKey,
   );
@@ -38,16 +41,38 @@ export default async function ManagedProjectPage({
     notFound();
   }
 
-  const publicationRepository = new PostgresMetadataPublicationRepository(sql);
-  const publication = await publicationRepository.getByProjectId(projectId);
   const issuance = await new TestnetIssuanceService(sql, {
     network: project.network,
     approvedIssuerPublicKey:
       process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY,
   }).getOwnedStatus(projectId, session.publicKey);
+
+  if (issuance?.status === "confirmed") {
+    try {
+      await createServerAutomaticPublicationService(
+        sql,
+      ).reconcileConfirmedProject(projectId, session.publicKey);
+      project =
+        (await projectRepository.findOwnedById(projectId, session.publicKey)) ??
+        project;
+    } catch {
+      // Issuance stays confirmed. The page below reports publication pending.
+    }
+  }
+
+  let publication = null;
+  try {
+    publication =
+      await createServerMetadataPublicationRepository(sql).getByProjectId(
+        projectId,
+      );
+  } catch {
+    // Missing publication runtime configuration is shown as pending, not issued.
+  }
+
   return (
     <ManagedProjectView
-      project={{ ...project, issuerPublicKey: null }}
+      project={project}
       publication={publication}
       issuance={issuance}
       intentConfigurationAvailable={

@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { after, before, beforeEach, test } from "node:test";
-import { renderToStaticMarkup } from "react-dom/server";
-
 import { Keypair } from "@stellar/stellar-sdk/base";
 import { NextRequest } from "next/server";
 
@@ -12,7 +10,6 @@ import {
   type CreateProjectRouteDependencies,
 } from "../../app/api/projects/route";
 
-import { ProjectLandingPage } from "../../components/project-landing-page";
 import { createDatabaseClient } from "../../lib/server/persistence/database";
 import { migrateDatabase } from "../../lib/server/persistence/migrations";
 import { PostgresProjectProfileRepository } from "../../lib/server/persistence/project-profile-repository";
@@ -177,23 +174,10 @@ if (!TEST_DATABASE_URL) {
     assert.equal(updated.metadataHome, "assets.orrylo.com");
     assert.equal(updated.issuerPublicKey, null);
 
-    await repository.publishOwned(created.project.projectId, OWNER, NOW + 3);
     const publicProject = await repository.findPublishedBySlug(
       created.project.slug,
     );
-
-    assert.ok(publicProject);
-    assert.equal(publicProject.projectId, created.project.projectId);
-    assert.equal(publicProject.displayName, "Nova Network");
-    assert.equal(publicProject.websiteUrl, "https://example.com/");
-    assert.equal(publicProject.metadataHome, "assets.orrylo.com");
-
-    const html = renderToStaticMarkup(
-      ProjectLandingPage({ project: publicProject }),
-    );
-    assert.match(html, /Nova Network/);
-    assert.match(html, /Updated managed metadata/);
-    assert.match(html, /https:\/\/example\.com\//);
+    assert.equal(publicProject, null);
   });
 
   test("wallet-session mismatch has zero project side effects and restored wallet A reuses the logical save", async () => {
@@ -403,7 +387,7 @@ if (!TEST_DATABASE_URL) {
     assert.notEqual(first.project.projectId, second.project.projectId);
   });
 
-  test("only the owner can manage/publish and public lookup renders persisted profile data", async () => {
+  test("drafts remain private until confirmed issuance drives publication", async () => {
     const service = new ManagedProjectService(sql, {
       network: "testnet",
       now: () => NOW,
@@ -422,35 +406,29 @@ if (!TEST_DATABASE_URL) {
       null,
     );
     assert.equal(
-      await repository.publishOwned(created.project.projectId, OTHER, NOW + 1),
-      null,
-    );
-    assert.equal(
       await repository.findPublishedBySlug(created.project.slug),
       null,
     );
+  });
 
-    const published = await repository.publishOwned(
-      created.project.projectId,
-      OWNER,
-      NOW + 2,
-    );
-    assert.ok(published);
-    assert.equal(published.publicStatus, "published");
+  test("legacy published flags without durable confirmation remain private", async () => {
+    const repository = new PostgresProjectProfileRepository(sql);
+    const project = await repository.create({
+      projectId: randomUUID(),
+      slug: `legacy-${randomUUID().slice(0, 8)}`,
+      assetCode: "LEGACY",
+      displayName: "Legacy draft",
+      issuerModel: "shared",
+      network: "testnet",
+      publicStatus: "published",
+      now: NOW,
+    });
 
-    const publicProject = await repository.findPublishedBySlug(
-      created.project.slug,
-    );
-    assert.ok(publicProject);
-    assert.equal(publicProject.projectId, created.project.projectId);
-    assert.equal(publicProject.displayName, "Nova");
+    await sql`
+      INSERT INTO project_profile_owners (project_id, owner_public_key, created_at)
+      VALUES (${project.projectId}, ${OWNER}, ${new Date(NOW)})
+    `;
 
-    const html = renderToStaticMarkup(
-      ProjectLandingPage({ project: publicProject }),
-    );
-    assert.match(html, /Persisted public project data/);
-    assert.match(html, /\/p\/nova/);
-    assert.match(html, /TOML status/i);
-    assert.match(html, /Not published/i);
+    assert.equal(await repository.findPublishedBySlug(project.slug), null);
   });
 }

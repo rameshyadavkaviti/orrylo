@@ -1,6 +1,10 @@
 import { readFile, writeFile } from "node:fs/promises";
 
 import { createDatabaseClient } from "../lib/server/persistence/database";
+import {
+  createServerAutomaticPublicationService,
+  reconcilePublicationAfterConfirmedExecution,
+} from "../lib/server/projects/automatic-publication-service";
 import { createServerSharedIssuanceOrchestrator } from "../lib/server/projects/shared-issuance-runtime";
 import type { SharedIssuerSigningPrimitive } from "../lib/stellar/shared-issuer-signing-policy";
 
@@ -195,12 +199,20 @@ async function main() {
         ...common,
         signedEnvelopeXdr,
       });
+      const publication = await reconcilePublicationAfterConfirmedExecution(
+        execution,
+        () =>
+          createServerAutomaticPublicationService(
+            applicationDatabase,
+          ).reconcileConfirmedProject(args.projectId, args.ownerPublicKey),
+      );
       process.stdout.write(
         `${JSON.stringify(
           {
             ok: true,
             action: "manual_signed_envelope_consumed",
             execution,
+            ...(publication ? { publication } : {}),
           },
           null,
           2,
@@ -210,12 +222,20 @@ async function main() {
     }
 
     const execution = await orchestrator.reconcileManualAttempt(common);
+    const publication = await reconcilePublicationAfterConfirmedExecution(
+      execution,
+      () =>
+        createServerAutomaticPublicationService(
+          applicationDatabase,
+        ).reconcileConfirmedProject(args.projectId, args.ownerPublicKey),
+    );
     process.stdout.write(
       `${JSON.stringify(
         {
           ok: true,
           action: "reconciled_exact_attempt",
           execution,
+          ...(publication ? { publication } : {}),
         },
         null,
         2,

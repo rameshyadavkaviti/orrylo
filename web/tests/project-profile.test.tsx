@@ -67,10 +67,11 @@ test("managed project view keeps ownership, routing, metadata, and on-chain stat
   assert.match(html, new RegExp(managed.projectId));
   assert.match(html, new RegExp(managed.ownerPublicKey));
   assert.match(html, /\/p\/nova/);
-  assert.match(html, /Private draft/i);
+  assert.match(html, /Draft/i);
   assert.match(html, /TOML publication.*Not published/is);
   assert.match(html, /Stellar asset.*Not created/is);
-  assert.match(html, /Publish public landing page/i);
+  assert.doesNotMatch(html, /Publish public landing page/i);
+  assert.doesNotMatch(html, /Publish metadata/i);
   assert.match(html, /Publication readiness/i);
   assert.match(html, /stellar\.toml/i);
   assert.match(html, /Explorer visibility/i);
@@ -81,6 +82,39 @@ test("managed project view keeps ownership, routing, metadata, and on-chain stat
   assert.match(html, /Generated: yes.*Published: no.*Reachable: no/is);
   assert.match(html, /Save metadata/i);
   assert.doesNotMatch(html, /asset created successfully/i);
+});
+
+test("issued projects show automatic publication state without manual publish decisions", () => {
+  const issuer = "GA6HCMBLTZS5VQ3FPJ4SCA5PXI4D54ZZG6EXOWZOCN2H7P7PVOQC7F3Y";
+  const managed: ManagedProjectProfile = {
+    ...PROJECT,
+    issuerPublicKey: issuer,
+    publicStatus: "published",
+    ownerPublicKey: issuer,
+  };
+  const html = renderToStaticMarkup(
+    <ManagedProjectView
+      project={managed}
+      issuance={{
+        requestId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        projectId: managed.projectId,
+        assetCode: managed.assetCode,
+        network: "testnet",
+        status: "confirmed",
+        reservationIssuerPublicKey: issuer,
+        reservationFingerprint: "1".repeat(64),
+        issuerPublicKey: issuer,
+        transactionHash: "2".repeat(64),
+        ledgerSequence: 123,
+        failureCode: null,
+      }}
+    />,
+  );
+
+  assert.match(html, /Issued/i);
+  assert.match(html, /Metadata Pending \/ Failed/i);
+  assert.doesNotMatch(html, /Publish public landing page/i);
+  assert.doesNotMatch(html, /Publish metadata/i);
 });
 
 test("public landing page does not render unsafe persisted metadata URLs", () => {

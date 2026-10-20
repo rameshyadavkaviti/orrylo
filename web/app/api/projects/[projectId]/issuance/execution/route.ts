@@ -10,6 +10,12 @@ import type { AuthSession } from "../../../../../../lib/auth/stores";
 import { isValidProjectId } from "../../../../../../lib/projects/project-profile";
 import type { SharedIssuanceOrchestrationResult } from "../../../../../../lib/server/projects/shared-issuance-orchestrator";
 import { getServerSharedIssuanceOrchestrator } from "../../../../../../lib/server/projects/shared-issuance-runtime";
+import {
+  createServerAutomaticPublicationService,
+  reconcilePublicationAfterConfirmedExecution,
+  type AutomaticPublicationResult,
+} from "../../../../../../lib/server/projects/automatic-publication-service";
+import { getDatabaseClient } from "../../../../../../lib/server/persistence/database";
 
 export const runtime = "nodejs";
 
@@ -25,6 +31,10 @@ export interface IssuanceExecutionRouteDependencies {
     projectId: string;
     ownerPublicKey: string;
   }): Promise<SharedIssuanceOrchestrationResult>;
+  reconcilePublication?(
+    projectId: string,
+    ownerPublicKey: string,
+  ): Promise<AutomaticPublicationResult>;
 }
 
 function dependencies(): IssuanceExecutionRouteDependencies {
@@ -36,6 +46,10 @@ function dependencies(): IssuanceExecutionRouteDependencies {
       const orchestrator = await getServerSharedIssuanceOrchestrator();
       return orchestrator.startOrResume(input);
     },
+    reconcilePublication: (projectId, ownerPublicKey) =>
+      createServerAutomaticPublicationService(
+        getDatabaseClient(),
+      ).reconcileConfirmedProject(projectId, ownerPublicKey),
   };
 }
 
@@ -83,8 +97,13 @@ export async function handleStartOrResumeIssuance(
       projectId,
       ownerPublicKey: session.publicKey,
     });
+    const publication = deps.reconcilePublication
+      ? await reconcilePublicationAfterConfirmedExecution(result, () =>
+          deps.reconcilePublication!(projectId, session.publicKey),
+        )
+      : undefined;
     return NextResponse.json(
-      { ok: true, execution: result },
+      { ok: true, execution: result, ...(publication ? { publication } : {}) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

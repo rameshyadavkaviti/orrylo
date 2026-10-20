@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 
 import { ProjectLandingPage } from "../../../components/project-landing-page";
 import { getDatabaseClient } from "../../../lib/server/persistence/database";
-import { PostgresMetadataPublicationRepository } from "../../../lib/server/persistence/metadata-publication-repository";
 import { PostgresProjectProfileRepository } from "../../../lib/server/persistence/project-profile-repository";
+import { createServerMetadataPublicationRepository } from "../../../lib/server/projects/automatic-publication-service";
 
 export const dynamic = "force-dynamic";
 
@@ -38,17 +38,16 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     notFound();
   }
 
-  const publicationRepository = new PostgresMetadataPublicationRepository(
-    getDatabaseClient(),
-  );
-  const publication = await publicationRepository.getByProjectId(
-    project.projectId,
-  );
+  let publication = null;
+  try {
+    publication = await createServerMetadataPublicationRepository(
+      getDatabaseClient(),
+    ).getByProjectId(project.projectId);
+  } catch {
+    // The landing page remains available even if metadata status cannot load.
+  }
   return (
-    <ProjectLandingPage
-      project={{ ...project, issuerPublicKey: null }}
-      metadataPublication={publication}
-    />
+    <ProjectLandingPage project={project} metadataPublication={publication} />
   );
 }
 

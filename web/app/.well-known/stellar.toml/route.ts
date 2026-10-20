@@ -10,7 +10,7 @@ import {
   renderRyloTestnetToml,
 } from "../../../lib/rylo/testnet-metadata";
 import { getDatabaseClient } from "../../../lib/server/persistence/database";
-import { PostgresMetadataPublicationRepository } from "../../../lib/server/persistence/metadata-publication-repository";
+import { createServerMetadataPublicationRepository } from "../../../lib/server/projects/automatic-publication-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ export interface SharedTomlRouteDependencies {
 export async function GET(request: Request) {
   return handleStellarTomlRequest(request, {
     listPublications: () =>
-      new PostgresMetadataPublicationRepository(
+      createServerMetadataPublicationRepository(
         getDatabaseClient(),
       ).listSharedTestnetPublications(),
   });

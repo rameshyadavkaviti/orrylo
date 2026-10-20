@@ -7,6 +7,11 @@ import { getWalletAuthService } from "../../lib/auth/runtime";
 import { projectManagePath } from "../../lib/projects/project-profile";
 import { getDatabaseClient } from "../../lib/server/persistence/database";
 import { PostgresProjectProfileRepository } from "../../lib/server/persistence/project-profile-repository";
+import {
+  createServerAutomaticPublicationService,
+  createServerMetadataPublicationRepository,
+} from "../../lib/server/projects/automatic-publication-service";
+import { TestnetIssuanceService } from "../../lib/server/projects/testnet-issuance-service";
 
 export const dynamic = "force-dynamic";
 
@@ -40,8 +45,53 @@ export async function MyAssetsPage() {
     );
   }
 
-  const repository = new PostgresProjectProfileRepository(getDatabaseClient());
+  const sql = getDatabaseClient();
+  const repository = new PostgresProjectProfileRepository(sql);
   const projects = await repository.listOwnedByWallet(session.publicKey);
+  const publicationRepository = (() => {
+    try {
+      return createServerMetadataPublicationRepository(sql);
+    } catch {
+      return null;
+    }
+  })();
+  const automaticPublication = (() => {
+    try {
+      return createServerAutomaticPublicationService(sql);
+    } catch {
+      return null;
+    }
+  })();
+  const projectStates = await Promise.all(
+    projects.map(async (project) => {
+      const issuance = await new TestnetIssuanceService(sql, {
+        network: project.network,
+        approvedIssuerPublicKey:
+          process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY,
+      }).getOwnedStatus(project.projectId, session.publicKey);
+      if (issuance?.status === "confirmed" && automaticPublication) {
+        try {
+          await automaticPublication.reconcileConfirmedProject(
+            project.projectId,
+            session.publicKey,
+          );
+        } catch {
+          // Issuance remains confirmed; the status below stays pending/failed.
+        }
+      }
+      let publication = null;
+      if (publicationRepository) {
+        try {
+          publication = await publicationRepository.getByProjectId(
+            project.projectId,
+          );
+        } catch {
+          // A status read failure must not hide other issued projects.
+        }
+      }
+      return { project, issuance, publication };
+    }),
+  );
 
   return (
     <div className="page-stack">
@@ -50,11 +100,11 @@ export async function MyAssetsPage() {
         <h1>Your managed Orrylo projects.</h1>
         <p>
           Manage saved drafts and projects from your connected wallet. Check a
-          project's transaction evidence to confirm whether a token was issued.
+          project&apos;s transaction evidence to confirm whether a token was issued.
         </p>
       </div>
 
-      {projects.length === 0 ? (
+      {projectStates.length === 0 ? (
         <div className="empty-state">
           <strong>No managed projects yet</strong>
           <p>
@@ -66,41 +116,62 @@ export async function MyAssetsPage() {
           </Link>
         </div>
       ) : (
-        <section className="card-grid asset-project-grid" aria-label="Your projects">
-          {projects.map((project) => (
-            <article
-              className="surface-card managed-project-card"
-              key={project.projectId}
-            >
-              <div className="card-title-row">
-                <div>
-                  <span className="eyebrow">{project.assetCode}</span>
-                  <h2>{project.displayName}</h2>
-                </div>
-                <span className="availability-badge">
-                  {project.publicStatus === "published"
-                    ? "Public page live"
-                    : "Draft project"}
-                </span>
-              </div>
-              <p className="muted">
-                {project.description ?? "Managed Stellar project profile."}
-              </p>
-              <small className="project-hint">A draft status does not indicate whether on-chain issuance has completed. Open the project to review transaction evidence.</small>
-              <div className="project-card-actions"><Link
-                className="button button-primary"
-                href={projectManagePath(project.projectId)}
+        <section
+          className="card-grid asset-project-grid"
+          aria-label="Your projects"
+        >
+          {projectStates.map(({ project, issuance, publication }) => {
+            const issued = issuance?.status === "confirmed";
+            const metadataVerified = Boolean(
+              publication?.reachable && publication.verifiedAt,
+            );
+            return (
+              <article
+                className="surface-card managed-project-card"
+                key={project.projectId}
               >
-                View project <span aria-hidden="true">↗</span>
-              </Link>
-              {project.publicStatus === "draft" ? (
-                <DeleteDraftButton
-                  projectId={project.projectId}
-                  projectName={project.displayName}
-                />
-              ) : null}</div>
-            </article>
-          ))}
+                <div className="card-title-row">
+                  <div>
+                    <span className="eyebrow">{project.assetCode}</span>
+                    <h2>{project.displayName}</h2>
+                  </div>
+                  <div>
+                    <span className="availability-badge">
+                      {issued ? "Issued" : "Draft"}
+                    </span>
+                    {issued ? (
+                      <span className="availability-badge">
+                        {metadataVerified
+                          ? "Metadata Verified"
+                          : "Metadata Pending / Failed"}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <p className="muted">
+                  {project.description ?? "Managed Stellar project profile."}
+                </p>
+                <small className="project-hint">
+                  A draft status does not indicate whether on-chain issuance has
+                  completed. Open the project to review transaction evidence.
+                </small>
+                <div className="project-card-actions">
+                  <Link
+                    className="button button-primary"
+                    href={projectManagePath(project.projectId)}
+                  >
+                    View project <span aria-hidden="true">↗</span>
+                  </Link>
+                  {!issued && project.publicStatus === "draft" ? (
+                    <DeleteDraftButton
+                      projectId={project.projectId}
+                      projectName={project.displayName}
+                    />
+                  ) : null}
+                </div>
+              </article>
+            );
+          })}
         </section>
       )}
     </div>

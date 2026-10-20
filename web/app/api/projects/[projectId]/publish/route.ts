@@ -14,6 +14,7 @@ import {
 } from "../../../../../lib/projects/project-profile";
 import { getDatabaseClient } from "../../../../../lib/server/persistence/database";
 import { PostgresProjectProfileRepository } from "../../../../../lib/server/persistence/project-profile-repository";
+import { createServerAutomaticPublicationService } from "../../../../../lib/server/projects/automatic-publication-service";
 
 export const runtime = "nodejs";
 
@@ -32,13 +33,22 @@ interface PublishContext {
 
 export async function POST(request: NextRequest, context: PublishContext) {
   const config = readServerAuthConfig();
-  const repository = new PostgresProjectProfileRepository(getDatabaseClient());
+  const sql = getDatabaseClient();
+  const repository = new PostgresProjectProfileRepository(sql);
+  const publication = createServerAutomaticPublicationService(sql);
 
   return handlePublishManagedProject(request, context, {
     authDomain: config.domain,
     getSession: (token) => getWalletAuthService().getSession(token),
-    publish: (projectId, ownerPublicKey) =>
-      repository.publishOwned(projectId, ownerPublicKey),
+    publish: async (projectId, ownerPublicKey) => {
+      const result = await publication.reconcileConfirmedProject(
+        projectId,
+        ownerPublicKey,
+      );
+      return result.landingPage === "published"
+        ? repository.findOwnedById(projectId, ownerPublicKey)
+        : null;
+    },
   });
 }
 

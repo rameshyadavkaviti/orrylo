@@ -9,6 +9,7 @@ import {
 } from "../../projects/project-profile";
 import type { DatabaseClient } from "./database";
 import { normalizeWalletPublicKey } from "./wallet";
+import type { VerifiedSharedAssetProvenance } from "../projects/shared-asset-provenance";
 
 interface ProjectProfileRow {
   project_id: string;
@@ -116,11 +117,23 @@ export class PostgresProjectProfileRepository {
     }
 
     const [row] = await this.sql<ProjectProfileRow[]>`
-      SELECT *
-      FROM project_profiles
-      WHERE slug = ${slug}
-        AND public_status = 'published'
-        AND deleted_at IS NULL
+      SELECT p.*
+      FROM project_profiles AS p
+      INNER JOIN project_profile_owners AS owner
+        ON owner.project_id = p.project_id
+      INNER JOIN project_issuance_ledger_confirmations AS confirmation
+        ON confirmation.project_id = p.project_id
+       AND confirmation.owner_public_key = owner.owner_public_key
+       AND confirmation.network = p.network
+       AND confirmation.asset_code = p.asset_code
+       AND confirmation.issuer_public_key = p.issuer_public_key
+      WHERE p.slug = ${slug}
+        AND p.public_status = 'published'
+        AND p.network = 'testnet'
+        AND p.issuer_model = 'shared'
+        AND confirmation.result_success = true
+        AND confirmation.signed_envelope_xdr_sha256 IS NOT NULL
+        AND p.deleted_at IS NULL
       LIMIT 1
     `;
 
@@ -198,35 +211,61 @@ export class PostgresProjectProfileRepository {
     return row ? mapManagedProjectProfile(row) : null;
   }
 
-  async publishOwned(
+  async publishConfirmedOwned(
     projectId: string,
     ownerPublicKey: string,
+    confirmation: VerifiedSharedAssetProvenance,
     now = Date.now(),
   ): Promise<ManagedProjectProfile | null> {
-    if (!isValidProjectId(projectId)) {
+    if (!isValidProjectId(projectId) || confirmation.projectId !== projectId) {
       return null;
     }
-
     const owner = normalizeWalletPublicKey(ownerPublicKey);
+    if (confirmation.ownerPublicKey !== owner) return null;
+
+    const explorerUrl = `https://stellar.expert/explorer/testnet/tx/${confirmation.transactionHash}`;
     const [row] = await this.sql<ManagedProjectProfileRow[]>`
       UPDATE project_profiles AS p
       SET
         public_status = 'published',
+        issuer_public_key = ${confirmation.issuerPublicKey},
+        explorer_url = ${explorerUrl},
         updated_at = CASE
-          WHEN p.public_status = 'published' THEN p.updated_at
+          WHEN p.public_status = 'published'
+            AND p.issuer_public_key = ${confirmation.issuerPublicKey}
+            AND p.explorer_url = ${explorerUrl}
+          THEN p.updated_at
           ELSE ${new Date(now)}
         END
-      FROM project_profile_owners AS o
+      FROM project_profile_owners AS owner,
+           project_issuance_ledger_confirmations AS confirmed
       WHERE p.project_id = ${projectId}
-        AND o.project_id = p.project_id
-        AND o.owner_public_key = ${owner}
+        AND owner.project_id = p.project_id
+        AND owner.owner_public_key = ${owner}
+        AND confirmed.confirmation_id = ${confirmation.confirmationId}
+        AND confirmed.project_id = p.project_id
+        AND confirmed.owner_public_key = owner.owner_public_key
+        AND confirmed.network = 'testnet'
+        AND confirmed.asset_code = p.asset_code
+        AND confirmed.issuer_public_key = ${confirmation.issuerPublicKey}
+        AND confirmed.issuance_request_id = ${confirmation.issuanceRequestId}
+        AND confirmed.issuance_intent_fingerprint = ${confirmation.issuanceIntentFingerprint}
+        AND confirmed.transaction_hash = ${confirmation.transactionHash}
+        AND confirmed.signed_envelope_xdr_sha256 = ${confirmation.signedEnvelopeXdrSha256}
+        AND confirmed.ledger_sequence = ${confirmation.ledgerSequence}
+        AND confirmed.result_success = true
+        AND p.network = 'testnet'
+        AND p.issuer_model = 'shared'
         AND p.deleted_at IS NULL
-      RETURNING p.*, o.owner_public_key
+      RETURNING p.*, owner.owner_public_key
     `;
 
     return row ? mapManagedProjectProfile(row) : null;
   }
-  async archiveOwnedDraft(projectId: string, ownerPublicKey: string): Promise<boolean> {
+  async archiveOwnedDraft(
+    projectId: string,
+    ownerPublicKey: string,
+  ): Promise<boolean> {
     if (!isValidProjectId(projectId)) return false;
     const owner = normalizeWalletPublicKey(ownerPublicKey);
     const rows = await this.sql<{ project_id: string }[]>`
@@ -246,7 +285,6 @@ export class PostgresProjectProfileRepository {
     `;
     return rows.length === 1;
   }
-
 }
 
 function mapProjectProfile(row: ProjectProfileRow): ProjectProfile {
