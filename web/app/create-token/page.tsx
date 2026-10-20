@@ -1,5 +1,4 @@
 import { CreateSharedTokenForm } from "../../components/create-shared-token-form";
-import { TokenBuilderSteps } from "../../components/token-builder-steps";
 
 export function CreateTokenPage() {
   return (
@@ -19,7 +18,6 @@ export function CreateTokenPage() {
         <span>✓ Shared Issuer model explained</span>
       </div>
 
-      <TokenBuilderSteps />
       <CreateSharedTokenForm />
     </div>
   );
