@@ -7,7 +7,7 @@ import { useState, type ReactNode } from "react";
 
 import { NAV_ITEMS, UTILITY_NAV_ITEMS } from "../lib/navigation";
 import { WalletAuthControl } from "./wallet-auth-control";
-import { HeaderPreferencesMenu } from "./header-preferences-menu";
+import { ThemeToggle } from "./theme-toggle";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -68,11 +68,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="workspace">
         <header className="topbar">
           <div className="topbar-context">
-            <span className="topbar-context-label">Workspace</span>
-            <strong>Token Studio</strong>
+            <span className="topbar-context-label">Stellar workspace</span>
+            <strong>Build on Stellar</strong>
           </div>
           <div id="wallet-connect" className="topbar-actions">
-            <HeaderPreferencesMenu />
+            <span className="header-network-status" title="Mainnet is not available yet"><span className="header-network-dot" aria-hidden="true" />Testnet <span className="header-network-only">only</span></span>
+            <ThemeToggle />
             <WalletAuthControl />
           </div>
         </header>
@@ -80,14 +81,18 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main className="main-content">{children}</main>
 
         <footer className="site-footer">
-          <span>Orrylo · Stellar Testnet</span>
-          <nav aria-label="Prototype utilities">
-            {UTILITY_NAV_ITEMS.map((item) => (
-              <Link key={item.href} href={item.href}>
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          <div className="footer-brand">
+            <Image src="/brand/orrylo-logo.webp" alt="" width={36} height={36} />
+            <div><strong>Orrylo</strong><span>Build with confidence on Stellar.</span></div>
+          </div>
+          <div className="footer-end">
+            <nav aria-label="Site utilities">
+              {UTILITY_NAV_ITEMS.map((item) => (
+                <Link key={item.href} href={item.href}>{item.label}</Link>
+              ))}
+            </nav>
+            <span className="footer-network"><span className="header-network-dot" aria-hidden="true" /> Stellar Testnet · Early access</span>
+          </div>
         </footer>
       </div>
     </div>
