@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { NAV_ITEMS, UTILITY_NAV_ITEMS } from "../lib/navigation";
 import { WalletAuthControl } from "./wallet-auth-control";
@@ -11,7 +11,6 @@ import { ThemeToggle } from "./theme-toggle";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [menuOpen, setMenuOpen] = useState(false);
 
   if (pathname?.startsWith("/p/")) {
     return <>{children}</>;
@@ -35,25 +34,31 @@ export function AppShell({ children }: { children: ReactNode }) {
           </span>
         </Link>
 
-        <button
-          className="mobile-nav-toggle"
-          type="button"
-          aria-controls="orrylo-primary-navigation"
-          aria-expanded={menuOpen}
-          aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
-          onClick={() => setMenuOpen((open) => !open)}
-        >
-          <span aria-hidden="true">{menuOpen ? "✕" : "☰"}</span>
-          <span>{menuOpen ? "Close" : "Menu"}</span>
-        </button>
-
-        <nav id="orrylo-primary-navigation" className={`nav-list${menuOpen ? " nav-list-open" : ""}`} aria-label="Primary navigation">
-          {NAV_ITEMS.map((item) => (
-            <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className={`nav-link${pathname === item.href || (item.href !== "/" && pathname?.startsWith(`${item.href}/`)) ? " nav-link-active" : ""}`} aria-current={pathname === item.href ? "page" : undefined}>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <details className="mobile-nav-details">
+          <summary className="mobile-nav-toggle" aria-controls="orrylo-primary-navigation">
+            <span className="mobile-menu-closed-label" aria-hidden="true">☰ Menu</span>
+            <span className="mobile-menu-open-label" aria-hidden="true">✕ Close</span>
+          </summary>
+          <nav
+            id="orrylo-primary-navigation"
+            className="nav-list"
+            aria-label="Primary navigation"
+          >
+            {NAV_ITEMS.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={(event) =>
+                  event.currentTarget.closest("details")?.removeAttribute("open")
+                }
+                className={`nav-link${pathname === item.href || (item.href !== "/" && pathname?.startsWith(`${item.href}/`)) ? " nav-link-active" : ""}`}
+                aria-current={pathname === item.href ? "page" : undefined}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </details>
 
         <div id="wallet-connect" className="unified-header-actions">
           <span className="header-network-status" title="Mainnet is not available yet">
