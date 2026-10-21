@@ -172,6 +172,7 @@ function fixture(
     signerPublicKey?: string;
     expectedOperationalSignerPublicKey?: string;
     appendFailures?: number;
+    observedLedgerClosedAt?: string;
   } = {},
 ) {
   const store = new MemoryStore();
@@ -206,7 +207,9 @@ function fixture(
           network: "testnet" as const,
           networkPassphrase: SHARED_ISSUER_TESTNET_PASSPHRASE,
           observedLedger: 100,
-          observedLedgerClosedAt: new Date(NOW - 2_000).toISOString(),
+          observedLedgerClosedAt:
+            options.observedLedgerClosedAt ??
+            new Date(NOW - 2_000).toISOString(),
           baseFeeStroops: "100",
           baseReserveStroops: "5000000",
           preconditions: {
@@ -332,8 +335,12 @@ function buildVariantPlan(
   const assetCode = overrides.assetCode ?? "NOVA";
   const issuerPublicKey = overrides.issuerPublicKey ?? ISSUER;
   const destinationPublicKey = overrides.destinationPublicKey ?? OWNER;
-  const validFrom = overrides.validFrom ?? Math.floor(NOW / 1_000);
-  const validUntil = overrides.validUntil ?? validFrom + 300;
+  const validFrom = overrides.validFrom ?? Math.floor((NOW - 2_000) / 1_000);
+  const validUntil =
+    overrides.validUntil ??
+    (overrides.validFrom === undefined
+      ? Math.floor(NOW / 1_000) + 300
+      : validFrom + 300);
   return buildSharedIssuerIssuancePlan(
     {
       projectId: PROJECT_ID,
@@ -461,6 +468,37 @@ test("successful mocked path preserves the required order and returns durable co
   assert.equal(
     fx.store.confirmation?.transactionHash,
     fx.store.attempts[0]!.transactionHash,
+  );
+});
+
+test("uses the observed closed-ledger time instead of a newer server clock for transaction minTime", async () => {
+  const observedLedgerClosedAt = new Date(NOW - 7_000).toISOString();
+  const fx = fixture({ observedLedgerClosedAt });
+
+  const result = await fx.orchestrator.startOrResume(input);
+
+  assert.equal(result.status, "confirmed");
+  assert.equal(
+    fx.store.attempts[0]!.validFrom,
+    Math.floor(Date.parse(observedLedgerClosedAt) / 1_000),
+  );
+  assert.equal(fx.store.attempts[0]!.validUntil, Math.floor(NOW / 1_000) + 300);
+});
+
+test("keeps the full validity window when the observed ledger clock is newer than the server clock", async () => {
+  const observedLedgerClosedAt = new Date(NOW + 7_000).toISOString();
+  const fx = fixture({ observedLedgerClosedAt });
+
+  const result = await fx.orchestrator.startOrResume(input);
+  const observedLedgerClosedAtSeconds = Math.floor(
+    Date.parse(observedLedgerClosedAt) / 1_000,
+  );
+
+  assert.equal(result.status, "confirmed");
+  assert.equal(fx.store.attempts[0]!.validFrom, observedLedgerClosedAtSeconds);
+  assert.equal(
+    fx.store.attempts[0]!.validUntil,
+    observedLedgerClosedAtSeconds + 300,
   );
 });
 

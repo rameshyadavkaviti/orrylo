@@ -223,7 +223,11 @@ export class SharedIssuanceOrchestrator {
       }
 
       const now = this.dependencies.now?.() ?? Date.now();
-      const validFrom = Math.floor(now / 1_000);
+      const { validFrom, validUntil } = issuanceTimebounds(
+        preflight,
+        now,
+        this.dependencies.validitySeconds,
+      );
       try {
         plan = buildSharedIssuerIssuancePlan(
           {
@@ -235,7 +239,7 @@ export class SharedIssuanceOrchestrator {
             network: "testnet",
             networkPassphrase: preflight.networkPassphrase,
             validFrom,
-            validUntil: validFrom + this.dependencies.validitySeconds,
+            validUntil,
           },
           preflight.preconditions,
         );
@@ -419,7 +423,11 @@ export class SharedIssuanceOrchestrator {
       }
 
       const now = this.dependencies.now?.() ?? Date.now();
-      const validFrom = Math.floor(now / 1_000);
+      const { validFrom, validUntil } = issuanceTimebounds(
+        preflight,
+        now,
+        this.dependencies.validitySeconds,
+      );
       try {
         plan = buildSharedIssuerIssuancePlan(
           {
@@ -431,7 +439,7 @@ export class SharedIssuanceOrchestrator {
             network: "testnet",
             networkPassphrase: preflight.networkPassphrase,
             validFrom,
-            validUntil: validFrom + this.dependencies.validitySeconds,
+            validUntil,
           },
           preflight.preconditions,
         );
@@ -827,6 +835,24 @@ function confirmed(
 
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function issuanceTimebounds(
+  preflight: Pick<SharedIssuerTestnetPreflightResult, "observedLedgerClosedAt">,
+  nowMs: number,
+  validitySeconds: number,
+): { validFrom: number; validUntil: number } {
+  const observedLedgerClosedAtMs = Date.parse(preflight.observedLedgerClosedAt);
+  const validFrom = Math.floor(observedLedgerClosedAtMs / 1_000);
+  const serverNow = Math.floor(nowMs / 1_000);
+
+  return {
+    // A transaction must already be valid at the latest authoritative ledger
+    // checkpoint. Using the web server clock here can put minTime a few seconds
+    // ahead of Stellar's last closed ledger and cause an immediate tx_too_early.
+    validFrom,
+    validUntil: Math.max(serverNow, validFrom) + validitySeconds,
+  };
 }
 
 function safeFailureCode(error: unknown): string {
