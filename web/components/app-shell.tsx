@@ -34,6 +34,19 @@ export function AppShell({ children }: { children: ReactNode }) {
           </span>
         </Link>
 
+        <nav className="nav-list desktop-primary-nav" aria-label="Desktop primary navigation">
+          {NAV_ITEMS.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`nav-link${pathname === item.href || (item.href !== "/" && pathname?.startsWith(`${item.href}/`)) ? " nav-link-active" : ""}`}
+              aria-current={pathname === item.href ? "page" : undefined}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
         <details className="mobile-nav-details">
           <summary className="mobile-nav-toggle" aria-controls="orrylo-primary-navigation">
             <span className="mobile-menu-closed-label" aria-hidden="true">☰ Menu</span>
