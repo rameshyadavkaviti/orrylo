@@ -272,3 +272,13 @@
     display:block;padding:12px 14px;text-align:left;white-space:normal
   }
 }
+
+/* Desktop uses a regular nav; mobile uses native details/summary. */
+@media (min-width:901px) {
+  .sidebar .desktop-primary-nav{display:flex}
+  .sidebar .mobile-nav-details{display:none}
+}
+@media (max-width:900px) {
+  .sidebar .desktop-primary-nav{display:none !important}
+  .sidebar .mobile-nav-details{display:block}
+}
