@@ -850,7 +850,7 @@ function issuanceTimebounds(
     // A transaction must already be valid at the latest authoritative ledger
     // checkpoint. Railway's web-server clock can put minTime a few seconds ahead
     // of Stellar's last closed ledger and cause an immediate tx_too_early. The
-    // upper bound still retains the full configured validity window.
+    // upper bound retains the full configured validity window in either case.
     validFrom,
     validUntil: Math.max(serverNow, validFrom) + validitySeconds,
   };
