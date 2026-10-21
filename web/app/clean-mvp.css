@@ -245,3 +245,30 @@
   .sidebar .nav-list{grid-row:3}
   .unified-header-actions .wallet-authenticated{max-width:100%}
 }
+
+
+/* Single native disclosure for navigation. No React state or hydration needed. */
+.mobile-nav-details{display:contents}
+.mobile-nav-details>summary{display:none;list-style:none}
+.mobile-nav-details>summary::-webkit-details-marker{display:none}
+.mobile-menu-open-label{display:none}
+@media (max-width:900px) {
+  .sidebar{position:relative;z-index:30}
+  .sidebar .mobile-nav-details{display:block;grid-column:2;grid-row:1;justify-self:end;min-width:0}
+  .sidebar .mobile-nav-details>summary.mobile-nav-toggle{display:inline-flex;align-items:center;justify-content:center;min-height:42px;cursor:pointer;user-select:none}
+  .mobile-nav-details[open] .mobile-menu-closed-label{display:none}
+  .mobile-nav-details[open] .mobile-menu-open-label{display:inline}
+  .sidebar .mobile-nav-details:not([open])>.nav-list{display:none !important}
+  .sidebar .mobile-nav-details[open]>.nav-list{
+    display:flex !important;position:absolute;top:100%;left:12px;right:12px;
+    width:auto;max-width:none;min-width:0;z-index:50;
+    flex-direction:column;align-items:stretch;justify-content:flex-start;
+    gap:4px;margin:0;padding:10px;
+    border:1px solid var(--line);border-radius:14px;
+    background:var(--surface);box-shadow:0 20px 48px rgba(0,0,0,.22);
+    overflow:visible;
+  }
+  .sidebar .mobile-nav-details>.nav-list .nav-link{
+    display:block;padding:12px 14px;text-align:left;white-space:normal
+  }
+}
