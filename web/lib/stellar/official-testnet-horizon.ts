@@ -319,6 +319,15 @@ export class OfficialStellarTestnetHorizonSubmissionAdapter implements SharedIss
     }
 
     if (!response.ok) {
+      // Preserve a bounded, sanitized network error code for diagnosis. Never
+      // log the signed envelope, the raw Horizon payload, or signing material.
+      const resultCode = await readSubmissionFailureCode(response);
+      console.error("orrylo_testnet_issuance_submission_failed", {
+        transactionHash,
+        httpStatus: response.status,
+        resultCode,
+      });
+      // A rejection response must not bypass exact-hash reconciliation.
       throw reconciliationRequired(transactionHash, response.status);
     }
 
@@ -441,5 +450,32 @@ async function parseJson<T>(response: Response): Promise<T> {
       "malformed_horizon_response",
       "Official Horizon returned malformed JSON.",
     );
+  }
+}
+
+/**
+ * Horizon includes a structured transaction result code for rejected submissions.
+ * Whitelist only safe error identifiers; never trust or log raw response text.
+ */
+async function readSubmissionFailureCode(response: Response): Promise<string> {
+  try {
+    const body: unknown = await response.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return "unavailable";
+    }
+    const extras = (body as Record<string, unknown>).extras;
+    if (!extras || typeof extras !== "object" || Array.isArray(extras)) {
+      return "unavailable";
+    }
+    const resultCodes = (extras as Record<string, unknown>).result_codes;
+    if (!resultCodes || typeof resultCodes !== "object" || Array.isArray(resultCodes)) {
+      return "unavailable";
+    }
+    const code = (resultCodes as Record<string, unknown>).transaction;
+    return typeof code === "string" && /^tx_[a-z_]{1,48}$/.test(code)
+      ? code
+      : "unavailable";
+  } catch {
+    return "unavailable";
   }
 }
