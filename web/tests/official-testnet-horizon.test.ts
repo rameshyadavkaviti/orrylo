@@ -459,3 +459,42 @@ test("invalid signed XDR is rejected before any submission request", async () =>
   );
   assert.equal(calls, 0);
 });
+
+
+test("Horizon rejection logs only a validated transaction error code and never retries", async () => {
+  const fixture = signedEnvelopeFixture();
+  const original = console.error;
+  const records: unknown[][] = [];
+  console.error = (...args: unknown[]) => { records.push(args); };
+  let requests = 0;
+  try {
+    const fetchImpl = (async () => {
+      requests++;
+      return jsonResponse({
+        title: "Transaction Failed",
+        extras: {
+          result_codes: { transaction: "tx_bad_auth", operations: ["op_bad_auth"] },
+          envelope_xdr: "DO_NOT_LOG_ENVELOPE",
+        },
+      }, 400);
+    }) as typeof fetch;
+    await assert.rejects(
+      new OfficialStellarTestnetHorizonSubmissionAdapter(fetchImpl)
+        .submitSignedEnvelope(fixture.signedEnvelopeXdr),
+      (error: unknown) =>
+        error instanceof OfficialTestnetHorizonError &&
+        error.code === "submission_reconciliation_required",
+    );
+  } finally {
+    console.error = original;
+  }
+  assert.equal(requests, 1);
+  assert.equal(records.length, 1);
+  assert.equal(records[0]?.[0], "orrylo_testnet_issuance_submission_failed");
+  assert.deepEqual(records[0]?.[1], {
+    transactionHash: fixture.hash,
+    httpStatus: 400,
+    resultCode: "tx_bad_auth",
+  });
+  assert.doesNotMatch(JSON.stringify(records), /DO_NOT_LOG_ENVELOPE|op_bad_auth/);
+});
