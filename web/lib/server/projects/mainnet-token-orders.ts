@@ -44,7 +44,7 @@ export async function createMainnetTokenOrder(
 ): Promise<OrderRow> {
   if (!isValidProjectId(input.projectId) ||
       !/^(0|[1-9][0-9]*)(?:\.[0-9]{1,7})?$/.test(input.initialSupply) ||
-      input.initialSupply === "0") {
+      !/[1-9]/.test(input.initialSupply)) {
     throw new MainnetOrderError("invalid_order");
   }
   const owner = normalizeWalletPublicKey(input.ownerPublicKey);
