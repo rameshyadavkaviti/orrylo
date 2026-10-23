@@ -41,6 +41,8 @@ type SaveState =
   | { status: "idle" }
   | { status: "saving" }
   | { status: "trustline_required" }
+  | { status: "mainnet_order"; order: MainnetOrderView }
+  | { status: "mainnet_order_unavailable"; managePath: string }
   | { status: "persisting_intent" }
   | { status: "preparing_issuance" }
   | { status: "confirming" }
@@ -56,7 +58,20 @@ type SaveState =
   | { status: "wallet_session_changed" }
   | { status: "failure"; message: string };
 
-export function CreateSharedTokenForm() {
+interface MainnetOrderView {
+  orderId: string;
+  projectId: string;
+  treasury: string;
+  issuer: string;
+  memo: string;
+  priceXlm: string;
+  status: string;
+  expiresAt: string;
+  managePath: string;
+}
+
+export function CreateSharedTokenForm({ network = "testnet" }: { network?: "testnet" | "public" }) {
+  const isMainnet = network === "public";
   const [draft, setDraft] = useState<SharedAssetDraft>(INITIAL_DRAFT);
   const [errors, setErrors] = useState<SharedAssetDraftErrors>({});
   const [initialSupply, setInitialSupply] = useState("");
@@ -253,6 +268,10 @@ export function CreateSharedTokenForm() {
         window.location.assign(result.managePath);
         return;
       }
+      if (isMainnet) {
+        await createMainnetOrder(result.projectId, result.managePath, review.initialSupply);
+        return;
+      }
       setTrustlineStep({
         projectId: result.projectId,
         managePath: result.managePath,
@@ -270,6 +289,29 @@ export function CreateSharedTokenForm() {
       }
     } finally {
       savingRef.current = false;
+    }
+  }
+
+  async function createMainnetOrder(projectId: string, managePath: string, supply: string) {
+    try {
+      const response = await fetch("/api/mainnet/orders", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, initialSupply: supply }),
+      });
+      const result = await readJson<{ ok: boolean; orderId: string; treasury: string; issuer: string; memo: string; priceXlm: string; status: string; expiresAt: string }>(response);
+      if (!response.ok || !result?.ok) {
+        setSaveState({ status: "mainnet_order_unavailable", managePath });
+        return;
+      }
+      setSaveState({ status: "mainnet_order", order: {
+        orderId: result.orderId, projectId, treasury: result.treasury,
+        issuer: result.issuer, memo: result.memo, priceXlm: result.priceXlm,
+        status: result.status, expiresAt: result.expiresAt, managePath,
+      } });
+    } catch {
+      setSaveState({ status: "mainnet_order_unavailable", managePath });
     }
   }
 
@@ -391,6 +433,7 @@ export function CreateSharedTokenForm() {
   const isWorking = [
     "saving",
     "trustline_required",
+    "mainnet_order",
     "persisting_intent",
     "preparing_issuance",
     "confirming",
@@ -713,7 +756,7 @@ export function CreateSharedTokenForm() {
                 </div>
                 <div>
                   <dt>Target network</dt>
-                  <dd>Stellar Testnet only</dd>
+                  <dd>{isMainnet ? "Stellar Mainnet" : "Stellar Testnet only"}</dd>
                 </div>
                 <div>
                   <dt>Issuer authority</dt>
@@ -727,7 +770,7 @@ export function CreateSharedTokenForm() {
                 </div>
                 <div>
                   <dt>Fees</dt>
-                  <dd>Server-authoritative Testnet fee</dd>
+                  <dd>{isMainnet ? "10 XLM service price + separate Stellar fees/reserve" : "Server-authoritative Testnet fee"}</dd>
                 </div>
                 <div>
                   <dt>On-chain status</dt>
@@ -823,7 +866,9 @@ export function CreateSharedTokenForm() {
             >
               {saveState.status === "saving"
                 ? "Validating / saving…"
-                : saveState.status === "trustline_required"
+                : saveState.status === "mainnet_order"
+                  ? "Order prepared"
+                  : saveState.status === "trustline_required"
                   ? "Trustline approval required…"
                   : saveState.status === "persisting_intent"
                     ? "Saving immutable intent…"
@@ -831,7 +876,7 @@ export function CreateSharedTokenForm() {
                       ? "Preparing issuance…"
                       : saveState.status === "confirming"
                         ? "Confirming…"
-                        : "Create Token"}
+                        : isMainnet ? "Save project & prepare order" : "Create Token"}
             </button>
 
             {saveState.status === "needs_wallet" ||
@@ -851,6 +896,22 @@ export function CreateSharedTokenForm() {
               </div>
             ) : null}
 
+            {isMainnet && saveState.status === "mainnet_order" ? (
+              <section aria-label="Mainnet payment order" className="draft-step">
+                <h3>Mainnet order created</h3>
+                <p>Your project is saved. A payment order is recorded, but wallet payment and token issuance are not enabled yet. Do not send funds manually.</p>
+                <dl className="preview-facts">
+                  <div><dt>Price</dt><dd>{saveState.order.priceXlm} XLM</dd></div>
+                  <div><dt>Treasury (receive-only)</dt><dd><code>{saveState.order.treasury}</code></dd></div>
+                  <div><dt>Order memo</dt><dd><code>{saveState.order.memo}</code></dd></div>
+                  <div><dt>Status</dt><dd>{saveState.order.status}</dd></div>
+                </dl>
+                <p><a href={saveState.order.managePath}>Open saved project</a></p>
+              </section>
+            ) : null}
+            {isMainnet && saveState.status === "mainnet_order_unavailable" ? (
+              <p role="status">Your project was saved, but Mainnet orders are not yet available. No payment was requested. <a href={saveState.managePath}>Open saved project</a>.</p>
+            ) : null}
             {trustlineStep && saveState.status === "trustline_required" ? (
               <CustomerTrustlineControl
                 key={`${trustlineStep.projectId}:${trustlineStep.supply}`}
