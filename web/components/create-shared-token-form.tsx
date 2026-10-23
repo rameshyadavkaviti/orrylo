@@ -18,6 +18,11 @@ import {
   type TokenBuilderReview,
 } from "../lib/projects/token-builder-review";
 import { SHARED_ASSET_DOMAIN } from "../lib/product/constants";
+import {
+  clearSettledMainnetPayment,
+  readPendingMainnetPayment,
+  withMainnetPaymentHandoff,
+} from "../lib/projects/pending-mainnet-payment";
 import { validateInitialSupply } from "../lib/validation/initial-supply";
 import {
   type SharedAssetDraft,
@@ -42,6 +47,7 @@ type SaveState =
   | { status: "saving" }
   | { status: "trustline_required" }
   | { status: "mainnet_order"; order: MainnetOrderView }
+  | { status: "mainnet_paid"; order: MainnetOrderView }
   | { status: "mainnet_order_unavailable"; managePath: string }
   | { status: "persisting_intent" }
   | { status: "preparing_issuance" }
@@ -86,6 +92,8 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
   const [mainnetPreview, setMainnetPreview] = useState<{ expectedHash: string; amount: string; memo: string; destination: string; source: string } | null>(null);
   const [mainnetPreviewError, setMainnetPreviewError] = useState<string | null>(null);
   const [mainnetPreviewBusy, setMainnetPreviewBusy] = useState(false);
+  const [mainnetPayBusy, setMainnetPayBusy] = useState(false);
+  const [mainnetPaymentMessage, setMainnetPaymentMessage] = useState<string | null>(null);
   const [trustlineStep, setTrustlineStep] = useState<{
     projectId: string;
     managePath: string;
@@ -362,6 +370,86 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
       setMainnetPreviewError("Payment preview is temporarily unavailable. No funds were moved.");
     } finally {
       setMainnetPreviewBusy(false);
+    }
+  }
+
+  async function reconcileMainnetPayment(order: MainnetOrderView) {
+    const pending = readPendingMainnetPayment(window.localStorage, order.orderId);
+    if (pending.kind !== "pending") {
+      setMainnetPaymentMessage("No recoverable payment hash was found in this browser. Do not make another payment until the order is checked.");
+      return;
+    }
+    setMainnetPayBusy(true);
+    try {
+      const response = await fetch(`/api/mainnet/orders/${encodeURIComponent(order.orderId)}/payment`, {
+        method: "POST", credentials: "same-origin", cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transactionHash: pending.value.transactionHash }),
+      });
+      const result = await readJson<{ok: boolean; status?: string}>(response);
+      if (response.ok && result?.ok && (result.status === "paid" || result.status === "already_paid")) {
+        clearSettledMainnetPayment(window.localStorage, order.orderId, pending.value.transactionHash);
+        setSaveState({status: "mainnet_paid", order});
+        setMainnetPaymentMessage("Payment confirmed on Mainnet and recorded for this order. Token issuance is not enabled yet.");
+      } else {
+        setMainnetPaymentMessage("Payment not yet confirmed or requires reconciliation. Orrylo will not request another payment; retry verification later.");
+      }
+    } catch {
+      setMainnetPaymentMessage("Network result is unknown. Your exact payment hash is retained; do not pay again.");
+    } finally {
+      setMainnetPayBusy(false);
+    }
+  }
+
+  async function payMainnetOrder(order: MainnetOrderView) {
+    if (mainnetPayBusy) return;
+    setMainnetPayBusy(true);
+    setMainnetPaymentMessage(null);
+    try {
+      if (readPendingMainnetPayment(window.localStorage, order.orderId).kind !== "none") {
+        setMainnetPaymentMessage("A payment attempt is already saved. Reconcile that exact hash before any new wallet action.");
+        return;
+      }
+      const response = await fetch(`/api/mainnet/orders/${encodeURIComponent(order.orderId)}/prepare`, {
+        method: "POST", credentials: "same-origin", cache: "no-store",
+      });
+      const plan = await readJson<{ok: boolean; xdr: string; expectedHash: string; source: string; destination: string; amount: string; memo: string; network: string}>(response);
+      if (!response.ok || !plan?.ok) {
+        setMainnetPaymentMessage("Customer payment is not enabled yet. No wallet transaction was started.");
+        return;
+      }
+      if (plan.network !== "public" || plan.amount !== "10.0000000" ||
+          plan.destination !== order.treasury || plan.memo !== order.memo ||
+          !/^G[A-Z2-7]{55}$/.test(plan.source) ||
+          !/^[0-9a-f]{64}$/.test(plan.expectedHash) || !plan.xdr) {
+        setMainnetPaymentMessage("The payment transaction did not match this order. No wallet transaction was started.");
+        return;
+      }
+      const handedOff = await withMainnetPaymentHandoff(
+        window.localStorage,
+        {version: 1, network: "public", orderId: order.orderId, source: plan.source,
+         transactionHash: plan.expectedHash, unsignedXdr: plan.xdr},
+        navigator.locks,
+        async () => {
+          const { default: albedo } = await import("@albedo-link/intent");
+          const outcome = await albedo.tx({
+            xdr: plan.xdr, pubkey: plan.source, network: "public", submit: true,
+            description: "Pay exactly 10 XLM to Orrylo for this saved token order",
+          });
+          if (outcome.tx_hash?.toLowerCase() !== plan.expectedHash || outcome.network !== "public") {
+            throw new Error("unknown_wallet_outcome");
+          }
+        },
+      );
+      if (handedOff) {
+        await reconcileMainnetPayment(order);
+      } else {
+        setMainnetPaymentMessage("Another tab or an existing pending payment prevents a new wallet request.");
+      }
+    } catch {
+      setMainnetPaymentMessage("Payment submission may be unknown. The saved hash must be reconciled; do not pay again.");
+    } finally {
+      setMainnetPayBusy(false);
     }
   }
 
@@ -952,7 +1040,7 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
             {isMainnet && saveState.status === "mainnet_order" ? (
               <section aria-label="Mainnet payment order" className="draft-step">
                 <h3>Mainnet order created</h3>
-                <p>Your project is saved. A payment order is recorded, but wallet payment and token issuance are not enabled yet. Do not send funds manually.</p>
+                <p>Your project and payment order are saved. Payment opens only when the Mainnet launch gates are explicitly enabled. Do not send funds manually.</p>
                 <dl className="preview-facts">
                   <div><dt>Price</dt><dd>{saveState.order.priceXlm} XLM</dd></div>
                   <div><dt>Treasury (receive-only)</dt><dd><code>{saveState.order.treasury}</code></dd></div>
@@ -980,7 +1068,21 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
                     <div><dt>Safety</dt><dd>No wallet opened, no signature requested, and no transaction submitted.</dd></div>
                   </dl>
                 ) : null}
+                <div className="builder-actions">
+                  <button type="button" className="button" disabled={mainnetPayBusy}
+                    onClick={() => void payMainnetOrder(saveState.order)}>
+                    {mainnetPayBusy ? "Opening or verifying wallet…" : "Pay 10 XLM with Albedo"}
+                  </button>
+                  <button type="button" className="button button-secondary" disabled={mainnetPayBusy}
+                    onClick={() => void reconcileMainnetPayment(saveState.order)}>
+                    Verify saved payment hash
+                  </button>
+                </div>
+                {mainnetPaymentMessage ? <p role="status">{mainnetPaymentMessage}</p> : null}
               </section>
+            ) : null}
+            {isMainnet && saveState.status === "mainnet_paid" ? (
+              <p role="status">Payment is confirmed for this order. Mainnet token issuance remains gated. <a href={saveState.order.managePath}>Open saved project</a>.</p>
             ) : null}
             {isMainnet && saveState.status === "mainnet_order_unavailable" ? (
               <p role="status">Your project was saved, but Mainnet orders are not yet available. No payment was requested. <a href={saveState.managePath}>Open saved project</a>.</p>
