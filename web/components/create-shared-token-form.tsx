@@ -778,8 +778,9 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
                 </div>
               </dl>
               <p className="builder-boundary-note" role="status">
-                Create Token saves the Project Profile and immutable issuance
-                intent as one journey, then starts the reviewed Testnet path.
+                {isMainnet
+                  ? "Saving creates a project and prepares a 10 XLM Mainnet order. Payment and token issuance remain unavailable until activation."
+                  : "Create Token saves the Project Profile and immutable issuance intent as one journey, then starts the reviewed Testnet path."}
               </p>
             </section>
           ) : (
@@ -885,10 +886,12 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
                 <p>
                   {saveState.status === "wallet_session_changed"
                     ? "Your wallet session changed before the project could be saved. Reconnect or confirm the wallet that completed this save flow, then retry."
-                    : "Connect with Albedo to own this project and continue the reviewed Create Token request."}
+                    : isMainnet
+                      ? "Connect with Albedo to own your project and prepare the Mainnet order."
+                      : "Connect with Albedo to own this project and continue the reviewed Create Token request."}
                 </p>
                 <WalletAuthControl
-                  connectLabel="Connect wallet & create token"
+                  connectLabel={isMainnet ? "Connect wallet & save project" : "Connect wallet & create token"}
                   onAuthenticated={(publicKey) =>
                     void continueAfterAuthentication(publicKey)
                   }
