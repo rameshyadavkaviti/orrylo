@@ -19,7 +19,7 @@ This is the approved Mainnet business journey. **Existing Testnet issuance must 
 - The Shared Issuer is Orrylo infrastructure; explicitly disclose that it is not user-owned.
 - Shared asset identity is `asset code + issuer`, and codes must not collide under that issuer.
 - A durable project identifier must be distinct from changeable public URL/slug and issuer metadata location.
-- RYLO is **out of scope** for the active product, onboarding, pricing, payment and rewards. Historical RYLO policy is not active product authority. Do not infer an RYLO dependency or reintroduce it without a new explicit owner decision.
+- RYLO is **out of scope** for the active product, onboarding, pricing, payment and rewards. It is separately governed as an independent tradable Stellar asset under [RYLO_POLICY.md](RYLO_POLICY.md) v2. That policy does not introduce an RYLO dependency into customer token creation or authorize Mainnet financial operations.
 - No fictitious token creation, unverifiable publication claims or implied Mainnet deployment.
 
 ## Minimum security invariants
@@ -36,7 +36,7 @@ This is the approved Mainnet business journey. **Existing Testnet issuance must 
 For customer-created Mainnet assets, **there is no free creation quota**: each creation, including the first, is priced at **10 XLM** payable on Mainnet only. No RYLO rewards, purchases, trustlines or other RYLO steps are part of the active customer journey. The binding requirements for order/payment verification, safe recovery/refunds, abuse protection and activation tests are in [MAINNET_PRICING_POLICY.md](MAINNET_PRICING_POLICY.md). This is product policy, not permission to enable Mainnet processing, modify signers or send transactions. The current Testnet path remains unaffected.
 
 ## Deferred but discoverable
-RYLO-related features and historical economics are excluded from active scope. Complex issuer multisig/governance, Dedicated Issuer contract control, Soroban templates, Mainnet provisioning, custom-domain automation and speculative anti-abuse infrastructure are deferred. Historical material is retained only as archival reference, not active requirements. Existing approved policy and implementation evidence remain in the permanent legacy branch for explicit reevaluation when needed.
+RYLO-related features remain excluded from the active customer product; the independently approved RYLO v2 policy is documented separately and not yet activated. Complex issuer multisig/governance, Dedicated Issuer contract control, Soroban templates, Mainnet provisioning, custom-domain automation and speculative anti-abuse infrastructure are deferred. Historical material is retained only as archival reference, not active requirements. Existing approved policy and implementation evidence remain in the permanent legacy branch for explicit reevaluation when needed.
 
 ## Source precedence
 Current rebuild code/tests and reproducible deployment facts govern implementation status. **This file is the canonical source for current product intent and takes precedence over previous conversation decisions, assistant recollections, and historical RYLO policy.** Technical layout is in `ARCHITECTURE.md`, milestone gates in `ROADMAP.md`, and payment safety requirements in `MAINNET_PRICING_POLICY.md`. Current code/tests and verifiable deployment facts determine what is actually implemented. Historical policies and the predecessor remain in `legacy/pre-rebuild` as archive only.
