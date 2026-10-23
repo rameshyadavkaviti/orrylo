@@ -390,7 +390,8 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
       if (response.ok && result?.ok && (result.status === "paid" || result.status === "already_paid")) {
         clearSettledMainnetPayment(window.localStorage, order.orderId, pending.value.transactionHash);
         setSaveState({status: "mainnet_paid", order});
-        setMainnetPaymentMessage("Payment confirmed on Mainnet and recorded for this order. Token issuance is not enabled yet.");
+        setMainnetPaymentMessage("Payment confirmed on Mainnet. Continuing to trustline and issuance…");
+        window.location.assign(order.managePath);
       } else {
         setMainnetPaymentMessage("Payment not yet confirmed or requires reconciliation. Orrylo will not request another payment; retry verification later.");
       }

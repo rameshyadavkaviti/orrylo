@@ -9,3 +9,4 @@
 /web/.env.*.local
 
 /web/.signer-dist/
+/web/tsconfig.tsbuildinfo

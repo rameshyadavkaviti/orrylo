@@ -25,6 +25,11 @@ const EXPECTED_TABLES = [
   "project_issuance_ledger_confirmations",
   "project_customer_change_trust_handoffs",
   "project_customer_change_trust_resolutions",
+  "mainnet_token_orders",
+  "mainnet_trustline_attempts",
+  "mainnet_issuance_attempts",
+  "mainnet_issuance_confirmations",
+  "mainnet_metadata_publications",
 ] as const;
 
 const EXPECTED_CONSTRAINTS = [

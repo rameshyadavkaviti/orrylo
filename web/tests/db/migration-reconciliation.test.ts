@@ -24,6 +24,10 @@ const ALL_MIGRATIONS = [
   "010_mvp_lite_db_security_hardening.sql",
   "011_shared_issuance_signing_mode.sql",
   "012_customer_change_trust_interlock.sql",
+  "013_mainnet_token_orders.sql",
+  "014_archive_unissued_drafts.sql",
+  "015_mainnet_payment_plan_reservation.sql",
+  "016_mainnet_token_issuance.sql",
 ];
 
 if (!TEST_DATABASE_URL) {
@@ -169,10 +173,7 @@ if (!TEST_DATABASE_URL) {
       `;
 
       const upgraded = await migrateDatabase(sql, directory);
-      assert.deepEqual(upgraded.applied, [
-        "011_shared_issuance_signing_mode.sql",
-        "012_customer_change_trust_interlock.sql",
-      ]);
+      assert.deepEqual(upgraded.applied, ALL_MIGRATIONS.slice(10));
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 10));
 
       const [appAcl] = await sql<
@@ -384,15 +385,7 @@ if (!TEST_DATABASE_URL) {
         SELECT name, checksum FROM schema_migrations ORDER BY name
       `;
       const upgraded = await migrateDatabase(sql, directory);
-      assert.deepEqual(upgraded.applied, [
-        "006_project_metadata_publications.sql",
-        "007_testnet_project_issuance.sql",
-        "008_gate_a_confirmation_provenance.sql",
-        "009_signed_envelope_digest.sql",
-        "010_mvp_lite_db_security_hardening.sql",
-        "011_shared_issuance_signing_mode.sql",
-        "012_customer_change_trust_interlock.sql",
-      ]);
+      assert.deepEqual(upgraded.applied, ALL_MIGRATIONS.slice(5));
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 5));
       const after = await sql<{ name: string; checksum: string }[]>`
         SELECT name, checksum FROM schema_migrations ORDER BY name
@@ -453,14 +446,7 @@ if (!TEST_DATABASE_URL) {
       `;
 
       const upgraded = await migrateDatabase(sql, directory);
-      assert.deepEqual(upgraded.applied, [
-        "007_testnet_project_issuance.sql",
-        "008_gate_a_confirmation_provenance.sql",
-        "009_signed_envelope_digest.sql",
-        "010_mvp_lite_db_security_hardening.sql",
-        "011_shared_issuance_signing_mode.sql",
-        "012_customer_change_trust_interlock.sql",
-      ]);
+      assert.deepEqual(upgraded.applied, ALL_MIGRATIONS.slice(6));
       const [legacy] = await sql<
         {
           confirmation_id: string | null;
@@ -493,13 +479,7 @@ if (!TEST_DATABASE_URL) {
         SELECT name, checksum FROM schema_migrations ORDER BY name
       `;
       const upgraded = await migrateDatabase(sql, directory);
-      assert.deepEqual(upgraded.applied, [
-        "008_gate_a_confirmation_provenance.sql",
-        "009_signed_envelope_digest.sql",
-        "010_mvp_lite_db_security_hardening.sql",
-        "011_shared_issuance_signing_mode.sql",
-        "012_customer_change_trust_interlock.sql",
-      ]);
+      assert.deepEqual(upgraded.applied, ALL_MIGRATIONS.slice(7));
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 7));
       const after = await sql<{ name: string; checksum: string }[]>`
         SELECT name, checksum FROM schema_migrations ORDER BY name
@@ -521,12 +501,7 @@ if (!TEST_DATABASE_URL) {
         SELECT name, checksum FROM schema_migrations ORDER BY name
       `;
       const upgraded = await migrateDatabase(sql, directory);
-      assert.deepEqual(upgraded.applied, [
-        "009_signed_envelope_digest.sql",
-        "010_mvp_lite_db_security_hardening.sql",
-        "011_shared_issuance_signing_mode.sql",
-        "012_customer_change_trust_interlock.sql",
-      ]);
+      assert.deepEqual(upgraded.applied, ALL_MIGRATIONS.slice(8));
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 8));
       const after = await sql<{ name: string; checksum: string }[]>`
         SELECT name, checksum FROM schema_migrations ORDER BY name
@@ -771,11 +746,7 @@ if (!TEST_DATABASE_URL) {
         SELECT name, checksum FROM schema_migrations ORDER BY name
       `;
       const upgraded = await migrateDatabase(sql, directory);
-      assert.deepEqual(upgraded.applied, [
-        "010_mvp_lite_db_security_hardening.sql",
-        "011_shared_issuance_signing_mode.sql",
-        "012_customer_change_trust_interlock.sql",
-      ]);
+      assert.deepEqual(upgraded.applied, ALL_MIGRATIONS.slice(9));
       assert.deepEqual(upgraded.verified, ALL_MIGRATIONS.slice(0, 9));
 
       const afterMigrations = await sql<{ name: string; checksum: string }[]>`

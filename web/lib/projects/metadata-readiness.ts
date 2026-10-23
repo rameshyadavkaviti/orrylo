@@ -90,7 +90,8 @@ export function buildMetadataReadiness(
     project.issuerModel !== "shared" ||
     project.metadataHome === SHARED_ASSET_DOMAIN;
   const sharedIssuerSupported = project.issuerModel === "shared";
-  const testnetSupported = project.network === "testnet";
+  const networkSupported =
+    project.network === "testnet" || project.network === "public";
   const issuerLinked = hasValidStellarIssuer(project.issuerPublicKey);
   const generatedToml = generateProjectCurrencyToml(project);
   const metadataConfigured =
@@ -100,7 +101,7 @@ export function buildMetadataReadiness(
     assetCodeValid &&
     issuerLinked &&
     sharedIssuerSupported &&
-    testnetSupported;
+    networkSupported;
   const publishedContentCurrent = Boolean(
     publication &&
     generatedToml &&
@@ -113,7 +114,7 @@ export function buildMetadataReadiness(
   if (!metadataHomeConfigured || !sharedHostCompatible)
     blockers.push("metadata_home");
   if (!sharedIssuerSupported) blockers.push("issuer_model");
-  if (!testnetSupported) blockers.push("network");
+  if (!networkSupported) blockers.push("network");
   if (!issuerLinked) blockers.push("issuer_linkage");
 
   const items: MetadataReadinessItem[] = [
@@ -196,11 +197,17 @@ export function buildMetadataReadiness(
     {
       key: "network",
       label: "Publication network",
-      state: testnetSupported ? "ready" : "unsupported",
-      value: testnetSupported ? "Testnet" : "Not supported",
-      detail: testnetSupported
-        ? "This bounded publication path is Testnet-only."
-        : "Mainnet publication is intentionally unavailable in this slice.",
+      state: networkSupported ? "ready" : "unsupported",
+      value:
+        project.network === "public"
+          ? "Mainnet"
+          : project.network === "testnet"
+            ? "Testnet"
+            : "Not supported",
+      detail:
+        project.network === "public"
+          ? "Mainnet Shared Issuer metadata is published only after verified issuance."
+          : "Testnet Shared Issuer metadata is published only after verified issuance.",
     },
     {
       key: "issuer_linkage",

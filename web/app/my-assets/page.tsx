@@ -11,6 +11,11 @@ import {
   createServerAutomaticPublicationService,
   createServerMetadataPublicationRepository,
 } from "../../lib/server/projects/automatic-publication-service";
+import { PostgresMainnetCreationStore } from "../../lib/server/projects/mainnet-creation-store";
+import {
+  createServerMainnetPublicationService,
+  PostgresMainnetPublicationBackend,
+} from "../../lib/server/projects/mainnet-publication-service";
 import { TestnetIssuanceService } from "../../lib/server/projects/testnet-issuance-service";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +53,9 @@ export async function MyAssetsPage() {
   const sql = getDatabaseClient();
   const repository = new PostgresProjectProfileRepository(sql);
   const projects = await repository.listOwnedByWallet(session.publicKey);
+  const mainnetStore = new PostgresMainnetCreationStore(sql);
+  const mainnetPublication = new PostgresMainnetPublicationBackend(sql);
+  const mainnetReconciliation = createServerMainnetPublicationService(sql);
   const publicationRepository = (() => {
     try {
       return createServerMetadataPublicationRepository(sql);
@@ -64,6 +72,44 @@ export async function MyAssetsPage() {
   })();
   const projectStates = await Promise.all(
     projects.map(async (project) => {
+      if (project.network === "public") {
+        let mainnetOrder = null;
+        let publication = null;
+        let currentProject = project;
+        try {
+          mainnetOrder = await mainnetStore.getOwned(
+            project.projectId,
+            session.publicKey,
+          );
+          if (mainnetOrder?.status === "issued") {
+            try {
+              await mainnetReconciliation.reconcile(
+                project.projectId,
+                session.publicKey,
+              );
+            } catch {
+              // Issuance is final; publication remains independently retryable.
+            }
+            currentProject =
+              (await repository.findOwnedById(
+                project.projectId,
+                session.publicKey,
+              )) ?? project;
+          }
+          publication = await mainnetPublication.getPublication(
+            project.projectId,
+            session.publicKey,
+          );
+        } catch {
+          // Missing migration/config is reported as pending without inventing issuance.
+        }
+        return {
+          project: currentProject,
+          issuance: null,
+          mainnetOrder,
+          publication,
+        };
+      }
       const issuance = await new TestnetIssuanceService(sql, {
         network: project.network,
         approvedIssuerPublicKey:
@@ -89,7 +135,7 @@ export async function MyAssetsPage() {
           // A status read failure must not hide other issued projects.
         }
       }
-      return { project, issuance, publication };
+      return { project, issuance, mainnetOrder: null, publication };
     }),
   );
 
@@ -120,8 +166,9 @@ export async function MyAssetsPage() {
           className="card-grid asset-project-grid"
           aria-label="Your projects"
         >
-          {projectStates.map(({ project, issuance, publication }) => {
-            const issued = issuance?.status === "confirmed";
+          {projectStates.map(({ project, issuance, mainnetOrder, publication }) => {
+            const issued =
+              issuance?.status === "confirmed" || mainnetOrder?.status === "issued";
             const metadataVerified = Boolean(
               publication?.reachable && publication.verifiedAt,
             );
@@ -162,7 +209,7 @@ export async function MyAssetsPage() {
                   >
                     View project <span aria-hidden="true">↗</span>
                   </Link>
-                  {!issued && project.publicStatus === "draft" ? (
+                  {!issued && !mainnetOrder && project.publicStatus === "draft" ? (
                     <DeleteDraftButton
                       projectId={project.projectId}
                       projectName={project.displayName}

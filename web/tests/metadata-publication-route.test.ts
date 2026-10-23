@@ -45,7 +45,7 @@ function publication(
   };
 }
 
-test("public shared TOML route aggregates only canonical Testnet publications deterministically", async () => {
+test("public shared TOML route aggregates canonical Testnet and Mainnet publications deterministically", async () => {
   const alpha = publication({
     projectId: "00000000-0000-4000-8000-000000000001",
     assetCode: "ALPHA",
@@ -82,8 +82,8 @@ test("public shared TOML route aggregates only canonical Testnet publications de
     response.headers.get("x-orrylo-metadata-home"),
     "assets.orrylo.com",
   );
-  assert.equal(body, `${alpha.currencyToml}\n${nova.currencyToml}`);
-  assert.doesNotMatch(body, /WRONG|MAIN/);
+  assert.equal(body, `${alpha.currencyToml}\n${mainnet.currencyToml}\n${nova.currencyToml}`);
+  assert.doesNotMatch(body, /WRONG/);
 });
 
 test("root-domain TOML publishes only the canonical RYLO Testnet identity", async () => {

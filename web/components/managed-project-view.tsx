@@ -10,21 +10,28 @@ import {
   projectPublicPath,
 } from "../lib/projects/project-profile";
 import { ManagedProjectMetadataForm } from "./managed-project-metadata-form";
+import { MainnetOrderControl } from "./mainnet-order-control";
+import type { MainnetOrderRecord } from "../lib/server/projects/mainnet-creation-store";
 
 export function ManagedProjectView({
   project,
   publication = null,
   issuance = null,
+  mainnetOrder = null,
   intentConfigurationAvailable = false,
+  mainnetActivationEnabled = false,
 }: {
   project: ManagedProjectProfile;
   publication?: MetadataPublicationState | null;
   issuance?: TestnetIssuanceRecord | null;
+  mainnetOrder?: MainnetOrderRecord | null;
   intentConfigurationAvailable?: boolean;
+  mainnetActivationEnabled?: boolean;
 }) {
   const publicPath = projectPublicPath(project.slug);
   const published = project.publicStatus === "published";
-  const issued = issuance?.status === "confirmed";
+  const issued =
+    issuance?.status === "confirmed" || mainnetOrder?.status === "issued";
   const readiness = buildMetadataReadiness(project, publication);
   const metadataBadge = !issued
     ? "Draft"
@@ -142,7 +149,7 @@ export function ManagedProjectView({
             <div>
               <dt>Stellar asset</dt>
               <dd>
-                {issuance?.status === "confirmed"
+                {issued
                   ? "Ledger verified"
                   : "Not confirmed"}
               </dd>
@@ -157,11 +164,18 @@ export function ManagedProjectView({
         </article>
       </section>
 
-      <TestnetIssuanceSection
-        project={project}
-        issuance={issuance}
-        intentConfigurationAvailable={intentConfigurationAvailable}
-      />
+      {project.network === "testnet" ? (
+        <TestnetIssuanceSection
+          project={project}
+          issuance={issuance}
+          intentConfigurationAvailable={intentConfigurationAvailable}
+        />
+      ) : mainnetOrder ? (
+        <MainnetOrderControl
+          initialOrder={mainnetOrder}
+          activationEnabled={mainnetActivationEnabled}
+        />
+      ) : null}
 
       <ManagedProjectMetadataForm
         projectId={project.projectId}

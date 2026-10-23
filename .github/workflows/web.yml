@@ -11,6 +11,7 @@ on:
   push:
     branches:
       - main
+      - rebuild/clean-mvp
     paths:
       - "web/**"
       - ".github/workflows/web.yml"

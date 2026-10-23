@@ -121,19 +121,36 @@ export class PostgresProjectProfileRepository {
       FROM project_profiles AS p
       INNER JOIN project_profile_owners AS owner
         ON owner.project_id = p.project_id
-      INNER JOIN project_issuance_ledger_confirmations AS confirmation
-        ON confirmation.project_id = p.project_id
-       AND confirmation.owner_public_key = owner.owner_public_key
-       AND confirmation.network = p.network
-       AND confirmation.asset_code = p.asset_code
-       AND confirmation.issuer_public_key = p.issuer_public_key
       WHERE p.slug = ${slug}
         AND p.public_status = 'published'
-        AND p.network = 'testnet'
         AND p.issuer_model = 'shared'
-        AND confirmation.result_success = true
-        AND confirmation.signed_envelope_xdr_sha256 IS NOT NULL
         AND p.deleted_at IS NULL
+        AND (
+          (
+            p.network = 'testnet'
+            AND EXISTS (
+              SELECT 1 FROM project_issuance_ledger_confirmations AS confirmation
+              WHERE confirmation.project_id = p.project_id
+                AND confirmation.owner_public_key = owner.owner_public_key
+                AND confirmation.network = p.network
+                AND confirmation.asset_code = p.asset_code
+                AND confirmation.issuer_public_key = p.issuer_public_key
+                AND confirmation.result_success = true
+                AND confirmation.signed_envelope_xdr_sha256 IS NOT NULL
+            )
+          ) OR (
+            p.network = 'public'
+            AND EXISTS (
+              SELECT 1 FROM mainnet_issuance_confirmations AS confirmation
+              WHERE confirmation.project_id = p.project_id
+                AND confirmation.owner_public_key = owner.owner_public_key
+                AND confirmation.network = p.network
+                AND confirmation.asset_code = p.asset_code
+                AND confirmation.issuer_public_key = p.issuer_public_key
+                AND confirmation.signed_envelope_xdr_sha256 IS NOT NULL
+            )
+          )
+        )
       LIMIT 1
     `;
 
@@ -281,6 +298,7 @@ export class PostgresProjectProfileRepository {
         AND NOT EXISTS (SELECT 1 FROM project_issuance_intents AS i WHERE i.project_id = p.project_id)
         AND NOT EXISTS (SELECT 1 FROM project_customer_change_trust_handoffs AS h WHERE h.project_id = p.project_id)
         AND NOT EXISTS (SELECT 1 FROM project_metadata_publications AS m WHERE m.project_id = p.project_id)
+        AND NOT EXISTS (SELECT 1 FROM mainnet_token_orders AS o WHERE o.project_id = p.project_id)
       RETURNING p.project_id
     `;
     return rows.length === 1;

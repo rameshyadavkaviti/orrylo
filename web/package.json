@@ -13,6 +13,7 @@
     "signer:build": "tsc -p signer-service/tsconfig.json",
     "signer:start": "node .signer-dist/signer-service/server.js",
     "signer:mainnet:start": "node .signer-dist/signer-service/mainnet-server.js",
+    "signer:mainnet:verify-connectivity": "node scripts/verify-mainnet-signer-connectivity.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts tests/*.test.tsx",

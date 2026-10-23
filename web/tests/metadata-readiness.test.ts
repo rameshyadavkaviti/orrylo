@@ -160,7 +160,7 @@ test("readiness keeps an older reachable publication truthful after Project Prof
   assert.equal(published?.value, "Yes · update available");
 });
 
-test("Dedicated Issuer and Mainnet projects are explicit publication blockers", () => {
+test("Dedicated Issuer remains blocked while Shared Issuer Mainnet is publishable", () => {
   const dedicated = buildMetadataReadiness({
     ...BASE,
     issuerModel: "dedicated",
@@ -175,6 +175,10 @@ test("Dedicated Issuer and Mainnet projects are explicit publication blockers", 
     network: "public",
     issuerPublicKey: ISSUER,
   });
-  assert.equal(mainnet.publicationReady, false);
-  assert.ok(mainnet.blockers.includes("network"));
+  assert.equal(mainnet.publicationReady, true);
+  assert.equal(mainnet.blockers.includes("network"), false);
+  assert.equal(
+    mainnet.items.find((item) => item.key === "network")?.value,
+    "Mainnet",
+  );
 });

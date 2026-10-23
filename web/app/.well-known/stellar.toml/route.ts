@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import {
-  renderSharedTestnetToml,
+  renderSharedAssetToml,
   type MetadataPublicationState,
 } from "../../../lib/projects/metadata-publication";
 import { SHARED_ASSET_DOMAIN } from "../../../lib/product/constants";
@@ -11,6 +11,7 @@ import {
 } from "../../../lib/rylo/testnet-metadata";
 import { getDatabaseClient } from "../../../lib/server/persistence/database";
 import { createServerMetadataPublicationRepository } from "../../../lib/server/projects/automatic-publication-service";
+import { PostgresMainnetPublicationBackend } from "../../../lib/server/projects/mainnet-publication-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,11 +21,21 @@ export interface SharedTomlRouteDependencies {
 }
 
 export async function GET(request: Request) {
+  const sql = getDatabaseClient();
   return handleStellarTomlRequest(request, {
-    listPublications: () =>
-      createServerMetadataPublicationRepository(
-        getDatabaseClient(),
-      ).listSharedTestnetPublications(),
+    async listPublications() {
+      const testnet = await createServerMetadataPublicationRepository(
+        sql,
+      ).listSharedTestnetPublications();
+      let mainnet: MetadataPublicationState[] = [];
+      try {
+        mainnet = await new PostgresMainnetPublicationBackend(sql).listPublications();
+      } catch {
+        // Migration 016 is an explicit activation step. Until it is applied,
+        // preserve the already-published Testnet namespace.
+      }
+      return [...testnet, ...mainnet];
+    },
   });
 }
 
@@ -63,7 +74,7 @@ export async function handleSharedTomlRequest(
 ) {
   const publications = await dependencies.listPublications();
   return tomlResponse(
-    renderSharedTestnetToml(publications),
+    renderSharedAssetToml(publications),
     SHARED_ASSET_DOMAIN,
   );
 }

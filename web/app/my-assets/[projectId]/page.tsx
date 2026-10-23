@@ -10,7 +10,16 @@ import {
   createServerAutomaticPublicationService,
   createServerMetadataPublicationRepository,
 } from "../../../lib/server/projects/automatic-publication-service";
+import { PostgresMainnetCreationStore } from "../../../lib/server/projects/mainnet-creation-store";
+import {
+  createServerMainnetPublicationService,
+  PostgresMainnetPublicationBackend,
+} from "../../../lib/server/projects/mainnet-publication-service";
 import { TestnetIssuanceService } from "../../../lib/server/projects/testnet-issuance-service";
+import {
+  MAINNET_SHARED_ISSUER_PUBLIC_KEY,
+  MAINNET_TREASURY_PUBLIC_KEY,
+} from "../../../lib/stellar/mainnet-creation";
 
 export const dynamic = "force-dynamic";
 
@@ -41,11 +50,24 @@ export default async function ManagedProjectPage({
     notFound();
   }
 
-  const issuance = await new TestnetIssuanceService(sql, {
-    network: project.network,
-    approvedIssuerPublicKey:
-      process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY,
-  }).getOwnedStatus(projectId, session.publicKey);
+  let mainnetOrder = null;
+  let issuance = null;
+  if (project.network === "public") {
+    try {
+      mainnetOrder = await new PostgresMainnetCreationStore(sql).getOwned(
+        projectId,
+        session.publicKey,
+      );
+    } catch {
+      // Missing Mainnet state is shown as a draft, never as issued.
+    }
+  } else {
+    issuance = await new TestnetIssuanceService(sql, {
+      network: project.network,
+      approvedIssuerPublicKey:
+        process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY,
+    }).getOwnedStatus(projectId, session.publicKey);
+  }
 
   if (issuance?.status === "confirmed") {
     try {
@@ -60,12 +82,35 @@ export default async function ManagedProjectPage({
     }
   }
 
+  if (mainnetOrder?.status === "issued") {
+    try {
+      await createServerMainnetPublicationService(sql).reconcile(
+        projectId,
+        session.publicKey,
+      );
+      project =
+        (await projectRepository.findOwnedById(projectId, session.publicKey)) ??
+        project;
+      mainnetOrder =
+        (await new PostgresMainnetCreationStore(sql).getOwned(
+          projectId,
+          session.publicKey,
+        )) ?? mainnetOrder;
+    } catch {
+      // Issuance stays final. The page reports publication pending/failed.
+    }
+  }
+
   let publication = null;
   try {
-    publication =
-      await createServerMetadataPublicationRepository(sql).getByProjectId(
-        projectId,
-      );
+    publication = project.network === "public"
+      ? await new PostgresMainnetPublicationBackend(sql).getPublication(
+          projectId,
+          session.publicKey,
+        )
+      : await createServerMetadataPublicationRepository(sql).getByProjectId(
+          projectId,
+        );
   } catch {
     // Missing publication runtime configuration is shown as pending, not issued.
   }
@@ -75,6 +120,20 @@ export default async function ManagedProjectPage({
       project={project}
       publication={publication}
       issuance={issuance}
+      mainnetOrder={mainnetOrder}
+      mainnetActivationEnabled={
+        project.network === "public" &&
+        process.env.ORRYLO_MAINNET_CREATION_ENABLED === "true" &&
+        process.env.ORRYLO_MAINNET_SHARED_ISSUER_PUBLIC_KEY ===
+          MAINNET_SHARED_ISSUER_PUBLIC_KEY &&
+        process.env.ORRYLO_MAINNET_TREASURY_PUBLIC_KEY ===
+          MAINNET_TREASURY_PUBLIC_KEY &&
+        process.env.ORRYLO_MAINNET_TREASURY_VERIFIED === "true" &&
+        Boolean(process.env.ORRYLO_MAINNET_ISSUER_FEE_STROOPS) &&
+        Boolean(process.env.ORRYLO_MAINNET_CUSTOMER_TRUSTLINE_MAX_FEE_STROOPS) &&
+        Boolean(process.env.ORRYLO_MAINNET_SIGNER_PRIVATE_URL) &&
+        Boolean(process.env.ORRYLO_MAINNET_SIGNER_REQUEST_AUTH_SECRET)
+      }
       intentConfigurationAvailable={
         project.network === "testnet" &&
         Boolean(process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY) &&

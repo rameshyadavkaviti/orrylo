@@ -7,6 +7,7 @@ export default defineConfig([
   ...nextTs,
   globalIgnores([
     ".next/**",
+    ".signer-dist/**",
     "node_modules/**",
     "coverage/**",
     "next-env.d.ts",
