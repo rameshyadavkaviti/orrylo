@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type { DatabaseClient } from "../persistence/database";
 import { normalizeWalletPublicKey } from "../persistence/wallet";
 import { isValidProjectId } from "../../projects/project-profile";
+import { buildUnsignedMainnetOrderPayment } from "../../stellar/mainnet-payment-plan";
 import {
   verifyMainnetPayment,
   type MainnetPaymentResult,
@@ -163,4 +164,50 @@ export async function settleMainnetTokenOrder(
     return { status: "already_paid", orderId: latest.order_id };
   }
   throw new MainnetOrderError("order_expired_or_conflicted");
+}
+
+/**
+ * Read-only preparation. The feature gate is enforced at the API boundary;
+ * this service neither signs nor submits, and does not change order state.
+ */
+export async function prepareMainnetOrderPayment(
+  sql: DatabaseClient,
+  input: { orderId: string; ownerPublicKey: string },
+  fetchImpl: typeof fetch = globalThis.fetch,
+) {
+  const owner = normalizeWalletPublicKey(input.ownerPublicKey);
+  const [order] = await sql<OrderRow[]>`
+    SELECT * FROM mainnet_token_orders
+    WHERE order_id = ${input.orderId} AND owner_public_key = ${owner}
+  `;
+  if (!order) throw new MainnetOrderError("order_not_found");
+  if (order.state !== "pending" || order.payment_transaction_hash) {
+    throw new MainnetOrderError("order_not_pending");
+  }
+  if (Date.now() >= order.expires_at.getTime() - 125000) {
+    throw new MainnetOrderError("order_expiring");
+  }
+  if (order.issuer_public_key !== MAINNET_ISSUER ||
+      order.treasury_public_key !== MAINNET_TREASURY ||
+      order.destination_public_key !== owner) {
+    throw new MainnetOrderError("order_configuration_mismatch");
+  }
+  const response = await fetchImpl(
+    `https://horizon.stellar.org/accounts/${encodeURIComponent(owner)}`,
+    { method: "GET", cache: "no-store", redirect: "error",
+      signal: AbortSignal.timeout(10000) },
+  );
+  if (!response.ok) throw new MainnetOrderError("source_account_unavailable");
+  const account: unknown = await response.json();
+  if (!account || typeof account !== "object" || Array.isArray(account) ||
+      !("account_id" in account) || account.account_id !== owner ||
+      !("sequence" in account) || typeof account.sequence !== "string") {
+    throw new MainnetOrderError("invalid_source_account_response");
+  }
+  return buildUnsignedMainnetOrderPayment({
+    source: owner,
+    sourceSequence: account.sequence,
+    destination: order.treasury_public_key,
+    memo: order.memo,
+  });
 }
