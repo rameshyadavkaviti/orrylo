@@ -3,7 +3,10 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type { DatabaseClient } from "../persistence/database";
 import { normalizeWalletPublicKey } from "../persistence/wallet";
 import { isValidProjectId } from "../../projects/project-profile";
-import { buildUnsignedMainnetOrderPayment } from "../../stellar/mainnet-payment-plan";
+import {
+  buildUnsignedMainnetOrderPayment,
+  type MainnetUnsignedPayment,
+} from "../../stellar/mainnet-payment-plan";
 import {
   verifyMainnetPayment,
   type MainnetPaymentResult,
@@ -27,6 +30,9 @@ interface OrderRow {
   state: string;
   payment_transaction_hash: string | null;
   payment_ledger: string | null;
+  payment_plan_hash: string | null;
+  payment_plan_xdr: string | null;
+  payment_plan_prepared_at: Date | null;
   created_at: Date;
   expires_at: Date;
 }
@@ -183,38 +189,72 @@ export async function prepareMainnetOrderPayment(
   fetchImpl: typeof fetch = globalThis.fetch,
 ) {
   const owner = normalizeWalletPublicKey(input.ownerPublicKey);
-  const [order] = await sql<OrderRow[]>`
-    SELECT * FROM mainnet_token_orders
-    WHERE order_id = ${input.orderId} AND owner_public_key = ${owner}
-  `;
-  if (!order) throw new MainnetOrderError("order_not_found");
-  if (order.state !== "pending" || order.payment_transaction_hash) {
-    throw new MainnetOrderError("order_not_pending");
-  }
-  if (Date.now() >= order.expires_at.getTime() - 125000) {
-    throw new MainnetOrderError("order_expiring");
-  }
-  if (order.issuer_public_key !== MAINNET_ISSUER ||
-      order.treasury_public_key !== MAINNET_TREASURY ||
-      order.destination_public_key !== owner) {
-    throw new MainnetOrderError("order_configuration_mismatch");
-  }
-  const response = await fetchImpl(
-    `https://horizon.stellar.org/accounts/${encodeURIComponent(owner)}`,
-    { method: "GET", cache: "no-store", redirect: "error",
-      signal: AbortSignal.timeout(10000) },
-  );
-  if (!response.ok) throw new MainnetOrderError("source_account_unavailable");
-  const account: unknown = await response.json();
-  if (!account || typeof account !== "object" || Array.isArray(account) ||
-      !("account_id" in account) || account.account_id !== owner ||
-      !("sequence" in account) || typeof account.sequence !== "string") {
-    throw new MainnetOrderError("invalid_source_account_response");
-  }
-  return buildUnsignedMainnetOrderPayment({
-    source: owner,
-    sourceSequence: account.sequence,
-    destination: order.treasury_public_key,
-    memo: order.memo,
+  return sql.begin(async (tx): Promise<MainnetUnsignedPayment> => {
+    // Hold the lock through Horizon sequence lookup and immutable reservation.
+    // A competing browser can only receive the exact same saved XDR/hash.
+    const [order] = await tx<OrderRow[]>`
+      SELECT * FROM mainnet_token_orders
+      WHERE order_id = ${input.orderId} AND owner_public_key = ${owner}
+      FOR UPDATE
+    `;
+    if (!order) throw new MainnetOrderError("order_not_found");
+    if (order.state !== "pending" || order.payment_transaction_hash) {
+      throw new MainnetOrderError("order_not_pending");
+    }
+    if (order.issuer_public_key !== MAINNET_ISSUER ||
+        order.treasury_public_key !== MAINNET_TREASURY ||
+        order.destination_public_key !== owner) {
+      throw new MainnetOrderError("order_configuration_mismatch");
+    }
+    if (order.payment_plan_hash || order.payment_plan_xdr || order.payment_plan_prepared_at) {
+      if (!order.payment_plan_hash || !order.payment_plan_xdr || !order.payment_plan_prepared_at ||
+          Date.now() >= order.payment_plan_prepared_at.getTime() + 110_000) {
+        throw new MainnetOrderError("payment_attempt_requires_reconciliation");
+      }
+      return {
+        xdr: order.payment_plan_xdr,
+        expectedHash: order.payment_plan_hash,
+        source: owner,
+        destination: order.treasury_public_key,
+        memo: order.memo,
+        amount: "10.0000000",
+        network: "public",
+      };
+    }
+    if (Date.now() >= order.expires_at.getTime() - 125_000) {
+      throw new MainnetOrderError("order_expiring");
+    }
+    const response = await fetchImpl(
+      `https://horizon.stellar.org/accounts/${encodeURIComponent(owner)}`,
+      { method: "GET", cache: "no-store", redirect: "error",
+        signal: AbortSignal.timeout(10000) },
+    );
+    if (!response.ok) throw new MainnetOrderError("source_account_unavailable");
+    const account: unknown = await response.json();
+    if (!account || typeof account !== "object" || Array.isArray(account) ||
+        !("account_id" in account) || account.account_id !== owner ||
+        !("sequence" in account) || typeof account.sequence !== "string") {
+      throw new MainnetOrderError("invalid_source_account_response");
+    }
+    const plan = buildUnsignedMainnetOrderPayment({
+      source: owner,
+      sourceSequence: account.sequence,
+      destination: order.treasury_public_key,
+      memo: order.memo,
+    });
+    const [reserved] = await tx<OrderRow[]>`
+      UPDATE mainnet_token_orders
+      SET payment_plan_hash = ${plan.expectedHash},
+          payment_plan_xdr = ${plan.xdr},
+          payment_plan_prepared_at = now()
+      WHERE order_id = ${input.orderId}
+        AND owner_public_key = ${owner}
+        AND state = 'pending'
+        AND payment_plan_hash IS NULL
+        AND expires_at > now() + interval '125 seconds'
+      RETURNING *
+    `;
+    if (!reserved) throw new MainnetOrderError("payment_reservation_conflict");
+    return plan;
   });
 }

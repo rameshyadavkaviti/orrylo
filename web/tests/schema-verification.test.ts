@@ -31,6 +31,7 @@ test("loads exact ordered migration names and SHA-256 checksums", async () => {
       "012_customer_change_trust_interlock.sql",
       "013_mainnet_token_orders.sql",
       "014_archive_unissued_drafts.sql",
+      "015_mainnet_payment_plan_reservation.sql",
     ],
   );
   for (const migration of evidence) {
