@@ -57,7 +57,7 @@ export function buildUnsignedMainnetOrderPayment(input: {
 
   return {
     xdr: transaction.toXDR(),
-    expectedHash: transaction.hash().toString("hex"),
+    expectedHash: Buffer.from(transaction.hash()).toString("hex"),
     source: input.source,
     destination: input.destination,
     memo: input.memo,

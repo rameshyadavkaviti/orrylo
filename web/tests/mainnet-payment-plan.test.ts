@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   Asset,
   Networks,
+  Transaction,
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
 import { buildUnsignedMainnetOrderPayment } from "../lib/stellar/mainnet-payment-plan";
@@ -17,6 +18,7 @@ test("unsigned XDR binds public network, exact single native 10 XLM operation an
   assert.equal(plan.network, "public");
   assert.equal(plan.amount, "10.0000000");
   const transaction = TransactionBuilder.fromXDR(plan.xdr, Networks.PUBLIC);
+  assert.ok(transaction instanceof Transaction);
   assert.equal(transaction.operations.length, 1);
   const payment = transaction.operations[0];
   assert.equal(payment.type, "payment");
@@ -26,9 +28,9 @@ test("unsigned XDR binds public network, exact single native 10 XLM operation an
   assert.equal(payment.amount, "10.0000000");
   assert.equal(payment.asset.equals(Asset.native()), true);
   assert.equal(transaction.memo.type, "text");
-  assert.equal(transaction.memo.value, memo);
+  assert.equal(Buffer.from(transaction.memo.value as Uint8Array).toString("utf8"), memo);
   assert.equal(transaction.signatures.length, 0);
-  assert.equal(transaction.hash().toString("hex"), plan.expectedHash);
+  assert.equal(Buffer.from(transaction.hash()).toString("hex"), plan.expectedHash);
 });
 
 test("invalid source, destination, memo or sequence never creates XDR", () => {
