@@ -70,14 +70,25 @@ if (!TEST_DATABASE_URL) {
       now: NOW,
     });
 
-    const project = await repository.findPublishedBySlug("nova");
+    const [project] = await sql<
+      {
+        project_id: string;
+        slug: string;
+        asset_code: string;
+        metadata_home: string;
+      }[]
+    >`
+      SELECT project_id, slug, asset_code, metadata_home
+      FROM project_profiles
+      WHERE project_id = ${projectId}
+    `;
 
     assert.ok(project);
-    assert.equal(project.projectId, projectId);
+    assert.equal(project.project_id, projectId);
     assert.equal(project.slug, "nova");
-    assert.equal(project.assetCode, "NOVA");
-    assert.equal(project.metadataHome, "assets.orrylo.com");
-    assert.notEqual(project.projectId, project.slug);
+    assert.equal(project.asset_code, "NOVA");
+    assert.equal(project.metadata_home, "assets.orrylo.com");
+    assert.notEqual(project.project_id, project.slug);
   });
 
   test("authenticated project creation persists owner and a private managed profile", async () => {
@@ -425,8 +436,12 @@ if (!TEST_DATABASE_URL) {
     });
 
     await sql`
-      INSERT INTO project_profile_owners (project_id, owner_public_key, created_at)
-      VALUES (${project.projectId}, ${OWNER}, ${new Date(NOW)})
+      INSERT INTO project_profile_owners (
+        project_id, owner_public_key, created_at, creation_request_id
+      )
+      VALUES (
+        ${project.projectId}, ${OWNER}, ${new Date(NOW)}, ${randomUUID()}
+      )
     `;
 
     assert.equal(await repository.findPublishedBySlug(project.slug), null);

@@ -85,6 +85,10 @@ if (!TEST_DATABASE_URL) {
       "010_mvp_lite_db_security_hardening.sql",
       "011_shared_issuance_signing_mode.sql",
       "012_customer_change_trust_interlock.sql",
+      "013_mainnet_token_orders.sql",
+      "014_archive_unissued_drafts.sql",
+      "015_mainnet_payment_plan_reservation.sql",
+      "016_mainnet_token_issuance.sql",
     ]);
 
     const [{ count }] = await sql<{ count: string }[]>`
