@@ -16,7 +16,7 @@ export interface MainnetPaymentIntent {
 }
 
 export type MainnetPaymentResult =
-  | { status: "confirmed"; hash: string; ledger: number }
+  | { status: "confirmed"; hash: string; ledger: number; createdAt: string }
   | { status: "not_found" }
   | { status: "rejected" };
 
@@ -68,7 +68,9 @@ export async function verifyMainnetPayment(
     transaction.memo !== intent.memo ||
     !Number.isSafeInteger(transaction.ledger) ||
     (transaction.ledger as number) <= 0 ||
-    transaction.operation_count !== 1
+    transaction.operation_count !== 1 ||
+    typeof transaction.created_at !== "string" ||
+    !Number.isFinite(Date.parse(transaction.created_at))
   ) return { status: "rejected" };
 
   const operations = await read(`/transactions/${hash}/operations?limit=2`);
@@ -89,5 +91,5 @@ export async function verifyMainnetPayment(
     amountToStroops(payment.amount) !== PRICE_STROOPS
   ) return { status: "rejected" };
 
-  return { status: "confirmed", hash, ledger: transaction.ledger as number };
+  return { status: "confirmed", hash, ledger: transaction.ledger as number, createdAt: transaction.created_at as string };
 }
