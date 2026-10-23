@@ -35,8 +35,14 @@ async function main() {
   try {
     runtime = createPrivateMainnetSignerRuntime();
     port = readPort(process.env);
-  } catch {
-    process.stderr.write("Mainnet signer service configuration rejected.\n");
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "unknown";
+    process.stderr.write(
+      `${JSON.stringify({
+        error: "mainnet_signer_configuration_rejected",
+        code,
+      })}\n`,
+    );
     process.exitCode = 1;
     return;
   }
@@ -59,15 +65,17 @@ async function main() {
         "content-type": "application/json; charset=utf-8",
         "cache-control": "no-store",
       });
-      response.end(JSON.stringify({
-        ok: true,
-        ready: true,
-        service: "orrylo-mainnet-signer",
-        network: "public",
-        issuerPublicKey: runtime.issuerPublicKey,
-        signerPublicKey: runtime.signerPublicKey,
-        signingEnabled: runtime.signingEnabled,
-      }));
+      response.end(
+        JSON.stringify({
+          ok: true,
+          ready: true,
+          service: "orrylo-mainnet-signer",
+          network: "public",
+          issuerPublicKey: runtime.issuerPublicKey,
+          signerPublicKey: runtime.signerPublicKey,
+          signingEnabled: runtime.signingEnabled,
+        }),
+      );
       return;
     }
     if (url.pathname !== "/v1/sign-and-submit") {
@@ -85,17 +93,20 @@ async function main() {
     }
     const method = request.method ?? "";
     const result = await handlePrivateMainnetSignerRequest(
-      new Request("http://orrylo-mainnet-signer.railway.internal/v1/sign-and-submit", {
-        method,
-        headers: {
-          authorization:
-            typeof request.headers.authorization === "string"
-              ? request.headers.authorization
-              : "",
-          "content-type": "application/json",
+      new Request(
+        "http://orrylo-mainnet-signer.railway.internal/v1/sign-and-submit",
+        {
+          method,
+          headers: {
+            authorization:
+              typeof request.headers.authorization === "string"
+                ? request.headers.authorization
+                : "",
+            "content-type": "application/json",
+          },
+          ...(method === "POST" ? { body } : {}),
         },
-        ...(method === "POST" ? { body } : {}),
-      }),
+      ),
       runtime,
     );
     response.writeHead(result.status, {
@@ -109,14 +120,16 @@ async function main() {
     socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
   });
   server.listen(port, "::", () => {
-    process.stdout.write(`${JSON.stringify({
-      ok: true,
-      service: "orrylo-mainnet-signer",
-      network: "public",
-      issuerPublicKey: runtime.issuerPublicKey,
-      signerPublicKey: runtime.signerPublicKey,
-      signingEnabled: runtime.signingEnabled,
-    })}\n`);
+    process.stdout.write(
+      `${JSON.stringify({
+        ok: true,
+        service: "orrylo-mainnet-signer",
+        network: "public",
+        issuerPublicKey: runtime.issuerPublicKey,
+        signerPublicKey: runtime.signerPublicKey,
+        signingEnabled: runtime.signingEnabled,
+      })}\n`,
+    );
   });
   const stop = () => server.close(() => process.exit(0));
   process.once("SIGTERM", stop);
