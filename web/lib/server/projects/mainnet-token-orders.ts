@@ -26,6 +26,7 @@ interface OrderRow {
   state: string;
   payment_transaction_hash: string | null;
   payment_ledger: string | null;
+  created_at: Date;
   expires_at: Date;
 }
 
@@ -125,6 +126,14 @@ export async function settleMainnetTokenOrder(
     return { status: outcome.status, orderId: order.order_id };
   }
 
+  // Accept only payment made while this exact order was open. A payment
+  // outside the window needs manual reconciliation, not automatic issuance.
+  const observedPaymentTime = Date.parse(outcome.createdAt);
+  if (!Number.isFinite(observedPaymentTime) ||
+      observedPaymentTime < order.created_at.getTime() ||
+      observedPaymentTime >= order.expires_at.getTime()) {
+    throw new MainnetOrderError("payment_outside_order_window");
+  }
   try {
     const [updated] = await sql<OrderRow[]>`
       UPDATE mainnet_token_orders SET
