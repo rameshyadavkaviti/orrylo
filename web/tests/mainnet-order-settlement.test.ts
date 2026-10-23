@@ -16,7 +16,11 @@ const order = {
   expires_at: new Date(now.getTime() + 60_000),
 };
 
-function fakeDatabase(row = order) {
+type OrderFixture = Omit<typeof order, "payment_transaction_hash"> & {
+  payment_transaction_hash: string | null;
+};
+
+function fakeDatabase(row: OrderFixture = order) {
   const queries: string[] = [];
   const sql = (async (strings: TemplateStringsArray) => {
     const query = strings.join("?").replace(/\s+/g, " ").trim();
@@ -53,4 +57,70 @@ test("settlement refuses a verifier result for a different hash", async () => {
     (error: unknown) => error instanceof MainnetOrderError && error.code === "payment_hash_mismatch",
   );
   assert.equal(fixture.queries.some((query) => query.startsWith("UPDATE")), false);
+});
+
+test("a refunded order is never reported as already paid, even for its old hash", async () => {
+  const fixture = fakeDatabase({ ...order, state: "refunded", payment_transaction_hash: hash });
+  await assert.rejects(
+    settleMainnetTokenOrder(fixture.sql, { orderId, ownerPublicKey: owner, transactionHash: hash }, confirmed),
+    (error: unknown) => error instanceof MainnetOrderError && error.code === "order_already_consumed",
+  );
+  assert.equal(fixture.queries.some((query) => query.startsWith("UPDATE")), false);
+});
+
+test("concurrent claims for the same order yield one paid and one already_paid", async () => {
+  let state: OrderFixture = { ...order };
+  let firstReads = 0;
+  let release!: () => void;
+  const bothStarted = new Promise<void>((resolve) => { release = resolve; });
+  let updates = 0;
+  const sql = (async (strings: TemplateStringsArray) => {
+    const query = strings.join("?").replace(/\s+/g, " ").trim();
+    if (query.startsWith("SELECT")) {
+      if (++firstReads <= 2) {
+        if (firstReads === 2) release();
+        await bothStarted;
+        return [{ ...order }];
+      }
+      return [{ ...state }];
+    }
+    if (query.startsWith("UPDATE")) {
+      assert.match(query, /AND state = 'pending' AND payment_transaction_hash IS NULL/);
+      if (state.state !== "pending") return [];
+      updates++;
+      state = { ...state, state: "paid", payment_transaction_hash: hash };
+      return [{ ...state }];
+    }
+    throw new Error(`Unexpected SQL: ${query}`);
+  }) as unknown as DatabaseClient;
+  const input = { orderId, ownerPublicKey: owner, transactionHash: hash };
+  const results = await Promise.all([
+    settleMainnetTokenOrder(sql, input, confirmed),
+    settleMainnetTokenOrder(sql, input, confirmed),
+  ]);
+  assert.deepEqual(results.map((result) => result.status).sort(), ["already_paid", "paid"]);
+  assert.equal(updates, 1);
+});
+
+test("a transaction not found on Horizon leaves the order untouched", async () => {
+  const fixture = fakeDatabase();
+  const result = await settleMainnetTokenOrder(
+    fixture.sql, { orderId, ownerPublicKey: owner, transactionHash: hash },
+    async () => ({ status: "not_found" }),
+  );
+  assert.equal(result.status, "not_found");
+  assert.equal(fixture.queries.some((query) => query.startsWith("UPDATE")), false);
+});
+
+test("a payment hash already consumed by another order fails closed", async () => {
+  const sql = (async (strings: TemplateStringsArray) => {
+    const query = strings.join("?").replace(/\s+/g, " ").trim();
+    if (query.startsWith("SELECT")) return [{ ...order }];
+    if (query.startsWith("UPDATE")) throw Object.assign(new Error("duplicate payment"), { code: "23505" });
+    throw new Error(`Unexpected SQL: ${query}`);
+  }) as unknown as DatabaseClient;
+  await assert.rejects(
+    settleMainnetTokenOrder(sql, { orderId, ownerPublicKey: owner, transactionHash: hash }, confirmed),
+    (error: unknown) => error instanceof MainnetOrderError && error.code === "payment_already_used",
+  );
 });

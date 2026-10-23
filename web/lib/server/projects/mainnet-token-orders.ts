@@ -110,7 +110,8 @@ export async function settleMainnetTokenOrder(
   `;
   if (!order) throw new MainnetOrderError("order_not_found");
   if (order.state !== "pending") {
-    if (order.payment_transaction_hash === input.transactionHash.toLowerCase()) {
+    if ((order.state === "paid" || order.state === "issued") &&
+        order.payment_transaction_hash === input.transactionHash.toLowerCase()) {
       return { status: "already_paid", orderId: order.order_id };
     }
     throw new MainnetOrderError("order_already_consumed");
