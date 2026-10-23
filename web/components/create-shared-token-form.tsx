@@ -962,7 +962,11 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
                 <p><a href={saveState.order.managePath}>Open saved project</a></p>
                 <button type="button" className="button button-secondary"
                   disabled={mainnetPreviewBusy}
-                  onClick={() => void previewMainnetPayment(saveState.order)}>
+                  onClick={() => {
+                    if (saveState.status === "mainnet_order") {
+                      void previewMainnetPayment(saveState.order);
+                    }
+                  }}>
                   {mainnetPreviewBusy ? "Preparing preview…" : "Preview exact payment (no signing)"}
                 </button>
                 {mainnetPreviewError ? <p role="status">{mainnetPreviewError}</p> : null}
