@@ -16,14 +16,14 @@ function fakeFetch(transactionPatch: Record<string, unknown> = {}, operationPatc
           asset_type: "native", amount: "10.0000000", ...operationPatch,
         }] } }
       : { hash, successful: true, source_account: sender, memo_type: "text",
-          memo: "order_123", ledger: 123, operation_count: 1, ...transactionPatch };
+          memo: "order_123", ledger: 123, created_at: "2026-10-23T10:00:00Z", operation_count: 1, ...transactionPatch };
     return new Response(JSON.stringify(body), { status: 200 });
   }) as typeof fetch;
 }
 
 test("confirms exactly ten XLM and order memo", async () => {
   assert.deepEqual(await verifyMainnetPayment(intent, fakeFetch()), {
-    status: "confirmed", hash, ledger: 123,
+    status: "confirmed", hash, ledger: 123, createdAt: "2026-10-23T10:00:00Z",
   });
 });
 
