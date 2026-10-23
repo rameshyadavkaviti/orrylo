@@ -424,24 +424,20 @@ if (!TEST_DATABASE_URL) {
 
   test("legacy published flags without durable confirmation remain private", async () => {
     const repository = new PostgresProjectProfileRepository(sql);
-    const project = await repository.create({
-      projectId: randomUUID(),
-      slug: `legacy-${randomUUID().slice(0, 8)}`,
-      assetCode: "LEGACY",
-      displayName: "Legacy draft",
-      issuerModel: "shared",
+    const service = new ManagedProjectService(sql, {
       network: "testnet",
-      publicStatus: "published",
-      now: NOW,
+      now: () => NOW,
     });
-
+    const { project } = await service.createManagedProject({
+      ownerPublicKey: OWNER,
+      idempotencyKey: randomUUID(),
+      code: "LEGACY",
+      displayName: "Legacy draft",
+    });
     await sql`
-      INSERT INTO project_profile_owners (
-        project_id, owner_public_key, created_at, creation_request_id
-      )
-      VALUES (
-        ${project.projectId}, ${OWNER}, ${new Date(NOW)}, ${randomUUID()}
-      )
+      UPDATE project_profiles
+      SET public_status = 'published'
+      WHERE project_id = ${project.projectId}
     `;
 
     assert.equal(await repository.findPublishedBySlug(project.slug), null);
