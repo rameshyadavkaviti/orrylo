@@ -144,7 +144,6 @@ export async function settleMainnetTokenOrder(
       WHERE order_id = ${input.orderId}
         AND owner_public_key = ${owner}
         AND state = 'pending'
-        AND expires_at > now()
         AND payment_transaction_hash IS NULL
       RETURNING *
     `;
