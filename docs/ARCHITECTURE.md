@@ -1,6 +1,6 @@
 # Orrylo — Minimal Proposed Architecture
 
-Status: **Proposed architecture, not yet implemented**.
+Status: **Partially implemented**. The active Testnet app is deployed and Mainnet preparatory order/verification code and Neon storage exist. Not a completed or activated Mainnet service; see `SOURCE_OF_TRUTH.md` current checkpoint.
 
 ```text
 Customer browser / Albedo wallet
@@ -37,7 +37,7 @@ This is a target layout. Inherited legacy paths remain present until deliberatel
 
 **Reevaluate:** full legacy workflow engine, generic transaction tables, complex triggers not necessary in the fresh schema, multi-feature UI/service coupling, extra adapters and long policy-loading instructions. Do not weaken protections on an existing live/shared database.
 
-**Defer:** RYLO economy, contract-controlled Dedicated Issuers, advanced governance and Mainnet topology. No separate service for each deferred module.
+**Defer:** RYLO economy, contract-controlled Dedicated Issuers, advanced governance and additional Mainnet topology beyond the explicitly provisioned Shared Issuer / Treasury / Funder accounts. No separate service for each deferred module.
 
 ## Deployment
 Target a reproducible low-cost Testnet deployment; use existing Railway/Neon/Cloudflare only where verified compatible. Private signer may remain separately deployed for isolation. No live infrastructure mutation is part of branch setup.
