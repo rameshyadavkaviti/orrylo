@@ -1,6 +1,6 @@
 # RYLO — Independent Tradable Asset Policy v2
 
-Status: **Owner-approved economic direction; documentation only, NOT deployment or transaction authorization.**
+Status: **Owner-approved fixed supply and allocations; documentation is not proof of issuance, deployment or supply lock.**
 Scope: RYLO as a standalone Stellar asset. This policy supersedes RYLO Policy v1 economics, eligibility, direct sale, rewards, controlled-access trading and bootstrap allocation. Historical implementation/account facts require independent on-chain verification.
 
 ## Identity and separation
@@ -10,7 +10,8 @@ Scope: RYLO as a standalone Stellar asset. This policy supersedes RYLO Policy v1
 - Tradability does not guarantee a listing, buyer, market value, liquidity, or appreciation.
 
 ## Fixed supply
-- Target total and maximum supply: **100,000,000 RYLO**.
+- Owner revised the approved target from 100 million to 998 million RYLO on 2026-10-23 before issuance. Previous unsigned 100-million issuance XDR must not be submitted.
+- Target total and maximum supply: **998,000,000 RYLO**.
 - Issue the entire approved supply once through a reviewed, auditable issuance ceremony. No additional minting after supply finalization.
 - Before any irreversible issuer lock, independently verify network, issuer, signer access/recovery, supply and destination allocations, flags, metadata and ledger results.
 - The technical mechanism for permanently disabling further issuance must be reviewed for Stellar correctness; never assume that a policy statement alone enforces a hard cap.
@@ -19,11 +20,11 @@ Scope: RYLO as a standalone Stellar asset. This policy supersedes RYLO Policy v1
 ## Allocation (percent of fixed total)
 | Allocation | Share | RYLO |
 | --- | ---: | ---: |
-| Long-term reserve | 60% | 60,000,000 |
-| Market liquidity allocation | 20% | 20,000,000 |
-| Development and operations | 15% | 15,000,000 |
-| Future distribution | 5% | 5,000,000 |
-| **Total** | **100%** | **100,000,000** |
+| Long-term reserve | 60% | 598,800,000 |
+| Market liquidity allocation | 20% | 199,600,000 |
+| Development and operations | 15% | 149,700,000 |
+| Future distribution | 5% | 49,900,000 |
+| **Total** | **100%** | **998,000,000** |
 
 - Allocation does not mean immediate public circulation or guaranteed liquidity.
 - Record distinct holding accounts, control, vesting/release decisions and transfers publicly before distribution. Detailed release schedule and custodians remain to be approved.
@@ -38,7 +39,7 @@ Scope: RYLO as a standalone Stellar asset. This policy supersedes RYLO Policy v1
 - A **small illustrative initial pool/order-book provision** is 100,000 RYLO paired with 10 XLM, giving an initial ratio of 0.0001 XLM/RYLO. This ratio is not a guaranteed price or valuation.
 - This is a planning example, **not** authorization to fund a pool, submit offers or launch public trading. Small liquidity can cause extreme price impact and slippage.
 - Of the reported 50 XLM available for Orrylo preparation, do not earmark or spend 10 XLM on RYLO until Mainnet infrastructure costs, reserves and operational buffer are established and a separate liquidity approval is given.
-- Liquidity allocation (20 million RYLO) is not an instruction to deploy all of it. Further provisioning requires a separate budget, market/risk review and explicit approval.
+- Liquidity allocation (199.6 million RYLO) is not an instruction to deploy all of it. Further provisioning requires a separate budget, market/risk review and explicit approval.
 
 ## No investment promises
 - No guaranteed yield, buyback, floor price, return, profit sharing, or representation that fixed supply ensures appreciation.
