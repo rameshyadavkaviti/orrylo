@@ -83,6 +83,9 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
   const [logoName, setLogoName] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
+  const [mainnetPreview, setMainnetPreview] = useState<{ expectedHash: string; amount: string; memo: string; destination: string; source: string } | null>(null);
+  const [mainnetPreviewError, setMainnetPreviewError] = useState<string | null>(null);
+  const [mainnetPreviewBusy, setMainnetPreviewBusy] = useState(false);
   const [trustlineStep, setTrustlineStep] = useState<{
     projectId: string;
     managePath: string;
@@ -101,6 +104,8 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
     setReview(null);
     setSaveState({ status: "idle" });
     setTrustlineStep(null);
+    setMainnetPreview(null);
+    setMainnetPreviewError(null);
     idempotencyKeyRef.current = null;
     issuanceIdempotencyKeyRef.current = null;
     pendingSaveRef.current = null;
@@ -312,6 +317,51 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
       } });
     } catch {
       setSaveState({ status: "mainnet_order_unavailable", managePath });
+    }
+  }
+
+  async function previewMainnetPayment(order: MainnetOrderView) {
+    if (mainnetPreviewBusy) return;
+    setMainnetPreviewBusy(true);
+    setMainnetPreview(null);
+    setMainnetPreviewError(null);
+    try {
+      const response = await fetch(
+        `/api/mainnet/orders/${encodeURIComponent(order.orderId)}/prepare`,
+        { method: "POST", credentials: "same-origin", cache: "no-store" },
+      );
+      const result = await readJson<{
+        ok: boolean;
+        expectedHash: string;
+        amount: string;
+        memo: string;
+        destination: string;
+        source: string;
+        network: string;
+      }>(response);
+      if (!response.ok || !result?.ok) {
+        setMainnetPreviewError("Payment preview is not enabled yet. No wallet transaction was started.");
+        return;
+      }
+      if (result.network !== "public" ||
+          result.amount !== "10.0000000" ||
+          result.memo !== order.memo ||
+          result.destination !== order.treasury ||
+          !/^[0-9a-f]{64}$/.test(result.expectedHash)) {
+        setMainnetPreviewError("The payment preview did not match your saved order.");
+        return;
+      }
+      setMainnetPreview({
+        expectedHash: result.expectedHash,
+        amount: result.amount,
+        memo: result.memo,
+        destination: result.destination,
+        source: result.source,
+      });
+    } catch {
+      setMainnetPreviewError("Payment preview is temporarily unavailable. No funds were moved.");
+    } finally {
+      setMainnetPreviewBusy(false);
     }
   }
 
@@ -910,6 +960,22 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
                   <div><dt>Status</dt><dd>{saveState.order.status}</dd></div>
                 </dl>
                 <p><a href={saveState.order.managePath}>Open saved project</a></p>
+                <button type="button" className="button button-secondary"
+                  disabled={mainnetPreviewBusy}
+                  onClick={() => void previewMainnetPayment(saveState.order)}>
+                  {mainnetPreviewBusy ? "Preparing preview…" : "Preview exact payment (no signing)"}
+                </button>
+                {mainnetPreviewError ? <p role="status">{mainnetPreviewError}</p> : null}
+                {mainnetPreview ? (
+                  <dl className="preview-facts" aria-label="Read-only payment transaction preview">
+                    <div><dt>Payment source</dt><dd><code>{mainnetPreview.source}</code></dd></div>
+                    <div><dt>Amount</dt><dd>{mainnetPreview.amount} XLM</dd></div>
+                    <div><dt>Destination</dt><dd><code>{mainnetPreview.destination}</code></dd></div>
+                    <div><dt>Memo</dt><dd><code>{mainnetPreview.memo}</code></dd></div>
+                    <div><dt>Unsigned transaction hash</dt><dd><code>{mainnetPreview.expectedHash}</code></dd></div>
+                    <div><dt>Safety</dt><dd>No wallet opened, no signature requested, and no transaction submitted.</dd></div>
+                  </dl>
+                ) : null}
               </section>
             ) : null}
             {isMainnet && saveState.status === "mainnet_order_unavailable" ? (
