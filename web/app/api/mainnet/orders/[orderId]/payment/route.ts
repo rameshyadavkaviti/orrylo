@@ -28,7 +28,7 @@ export async function POST(
   );
   if (!session) return fail("unauthenticated", 401);
   const { orderId } = await context.params;
-  if (!/^[0-9a-f]{8}-[0-9a-f-]{27,28}$/i.test(orderId)) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(orderId)) {
     return fail("invalid_request", 400);
   }
   let body: unknown;
