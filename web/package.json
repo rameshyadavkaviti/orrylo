@@ -26,23 +26,23 @@
     "test:db": "tsx --test --test-concurrency=1 tests/db/*.test.ts"
   },
   "dependencies": {
-    "next": "16.4.0",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
     "@albedo-link/intent": "0.13.0",
     "@stellar/stellar-sdk": "17.2.1",
-    "postgres": "3.4.9"
+    "next": "16.4.2",
+    "postgres": "3.4.9",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.16",
     "@types/node": "^22.18.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^10.12.0",
     "eslint-config-next": "16.4.0",
     "prettier": "^3.6.2",
-    "tsx": "^4.20.6",
-    "typescript": "^5.9.3",
     "tailwindcss": "^4.1.16",
-    "@tailwindcss/postcss": "^4.1.16"
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
   }
 }
