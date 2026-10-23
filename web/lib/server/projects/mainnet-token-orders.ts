@@ -126,6 +126,9 @@ export async function settleMainnetTokenOrder(
   if (outcome.status !== "confirmed") {
     return { status: outcome.status, orderId: order.order_id };
   }
+  if (outcome.hash !== input.transactionHash.toLowerCase()) {
+    throw new MainnetOrderError("payment_hash_mismatch");
+  }
 
   // Accept only payment made while this exact order was open. A payment
   // outside the window needs manual reconciliation, not automatic issuance.
@@ -146,6 +149,9 @@ export async function settleMainnetTokenOrder(
         AND owner_public_key = ${owner}
         AND state = 'pending'
         AND payment_transaction_hash IS NULL
+        AND expires_at > now()
+        AND created_at <= ${outcome.createdAt}::timestamptz
+        AND expires_at > ${outcome.createdAt}::timestamptz
       RETURNING *
     `;
     if (updated) return { status: "paid", orderId: updated.order_id };
