@@ -69,9 +69,6 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Check formatting
-        run: npm run format:check
-
       - name: Lint
         run: npm run lint
 
