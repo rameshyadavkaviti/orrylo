@@ -36,6 +36,7 @@ CREATE TABLE mainnet_token_orders (
 CREATE INDEX mainnet_token_orders_owner_idx
   ON mainnet_token_orders (owner_public_key, created_at DESC);
 
--- Role grants must be reconciled with the actual application's least-privilege
--- Neon login before exposing the new API. This migration grants no PUBLIC access.
+-- Only the authenticated application role can create/read/settle orders.
+-- Database owner retains migration authority; PUBLIC receives no privileges.
 REVOKE ALL ON mainnet_token_orders FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE ON mainnet_token_orders TO orrylo_app;
