@@ -433,6 +433,7 @@ if (!TEST_DATABASE_URL) {
       idempotencyKey: randomUUID(),
       code: "LEGACY",
       displayName: "Legacy draft",
+      description: "Legacy publication fixture.",
     });
     await sql`
       UPDATE project_profiles
