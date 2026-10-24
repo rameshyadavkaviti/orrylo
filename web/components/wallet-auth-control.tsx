@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { StellarNetwork } from "../lib/config/public-env";
 
 import { albedoAuthAdapter } from "../lib/wallet/albedo-auth-adapter";
@@ -39,6 +40,7 @@ export function WalletAuthControl({
   network = "testnet",
   onAuthenticated,
 }: WalletAuthControlProps = {}) {
+  const router = useRouter();
   const [state, setState] = useState<WalletAuthState>({
     status: "disconnected",
   });
@@ -46,7 +48,7 @@ export function WalletAuthControl({
   useEffect(() => {
     let active = true;
 
-    void (async () => {
+    async function updateFromSession() {
       try {
         const response = await fetch("/api/auth/session", {
           method: "GET",
@@ -70,10 +72,13 @@ export function WalletAuthControl({
           setState({ status: "disconnected" });
         }
       }
-    })();
+    }
 
+    void updateFromSession();
+    window.addEventListener("orrylo-auth-changed", updateFromSession);
     return () => {
       active = false;
+      window.removeEventListener("orrylo-auth-changed", updateFromSession);
     };
   }, []);
 
@@ -165,6 +170,8 @@ export function WalletAuthControl({
 
       setState({ status: "authenticated", publicKey: result.publicKey });
       onAuthenticated?.(result.publicKey);
+      window.dispatchEvent(new Event("orrylo-auth-changed"));
+      router.refresh();
     } catch {
       setState({
         status: "failure",
@@ -182,6 +189,8 @@ export function WalletAuthControl({
       });
     } finally {
       setState({ status: "disconnected" });
+      window.dispatchEvent(new Event("orrylo-auth-changed"));
+      router.refresh();
     }
   }
 
