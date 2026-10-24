@@ -13,7 +13,7 @@ import "./palette.css";
 export const metadata: Metadata = {
   title: "Orrylo — Build on Stellar",
   description:
-    "Design and preview a Stellar token without connecting a wallet. Explore Orrylo's clean MVP token builder.",
+    "Design and preview a Stellar asset without connecting a wallet. Explore Orrylo's clean MVP asset builder.",
   icons: {
     icon: "/brand/orrylo-logo-1f95ea3.webp",
     shortcut: "/brand/orrylo-logo-1f95ea3.webp",
