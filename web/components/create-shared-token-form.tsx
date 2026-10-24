@@ -32,6 +32,7 @@ import {
 } from "../lib/validation/token";
 import { WalletAuthControl } from "./wallet-auth-control";
 import { CustomerTrustlineControl } from "./customer-trustline-control";
+import { MainnetOrderControl, type MainnetOrderView as VerifiedMainnetOrder } from "./mainnet-order-control";
 
 const INITIAL_DRAFT: SharedAssetDraft = {
   code: "",
@@ -76,7 +77,7 @@ interface MainnetOrderView {
   managePath: string;
 }
 
-export function CreateSharedTokenForm({ network = "testnet" }: { network?: "testnet" | "public" }) {
+export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEnabled = false }: { network?: "testnet" | "public"; mainnetActivationEnabled?: boolean }) {
   const isMainnet = network === "public";
   const [draft, setDraft] = useState<SharedAssetDraft>(INITIAL_DRAFT);
   const [errors, setErrors] = useState<SharedAssetDraftErrors>({});
@@ -94,6 +95,7 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
   const [mainnetPreviewBusy, setMainnetPreviewBusy] = useState(false);
   const [mainnetPayBusy, setMainnetPayBusy] = useState(false);
   const [mainnetPaymentMessage, setMainnetPaymentMessage] = useState<string | null>(null);
+  const [verifiedMainnetOrder, setVerifiedMainnetOrder] = useState<VerifiedMainnetOrder | null>(null);
   const [trustlineStep, setTrustlineStep] = useState<{
     projectId: string;
     managePath: string;
@@ -115,6 +117,7 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
     setTrustlineStep(null);
     setMainnetPreview(null);
     setMainnetPreviewError(null);
+    setVerifiedMainnetOrder(null);
     idempotencyKeyRef.current = null;
     issuanceIdempotencyKeyRef.current = null;
     pendingSaveRef.current = null;
@@ -330,6 +333,20 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
     }
   }
 
+  async function loadVerifiedMainnetOrder(order: MainnetOrderView) {
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(order.projectId)}/mainnet`, { credentials: "same-origin", cache: "no-store" });
+      const data = await readJson<{ok: boolean; order: VerifiedMainnetOrder}>(response);
+      if (!response.ok || !data?.ok || data.order.status === "awaiting_payment") {
+        setMainnetPaymentMessage("Payment state is not yet verified. Check the saved payment hash; do not pay again.");
+        return;
+      }
+      setVerifiedMainnetOrder(data.order);
+    } catch {
+      setMainnetPaymentMessage("Could not load the next step. Your paid order is saved; resume from your project.");
+    }
+  }
+
   async function previewMainnetPayment(order: MainnetOrderView) {
     if (mainnetPreviewBusy) return;
     setMainnetPreviewBusy(true);
@@ -392,8 +409,15 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
       if (response.ok && result?.ok && (result.status === "paid" || result.status === "already_paid")) {
         clearSettledMainnetPayment(window.localStorage, order.orderId, pending.value.transactionHash);
         setSaveState({status: "mainnet_paid", order});
-        setMainnetPaymentMessage("Payment confirmed on Mainnet. Continuing to trustline and issuance…");
-        window.location.assign(order.managePath);
+        setMainnetPaymentMessage("Payment confirmed. Preparing the next step…");
+        try {
+          const next = await fetch(`/api/projects/${encodeURIComponent(order.projectId)}/mainnet`, { credentials: "same-origin", cache: "no-store" });
+          const data = await readJson<{ok: boolean; order: VerifiedMainnetOrder}>(next);
+          if (!next.ok || !data?.ok) throw new Error("state_unavailable");
+          setVerifiedMainnetOrder(data.order);
+        } catch {
+          setMainnetPaymentMessage("Payment is verified, but the next step could not load. Use your saved project to resume safely. Do not pay again.");
+        }
       } else {
         setMainnetPaymentMessage("Payment not yet confirmed or requires reconciliation. Orrylo will not request another payment; retry verification later.");
       }
@@ -1116,9 +1140,16 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
             ) : null}
             {isMainnet && saveState.status === "mainnet_paid" ? (
               <section className="creation-resume-panel" role="status">
-                <h3>Payment confirmed</h3>
-                <p>Your 10 XLM payment has been verified. Continue with wallet preparation using your saved project. No second payment is needed. Mainnet issuance remains gated.</p>
-                <a className="button button-primary" href={saveState.order.managePath+"#creation-next-step"}>Continue to wallet preparation →</a>
+                {verifiedMainnetOrder ? (
+                  <MainnetOrderControl initialOrder={verifiedMainnetOrder} activationEnabled={mainnetActivationEnabled} onIssued={() => window.location.assign(saveState.order.managePath)} />
+                ) : (
+                  <>
+                    <h3>Payment confirmed</h3>
+                    <p>{mainnetPaymentMessage ?? "Loading wallet preparation…"}</p>
+                    <button type="button" className="button button-secondary" onClick={() => void loadVerifiedMainnetOrder(saveState.order)}>Reload next step</button>
+                    <a href={saveState.order.managePath}>Recover from saved project</a>
+                  </>
+                )}
               </section>
             ) : null}
             {isMainnet && saveState.status === "mainnet_order_unavailable" ? (
