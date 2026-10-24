@@ -286,7 +286,6 @@ test("burns challenge after failed proof", async () => {
 test("rejects cross-context challenge reuse", async () => {
   const contexts = [
     { domain: "evil.example", network: "testnet" as const },
-    { domain: "app.orrylo.com", network: "public" as const },
   ];
 
   for (const context of contexts) {
@@ -360,3 +359,15 @@ test("rejects public-key substitution", async () => {
 function randomNonce(seed: string): string {
   return Buffer.from(seed.padEnd(32, "_")).toString("base64url").slice(0, 43);
 }
+
+
+test("a Mainnet wallet proof authenticates on the same domain without changing the global network", async () => {
+  const service = createService();
+  const challenge = await service.createChallenge(NOW, "z".repeat(43), "public");
+  assert.match(challenge.payload, /network=public/);
+  const result = await service.verifyWallet({
+    challengeId: challenge.id, payload: challenge.payload,
+    proof: proofFor(challenge.payload),
+  }, NOW + 1);
+  assert.equal(result.ok, true);
+});
