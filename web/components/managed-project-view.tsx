@@ -177,7 +177,7 @@ export function ManagedProjectView({
         />
       ) : mainnetOrder?.status === "issued" ? (
         <MainnetOrderControl initialOrder={mainnetOrder} activationEnabled={mainnetActivationEnabled} />
-      ) : null
+      ) : null}
 
       <ManagedProjectMetadataForm
         projectId={project.projectId}
