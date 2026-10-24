@@ -405,3 +405,38 @@
     max-width: 100%;
   }
 }
+
+/* Guided token creation progress and next-action focus. */
+.creation-progress{display:grid;gap:12px;padding:18px;border:1px solid var(--line);border-radius:18px;background:var(--surface-soft)}
+.creation-progress-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.creation-progress-top strong{font-size:1.05rem;color:var(--text)}
+.creation-progress-top span,.creation-progress-caption{font-size:.82rem;line-height:1.55;color:var(--muted)}
+.creation-progress-caption{margin:0}
+.creation-progress-list{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;list-style:none;margin:0;padding:0}
+.creation-progress-list:has(>li:nth-child(4):last-child){grid-template-columns:repeat(4,minmax(0,1fr))}
+.creation-progress-list li{min-width:0;display:grid;justify-items:center;align-content:start;text-align:center;gap:7px;opacity:.5}
+.creation-progress-list li>span{display:grid;width:29px;height:29px;place-items:center;border:1px solid var(--line);border-radius:50%;font-weight:800;font-size:.8rem;color:var(--muted)}
+.creation-progress-list li small{font-size:.66rem;line-height:1.25;color:var(--muted)}
+.creation-progress-list li.is-current,.creation-progress-list li.is-complete{opacity:1}
+.creation-progress-list li.is-current>span{background:var(--accent);color:var(--accent-contrast);border-color:var(--accent)}
+.creation-progress-list li.is-complete>span{background:var(--violet-soft);color:var(--accent);border-color:var(--accent)}
+.creation-active-step{scroll-margin-top:24px;border:2px solid var(--accent);border-radius:18px;padding:18px;background:var(--surface)}
+.creation-project-next-step{scroll-margin-top:20px}
+.creation-project-next-step>.surface-card{border:2px solid var(--accent);box-shadow:var(--shadow)}
+.creation-project-next-step .project-card-actions{margin-top:16px}
+.creation-project-next-step .project-card-actions>.button{width:100%;min-height:50px}
+.creation-resume-panel{display:grid;gap:12px;margin-top:12px}
+.creation-resume-panel h3,.creation-resume-panel p{margin:0}
+.creation-resume-panel .button{width:100%;text-align:center}
+@media(max-width:680px){
+  .creation-progress{padding:14px 10px;gap:10px}
+  .creation-progress-list{gap:2px}
+  .creation-progress-list li small{font-size:.61rem}
+  .creation-progress-list li>span{width:26px;height:26px}
+  .guided-form[data-creation-stage="review"] .draft-fields>.draft-step:not([aria-labelledby="final-review-title"]){display:none}
+  .guided-form[data-workflow-status="trustline_required"] .draft-fields,
+  .guided-form[data-workflow-status="mainnet_order"] .draft-fields,
+  .guided-form[data-workflow-status="mainnet_paid"] .draft-fields{display:none}
+  .creation-active-step{padding:14px}
+  .creation-active-step .button-primary{width:100%;min-height:48px}
+}
