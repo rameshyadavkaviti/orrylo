@@ -210,6 +210,7 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
     const prepared = prepareManagedProjectSave(
       draft,
       idempotencyKeyRef.current,
+      network,
     );
     setErrors(prepared.errors);
     if (!prepared.ok) {
@@ -961,7 +962,7 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
           <dl className="preview-facts">
             <div>
               <dt>Target network</dt>
-              <dd>Stellar Testnet</dd>
+              <dd>{isMainnet ? "Stellar Mainnet" : "Stellar Testnet"}</dd>
             </div>
             <div>
               <dt>Initial supply</dt>
@@ -1031,6 +1032,7 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
                 </p>
                 <WalletAuthControl
                   connectLabel={isMainnet ? "Connect wallet & save project" : "Connect wallet & create token"}
+                  network={network}
                   onAuthenticated={(publicKey) =>
                     void continueAfterAuthentication(publicKey)
                   }
