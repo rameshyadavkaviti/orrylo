@@ -11,7 +11,7 @@ export function CreateTokenPage({ network = "testnet" }: { network?: StellarNetw
         <h1>Create your product.</h1>
         <p>
           {mainnet
-            ? "Design a Stellar-powered product and review its token details. Mainnet payments and issuance remain disabled until activation is complete."
+            ? "Design a Stellar-powered product and review its token details. Mainnet creation costs 10 XLM plus network fees and reserves when activated. Mainnet payments and issuance remain disabled until activation is complete."
             : "Give your product an identity, preview its token and supply, then connect Albedo to approve the Testnet trustline and issuance."}
         </p>
       </div>
