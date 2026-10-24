@@ -486,3 +486,32 @@
   .sidebar .mobile-nav-details>.mobile-nav-panel .nav-link,
   .sidebar .mobile-nav-details .mobile-nav-toggle{transition:none!important;transform:none!important}
 }
+
+/* Mobile menu belongs directly below the Close button, spanning the header. */
+@media (max-width:900px) {
+  .sidebar .mobile-nav-details{display:contents}
+  .sidebar .mobile-nav-details>.mobile-nav-toggle{
+    grid-column:2;grid-row:1;justify-self:end;
+  }
+  .sidebar .mobile-nav-details>.mobile-nav-panel{
+    position:static;grid-column:1 / -1;grid-row:2;
+    left:auto;right:auto;top:auto;
+    width:100%;max-width:none;min-width:0;
+    max-height:min(65dvh,480px);
+    margin:0;box-sizing:border-box;
+    display:none;transform:none;
+    border-radius:16px;
+  }
+  .sidebar .mobile-nav-details>.mobile-nav-panel.mobile-nav-panel-open{
+    display:flex;visibility:visible;opacity:1;transform:none;
+    animation:orrylo-mobile-menu-enter .32s cubic-bezier(.22,1,.36,1) both;
+  }
+  .sidebar .unified-header-actions{grid-column:1 / -1;grid-row:3}
+  @keyframes orrylo-mobile-menu-enter{
+    from{opacity:0;transform:translateY(-7px)}
+    to{opacity:1;transform:translateY(0)}
+  }
+}
+@media (max-width:900px) and (prefers-reduced-motion:reduce){
+  .sidebar .mobile-nav-details>.mobile-nav-panel.mobile-nav-panel-open{animation:none}
+}
