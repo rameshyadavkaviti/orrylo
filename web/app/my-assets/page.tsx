@@ -145,7 +145,7 @@ export async function MyAssetsPage() {
         <h1>Your managed Orrylo projects.</h1>
         <p>
           Manage saved drafts and projects from your connected wallet. Check a
-          project&apos;s transaction evidence to confirm whether a asset was issued.
+          project&apos;s transaction evidence to confirm whether an asset was issued.
         </p>
       </div>
 
@@ -153,7 +153,7 @@ export async function MyAssetsPage() {
         <div className="empty-state">
           <strong>No managed projects yet</strong>
           <p>
-            Configure a asset anonymously, then save it when you are ready to
+            Configure an asset anonymously, then save it when you are ready to
             keep managing it with Orrylo.
           </p>
           <Link className="button button-primary" href="/create">
