@@ -309,3 +309,11 @@
 @media(max-width:900px){.clean-hero{gap:14px}.clean-visual{overflow:hidden}.clean-token-halo.clean-halo-two{max-width:95vw}.clean-step-grid article:hover{transform:none}}
 @media(max-width:620px){.clean-hero{padding:36px 22px}.clean-hero h1{font-size:clamp(2.8rem,12vw,4.3rem)}.clean-hero-copy>p:not(.clean-disclaimer){line-height:1.65}.clean-actions{gap:10px;margin-top:24px}.clean-actions .clean-cta{width:100%}.clean-visual{min-height:200px}.clean-bottom{gap:22px}.clean-disclaimer{line-height:1.6}.clean-step-grid article{padding:24px}}
 @media(prefers-reduced-motion:reduce){.clean-step-grid article,.clean-token-core,.clean-subtle-link,.sidebar .brand,.sidebar .nav-link{transition:none}.clean-step-grid article:hover,.clean-visual:hover .clean-token-core{transform:none}}
+
+/* Two real network choices; Mainnet financial actions remain independently gated. */
+.header-network-selector{display:flex;align-items:center;gap:3px;border:1px solid var(--line);border-radius:11px;background:var(--surface-soft);padding:4px;white-space:nowrap}
+.header-network-choice{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:7px 10px;border-radius:8px;color:var(--muted);font-size:.78rem;font-weight:700;text-decoration:none;transition:background .18s ease,color .18s ease}
+.header-network-choice:hover{color:var(--text);background:var(--surface)}
+.header-network-choice-active{color:var(--text);background:var(--violet-soft);box-shadow:inset 0 0 0 1px var(--violet)}
+.header-network-choice:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+@media(max-width:640px){.header-network-selector{order:1}.header-network-choice{font-size:.72rem;padding:6px 8px}}
