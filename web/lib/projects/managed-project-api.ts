@@ -1,5 +1,8 @@
+import type { ProjectNetwork } from "./project-profile";
+
 export interface CreateManagedProjectRequest {
   idempotencyKey: string;
+  network?: ProjectNetwork;
   code: string;
   displayName: string;
   description: string;
@@ -74,6 +77,7 @@ export function parseCreateManagedProjectRequest(
     typeof input.code !== "string" ||
     typeof input.displayName !== "string" ||
     typeof input.description !== "string" ||
+    (input.network !== undefined && input.network !== "testnet" && input.network !== "public") ||
     (input.authenticatedWalletAssertion !== undefined &&
       typeof input.authenticatedWalletAssertion !== "string")
   ) {
@@ -94,6 +98,7 @@ export function parseCreateManagedProjectRequest(
 
   return {
     idempotencyKey: input.idempotencyKey,
+    ...(input.network ? { network: input.network as ProjectNetwork } : {}),
     code: input.code,
     displayName: input.displayName,
     description: input.description,
