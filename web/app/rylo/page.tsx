@@ -14,11 +14,11 @@ export function RyloPage() {
         />
         <div>
           <span className="eyebrow">RYLO · Stellar asset</span>
-          <h1>A asset with its own identity.</h1>
+          <h1>An asset with its own identity.</h1>
           <p>
             RYLO is a standalone Stellar asset designed for transfer and potential
             trading. It is separate from Orrylo&apos;s asset-creation service:
-            you do not need to buy, hold, or use RYLO to create a asset.
+            you do not need to buy, hold, or use RYLO to create an asset.
           </p>
         </div>
       </div>
