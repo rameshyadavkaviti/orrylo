@@ -7,12 +7,12 @@ export function CreateTokenPage() {
   return (
     <div className="page-stack">
       <div className="page-heading builder-page-heading">
-        <span className="eyebrow">Create Token</span>
-        <h1>{mainnet ? "Create your Stellar Mainnet token." : "Create your Stellar Testnet token."}</h1>
+        <span className="eyebrow">Product studio</span>
+        <h1>Create your product.</h1>
         <p>
           {mainnet
-            ? "Review your token, connect Albedo, and create a 10 XLM order. Payments and issuance remain disabled until Mainnet activation is complete."
-            : "Start without a wallet. Choose your token details, review the exact supply, then connect Albedo to establish the trustline and confirm issuance on Testnet."}
+            ? "Design a Stellar-powered product and review its token details. Mainnet payments and issuance remain disabled until activation is complete."
+            : "Give your product an identity, preview its token and supply, then connect Albedo to approve the Testnet trustline and issuance."}
         </p>
       </div>
 

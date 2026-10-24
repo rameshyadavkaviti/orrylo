@@ -63,3 +63,7 @@ html[data-theme="dark"] .clean-bottom p,
 html[data-theme="dark"] .clean-step-grid p{color:var(--muted)}
 html[data-theme="dark"] .metadata-publication-action small{color:var(--muted)}
 html[data-theme="dark"] .metadata-publication-action .field-error{color:#ffb4c3!important}
+
+/* Product studio polish in dark mode. */
+html[data-theme="dark"] .clean-step-grid article:hover{border-color:#65548f;box-shadow:0 18px 40px rgba(0,0,0,.22)}
+html[data-theme="dark"] .clean-bottom{box-shadow:none}
