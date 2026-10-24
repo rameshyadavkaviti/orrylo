@@ -15,9 +15,9 @@ export const metadata: Metadata = {
   description:
     "Design and preview a Stellar token without connecting a wallet. Explore Orrylo's clean MVP token builder.",
   icons: {
-    icon: "/brand/orrylo-logo.webp?v=1f95ea3",
-    shortcut: "/brand/orrylo-logo.webp?v=1f95ea3",
-    apple: "/brand/orrylo-logo.webp?v=1f95ea3",
+    icon: "/brand/orrylo-logo-1f95ea3.webp",
+    shortcut: "/brand/orrylo-logo-1f95ea3.webp",
+    apple: "/brand/orrylo-logo-1f95ea3.webp",
   },
 };
 
