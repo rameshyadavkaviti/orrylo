@@ -79,7 +79,6 @@ export function readMainnetCreationConfiguration(
   );
   const treasury = normalizedPublicKey(env.ORRYLO_MAINNET_TREASURY_PUBLIC_KEY);
   if (
-    env.NEXT_PUBLIC_STELLAR_NETWORK !== "public" ||
     issuer !== MAINNET_SHARED_ISSUER_PUBLIC_KEY ||
     env.ORRYLO_MAINNET_TREASURY_VERIFIED !== "true" ||
     !positiveInteger(env.ORRYLO_MAINNET_ISSUER_FEE_STROOPS) ||
