@@ -50,9 +50,14 @@ export class WalletAuthService {
   async createChallenge(
     now = Date.now(),
     nonce?: string,
+    network: StellarNetwork = this.config.network,
   ): Promise<PublicAuthChallenge> {
+    if (network !== "testnet" && network !== "public") {
+      throw new Error("unsupported_auth_network");
+    }
     const challenge = createAuthChallenge({
       ...this.config,
+      network,
       now,
       nonce,
     });
@@ -82,7 +87,7 @@ export class WalletAuthService {
     if (
       challenge.purpose !== AUTH_PURPOSE ||
       challenge.domain !== this.config.domain ||
-      challenge.network !== this.config.network ||
+      (challenge.network !== "testnet" && challenge.network !== "public") ||
       request.payload !== challenge.payload
     ) {
       return { ok: false, code: "challenge_mismatch" };
