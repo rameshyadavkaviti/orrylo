@@ -1,8 +1,8 @@
 import { CreateSharedTokenForm } from "../../components/create-shared-token-form";
-import { readPublicRuntimeConfig } from "../../lib/config/public-env";
+import { cookies } from "next/headers";
+import type { StellarNetwork } from "../../lib/config/public-env";
 
-export function CreateTokenPage() {
-  const network = readPublicRuntimeConfig().network;
+export function CreateTokenPage({ network = "testnet" }: { network?: StellarNetwork } = {}) {
   const mainnet = network === "public";
   return (
     <div className="page-stack">
@@ -22,9 +22,21 @@ export function CreateTokenPage() {
         <span>✓ Shared Issuer model explained</span>
       </div>
 
-      <CreateSharedTokenForm network={network} />
+      <CreateSharedTokenForm key={network} network={network} />
     </div>
   );
 }
 
-export default CreateTokenPage;
+/** Network selection is a preference, never payment authorization. */
+export default async function CreateProductPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ network?: string }>;
+}) {
+  const requested = (await searchParams)?.network;
+  const remembered = (await cookies()).get("orrylo-network")?.value;
+  const network: StellarNetwork = requested === "public" || requested === "testnet"
+    ? requested
+    : remembered === "public" ? "public" : "testnet";
+  return <CreateTokenPage network={network} />;
+}
