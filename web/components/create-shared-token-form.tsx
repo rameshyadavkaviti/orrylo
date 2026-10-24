@@ -31,6 +31,7 @@ import {
   validateSharedAssetDraft,
 } from "../lib/validation/token";
 import { WalletAuthControl } from "./wallet-auth-control";
+import { WalletBalance } from "./wallet-balance";
 import { CustomerTrustlineControl } from "./customer-trustline-control";
 import { MainnetOrderControl, type MainnetOrderView as VerifiedMainnetOrder } from "./mainnet-order-control";
 
@@ -648,9 +649,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
             required to save a Project Profile, not to preview assets.
           </p>
         </div>
-        <span className="builder-anonymous-note">
-          Preview: no wallet required
-        </span>
+        <WalletBalance network={network} />
       </div>
 
       <div className="draft-layout">
