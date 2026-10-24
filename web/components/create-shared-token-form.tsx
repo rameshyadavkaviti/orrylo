@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { type ChangeEvent, type FormEvent, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 
 import type {
   CreateManagedProjectFailure,
@@ -106,6 +106,7 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
   const revisionRef = useRef(0);
   const savingRef = useRef(false);
   const logoReadVersionRef = useRef(0);
+  const workflowRef = useRef<HTMLDivElement>(null);
 
   function invalidateReview() {
     revisionRef.current += 1;
@@ -578,6 +579,17 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
     "preparing_issuance",
     "confirming",
   ].includes(saveState.status);
+
+  const flowLabels = isMainnet
+    ? ["Design", "Review & connect", "Pay", "Prepare wallet", "Verify"]
+    : ["Design", "Review & connect", "Prepare wallet", "Verify"];
+  const stage = saveState.status === "confirmed" ? (isMainnet ? 4 : 3)
+    : ["trustline_required", "mainnet_paid", "persisting_intent", "preparing_issuance", "confirming", "reconciliation_required"].includes(saveState.status) ? (isMainnet ? 3 : 2)
+    : ["mainnet_order", "mainnet_order_unavailable"].includes(saveState.status) ? 2
+    : review ? 1 : 0;
+  useEffect(() => {
+    if (saveState.status !== "idle") workflowRef.current?.scrollIntoView({behavior:"smooth",block:"start"});
+  }, [saveState.status]);
   const previewCode = draft.code.trim().toUpperCase() || "TOKEN";
   const previewName = draft.displayName.trim() || "Your token";
   const previewDescription =
@@ -585,7 +597,23 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
     "Add a short description to show people what your token is for.";
 
   return (
-    <form className="form-card guided-form" onSubmit={handleSubmit} noValidate>
+    <form className="form-card guided-form" data-creation-stage={review ? "review" : "design"} data-workflow-status={saveState.status} onSubmit={handleSubmit} noValidate>
+      <section className="creation-progress" aria-label="Token creation progress">
+        <div className="creation-progress-top"><strong>Create your token</strong><span>Step {stage + 1} of {flowLabels.length}</span></div>
+        <ol className="creation-progress-list">{flowLabels.map((label, index) => (
+          <li key={label} className={index===stage ? "is-current" : index<stage ? "is-complete" : ""} aria-current={index===stage ? "step" : undefined}>
+            <span aria-hidden="true">{index<stage ? "✓" : index+1}</span><small>{label}</small>
+          </li>
+        ))}</ol>
+        <p className="creation-progress-caption" role="status">
+          {saveState.status==="trustline_required" ? "Next: prepare your wallet to receive this token. No other page needed."
+            : saveState.status==="mainnet_paid" ? "Payment verified. Continue wallet preparation without paying again."
+            : saveState.status==="mainnet_order" ? "Your project is saved. Authorize payment only when enabled."
+            : saveState.status==="confirmed" ? "Confirmed on Stellar."
+            : review ? "Review details and continue. Project saving is handled automatically."
+            : "Enter your token details. No wallet required to preview."}
+        </p>
+      </section>
       <div className="builder-heading">
         <div>
           <span className="eyebrow">Interactive token builder</span>
@@ -839,12 +867,13 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
           </section>
 
           <div className="form-actions">
+            {review ? <button type="button" className="button button-secondary" onClick={invalidateReview} disabled={isWorking}>Edit details</button> : null}
             <button
               type="submit"
               className="button button-secondary"
               disabled={isWorking}
             >
-              Review configuration
+              {review ? "Update review" : "Review & continue"}
             </button>
           </div>
 
@@ -991,9 +1020,9 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
             </div>
           </dl>
 
-          <div className="execution-boundary">
-            <span className="eyebrow">Create Token</span>
-            <strong>One reviewed Project Profile + issuance journey.</strong>
+          <div ref={workflowRef} className="execution-boundary creation-active-step" tabIndex={-1}>
+            <span className="eyebrow">Your next step</span>
+            <strong>{saveState.status==="trustline_required" ? "Prepare your wallet" : saveState.status==="mainnet_order" ? "Review and authorize payment" : saveState.status==="mainnet_paid" ? "Payment confirmed — continue" : saveState.status==="confirmed" ? "Your token is ready" : review ? "Save and continue" : "Review token details first"}</strong>
             <p>
               Your Albedo-authenticated wallet becomes the owner and receiving
               destination. Issuer, network, fee and ledger status remain
@@ -1017,7 +1046,7 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
                       ? "Preparing issuance…"
                       : saveState.status === "confirming"
                         ? "Confirming…"
-                        : isMainnet ? "Save project & prepare order" : "Create Token"}
+                        : isMainnet ? "Continue to payment" : "Continue to wallet preparation"}
             </button>
 
             {saveState.status === "needs_wallet" ||
@@ -1042,7 +1071,7 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
 
             {isMainnet && saveState.status === "mainnet_order" ? (
               <section aria-label="Mainnet payment order" className="draft-step">
-                <h3>Mainnet order created</h3>
+                <h3>Review your payment</h3>
                 <p>Your project and payment order are saved. Payment opens only when the Mainnet launch gates are explicitly enabled. Do not send funds manually.</p>
                 <dl className="preview-facts">
                   <div><dt>Price</dt><dd>{saveState.order.priceXlm} XLM</dd></div>
@@ -1085,7 +1114,11 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
               </section>
             ) : null}
             {isMainnet && saveState.status === "mainnet_paid" ? (
-              <p role="status">Payment is confirmed for this order. Mainnet token issuance remains gated. <a href={saveState.order.managePath}>Open saved project</a>.</p>
+              <section className="creation-resume-panel" role="status">
+                <h3>Payment confirmed</h3>
+                <p>Your 10 XLM payment has been verified. Continue with wallet preparation using your saved project. No second payment is needed. Mainnet issuance remains gated.</p>
+                <a className="button button-primary" href={saveState.order.managePath+"#creation-next-step"}>Continue to wallet preparation →</a>
+              </section>
             ) : null}
             {isMainnet && saveState.status === "mainnet_order_unavailable" ? (
               <p role="status">Your project was saved, but Mainnet orders are not yet available. No payment was requested. <a href={saveState.managePath}>Open saved project</a>.</p>
