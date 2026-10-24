@@ -1,28 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 import type { StellarNetwork } from "../lib/config/public-env";
 
 const PREFERENCE_KEY = "orrylo-selected-network";
+const EVENT = "orrylo-network-change";
 
-/** UI preference only. Financial endpoints enforce their own network and activation. */
+function subscribe(callback: () => void) {
+  window.addEventListener(EVENT, callback);
+  window.addEventListener("popstate", callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener(EVENT, callback);
+    window.removeEventListener("popstate", callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+function selectedNetwork(): StellarNetwork {
+  const requested = new URLSearchParams(window.location.search).get("network");
+  if (requested === "public" || requested === "testnet") return requested;
+  return window.localStorage.getItem(PREFERENCE_KEY) === "public" ? "public" : "testnet";
+}
+
+/** Browser preference only. Financial endpoints independently validate and gate requests. */
 export function NetworkSelector() {
-  const [network, setNetwork] = useState<StellarNetwork>("testnet");
-  useEffect(() => {
-    const urlNetwork = new URLSearchParams(window.location.search).get("network");
-    const stored = window.localStorage.getItem(PREFERENCE_KEY);
-    const selected = urlNetwork === "public" || urlNetwork === "testnet"
-      ? urlNetwork
-      : stored === "public" ? "public" : "testnet";
-    setNetwork(selected);
-  }, []);
+  const network = useSyncExternalStore(subscribe, selectedNetwork, () => "testnet");
 
   function choose(value: StellarNetwork) {
-    setNetwork(value);
     window.localStorage.setItem(PREFERENCE_KEY, value);
     document.cookie = `orrylo-network=${value}; Path=/; SameSite=Lax; Max-Age=31536000`;
+    window.dispatchEvent(new Event(EVENT));
   }
 
   return (
