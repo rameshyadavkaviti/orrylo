@@ -615,7 +615,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
   useEffect(() => {
     if (saveState.status !== "idle") workflowRef.current?.scrollIntoView({behavior:"smooth",block:"start"});
   }, [saveState.status]);
-  const previewCode = draft.code.trim().toUpperCase() || "TOKEN";
+  const previewCode = draft.code.trim().toUpperCase() || "ASSET";
   const previewName = draft.displayName.trim() || "Your asset";
   const previewDescription =
     draft.description.trim() ||
