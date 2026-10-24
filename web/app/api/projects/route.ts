@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE_NAME } from "../../../lib/auth/constants";
 import { isTrustedAuthOrigin } from "../../../lib/auth/origin";
 import type { AuthSession } from "../../../lib/auth/stores";
+import type { ProjectNetwork } from "../../../lib/projects/project-profile";
 import {
   getWalletAuthService,
   readServerAuthConfig,
@@ -34,6 +35,7 @@ export interface CreateProjectRouteDependencies {
     ownerPublicKey: string,
     input: {
       idempotencyKey: string;
+      network?: ProjectNetwork;
       code: string;
       displayName: string;
       description: string;
@@ -51,7 +53,7 @@ export interface CreateProjectRouteDependencies {
 export async function POST(request: NextRequest) {
   const config = readServerAuthConfig();
   const service = new ManagedProjectService(getDatabaseClient(), {
-    network: config.network,
+    network: "testnet",
   });
 
   return handleCreateManagedProject(request, {
