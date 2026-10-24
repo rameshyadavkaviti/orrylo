@@ -214,7 +214,7 @@ export function ManagedProjectView({
         {readiness.blockers.length > 0 ? (
           <p className="readiness-note">
             {issued
-              ? "Automatic publication is pending or failed. Orrylo will retry safely without repeating token issuance."
+              ? "Automatic publication is pending or failed. Orrylo will retry safely without repeating asset issuance."
               : "This draft remains private. Publication begins automatically only after confirmed Stellar issuance."}
           </p>
         ) : null}
@@ -257,7 +257,7 @@ export function ManagedProjectView({
       <section className="prototype-boundary">
         <div>
           <span className="eyebrow">Execution boundary</span>
-          <strong>Metadata publication is not token issuance.</strong>
+          <strong>Metadata publication is not asset issuance.</strong>
         </div>
         <p>
           Confirmed issuance starts landing-page and metadata publication
