@@ -7,7 +7,7 @@ export function TokenBuilderSteps() {
     { number: "04", title: "Verify", detail: "Confirm the on-chain Testnet result." },
   ];
   return (
-    <section aria-label="Token creation overview" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <section aria-label="Asset creation overview" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {steps.map((step) => (
         <div key={step.number} className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-sm">
           <span className="text-xs font-bold tracking-widest text-[var(--violet)]">{step.number}</span>
