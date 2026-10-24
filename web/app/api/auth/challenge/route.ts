@@ -18,7 +18,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const challenge = await getWalletAuthService().createChallenge();
+  const requested = request.nextUrl.searchParams.getAll("network");
+  if (requested.length > 1 || (requested[0] !== undefined &&
+    requested[0] !== "testnet" && requested[0] !== "public")) {
+    return NextResponse.json({ code: "invalid_request" }, {
+      status: 400, headers: { "Cache-Control": "no-store" },
+    });
+  }
+  const challenge = await getWalletAuthService().createChallenge(
+    Date.now(), undefined, requested[0] ?? config.network,
+  );
 
   return NextResponse.json(challenge, {
     headers: {
