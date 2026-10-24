@@ -40,7 +40,7 @@ export function NetworkSelector() {
   }
 
   return (
-    <div role="group" aria-label="Stellar network" className="header-network-selector" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: 5, border: "1px solid var(--line)", borderRadius: 12, background: "var(--surface-soft)", flexShrink: 0, whiteSpace: "nowrap" }}>
+    <div role="group" aria-label="Stellar network selection" className="header-network-selector" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: 5, border: "1px solid var(--line)", borderRadius: 12, background: "var(--surface-soft)", flexShrink: 0, whiteSpace: "nowrap" }}>
       {(["testnet", "public"] as const).map((value) => (
         <Link
           key={value}
