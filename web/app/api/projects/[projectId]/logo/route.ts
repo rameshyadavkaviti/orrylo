@@ -7,6 +7,8 @@ import { isValidProjectId } from "../../../../../lib/projects/project-profile";
 import { getDatabaseClient } from "../../../../../lib/server/persistence/database";
 import { PostgresProjectProfileRepository } from "../../../../../lib/server/persistence/project-profile-repository";
 import { detectLogoType, logoObjectKey, storeLogo } from "../../../../../lib/server/projects/logo-storage";
+import { createServerMetadataPublicationService } from "../../../../../lib/server/projects/automatic-publication-service";
+import { PostgresMainnetPublicationBackend } from "../../../../../lib/server/projects/mainnet-publication-service";
 
 export const runtime = "nodejs";
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -48,9 +50,23 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pr
     await storeLogo(key, bytes, type);
     const updated = await repository.updateOwnedLogoUrl(projectId, session.publicKey, publicUrl);
     if (!updated) return NextResponse.json({ ok: false, code: "project_not_found" }, { status: 404 });
-    // For already-issued assets, the metadata publication must be reconciled
-    // separately. Do not claim remote TOML is updated until verified.
-    return NextResponse.json({ ok: true, logoUrl: publicUrl, metadataNeedsReconciliation: owned.publicStatus === "published" }, { headers: { "Cache-Control": "no-store" } });
+    let metadataStatus: "not_issued" | "verified" | "pending" = "not_issued";
+    if (updated.publicStatus === "published") {
+      try {
+        if (updated.network === "public") {
+          const result = await new PostgresMainnetPublicationBackend(getDatabaseClient())
+            .publishMetadata(projectId, session.publicKey);
+          metadataStatus = result.verified ? "verified" : "pending";
+        } else {
+          const result = await createServerMetadataPublicationService(getDatabaseClient())
+            .publishOwnedProject(projectId, session.publicKey);
+          metadataStatus = result.status === "verified" ? "verified" : "pending";
+        }
+      } catch {
+        metadataStatus = "pending"; // Persisted image is not lost if remote metadata verification fails.
+      }
+    }
+    return NextResponse.json({ ok: true, logoUrl: publicUrl, metadataStatus }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({ ok: false, code: "logo_storage_unavailable" }, { status: 503 });
   }
