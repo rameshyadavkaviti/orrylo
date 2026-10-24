@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useSyncExternalStore } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import type { StellarNetwork } from "../lib/config/public-env";
 
@@ -10,49 +10,77 @@ const EVENT = "orrylo-network-change";
 
 function subscribe(callback: () => void) {
   window.addEventListener(EVENT, callback);
-  window.addEventListener("popstate", callback);
   window.addEventListener("storage", callback);
   return () => {
     window.removeEventListener(EVENT, callback);
-    window.removeEventListener("popstate", callback);
     window.removeEventListener("storage", callback);
   };
+}
+
+function rememberedNetwork(): StellarNetwork {
+  return window.localStorage.getItem(PREFERENCE_KEY) === "public" ? "public" : "testnet";
 }
 
 function rememberNetwork(value: StellarNetwork) {
   window.localStorage.setItem(PREFERENCE_KEY, value);
   document.cookie = `orrylo-network=${value}; Path=/; SameSite=Lax; Max-Age=31536000`;
+  window.dispatchEvent(new Event(EVENT));
 }
 
-function selectedNetwork(): StellarNetwork {
-  const requested = new URLSearchParams(window.location.search).get("network");
-  if (requested === "public" || requested === "testnet") return requested;
-  return window.localStorage.getItem(PREFERENCE_KEY) === "public" ? "public" : "testnet";
-}
-
-/** Browser preference only. Financial endpoints independently validate and gate requests. */
+/** UI preference only. Financial endpoints independently validate and gate requests. */
 export function NetworkSelector() {
-  const network = useSyncExternalStore(subscribe, selectedNetwork, () => "testnet");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const savedNetwork = useSyncExternalStore(subscribe, rememberedNetwork, () => "testnet");
+  const requested = searchParams.get("network");
+  const routeNetwork: StellarNetwork | null =
+    requested === "public" || requested === "testnet" ? requested : null;
+  const [pendingNetwork, setPendingNetwork] = useState<StellarNetwork | null>(null);
+  const [pendingTarget, setPendingTarget] = useState<string | null>(null);
+  const currentTarget = `${pathname}?${searchParams.toString()}`;
+
+  // Once the destination has rendered, the URL becomes authoritative again.
+  useEffect(() => {
+    if (pendingTarget === null) return;
+    if (currentTarget === pendingTarget) {
+      // State was committed by the router, not just the click.
+      setPendingNetwork(null);
+      setPendingTarget(null);
+    }
+  }, [currentTarget, pendingTarget]);
+
+  const network = pendingNetwork ?? routeNetwork ?? savedNetwork;
 
   function choose(value: StellarNetwork) {
+    if (value === network && pathname === "/create" && routeNetwork === value) return;
+    // Update the indicator immediately, before any Next.js navigation or server render.
+    setPendingNetwork(value);
+    const target = `/create?network=${value}`;
+    setPendingTarget(target);
     rememberNetwork(value);
-    window.dispatchEvent(new Event(EVENT));
+    router.push(target);
   }
 
   return (
-    <div role="group" aria-label="Stellar network selection" className="header-network-selector" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: 5, border: "1px solid var(--line)", borderRadius: 12, background: "var(--surface-soft)", flexShrink: 0, whiteSpace: "nowrap" }}>
+    <div
+      role="group"
+      aria-label="Stellar network selection"
+      className="header-network-selector"
+      data-network={network}
+    >
+      <span className="header-network-thumb" aria-hidden="true" />
       {(["testnet", "public"] as const).map((value) => (
-        <Link
+        <button
           key={value}
-          href={`/create?network=${value}`}
+          type="button"
           onClick={() => choose(value)}
-          aria-current={network === value ? "true" : undefined}
+          aria-pressed={network === value}
           className={`header-network-choice${network === value ? " header-network-choice-active" : ""}`}
-          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 73, minHeight: 35, padding: "7px 13px", borderRadius: 8, textDecoration: "none", fontSize: 13, fontWeight: 700, lineHeight: "20px", color: network === value ? "var(--text)" : "var(--muted)", background: network === value ? "var(--violet-soft)" : "transparent", boxShadow: network === value ? "inset 0 0 0 1px var(--violet)" : "none" }}
           title={value === "public" ? "Mainnet preview; live payments are gated" : "Stellar Testnet"}
         >
           {value === "public" ? "Mainnet" : "Testnet"}
-        </Link>
+        </button>
       ))}
     </div>
   );
