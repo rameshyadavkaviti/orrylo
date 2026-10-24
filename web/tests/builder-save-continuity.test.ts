@@ -90,3 +90,13 @@ test("post-authentication retry carries the authenticated wallet only as a conti
     prepared.pending.request.idempotencyKey,
   );
 });
+
+
+test("selected network stays frozen in the prepared project identity", () => {
+  const prepared = prepareManagedProjectSave(
+    { code: "NOVA", displayName: "Nova", description: "Public" },
+    "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "public",
+  );
+  assert.equal(prepared.ok, true);
+  if (prepared.ok) assert.equal(prepared.pending.request.network, "public");
+});
