@@ -12,9 +12,9 @@ test("homepage makes anonymous token building the dominant product journey", () 
 
   assert.match(html, /Your idea.*Made tangible/is);
   assert.match(html, />Create your product/i);
-  assert.match(html, /Wallet approval required to issue/i);
+  assert.match(html, /Mainnet payments gated/i);
   assert.match(html, /Free to explore/i);
-  assert.match(html, /Testnet only/i);
+  assert.match(html, /CHOOSE YOUR NETWORK/i);
   assert.match(html, /Connect Albedo/i);
   assert.match(html, /Testnet issuance is available/i);
 });
@@ -65,4 +65,12 @@ test("products distinguish available prototype work from future services", () =>
   assert.match(html, /Custom Stellar Services/i);
   assert.match(html, /Coming soon/i);
   assert.match(html, /does not simulate/i);
+});
+
+
+test("Mainnet product studio renders a Mainnet-specific payment preview without enabling financial actions", () => {
+  const html = renderToStaticMarkup(<CreateTokenPage network="public" />);
+  assert.match(html, /Mainnet payments and issuance remain disabled/i);
+  assert.match(html, /Stellar Mainnet/i);
+  assert.match(html, /10 XLM service price/i);
 });
