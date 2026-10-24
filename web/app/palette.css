@@ -10,7 +10,7 @@
 }
 html[data-theme="dark"]{
   color-scheme:dark;
-  --background:#080D0A;--surface:#111D16;--surface-soft:#192A20;
+  --background:#17221F;--surface:#202F29;--surface-soft:#293C33;
   --text:#EEF9F1;--muted:#AAC3B2;--line:#2C4938;
   --violet:#22E69A;--violet-soft:#143D2B;
   --navy:#09130E;--navy-soft:#14251B;
