@@ -197,6 +197,27 @@ export class PostgresProjectProfileRepository {
     return rows.map(mapManagedProjectProfile);
   }
 
+  async updateOwnedLogoUrl(
+    projectId: string,
+    ownerPublicKey: string,
+    logoUrl: string,
+    now = Date.now(),
+  ): Promise<ManagedProjectProfile | null> {
+    if (!isValidProjectId(projectId)) return null;
+    const owner = normalizeWalletPublicKey(ownerPublicKey);
+    const [row] = await this.sql<ManagedProjectProfileRow[]>`
+      UPDATE project_profiles AS p
+      SET logo_url = ${logoUrl}, updated_at = ${new Date(now)}
+      FROM project_profile_owners AS o
+      WHERE p.project_id = ${projectId}
+        AND o.project_id = p.project_id
+        AND o.owner_public_key = ${owner}
+        AND p.deleted_at IS NULL
+      RETURNING p.*, o.owner_public_key
+    `;
+    return row ? mapManagedProjectProfile(row) : null;
+  }
+
   async updateOwnedMetadata(
     projectId: string,
     ownerPublicKey: string,

@@ -89,6 +89,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
   const [review, setReview] = useState<TokenBuilderReview | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoName, setLogoName] = useState<string | null>(null);
+  const logoFileRef = useRef<File | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle" });
   const [mainnetPreview, setMainnetPreview] = useState<{ expectedHash: string; amount: string; memo: string; destination: string; source: string } | null>(null);
@@ -143,6 +144,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
     setLogoError(null);
     setLogoPreview(null);
     setLogoName(null);
+    logoFileRef.current = null;
 
     if (!file) return;
 
@@ -158,6 +160,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
       return;
     }
 
+    logoFileRef.current = file;
     const reader = new FileReader();
 
     reader.onload = () => {
@@ -278,6 +281,23 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
           message: describeProjectSaveFailure(result),
         });
         return;
+      }
+
+      if (logoFileRef.current) {
+        const logoData = new FormData();
+        logoData.set("logo", logoFileRef.current);
+        const logoResponse = await fetch(`/api/projects/${result.projectId}/logo`, {
+          method: "POST",
+          credentials: "same-origin",
+          body: logoData,
+        });
+        if (!logoResponse.ok) {
+          setSaveState({
+            status: "failure",
+            message: `Project saved, but logo upload failed. Open ${result.managePath} to recover; no token issuance was started.`,
+          });
+          return;
+        }
       }
 
       if (
@@ -798,7 +818,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
                 <h3 id="brand-step">Logo &amp; presentation</h3>
                 <p>
                   Add a local image to make the asset preview feel like your
-                  project. Nothing is uploaded to Orrylo.
+                  project. Your logo will be uploaded and saved with the project before issuance.
                 </p>
               </div>
             </div>
@@ -820,7 +840,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
                 </small>
               ) : (
                 <small id="logo-help">
-                  PNG, JPEG, or WebP · up to 2 MB · previewed in this browser
+                  PNG, JPEG, or WebP · up to 2 MB · saved when you create the project
                   only{logoName ? " · " + logoName : ""}
                 </small>
               )}
@@ -935,7 +955,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
                   <dt>Logo</dt>
                   <dd>
                     {review.logoFileName
-                      ? `${review.logoFileName} (browser only)`
+                      ? `${review.logoFileName} (uploaded on save)`
                       : "None"}
                   </dd>
                 </div>
