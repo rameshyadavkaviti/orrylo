@@ -8,8 +8,8 @@ export const RYLO_HOME_DOMAIN = "orrylo.com";
 export const RYLO_MAINNET_NETWORK_PASSPHRASE =
   "Public Global Stellar Network ; September 2015";
 export const ORRYLO_METADATA_LOGO_URL =
-  "https://orrylo.com/brand/orrylo-logo.webp";
-export const RYLO_MAINNET_IMAGE_URL = "https://orrylo.com/brand/rylo-logo.webp";
+  "https://orrylo.com/logo.png";
+export const RYLO_MAINNET_IMAGE_URL = "https://orrylo.com/logo.png";
 
 /**
  * Canonical RYLO Mainnet identity metadata. This does not assert issuance,
