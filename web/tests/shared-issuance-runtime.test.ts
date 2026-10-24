@@ -41,9 +41,8 @@ test("missing signer or confirmation-writer runtime config fails closed", () => 
   }
 });
 
-test("runtime has no silent network, issuer, or fee activation defaults", () => {
+test("runtime has no silent issuer or fee activation defaults", () => {
   for (const env of [
-    { ...VALID_ENV, NEXT_PUBLIC_STELLAR_NETWORK: "" },
     {
       ...VALID_ENV,
       ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY: "",
@@ -56,6 +55,10 @@ test("runtime has no silent network, issuer, or fee activation defaults", () => 
       SharedIssuanceRuntimeUnavailableError,
     );
   }
+});
+
+test("testnet signer stays isolated from the selected UI network", () => {
+  assert.equal(readSharedIssuanceRuntimeConfig({ ...VALID_ENV, NEXT_PUBLIC_STELLAR_NETWORK: "public" }).issuerPublicKey, ISSUER);
 });
 
 test("valid production config constructs only the private Railway primitive", async () => {
