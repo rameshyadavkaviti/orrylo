@@ -31,7 +31,7 @@ export function AssetListStateView({ state }: { state: AssetListState }) {
           implemented and confirmed.
         </p>
         <Link className="button button-primary" href="/create-token">
-          Prepare a token draft
+          Prepare an asset draft
         </Link>
       </div>
     );
