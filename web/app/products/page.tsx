@@ -2,9 +2,9 @@ import Link from "next/link";
 
 const PRODUCTS = [
   {
-    title: "Token Draft",
+    title: "Asset Draft",
     description:
-      "Shape a Shared Issuer token identity and preview it before anything goes on-chain.",
+      "Shape a Shared Issuer asset identity and preview it before anything goes on-chain.",
     status: "Prototype available",
     href: "/create",
   },
@@ -35,7 +35,7 @@ export function ProductsPage() {
         <span className="eyebrow">Products &amp; Services</span>
         <h1>Start simple, then add infrastructure when you need it.</h1>
         <p>
-          Orrylo is growing beyond token creation. Every card below says clearly
+          Orrylo is growing beyond asset creation. Every card below says clearly
           whether you can use it in this prototype or whether it is still ahead.
         </p>
       </div>
@@ -50,7 +50,7 @@ export function ProductsPage() {
             <p className="muted">{product.description}</p>
             {"href" in product ? (
               <Link className="button button-primary" href={product.href}>
-                Open token builder
+                Open asset builder
               </Link>
             ) : (
               <button
@@ -71,7 +71,7 @@ export function ProductsPage() {
           <strong>Unavailable services stay visibly unavailable.</strong>
         </div>
         <p>
-          Orrylo does not simulate provisioning, token issuance, contract
+          Orrylo does not simulate provisioning, asset issuance, contract
           deployment, or payment success when those execution paths do not
           exist.
         </p>
