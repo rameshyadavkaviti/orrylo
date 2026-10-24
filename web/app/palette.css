@@ -263,3 +263,77 @@ html[data-theme="dark"] .field select:focus-visible{border-color:var(--accent);o
   .clean-visual .clean-token-core{transition:none}
   .clean-visual:hover .clean-token-core{transform:none}
 }
+
+/* Error-state layout safety across pages and responsive header.
+   Alerts may wrap, but must never change the width of their parent grid track. */
+.app-shell,.workspace,.main-content,.page-stack,.page-heading,
+.form-card,.surface-card,.empty-state,.draft-layout,.draft-fields,
+.draft-preview,.creation-active-step,.managed-project-card,
+.prototype-boundary,.step-heading,.field,.wallet-auth-control{
+  min-width:0;
+}
+[role="alert"],.field-error,.form-message,.wallet-auth-error,
+.readiness-note,.wallet-auth-control .wallet-auth-error{
+  max-width:100%;
+  min-width:0;
+  box-sizing:border-box;
+  overflow-wrap:anywhere;
+  word-break:normal;
+  white-space:normal;
+}
+.wallet-auth-control{position:relative}
+.wallet-auth-error{
+  display:block;
+  width:min(100%,320px);
+  margin:0;
+  color:#EF6E78;
+  font-size:.78rem;
+  font-weight:500;
+  line-height:1.45;
+  text-align:left;
+}
+.field-error{line-height:1.45}
+.form-message{line-height:1.5}
+
+/* Header alerts float below their own control so the navbar never reflows. */
+.sidebar .unified-header-actions .wallet-auth-control{
+  align-self:center;
+}
+.sidebar .unified-header-actions .wallet-auth-control .wallet-auth-error{
+  position:absolute;
+  z-index:75;
+  right:0;
+  top:calc(100% + 9px);
+  width:max-content;
+  max-width:min(330px,calc(100vw - 32px));
+  padding:10px 12px;
+  border:1px solid color-mix(in srgb,#EF6E78 30%,var(--line));
+  border-radius:11px;
+  background:var(--surface);
+  box-shadow:0 12px 30px rgba(0,0,0,.17);
+}
+@media(max-width:900px){
+  /* Override legacy :has(.wallet-auth-error) rule which moved the button to row 2. */
+  .sidebar .unified-header-actions .wallet-auth-control:has(.wallet-auth-error){
+    grid-column:3;
+    grid-row:1;
+    width:auto;
+    max-width:100%;
+    justify-items:stretch;
+  }
+  .sidebar .unified-header-actions .wallet-auth-control .wallet-auth-error{
+    max-width:min(300px,calc(100vw - 32px));
+  }
+}
+@media(max-width:370px){
+  .sidebar .unified-header-actions .wallet-auth-control:has(.wallet-auth-error){
+    grid-column:1 / -1;
+    grid-row:2;
+    width:100%;
+  }
+}
+/* Inline connect controls remain contained on My Assets and in the builder. */
+.empty-state .wallet-auth-control,
+.form-card .wallet-auth-control{width:100%;max-width:100%;justify-items:center}
+.empty-state .wallet-auth-error,
+.form-card .wallet-auth-error{width:min(100%,360px);text-align:center}
