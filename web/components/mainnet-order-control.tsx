@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { classifyWalletIntentError } from "../lib/wallet/errors";
 
-interface MainnetOrderView {
+export interface MainnetOrderView {
   orderId: string;
   projectId: string;
   ownerPublicKey: string;
@@ -33,9 +33,11 @@ interface MainnetOrderView {
 export function MainnetOrderControl({
   initialOrder,
   activationEnabled,
+  onIssued,
 }: {
   initialOrder: MainnetOrderView;
   activationEnabled: boolean;
+  onIssued?: () => void;
 }) {
   const [order, setOrder] = useState(initialOrder);
   const [busy, setBusy] = useState(false);
@@ -95,8 +97,10 @@ export function MainnetOrderControl({
     setBusy(true);
     setMessage("Reconciling the one permitted issuance transaction…");
     try {
-      setOrder(await command<MainnetOrderView>(order.projectId, { action: "issue" }));
-      setMessage("Issuance reconciliation completed. Refresh for publication status.");
+      const updated = await command<MainnetOrderView>(order.projectId, { action: "issue" });
+      setOrder(updated);
+      if (updated.status === "issued") onIssued?.();
+      else setMessage("Issuance is still being verified. Do not submit another transaction.");
     } catch {
       setMessage(
         "Issuance remains in exact-hash reconciliation. Orrylo will not sign or submit a replacement.",
