@@ -203,7 +203,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
     ) {
       setSaveState({
         status: "failure",
-        message: "Review the exact token configuration before creating it.",
+        message: "Review the exact asset configuration before creating it.",
       });
       return;
     }
@@ -221,7 +221,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
       setReview(null);
       setSaveState({
         status: "failure",
-        message: "Review the highlighted token details before saving.",
+        message: "Review the highlighted asset details before saving.",
       });
       return;
     }
@@ -461,7 +461,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
           const { default: albedo } = await import("@albedo-link/intent");
           const outcome = await albedo.tx({
             xdr: plan.xdr, pubkey: plan.source, network: "public", submit: true,
-            description: "Pay exactly 10 XLM to Orrylo for this saved token order",
+            description: "Pay exactly 10 XLM to Orrylo for this saved asset order",
           });
           if (outcome.tx_hash?.toLowerCase() !== plan.expectedHash || outcome.network !== "public") {
             throw new Error("unknown_wallet_outcome");
@@ -511,7 +511,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
         setSaveState({
           status: "failure",
           message:
-            "The Project Profile was saved, but the immutable token intent was not confirmed. Open the project to recover from server state.",
+            "The Project Profile was saved, but the immutable asset intent was not confirmed. Open the project to recover from server state.",
         });
         return;
       }
@@ -565,7 +565,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
       }
       setSaveState({
         status: "failure",
-        message: `Token creation stopped before submission (${executionResult.execution.failureCode}). No automatic retry was attempted.`,
+        message: `Asset creation stopped before submission (${executionResult.execution.failureCode}). No automatic retry was attempted.`,
       });
     } catch {
       window.location.assign(managePath);
@@ -616,36 +616,36 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
     if (saveState.status !== "idle") workflowRef.current?.scrollIntoView({behavior:"smooth",block:"start"});
   }, [saveState.status]);
   const previewCode = draft.code.trim().toUpperCase() || "TOKEN";
-  const previewName = draft.displayName.trim() || "Your token";
+  const previewName = draft.displayName.trim() || "Your asset";
   const previewDescription =
     draft.description.trim() ||
-    "Add a short description to show people what your token is for.";
+    "Add a short description to show people what your asset is for.";
 
   return (
     <form className="form-card guided-form" data-creation-stage={review ? "review" : "design"} data-workflow-status={saveState.status} onSubmit={handleSubmit} noValidate>
-      <section className="creation-progress" aria-label="Token creation progress">
-        <div className="creation-progress-top"><strong>Create your token</strong><span>Step {stage + 1} of {flowLabels.length}</span></div>
+      <section className="creation-progress" aria-label="Asset creation progress">
+        <div className="creation-progress-top"><strong>Create your asset</strong><span>Step {stage + 1} of {flowLabels.length}</span></div>
         <ol className="creation-progress-list">{flowLabels.map((label, index) => (
           <li key={label} className={index===stage ? "is-current" : index<stage ? "is-complete" : ""} aria-current={index===stage ? "step" : undefined}>
             <span aria-hidden="true">{index<stage ? "✓" : index+1}</span><small>{label}</small>
           </li>
         ))}</ol>
         <p className="creation-progress-caption" role="status">
-          {saveState.status==="trustline_required" ? "Next: prepare your wallet to receive this token. No other page needed."
+          {saveState.status==="trustline_required" ? "Next: prepare your wallet to receive this asset. No other page needed."
             : saveState.status==="mainnet_paid" ? "Payment verified. Continue wallet preparation without paying again."
             : saveState.status==="mainnet_order" ? "Your project is saved. Authorize payment only when enabled."
             : saveState.status==="confirmed" ? "Confirmed on Stellar."
             : review ? "Review details and continue. Project saving is handled automatically."
-            : "Enter your token details. No wallet required to preview."}
+            : "Enter your asset details. No wallet required to preview."}
         </p>
       </section>
       <div className="builder-heading">
         <div>
-          <span className="eyebrow">Interactive token builder</span>
-          <h2>Shape the token you want Orrylo to create.</h2>
+          <span className="eyebrow">Interactive asset builder</span>
+          <h2>Shape the asset you want Orrylo to create.</h2>
           <p>
             Explore your configuration without connecting a wallet. A wallet is
-            required to save a Project Profile, not to preview tokens.
+            required to save a Project Profile, not to preview assets.
           </p>
         </div>
         <span className="builder-anonymous-note">
@@ -659,7 +659,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
             <div className="step-heading">
               <span className="step-number">1</span>
               <div>
-                <h3 id="identity-step">Token identity</h3>
+                <h3 id="identity-step">Asset identity</h3>
                 <p>
                   Choose the name, Stellar asset code, and short story people
                   will see first.
@@ -702,7 +702,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
                   onChange={(event) =>
                     updateField("displayName", event.target.value)
                   }
-                  placeholder="My Token"
+                  placeholder="My Asset"
                   autoComplete="off"
                   aria-describedby={
                     errors.displayName ? "name-error" : undefined
@@ -728,7 +728,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
                 onChange={(event) =>
                   updateField("description", event.target.value)
                 }
-                placeholder="What does your token represent or enable?"
+                placeholder="What does your asset represent or enable?"
                 rows={4}
                 maxLength={TOKEN_DESCRIPTION_MAX_LENGTH + 1}
                 aria-describedby={
@@ -752,7 +752,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
             <div className="step-heading">
               <span className="step-number">2</span>
               <div>
-                <h3 id="supply-step">Initial token supply</h3>
+                <h3 id="supply-step">Initial asset supply</h3>
                 <p>
                   Choose the amount intended for the first issuance. This is not
                   a fixed lifetime cap.
@@ -760,7 +760,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
               </div>
             </div>
             <label className="field">
-              <span>Initial supply (token units)</span>
+              <span>Initial supply (asset units)</span>
               <input
                 name="initialSupply"
                 type="text"
@@ -781,14 +781,14 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
                 </small>
               ) : (
                 <small id="supply-help">
-                  Positive amount, up to seven decimal places. No tokens are
+                  Positive amount, up to seven decimal places. No assets are
                   minted here.
                 </small>
               )}
             </label>
             <p className="builder-boundary-note">
               This amount becomes immutable only after the final review and
-              Create Token action. It is never inferred from browser state.
+              Create Asset action. It is never inferred from browser state.
             </p>
           </section>
 
@@ -798,14 +798,14 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
               <div>
                 <h3 id="brand-step">Logo &amp; presentation</h3>
                 <p>
-                  Add a local image to make the token preview feel like your
+                  Add a local image to make the asset preview feel like your
                   project. Nothing is uploaded to Orrylo.
                 </p>
               </div>
             </div>
 
             <label className="field logo-field">
-              <span>Token logo</span>
+              <span>Asset logo</span>
               <input
                 name="logo"
                 type="file"
@@ -912,7 +912,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
                 <div>
                   <h3 id="final-review-title">Final draft review</h3>
                   <p>
-                    Review the exact configuration before creating the token.
+                    Review the exact configuration before creating the asset.
                   </p>
                 </div>
               </div>
@@ -942,7 +942,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
                 </div>
                 <div>
                   <dt>Exact initial supply</dt>
-                  <dd>{review.initialSupply} tokens</dd>
+                  <dd>{review.initialSupply} assets</dd>
                 </div>
                 <div>
                   <dt>Maximum lifetime supply</dt>
@@ -973,8 +973,8 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
               </dl>
               <p className="builder-boundary-note" role="status">
                 {isMainnet
-                  ? "Saving creates a project and prepares a 10 XLM Mainnet order. Payment and token issuance remain unavailable until activation."
-                  : "Create Token saves the Project Profile and immutable issuance intent as one journey, then starts the reviewed Testnet path."}
+                  ? "Saving creates a project and prepares a 10 XLM Mainnet order. Payment and asset issuance remain unavailable until activation."
+                  : "Create Asset saves the Project Profile and immutable issuance intent as one journey, then starts the reviewed Testnet path."}
               </p>
             </section>
           ) : (
@@ -985,10 +985,10 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
           )}
         </div>
 
-        <aside className="draft-preview" aria-label="Live token preview">
+        <aside className="draft-preview" aria-label="Live asset preview">
           <div className="preview-header">
             <div>
-              <span className="eyebrow">Live token preview</span>
+              <span className="eyebrow">Live asset preview</span>
               <small>Updates as you build</small>
             </div>
             <span className="preview-network">Stellar</span>
@@ -1047,7 +1047,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
 
           <div ref={workflowRef} className="execution-boundary creation-active-step" tabIndex={-1}>
             <span className="eyebrow">Your next step</span>
-            <strong>{saveState.status==="trustline_required" ? "Prepare your wallet" : saveState.status==="mainnet_order" ? "Review and authorize payment" : saveState.status==="mainnet_paid" ? "Payment confirmed — continue" : saveState.status==="confirmed" ? "Your token is ready" : review ? "Save and continue" : "Review token details first"}</strong>
+            <strong>{saveState.status==="trustline_required" ? "Prepare your wallet" : saveState.status==="mainnet_order" ? "Review and authorize payment" : saveState.status==="mainnet_paid" ? "Payment confirmed — continue" : saveState.status==="confirmed" ? "Your asset is ready" : review ? "Save and continue" : "Review asset details first"}</strong>
             <p>
               Your Albedo-authenticated wallet becomes the owner and receiving
               destination. Issuer, network, fee and ledger status remain
@@ -1082,10 +1082,10 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
                     ? "Your wallet session changed before the project could be saved. Reconnect or confirm the wallet that completed this save flow, then retry."
                     : isMainnet
                       ? "Connect with Albedo to own your project and prepare the Mainnet order."
-                      : "Connect with Albedo to own this project and continue the reviewed Create Token request."}
+                      : "Connect with Albedo to own this project and continue the reviewed Create Asset request."}
                 </p>
                 <WalletAuthControl
-                  connectLabel={isMainnet ? "Connect wallet & save project" : "Connect wallet & create token"}
+                  connectLabel={isMainnet ? "Connect wallet & save project" : "Connect wallet & create asset"}
                   network={network}
                   onAuthenticated={(publicKey) =>
                     void continueAfterAuthentication(publicKey)
@@ -1186,7 +1186,7 @@ export function CreateSharedTokenForm({ network = "testnet", mainnetActivationEn
                   {" "}
                   · {saveState.supply} {saveState.assetCode}
                 </span>
-                <a href={saveState.managePath}> Open token project</a>
+                <a href={saveState.managePath}> Open asset project</a>
               </p>
             ) : null}
 
@@ -1218,7 +1218,7 @@ function describeProjectSaveFailure(
   switch (result.code) {
     case "invalid_project":
     case "invalid_request":
-      return "Review the token details and try saving again.";
+      return "Review the asset details and try saving again.";
     case "invalid_idempotency_key":
     case "idempotency_conflict":
       return "This save attempt no longer matches the current project. Change a field or retry from the current configuration.";
