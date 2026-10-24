@@ -164,7 +164,7 @@ export function ConfirmInitialSupplyIntent({
     return (
       <p role="status">
         Intent confirmation is unavailable until the Testnet Shared Issuer is
-        independently approved and configured. No token has been issued.
+        independently approved and configured. No asset has been issued.
       </p>
     );
   }
@@ -172,7 +172,7 @@ export function ConfirmInitialSupplyIntent({
     return (
       <div role="status">
         <p>
-          Immutable application intent committed for {confirmed.amount} tokens.
+          Immutable application intent committed for {confirmed.amount} assets.
           Status: {confirmed.executionStatus}. Success requires durable
           authoritative ledger confirmation.
         </p>
@@ -204,7 +204,7 @@ export function ConfirmInitialSupplyIntent({
         It has not been stored in the Project Profile or committed to Stellar.
       </p>
       <label className="field">
-        <span>Selected initial supply (token units)</span>
+        <span>Selected initial supply (asset units)</span>
         <input
           type="text"
           inputMode="decimal"
