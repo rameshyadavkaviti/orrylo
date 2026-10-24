@@ -21,12 +21,12 @@ export function CreateTokenPage({ network = "testnet" }: { network?: StellarNetw
         <h1>Create your product.</h1>
         <p>
           {mainnet
-            ? "Design a Stellar-powered product and review its token details. Mainnet creation costs 10 XLM plus network fees and reserves when activated. Mainnet payments and issuance remain disabled until activation is complete."
-            : "Give your product an identity, preview its token and supply, then connect Albedo to approve the Testnet trustline and issuance."}
+            ? "Design a Stellar-powered product and review its asset details. Mainnet creation costs 10 XLM plus network fees and reserves when activated. Mainnet payments and issuance remain disabled until activation is complete."
+            : "Give your product an identity, preview its asset and supply, then connect Albedo to approve the Testnet trustline and issuance."}
         </p>
       </div>
 
-      <div className="builder-assurances" aria-label="Token creation highlights">
+      <div className="builder-assurances" aria-label="Asset creation highlights">
         <span>✓ Design and preview for free</span>
         <span>✓ Guided step-by-step creation</span>
         <span>{mainnet ? (mainnetActivationEnabled ? "✓ 10 XLM creation fee" : "Mainnet creation not yet enabled") : "✓ Testnet wallet approval"}</span>
