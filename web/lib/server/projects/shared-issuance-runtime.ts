@@ -98,10 +98,6 @@ let serverOrchestrator: Promise<SharedIssuanceOrchestrator> | null = null;
 export function readSharedIssuanceRuntimeConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): SharedIssuanceRuntimeConfig {
-  if (env.NEXT_PUBLIC_STELLAR_NETWORK?.trim() !== "testnet") {
-    throw unavailable("NEXT_PUBLIC_STELLAR_NETWORK must be testnet.");
-  }
-
   const config = {
     signerPublicKey: env.ORRYLO_TESTNET_SHARED_ISSUER_SIGNER_PUBLIC_KEY,
     issuerPublicKey: required(
