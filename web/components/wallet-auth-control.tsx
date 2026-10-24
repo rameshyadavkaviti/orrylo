@@ -112,7 +112,7 @@ export function WalletAuthControl({
       setState({
         status: "failure",
         message:
-          "Wallet authentication is temporarily unavailable. The token builder still works without a wallet.",
+          "Wallet authentication is temporarily unavailable. The asset builder still works without a wallet.",
       });
       return;
     }
@@ -176,7 +176,7 @@ export function WalletAuthControl({
       setState({
         status: "failure",
         message:
-          "Wallet verification is temporarily unavailable. Your token configuration is still available.",
+          "Wallet verification is temporarily unavailable. Your asset configuration is still available.",
       });
     }
   }
