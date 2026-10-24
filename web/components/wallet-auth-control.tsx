@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { StellarNetwork } from "../lib/config/public-env";
 
 import { albedoAuthAdapter } from "../lib/wallet/albedo-auth-adapter";
 import { describeAuthApiFailure } from "../lib/wallet/auth-messages";
@@ -29,11 +30,13 @@ interface SessionResponse {
 
 export interface WalletAuthControlProps {
   connectLabel?: string;
+  network?: StellarNetwork;
   onAuthenticated?: (publicKey: string) => void;
 }
 
 export function WalletAuthControl({
   connectLabel = "Connect Wallet",
+  network = "testnet",
   onAuthenticated,
 }: WalletAuthControlProps = {}) {
   const [state, setState] = useState<WalletAuthState>({
@@ -80,7 +83,7 @@ export function WalletAuthControl({
     let challenge: ChallengeResponse;
 
     try {
-      const response = await fetch("/api/auth/challenge", {
+      const response = await fetch(`/api/auth/challenge?network=${network}`, {
         method: "POST",
         credentials: "same-origin",
       });
