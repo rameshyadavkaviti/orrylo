@@ -1,9 +1,19 @@
 import { CreateSharedTokenForm } from "../../components/create-shared-token-form";
 import { cookies } from "next/headers";
 import type { StellarNetwork } from "../../lib/config/public-env";
+import { MAINNET_SHARED_ISSUER_PUBLIC_KEY, MAINNET_TREASURY_PUBLIC_KEY } from "../../lib/stellar/mainnet-creation";
 
 export function CreateTokenPage({ network = "testnet" }: { network?: StellarNetwork } = {}) {
   const mainnet = network === "public";
+  const mainnetActivationEnabled = mainnet &&
+    process.env.ORRYLO_MAINNET_CREATION_ENABLED === "true" &&
+    process.env.ORRYLO_MAINNET_SHARED_ISSUER_PUBLIC_KEY === MAINNET_SHARED_ISSUER_PUBLIC_KEY &&
+    process.env.ORRYLO_MAINNET_TREASURY_PUBLIC_KEY === MAINNET_TREASURY_PUBLIC_KEY &&
+    process.env.ORRYLO_MAINNET_TREASURY_VERIFIED === "true" &&
+    Boolean(process.env.ORRYLO_MAINNET_ISSUER_FEE_STROOPS) &&
+    Boolean(process.env.ORRYLO_MAINNET_CUSTOMER_TRUSTLINE_MAX_FEE_STROOPS) &&
+    Boolean(process.env.ORRYLO_MAINNET_SIGNER_PRIVATE_URL) &&
+    Boolean(process.env.ORRYLO_MAINNET_SIGNER_REQUEST_AUTH_SECRET);
   return (
     <div className="page-stack">
       <div className="page-heading builder-page-heading">
@@ -22,7 +32,7 @@ export function CreateTokenPage({ network = "testnet" }: { network?: StellarNetw
         <span>✓ Shared Issuer model explained</span>
       </div>
 
-      <CreateSharedTokenForm key={network} network={network} />
+      <CreateSharedTokenForm key={network} network={network} mainnetActivationEnabled={mainnetActivationEnabled} />
     </div>
   );
 }
