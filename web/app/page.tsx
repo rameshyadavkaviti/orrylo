@@ -17,10 +17,8 @@ export function HomePage() {
         </div>
         <div className="clean-visual" aria-hidden="true">
           <div className="clean-visual-glow" />
-          <div className="clean-token-halo clean-halo-one" />
-          <div className="clean-token-halo clean-halo-two" />
-          <div className="clean-token-core"><Image src="/brand/orrylo-logo-1f95ea3.webp" alt="" width={160} height={160} className="clean-token-logo" priority /></div>
-          <div className="clean-visual-caption"><span className="clean-caption-dot" /> YOUR NEXT IDEA STARTS HERE</div>
+          <div className="clean-token-core"><Image src="/brand/orrylo-logo-1f95ea3.webp" alt="" width={320} height={320} className="clean-token-logo" priority /></div>
+          <div className="clean-visual-caption">Turn your <strong>idea</strong> into a product</div>
         </div>
       </section>
       <section id="how-it-works" className="clean-steps" aria-labelledby="steps-heading">
