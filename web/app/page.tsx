@@ -19,7 +19,7 @@ export function HomePage() {
           <div className="clean-visual-glow" />
           <div className="clean-token-halo clean-halo-one" />
           <div className="clean-token-halo clean-halo-two" />
-          <div className="clean-token-core"><Image src="/brand/orrylo-logo.webp" alt="" width={160} height={160} className="clean-token-logo" priority /></div>
+          <div className="clean-token-core"><Image src="/brand/orrylo-logo.webp?v=1f95ea3" alt="" width={160} height={160} className="clean-token-logo" priority /></div>
           <div className="clean-visual-caption"><span className="clean-caption-dot" /> YOUR NEXT IDEA STARTS HERE</div>
         </div>
       </section>
