@@ -13,8 +13,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   const config = readServerAuthConfig();
-  if (config.network !== "public" ||
-      process.env.ORRYLO_MAINNET_ORDERS_ENABLED !== "true") {
+  if (process.env.ORRYLO_MAINNET_ORDERS_ENABLED !== "true") {
     return fail("mainnet_orders_disabled", 503);
   }
   if (!isTrustedAuthOrigin(request.headers.get("origin"), config.domain)) {
