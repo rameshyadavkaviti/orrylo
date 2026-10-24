@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { NAV_ITEMS, UTILITY_NAV_ITEMS } from "../lib/navigation";
 import { WalletAuthControl } from "./wallet-auth-control";
@@ -107,7 +107,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         <div id="wallet-connect" className="unified-header-actions">
-          <NetworkSelector />
+          <Suspense fallback={<div className="header-network-selector header-network-placeholder" aria-label="Loading network selection"><span>Testnet</span><span>Mainnet</span></div>}>
+            <NetworkSelector />
+          </Suspense>
           <ThemeToggle />
           <WalletAuthControl connectLabel="Connect" />
         </div>
