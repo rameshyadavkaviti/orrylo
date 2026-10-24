@@ -40,7 +40,7 @@ export interface IssuanceRouteDependencies {
 function dependencies(): IssuanceRouteDependencies {
   const config = readServerAuthConfig();
   const service = new TestnetIssuanceService(getDatabaseClient(), {
-    network: config.network,
+    network: "testnet",
     approvedIssuerPublicKey:
       process.env.ORRYLO_APPROVED_TESTNET_SHARED_ISSUER_PUBLIC_KEY,
   });
