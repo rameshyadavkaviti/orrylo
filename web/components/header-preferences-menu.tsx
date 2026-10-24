@@ -47,7 +47,7 @@ export function HeaderPreferencesMenu() {
             <span>Stellar Testnet is active</span>
           </div>
           <NetworkSelector />
-          <p className="header-preferences-hint">Mainnet is not available yet. Token issuance stays on Testnet.</p>
+          <p className="header-preferences-hint">Mainnet is not available yet. Asset issuance stays on Testnet.</p>
           <div className="header-preferences-appearance">
             <div>
               <strong>Appearance</strong>
