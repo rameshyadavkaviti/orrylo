@@ -198,3 +198,37 @@ test("publish boundary also binds the operation to the authenticated owner", asy
     publicPath: "/p/nova",
   });
 });
+
+
+test("explicit Mainnet selection reaches the owner-bound project creation service", async () => {
+  let network: string | undefined;
+  const deps: CreateProjectRouteDependencies = {
+    authDomain: "app.orrylo.com",
+    getSession: async () => SESSION,
+    createProject: async (_owner, input) => {
+      network = input.network;
+      return { created: true, project: { projectId: PROJECT_ID, slug: "nova", publicStatus: "draft" } };
+    },
+  };
+  const response = await handleCreateManagedProject(createRequest({
+    idempotencyKey: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+    code: "NOVA", displayName: "Nova", description: "Mainnet", network: "public",
+  }), deps);
+  assert.equal(response.status, 201);
+  assert.equal(network, "public");
+});
+
+test("invalid project network is rejected before writing", async () => {
+  let called = false;
+  const deps: CreateProjectRouteDependencies = {
+    authDomain: "app.orrylo.com",
+    getSession: async () => SESSION,
+    createProject: async () => { called = true; throw new Error("unexpected write"); },
+  };
+  const response = await handleCreateManagedProject(createRequest({
+    idempotencyKey: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+    code: "NOVA", displayName: "Nova", description: "Invalid", network: "future",
+  }), deps);
+  assert.equal(response.status, 400);
+  assert.equal(called, false);
+});
