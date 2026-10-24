@@ -337,3 +337,35 @@ html[data-theme="dark"] .field select:focus-visible{border-color:var(--accent);o
 .form-card .wallet-auth-control{width:100%;max-width:100%;justify-items:center}
 .empty-state .wallet-auth-error,
 .form-card .wallet-auth-error{width:min(100%,360px);text-align:center}
+
+/* Homepage: restrained network readiness cards in the active theme. */
+.home-section-intro{margin:10px 0 0;max-width:62ch;color:var(--muted);font-size:.95rem;line-height:1.65}
+.home-network-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.home-network-card{
+  display:flex;flex-direction:column;align-items:flex-start;gap:13px;min-width:0;
+  padding:clamp(22px,3vw,32px);
+  border:1px solid var(--line);border-radius:20px;
+  background:var(--surface);color:var(--text);
+}
+.home-network-tag{
+  display:inline-flex;align-items:center;
+  font-size:.69rem;line-height:1.3;font-weight:800;letter-spacing:.09em;
+  color:var(--accent);
+}
+.home-network-tag-muted{color:var(--muted)}
+.home-network-card h3{
+  margin:0;font-size:clamp(1.2rem,2.1vw,1.55rem);
+  font-weight:750;letter-spacing:-.035em;line-height:1.25;
+}
+.home-network-card p{margin:0;color:var(--muted);font-size:.91rem;line-height:1.7;max-width:52ch}
+.home-network-card a{
+  margin-top:auto;padding-top:8px;
+  display:inline-flex;align-items:center;gap:10px;
+  font-size:.86rem;font-weight:750;color:var(--accent);text-decoration:none;
+}
+.home-network-card a:hover{text-decoration:underline;text-underline-offset:4px}
+.home-network-card a:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:3px}
+@media(max-width:720px){
+  .home-network-grid{grid-template-columns:minmax(0,1fr)}
+  .home-network-card{padding:23px}
+}
