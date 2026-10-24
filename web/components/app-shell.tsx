@@ -46,7 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Link className="brand" href="/" aria-label="Orrylo home">
           <Image
             className="brand-logo"
-            src="/brand/orrylo-logo.webp"
+            src="/brand/orrylo-logo.webp?v=1f95ea3"
             alt=""
             width={52}
             height={52}
@@ -120,7 +120,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <footer className="site-footer">
           <div className="footer-brand">
-            <Image src="/brand/orrylo-logo.webp" alt="" width={36} height={36} />
+            <Image src="/brand/orrylo-logo.webp?v=1f95ea3" alt="" width={36} height={36} />
             <div><strong>Orrylo</strong><span>Build with confidence on Stellar.</span></div>
           </div>
           <div className="footer-end">
