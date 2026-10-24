@@ -164,3 +164,17 @@ html[data-theme="dark"] .field select:focus-visible{border-color:var(--accent);o
 @media(prefers-reduced-motion:reduce){
   .header-network-selector .header-network-thumb,.header-network-selector .header-network-choice{transition:none!important}
 }
+
+/* Creation progress: clearer step numbers and stronger labels. */
+.creation-progress-list li > span:first-child{
+  width:36px;
+  height:36px;
+  min-width:36px;
+  font-size:1rem;
+  font-weight:800;
+  line-height:1;
+}
+.creation-progress-list li > small{
+  font-weight:700;
+  font-size:.76rem;
+}
