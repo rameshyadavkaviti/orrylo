@@ -211,6 +211,7 @@ export function WalletAuthControl({
         type="button"
         className="button button-secondary"
         disabled={Boolean(progressLabel)}
+        aria-label={progressLabel ?? "Connect wallet"}
         onClick={() => void connect()}
       >
         {progressLabel ?? connectLabel}
