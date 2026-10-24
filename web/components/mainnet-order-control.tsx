@@ -117,7 +117,8 @@ export function MainnetOrderControl({
   return (
     <section className="surface-card" aria-label="Mainnet token order">
       <span className="eyebrow">Stellar Mainnet · Shared Issuer</span>
-      <h2>Immutable token order</h2>
+      <h2>{trustlinePending ? "Next: Prepare your wallet" : issuancePending ? "Next: Create and verify your token" : order.status==="issued" ? "Your token is ready" : "Continue token creation"}</h2>
+      <p className="creation-progress-caption">{trustlinePending ? "Payment is complete. Authorize this token in Albedo so your wallet can receive it. Stellar requires a separate trustline transaction." : issuancePending ? "Wallet ready. Confirm and verify the one reserved issuance." : paymentPending ? "Verify the saved payment first. Do not send a payment manually." : "Only confirmed ledger results are shown as complete."}</p>
       <dl className="managed-project-facts">
         <div><dt>Order status</dt><dd>{order.status.replaceAll("_", " ")}</dd></div>
         <div><dt>Initial supply</dt><dd>{order.amount}</dd></div>
@@ -130,8 +131,8 @@ export function MainnetOrderControl({
       {activationEnabled ? (
         <div className="project-card-actions">
           {paymentPending ? <p role="status">Complete or reconcile the existing exact 10 XLM payment from the token creation screen.</p> : null}
-          {trustlinePending ? <button className="button button-primary" type="button" disabled={busy} onClick={() => void trust()}>Establish trustline</button> : null}
-          {issuancePending ? <button className="button button-primary" type="button" disabled={busy} onClick={() => void issue()}>{order.status === "issuance_reconciliation_required" ? "Verify transaction & publish" : "Issue and verify"}</button> : null}
+          {trustlinePending ? <button className="button button-primary" type="button" disabled={busy} onClick={() => void trust()}>Prepare my wallet in Albedo</button> : null}
+          {issuancePending ? <button className="button button-primary" type="button" disabled={busy} onClick={() => void issue()}>{order.status === "issuance_reconciliation_required" ? "Verify transaction & publish" : "Create token & verify"}</button> : null}
         </div>
       ) : null}
       {message ? <p aria-live="polite">{message}</p> : null}
