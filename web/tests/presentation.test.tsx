@@ -10,9 +10,9 @@ import { RyloPage } from "../app/rylo/page";
 test("homepage makes anonymous token building the dominant product journey", () => {
   const html = renderToStaticMarkup(<HomePage />);
 
-  assert.match(html, /Your token.*Made simple/is);
-  assert.match(html, />Create your token/i);
-  assert.match(html, /no wallet required to start/i);
+  assert.match(html, /Your idea.*Made tangible/is);
+  assert.match(html, />Create your product/i);
+  assert.match(html, /Wallet approval required to issue/i);
   assert.match(html, /Free to explore/i);
   assert.match(html, /Testnet only/i);
   assert.match(html, /Connect Albedo/i);
@@ -22,7 +22,7 @@ test("homepage makes anonymous token building the dominant product journey", () 
 test("create-token experience offers a meaningful anonymous live builder", () => {
   const html = renderToStaticMarkup(<CreateTokenPage />);
 
-  assert.match(html, /Create your Stellar Testnet token/i);
+  assert.match(html, /Create your product\./i);
   assert.match(html, /No wallet needed to explore/i);
   assert.match(html, /Token identity/i);
   assert.match(html, /Description/i);
