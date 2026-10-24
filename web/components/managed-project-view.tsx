@@ -52,6 +52,11 @@ export function ManagedProjectView({
         </p>
       </div>
 
+      {mainnetOrder && mainnetOrder.status !== "issued" ? (
+        <div id="creation-next-step" className="creation-project-next-step">
+          <MainnetOrderControl initialOrder={mainnetOrder} activationEnabled={mainnetActivationEnabled} />
+        </div>
+      ) : null}
       <section className="managed-project-summary">
         <article className="surface-card">
           <span className="eyebrow">Project identity</span>
@@ -170,12 +175,9 @@ export function ManagedProjectView({
           issuance={issuance}
           intentConfigurationAvailable={intentConfigurationAvailable}
         />
-      ) : mainnetOrder ? (
-        <MainnetOrderControl
-          initialOrder={mainnetOrder}
-          activationEnabled={mainnetActivationEnabled}
-        />
-      ) : null}
+      ) : mainnetOrder?.status === "issued" ? (
+        <MainnetOrderControl initialOrder={mainnetOrder} activationEnabled={mainnetActivationEnabled} />
+      ) : null
 
       <ManagedProjectMetadataForm
         projectId={project.projectId}
