@@ -178,3 +178,20 @@ html[data-theme="dark"] .field select:focus-visible{border-color:var(--accent);o
   font-weight:700;
   font-size:.76rem;
 }
+
+/* Align the identity inputs and their helper text on the same baseline. */
+.draft-step .builder-field-grid > .field{
+  grid-template-rows:auto auto minmax(2.6em,auto);
+  align-content:start;
+  min-width:0;
+}
+.draft-step .builder-field-grid > .field > input{
+  box-sizing:border-box;
+  min-height:48px;
+}
+.draft-step .builder-field-grid > .field > small{
+  display:block;
+  line-height:1.3;
+  min-height:2.6em;
+  overflow-wrap:break-word;
+}
