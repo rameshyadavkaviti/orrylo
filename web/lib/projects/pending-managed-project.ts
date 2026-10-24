@@ -1,4 +1,5 @@
 import type { CreateManagedProjectRequest } from "./managed-project-api";
+import type { ProjectNetwork } from "./project-profile";
 import type {
   SharedAssetDraft,
   SharedAssetDraftErrors,
@@ -25,6 +26,7 @@ export type PrepareManagedProjectSaveResult =
 export function prepareManagedProjectSave(
   draft: SharedAssetDraft,
   idempotencyKey: string,
+  network?: ProjectNetwork,
 ): PrepareManagedProjectSaveResult {
   const validation = validateSharedAssetDraft(draft);
 
@@ -43,6 +45,7 @@ export function prepareManagedProjectSave(
       normalizedDraft: validation.normalized,
       request: {
         idempotencyKey,
+        ...(network ? { network } : {}),
         code: validation.normalized.code,
         displayName: validation.normalized.displayName,
         description: validation.normalized.description,
