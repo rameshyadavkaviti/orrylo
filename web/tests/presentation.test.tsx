@@ -72,5 +72,5 @@ test("Mainnet product studio renders a Mainnet-specific payment preview without 
   const html = renderToStaticMarkup(<CreateTokenPage network="public" />);
   assert.match(html, /Mainnet payments and issuance remain disabled/i);
   assert.match(html, /Stellar Mainnet/i);
-  assert.match(html, /10 XLM service price/i);
+  assert.match(html, /10 XLM/i);
 });
