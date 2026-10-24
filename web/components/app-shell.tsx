@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { NAV_ITEMS, UTILITY_NAV_ITEMS } from "../lib/navigation";
 import { WalletAuthControl } from "./wallet-auth-control";
 import { ThemeToggle } from "./theme-toggle";
+import { NetworkSelector } from "./network-selector";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -74,10 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </details>
 
         <div id="wallet-connect" className="unified-header-actions">
-          <span className="header-network-status" title="Mainnet is not available yet">
-            <span className="header-network-dot" aria-hidden="true" />
-            Testnet
-          </span>
+          <NetworkSelector />
           <ThemeToggle />
           <WalletAuthControl />
         </div>
@@ -97,7 +95,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Link key={item.href} href={item.href}>{item.label}</Link>
               ))}
             </nav>
-            <span className="footer-network"><span className="header-network-dot" aria-hidden="true" /> Stellar Testnet · Early access</span>
+            <span className="footer-network"><span className="header-network-dot" aria-hidden="true" /> Stellar · Early access</span>
           </div>
         </footer>
       </div>
