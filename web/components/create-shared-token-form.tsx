@@ -584,7 +584,8 @@ export function CreateSharedTokenForm({ network = "testnet" }: { network?: "test
     ? ["Design", "Review & connect", "Pay", "Prepare wallet", "Verify"]
     : ["Design", "Review & connect", "Prepare wallet", "Verify"];
   const stage = saveState.status === "confirmed" ? (isMainnet ? 4 : 3)
-    : ["trustline_required", "mainnet_paid", "persisting_intent", "preparing_issuance", "confirming", "reconciliation_required"].includes(saveState.status) ? (isMainnet ? 3 : 2)
+    : ["persisting_intent", "preparing_issuance", "confirming", "reconciliation_required"].includes(saveState.status) ? (isMainnet ? 4 : 3)
+    : ["trustline_required", "mainnet_paid"].includes(saveState.status) ? (isMainnet ? 3 : 2)
     : ["mainnet_order", "mainnet_order_unavailable"].includes(saveState.status) ? 2
     : review ? 1 : 0;
   useEffect(() => {
