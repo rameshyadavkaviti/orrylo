@@ -6,14 +6,14 @@ export function HomePage() {
     <div className="clean-home">
       <section className="clean-hero" aria-labelledby="home-title">
         <div className="clean-hero-copy">
-          <span className="clean-kicker"><span className="clean-dot" /> BUILT FOR STELLAR · TESTNET PREVIEW</span>
+          <span className="clean-kicker"><span className="clean-dot" /> BUILT FOR STELLAR · CHOOSE YOUR NETWORK</span>
           <h1 id="home-title">Your idea.<br /><span>Made tangible.</span></h1>
           <p>Turn a concept into a Stellar-powered product. Shape its identity, preview the details, and move forward when you’re ready.</p>
           <div className="clean-actions">
             <Link className="clean-cta" href="/create-token">Create your product <span aria-hidden="true">↗</span></Link>
             <a className="clean-subtle-link" href="#how-it-works">See how it works <span aria-hidden="true">↓</span></a>
           </div>
-          <p className="clean-disclaimer">Free to explore · Testnet only · Wallet approval required to issue</p>
+          <p className="clean-disclaimer">Free to explore · Testnet issuance available · Mainnet payments gated</p>
         </div>
         <div className="clean-visual" aria-hidden="true">
           <div className="clean-visual-glow" />
