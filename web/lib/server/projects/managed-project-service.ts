@@ -50,6 +50,7 @@ interface WorkflowRow {
 export interface CreateManagedProjectInput {
   ownerPublicKey: string;
   idempotencyKey: string;
+  network?: ProjectNetwork;
   code: string;
   displayName: string;
   description: string;
@@ -100,6 +101,11 @@ export class ManagedProjectService {
       throw new ManagedProjectCreationError("invalid_project");
     }
 
+    const network = input.network ?? this.options.network;
+    if (network !== "testnet" && network !== "public") {
+      throw new ManagedProjectCreationError("invalid_project");
+    }
+
     const now = this.options.now?.() ?? Date.now();
     const description = validation.normalized.description || null;
     const payload = {
@@ -107,7 +113,7 @@ export class ManagedProjectService {
       displayName: validation.normalized.displayName,
       description,
       issuerModel: "shared",
-      network: this.options.network,
+      network,
       metadataHome: SHARED_ASSET_DOMAIN,
       publicStatus: "draft",
     } as const;
@@ -231,7 +237,7 @@ export class ManagedProjectService {
             NULL,
             ${SHARED_ASSET_DOMAIN},
             'shared',
-            ${this.options.network},
+            ${network},
             NULL,
             NULL,
             'draft',
