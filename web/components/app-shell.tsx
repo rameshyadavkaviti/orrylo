@@ -77,7 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div id="wallet-connect" className="unified-header-actions">
           <NetworkSelector />
           <ThemeToggle />
-          <WalletAuthControl />
+          <WalletAuthControl connectLabel="Connect" />
         </div>
       </aside>
 
