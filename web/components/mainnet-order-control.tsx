@@ -131,7 +131,7 @@ export function MainnetOrderControl({
         <div className="project-card-actions">
           {paymentPending ? <p role="status">Complete or reconcile the existing exact 10 XLM payment from the token creation screen.</p> : null}
           {trustlinePending ? <button className="button button-primary" type="button" disabled={busy} onClick={() => void trust()}>Establish trustline</button> : null}
-          {issuancePending ? <button className="button button-primary" type="button" disabled={busy} onClick={() => void issue()}>Issue and verify</button> : null}
+          {issuancePending ? <button className="button button-primary" type="button" disabled={busy} onClick={() => void issue()}>{order.status === "issuance_reconciliation_required" ? "Verify transaction & publish" : "Issue and verify"}</button> : null}
         </div>
       ) : null}
       {message ? <p aria-live="polite">{message}</p> : null}
