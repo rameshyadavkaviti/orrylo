@@ -121,3 +121,46 @@ html[data-theme="dark"] input::placeholder,html[data-theme="dark"] textarea::pla
 html[data-theme="dark"] .field input:focus-visible,
 html[data-theme="dark"] .field textarea:focus-visible,
 html[data-theme="dark"] .field select:focus-visible{border-color:var(--accent);outline-color:var(--accent)}
+
+/* Network switch: the UI responds on first click; only the thumb animates. */
+.header-network-selector{
+  --network-inset:4px;
+  position:relative;isolation:isolate;display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  align-items:stretch;gap:0!important;
+  min-width:164px;min-height:45px;padding:var(--network-inset)!important;
+  border:1px solid var(--line);border-radius:14px;
+  background:var(--surface-soft);white-space:nowrap;flex-shrink:0;
+}
+.header-network-selector .header-network-thumb{
+  position:absolute;z-index:-1;pointer-events:none;
+  top:var(--network-inset);bottom:var(--network-inset);left:var(--network-inset);
+  width:calc((100% - 2 * var(--network-inset)) / 2);
+  border-radius:10px;background:var(--violet-soft);
+  border:1px solid var(--accent);
+  box-shadow:0 3px 12px color-mix(in srgb,var(--accent) 12%,transparent);
+  transform:translateX(0);
+  transition:transform 480ms cubic-bezier(.22,1,.36,1),background-color 480ms ease,box-shadow 480ms ease;
+}
+.header-network-selector[data-network="public"] .header-network-thumb{transform:translateX(100%)}
+.header-network-selector .header-network-choice{
+  position:relative;z-index:1;min-width:0!important;
+  min-height:37px;padding:8px 12px!important;
+  border:0;border-radius:10px;background:transparent!important;
+  box-shadow:none!important;color:var(--muted);
+  font:inherit;font-size:.79rem;font-weight:700;line-height:1.3;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transition:color 360ms ease;
+}
+.header-network-selector .header-network-choice-active,
+.header-network-selector .header-network-choice[aria-pressed="true"]{color:var(--accent)!important}
+.header-network-selector .header-network-choice:hover{color:var(--text)}
+.header-network-selector .header-network-choice:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.header-network-placeholder{color:var(--muted);font-size:.79rem;font-weight:700}
+.header-network-placeholder>span{min-height:37px;display:grid;place-items:center;padding:8px 12px}
+@media(max-width:900px){
+  .unified-header-actions .header-network-selector{min-width:0;width:100%}
+}
+@media(prefers-reduced-motion:reduce){
+  .header-network-selector .header-network-thumb,.header-network-selector .header-network-choice{transition:none!important}
+}
