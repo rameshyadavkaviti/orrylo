@@ -13,8 +13,8 @@ import {
 } from "../lib/product/constants";
 import {
   ORRYLO_METADATA_LOGO_URL,
-  RYLO_TESTNET_IMAGE_URL,
-  RYLO_TESTNET_NETWORK_PASSPHRASE,
+  RYLO_MAINNET_IMAGE_URL,
+  RYLO_MAINNET_NETWORK_PASSPHRASE,
 } from "../lib/rylo/testnet-metadata";
 
 function publication(
@@ -86,7 +86,7 @@ test("public shared TOML route aggregates canonical Testnet and Mainnet publicat
   assert.doesNotMatch(body, /WRONG/);
 });
 
-test("root-domain TOML publishes only the canonical RYLO Testnet identity", async () => {
+test("root-domain TOML publishes only the canonical RYLO Mainnet identity", async () => {
   let sharedReads = 0;
   const response = await handleStellarTomlRequest(
     new Request("https://orrylo.com/.well-known/stellar.toml"),
@@ -112,7 +112,7 @@ test("root-domain TOML publishes only the canonical RYLO Testnet identity", asyn
   assert.equal(response.headers.get("x-orrylo-metadata-home"), "orrylo.com");
   assert.match(
     body,
-    new RegExp(`NETWORK_PASSPHRASE = "${RYLO_TESTNET_NETWORK_PASSPHRASE}"`),
+    new RegExp(`NETWORK_PASSPHRASE = "${RYLO_MAINNET_NETWORK_PASSPHRASE}"`),
   );
   assert.match(body, new RegExp(`ACCOUNTS = \\["${RYLO_TESTNET_ISSUER}"\\]`));
   assert.match(body, new RegExp(`issuer = "${RYLO_TESTNET_ISSUER}"`));
@@ -120,11 +120,11 @@ test("root-domain TOML publishes only the canonical RYLO Testnet identity", asyn
   assert.equal((body.match(/code = "RYLO"/g) ?? []).length, 1);
   assert.match(body, /display_decimals = 7/);
   assert.match(body, /is_asset_anchored = false/);
-  assert.match(body, /status = "test"/);
+  assert.doesNotMatch(body, /status = "test"/);
   assert.match(body, new RegExp(`ORG_LOGO = "${ORRYLO_METADATA_LOGO_URL}"`));
-  assert.match(body, new RegExp(`image = "${RYLO_TESTNET_IMAGE_URL}"`));
+  assert.match(body, new RegExp(`image = "${RYLO_MAINNET_IMAGE_URL}"`));
   assert.doesNotMatch(body, new RegExp(RYLO_ABANDONED_TESTNET_ISSUER));
-  assert.doesNotMatch(body, new RegExp(RYLO_ISSUER_CANDIDATE));
+  assert.doesNotMatch(body, new RegExp(RYLO_TESTNET_ISSUER));
   assert.doesNotMatch(
     body,
     /CAPB6JBF466Y6TY4UBAQDSN24KTILN2R2CLINBGJSIGS5BTTEEDW3GMI/,

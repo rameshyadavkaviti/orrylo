@@ -6,8 +6,8 @@ import {
 } from "../../../lib/projects/metadata-publication";
 import { SHARED_ASSET_DOMAIN } from "../../../lib/product/constants";
 import {
-  RYLO_TESTNET_HOME_DOMAIN,
-  renderRyloTestnetToml,
+  RYLO_HOME_DOMAIN,
+  renderRyloMainnetToml,
 } from "../../../lib/rylo/testnet-metadata";
 import { getDatabaseClient } from "../../../lib/server/persistence/database";
 import { createServerMetadataPublicationRepository } from "../../../lib/server/projects/automatic-publication-service";
@@ -50,8 +50,8 @@ export async function handleStellarTomlRequest(
     ? new URL(`http://${hostHeader}`).hostname.toLowerCase()
     : new URL(request.url).hostname.toLowerCase();
 
-  if (host === RYLO_TESTNET_HOME_DOMAIN) {
-    return tomlResponse(renderRyloTestnetToml(), RYLO_TESTNET_HOME_DOMAIN);
+  if (host === RYLO_HOME_DOMAIN) {
+    return tomlResponse(renderRyloMainnetToml(), RYLO_HOME_DOMAIN);
   }
 
   if (host === SHARED_ASSET_DOMAIN) {
