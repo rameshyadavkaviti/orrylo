@@ -43,7 +43,7 @@ export function ProjectLandingPage({
         </Link>
         <nav aria-label="Project sections">
           <a href="#about">About</a>
-          <a href="#token">Token</a>
+          <a href="#token">Asset</a>
           <a href="#project">Project</a>
           {explorerUrl ? (
             <a href={explorerUrl ?? undefined} target="_blank" rel="noreferrer">
@@ -109,7 +109,7 @@ export function ProjectLandingPage({
           </div>
         </section>
 
-        <section className="project-public-stats" aria-label="Token overview">
+        <section className="project-public-stats" aria-label="Asset overview">
           <div>
             <span>Asset code</span>
             <strong>{project.assetCode}</strong>
@@ -154,7 +154,7 @@ export function ProjectLandingPage({
           <div className="project-public-section-heading">
             <div>
               <span className="project-public-section-kicker">
-                Token information
+                Asset information
               </span>
               <h2>Transparent Stellar identity</h2>
             </div>
