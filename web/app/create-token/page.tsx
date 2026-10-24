@@ -26,10 +26,10 @@ export function CreateTokenPage({ network = "testnet" }: { network?: StellarNetw
         </p>
       </div>
 
-      <div className="builder-assurances" aria-label="Builder availability">
-        <span>✓ No wallet needed to explore</span>
-        <span>✓ Live token preview</span>
-        <span>✓ Shared Issuer model explained</span>
+      <div className="builder-assurances" aria-label="Token creation highlights">
+        <span>✓ Design and preview for free</span>
+        <span>✓ Guided step-by-step creation</span>
+        <span>{mainnet ? (mainnetActivationEnabled ? "✓ 10 XLM creation fee" : "Mainnet creation not yet enabled") : "✓ Testnet wallet approval"}</span>
       </div>
 
       <CreateSharedTokenForm key={network} network={network} mainnetActivationEnabled={mainnetActivationEnabled} />
