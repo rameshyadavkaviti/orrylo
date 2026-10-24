@@ -13,79 +13,71 @@ export function RyloPage() {
           priority
         />
         <div>
-          <span className="eyebrow">RYLO</span>
-          <h1>Membership and utility for people building with Orrylo.</h1>
+          <span className="eyebrow">RYLO · Stellar asset</span>
+          <h1>A token with its own identity.</h1>
           <p>
-            RYLO is the Orrylo ecosystem utility token. The approved policy
-            connects membership to successful building—not investment-return
-            promises.
+            RYLO is a standalone Stellar asset designed for transfer and potential
+            trading. It is separate from Orrylo&apos;s token-creation service:
+            you do not need to buy, hold, or use RYLO to create a token.
           </p>
         </div>
       </div>
 
-      <section className="value-grid" aria-label="RYLO membership path">
+      <section className="value-grid" aria-label="RYLO token overview">
         <article className="value-card">
           <span className="step-number">01</span>
-          <h2>Become eligible</h2>
-          <p>
-            Your wallet becomes eligible after your first successful token
-            creation through Orrylo.
-          </p>
+          <h2>Independent asset</h2>
+          <p>RYLO has a separate issuer and distribution policy. Orrylo token creation is priced in XLM, not RYLO.</p>
         </article>
         <article className="value-card">
-          <span className="policy-value">50</span>
-          <h2>Free Build Credit</h2>
-          <p>
-            50 RYLO-equivalent of internal service credit. It is not minted
-            RYLO, transferable, or tradable.
-          </p>
+          <span className="policy-value">998M</span>
+          <h2>Fixed supply target</h2>
+          <p>The approved total supply is 998,000,000 RYLO, intended for a single issuance followed by reviewed supply finalization.</p>
         </article>
         <article className="value-card">
-          <span className="policy-value">150</span>
-          <h2>Launch reward</h2>
-          <p>
-            Approved first-successful-token reward: 150 RYLO when the qualifying
-            event falls inside the 60-day launch window.
-          </p>
+          <span className="policy-value">Open</span>
+          <h2>Transferable by design</h2>
+          <p>The intended model allows ordinary Stellar trustlines and transfers without Orrylo membership or purchase requirements.</p>
         </article>
       </section>
 
       <section className="two-column">
         <article className="surface-card feature-card">
-          <span className="eyebrow">Current approved policy</span>
-          <h2>Clear rules, separate states.</h2>
+          <span className="eyebrow">Approved allocation plan</span>
+          <h2>Where the supply is intended to go</h2>
           <ul className="fact-list">
-            <li>Eligibility is wallet-bound and permanent by default.</li>
-            <li>
-              Eligibility and Stellar trustline authorization are separate.
-            </li>
-            <li>Maximum supply policy: 100,000,000 RYLO; initial mint: 0.</li>
-            <li>Eligible, authorized members may transfer and trade RYLO.</li>
+            <li><strong>60%</strong> · Long-term reserve — 598,800,000 RYLO</li>
+            <li><strong>20%</strong> · Market liquidity allocation — 199,600,000 RYLO</li>
+            <li><strong>15%</strong> · Development and operations — 149,700,000 RYLO</li>
+            <li><strong>5%</strong> · Future distribution — 49,900,000 RYLO</li>
           </ul>
+          <p className="muted">These are planned allocations, not evidence of tokens in circulation or funded liquidity.</p>
         </article>
 
         <article className="surface-card feature-card">
-          <span className="eyebrow">Launch window</span>
-          <h2>60 days from the official launch timestamp.</h2>
+          <span className="eyebrow">Launch readiness</span>
+          <h2>Policy approved. Launch not confirmed.</h2>
           <p className="muted">
-            The exact official launch timestamp is intentionally not chosen or
-            configured in the repository yet. Successful creation after the
-            window may still establish eligibility without the launch reward.
+            Issuance, supply-lock controls, custody, token metadata, and any
+            liquidity launch require independent on-chain verification and
+            separate authorization. The approved policy alone does not prove
+            that RYLO has been issued, locked, listed, or made available to trade.
           </p>
-          <span className="availability-badge">Reward execution not live</span>
+          <span className="availability-badge">Public launch not verified</span>
         </article>
       </section>
 
       <article className="prototype-boundary">
         <div>
-          <span className="eyebrow">Price transparency</span>
-          <strong>Approved Orrylo direct sale price: 1 RYLO = 0.1 XLM</strong>
+          <span className="eyebrow">Transparency</span>
+          <strong>No RYLO purchase required for Orrylo</strong>
         </div>
         <p>
-          This is a direct Orrylo sale policy, not intrinsic value, guaranteed
-          market value, guaranteed resale value, or a promise of future value.
-          Direct sale and on-chain RYLO execution are not active in this
-          prototype.
+          Creating an Orrylo Mainnet token has a separate approved service price
+          of 10 XLM per creation when activated. RYLO has no guaranteed
+          market value, liquidity, listing, price floor, or investment return.
+          The previous direct-sale price and first-build reward programs have
+          been superseded.
         </p>
       </article>
     </div>
