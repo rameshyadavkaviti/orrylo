@@ -32,10 +32,10 @@ export function TestnetIssuanceSection({
   return (
     <section className="surface-card" aria-label="Testnet asset issuance">
       <span className="eyebrow">Stellar Testnet · Shared Issuer</span>
-      <h2>Token issuance</h2>
+      <h2>Asset issuance</h2>
       <p>
         Saving your Project Profile does not issue a Stellar asset. Orrylo must
-        receive confirmed on-chain evidence before displaying an issued token.
+        receive confirmed on-chain evidence before displaying an issued asset.
       </p>
       <dl className="managed-project-facts">
         <div>
