@@ -94,7 +94,7 @@ export function IssuanceExecutionControl({
         >
           {state === "reconciliation_required" || state === "confirming"
             ? "Check exact transaction"
-            : "Create Token"}
+            : "Create Asset"}
         </button>
       ) : null}
     </div>
