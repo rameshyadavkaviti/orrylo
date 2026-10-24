@@ -20,8 +20,7 @@ export async function POST(
   context: { params: Promise<{ orderId: string }> },
 ) {
   const config = readServerAuthConfig();
-  if (config.network !== "public" ||
-      process.env.ORRYLO_MAINNET_ORDERS_ENABLED !== "true" ||
+  if (process.env.ORRYLO_MAINNET_ORDERS_ENABLED !== "true" ||
       process.env.ORRYLO_MAINNET_PAYMENT_PREPARE_ENABLED !== "true") {
     return fail("mainnet_payment_preparation_disabled", 503);
   }
