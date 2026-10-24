@@ -19,6 +19,11 @@ function subscribe(callback: () => void) {
   };
 }
 
+function rememberNetwork(value: StellarNetwork) {
+  window.localStorage.setItem(PREFERENCE_KEY, value);
+  document.cookie = `orrylo-network=${value}; Path=/; SameSite=Lax; Max-Age=31536000`;
+}
+
 function selectedNetwork(): StellarNetwork {
   const requested = new URLSearchParams(window.location.search).get("network");
   if (requested === "public" || requested === "testnet") return requested;
@@ -30,8 +35,7 @@ export function NetworkSelector() {
   const network = useSyncExternalStore(subscribe, selectedNetwork, () => "testnet");
 
   function choose(value: StellarNetwork) {
-    window.localStorage.setItem(PREFERENCE_KEY, value);
-    document.cookie = `orrylo-network=${value}; Path=/; SameSite=Lax; Max-Age=31536000`;
+    rememberNetwork(value);
     window.dispatchEvent(new Event(EVENT));
   }
 
