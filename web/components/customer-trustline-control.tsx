@@ -382,7 +382,7 @@ export function CustomerTrustlineControl({
         <span className="step-number">7</span>
         <div>
           <h3>Establish trustline</h3>
-          <p>Authorize your wallet to receive this exact Stellar Testnet asset before token issuance.</p>
+          <p>Authorize your wallet to receive this exact Stellar Testnet asset before asset issuance.</p>
         </div>
       </div>
       <h4>Wallet delivery and network fees</h4>
@@ -481,7 +481,7 @@ export function CustomerTrustlineControl({
           disabled={working}
           onClick={() => void finish()}
         >
-          {working ? "Creating token…" : "Confirm Create Token"}
+          {working ? "Creating asset…" : "Confirm Create Asset"}
         </button>
       ) : null}
       {!working ? (
