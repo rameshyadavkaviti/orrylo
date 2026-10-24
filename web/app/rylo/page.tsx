@@ -14,20 +14,20 @@ export function RyloPage() {
         />
         <div>
           <span className="eyebrow">RYLO · Stellar asset</span>
-          <h1>A token with its own identity.</h1>
+          <h1>A asset with its own identity.</h1>
           <p>
             RYLO is a standalone Stellar asset designed for transfer and potential
-            trading. It is separate from Orrylo&apos;s token-creation service:
-            you do not need to buy, hold, or use RYLO to create a token.
+            trading. It is separate from Orrylo&apos;s asset-creation service:
+            you do not need to buy, hold, or use RYLO to create a asset.
           </p>
         </div>
       </div>
 
-      <section className="value-grid" aria-label="RYLO token overview">
+      <section className="value-grid" aria-label="RYLO asset overview">
         <article className="value-card">
           <span className="step-number">01</span>
           <h2>Independent asset</h2>
-          <p>RYLO has a separate issuer and distribution policy. Orrylo token creation is priced in XLM, not RYLO.</p>
+          <p>RYLO has a separate issuer and distribution policy. Orrylo asset creation is priced in XLM, not RYLO.</p>
         </article>
         <article className="value-card">
           <span className="policy-value">998M</span>
@@ -51,14 +51,14 @@ export function RyloPage() {
             <li><strong>15%</strong> · Development and operations — 149,700,000 RYLO</li>
             <li><strong>5%</strong> · Future distribution — 49,900,000 RYLO</li>
           </ul>
-          <p className="muted">These are planned allocations, not evidence of tokens in circulation or funded liquidity.</p>
+          <p className="muted">These are planned allocations, not evidence of assets in circulation or funded liquidity.</p>
         </article>
 
         <article className="surface-card feature-card">
           <span className="eyebrow">Launch readiness</span>
           <h2>Policy approved. Launch not confirmed.</h2>
           <p className="muted">
-            Issuance, supply-lock controls, custody, token metadata, and any
+            Issuance, supply-lock controls, custody, asset metadata, and any
             liquidity launch require independent on-chain verification and
             separate authorization. The approved policy alone does not prove
             that RYLO has been issued, locked, listed, or made available to trade.
@@ -73,7 +73,7 @@ export function RyloPage() {
           <strong>No RYLO purchase required for Orrylo</strong>
         </div>
         <p>
-          Creating an Orrylo Mainnet token has a separate approved service price
+          Creating an Orrylo Mainnet asset has a separate approved service price
           of 10 XLM per creation when activated. RYLO has no guaranteed
           market value, liquidity, listing, price floor, or investment return.
           The previous direct-sale price and first-build reward programs have
