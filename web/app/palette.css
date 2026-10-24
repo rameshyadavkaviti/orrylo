@@ -485,3 +485,46 @@ html[data-theme="dark"] .field select:focus-visible{border-color:var(--accent);o
   .products-service-card{padding:22px}
   .products-transparency{padding:22px}
 }
+
+/* My Assets: wallet-first workspace and resilient project cards. */
+.my-assets-welcome{
+  display:grid;grid-template-columns:minmax(0,1.2fr) minmax(245px,.8fr);
+  gap:clamp(24px,4vw,52px);align-items:center;
+  padding:clamp(26px,4vw,48px);
+  background:linear-gradient(125deg,var(--surface),var(--surface-soft));
+  border:1px solid var(--line);border-radius:24px;
+}
+.my-assets-welcome-copy{display:flex;flex-direction:column;align-items:flex-start;gap:16px;min-width:0}
+.my-assets-welcome h2{font-size:clamp(1.7rem,3.2vw,2.6rem);line-height:1.13;letter-spacing:-.045em;margin:0}
+.my-assets-welcome p{color:var(--muted);line-height:1.7;max-width:52ch;margin:0}
+.my-assets-connect-actions{display:flex;flex-wrap:wrap;align-items:flex-start;gap:12px;min-width:0;max-width:100%}
+.my-assets-connect-actions .wallet-auth-control{width:auto;max-width:100%;justify-items:start}
+.my-assets-connect-actions .wallet-auth-error{position:static;width:min(100%,330px);text-align:left}
+.my-assets-connect-actions .button{min-height:44px}
+.my-assets-welcome-steps{margin:0;padding:24px;list-style:none;display:grid;gap:22px;background:var(--surface);border:1px solid var(--line);border-radius:18px}
+.my-assets-welcome-steps li{display:flex;align-items:flex-start;gap:14px;min-width:0}
+.my-assets-welcome-steps li>span{flex:0 0 32px;height:32px;display:grid;place-items:center;background:var(--violet-soft);color:var(--accent);font-size:.7rem;font-weight:800;border-radius:50%}
+.my-assets-welcome-steps li>div{display:grid;gap:4px}
+.my-assets-welcome-steps strong{font-size:.94rem}
+.my-assets-welcome-steps small{color:var(--muted);line-height:1.5}
+.my-assets-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:18px 22px;background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.my-assets-wallet-summary{display:grid;gap:6px;min-width:0}
+.my-assets-wallet-summary code{font-size:.9rem;overflow-wrap:anywhere;color:var(--text)}
+.my-assets-section-heading{display:flex;align-items:end;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:18px}
+.my-assets-section-heading h2{margin:7px 0 0;font-size:clamp(1.45rem,2.5vw,2rem);letter-spacing:-.04em}
+.my-assets-section-heading p{color:var(--muted);font-size:.87rem;margin:0}
+.my-assets-count{display:inline-grid;place-items:center;min-width:28px;height:28px;padding-inline:8px;border-radius:99px;background:var(--violet-soft);color:var(--accent);font-size:.78rem;vertical-align:middle;letter-spacing:0}
+.my-assets-projects,.my-assets-projects .asset-project-grid{min-width:0}
+.my-assets-projects .managed-project-card{min-width:0;overflow-wrap:anywhere}
+.my-assets-project-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.my-assets-project-meta span{border:1px solid var(--line);border-radius:99px;padding:5px 9px;color:var(--muted);font-size:.72rem;line-height:1.35}
+@media(max-width:800px){.my-assets-welcome{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:620px){
+  .my-assets-welcome{padding:24px 20px}
+  .my-assets-welcome-steps{padding:20px}
+  .my-assets-toolbar{padding:18px}
+  .my-assets-toolbar>.button{width:100%;justify-content:center}
+  .my-assets-connect-actions{flex-direction:column;align-items:stretch;width:100%}
+  .my-assets-connect-actions .wallet-auth-control{width:100%}
+  .my-assets-connect-actions .button{justify-content:center}
+}
