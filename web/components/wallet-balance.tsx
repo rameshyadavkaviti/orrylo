@@ -51,12 +51,19 @@ export function WalletBalance({ network }: { network: StellarNetwork }) {
 
     setState({ status: "loading" });
     void refresh();
-    const interval = window.setInterval(() => void refresh(), 20_000);
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 20_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("orrylo-auth-changed", onAuthChanged);
     return () => {
       active = false;
       controller.abort();
       window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("orrylo-auth-changed", onAuthChanged);
     };
   }, [network]);
