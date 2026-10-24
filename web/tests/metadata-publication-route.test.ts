@@ -114,8 +114,8 @@ test("root-domain TOML publishes only the canonical RYLO Mainnet identity", asyn
     body,
     new RegExp(`NETWORK_PASSPHRASE = "${RYLO_MAINNET_NETWORK_PASSPHRASE}"`),
   );
-  assert.match(body, new RegExp(`ACCOUNTS = \\["${RYLO_TESTNET_ISSUER}"\\]`));
-  assert.match(body, new RegExp(`issuer = "${RYLO_TESTNET_ISSUER}"`));
+  assert.match(body, new RegExp(`ACCOUNTS = \\["${RYLO_ISSUER_CANDIDATE}"\\]`));
+  assert.match(body, new RegExp(`issuer = "${RYLO_ISSUER_CANDIDATE}"`));
   assert.equal((body.match(/\[\[CURRENCIES\]\]/g) ?? []).length, 1);
   assert.equal((body.match(/code = "RYLO"/g) ?? []).length, 1);
   assert.match(body, /display_decimals = 7/);
