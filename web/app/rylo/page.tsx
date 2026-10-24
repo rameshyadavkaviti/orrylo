@@ -6,7 +6,7 @@ export function RyloPage() {
       <div className="page-heading rylo-heading">
         <Image
           className="rylo-logo"
-          src="/brand/rylo-logo.webp"
+          src="/brand/rylo-logo-v2.webp"
           alt="RYLO"
           width={112}
           height={112}
