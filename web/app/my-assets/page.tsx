@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { DeleteDraftButton } from "../../components/delete-draft-button";
+import { WalletAuthControl } from "../../components/wallet-auth-control";
 
 import { SESSION_COOKIE_NAME } from "../../lib/auth/constants";
 import { getWalletAuthService } from "../../lib/auth/runtime";
@@ -42,9 +43,7 @@ export async function MyAssetsPage() {
             Wallet authentication identifies project ownership. It does not
             create or sign a Stellar transaction.
           </p>
-          <a className="button button-secondary" href="#wallet-connect">
-            Connect Wallet
-          </a>
+          <WalletAuthControl connectLabel="Connect Wallet" />
         </div>
       </div>
     );
