@@ -40,7 +40,7 @@ export function NetworkSelector() {
   }
 
   return (
-    <div role="group" aria-label="Stellar network" className="header-network-selector">
+    <div role="group" aria-label="Stellar network" className="header-network-selector" style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: 5, border: "1px solid var(--line)", borderRadius: 12, background: "var(--surface-soft)", flexShrink: 0, whiteSpace: "nowrap" }}>
       {(["testnet", "public"] as const).map((value) => (
         <Link
           key={value}
@@ -48,6 +48,7 @@ export function NetworkSelector() {
           onClick={() => choose(value)}
           aria-current={network === value ? "true" : undefined}
           className={`header-network-choice${network === value ? " header-network-choice-active" : ""}`}
+          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 73, minHeight: 35, padding: "7px 13px", borderRadius: 8, textDecoration: "none", fontSize: 13, fontWeight: 700, lineHeight: "20px", color: network === value ? "var(--text)" : "var(--muted)", background: network === value ? "var(--violet-soft)" : "transparent", boxShadow: network === value ? "inset 0 0 0 1px var(--violet)" : "none" }}
           title={value === "public" ? "Mainnet preview; live payments are gated" : "Stellar Testnet"}
         >
           {value === "public" ? "Mainnet" : "Testnet"}
