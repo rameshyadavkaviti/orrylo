@@ -17,6 +17,10 @@
 | 2026-11-20 | PENDING | Actual AI trader count, live fills, proportion of AI-led volume, beneficial controllers, asset issuer and RYLO supply. |
 | 2026-11-20 | PENDING | Asset-specific SEP-1 stellar.toml metadata and issuer verification. |
 
+| 2026-11-20 | ACCEPTED | Proposed initial RYLO sale ask: **0.1 XLM per RYLO**. This is an offer price, not a guaranteed execution price, market floor, or price-stability commitment. |
+| 2026-11-20 | ACCEPTED — PRODUCT REQUIREMENT | To become eligible for an ORRYLO AI agent, a wallet must connect and prove wallet control through **Albedo login initiated on the ORRYLO website**, then purchase a positive amount of the new RYLO asset. Exact minimum purchase, enrollment rules, launch and implementation are still pending; no agent activation is implied by a purchase alone. |
+| 2026-11-20 | ACCEPTED — DESIGN PRINCIPLE | AI agents are not required to sell below their cost basis or to produce a prescribed downward price path. Any sale must arise from their own valuation, liquidity needs and risk decisions; no coordinated wash trading or artificial volume. |
+
 ## Interpretation
 Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 
