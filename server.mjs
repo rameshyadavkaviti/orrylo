@@ -10,6 +10,7 @@ const paths=new Map([
  ["/logo.png",["public/logo.png","image/png"]],
  ["/logo",["public/logo.png","image/png"]],
  ["/robots.txt",["public/robots.txt","text/plain; charset=utf-8"]],
+ ["/.well-known/stellar.toml",["public/.well-known/stellar.toml","text/plain; charset=utf-8"]],
  ["/sitemap.xml",["public/sitemap.xml","application/xml; charset=utf-8"]]
 ]);
 createServer(async(req,res)=>{
@@ -18,6 +19,7 @@ createServer(async(req,res)=>{
  if(path==="/healthz"){res.writeHead(200,{...headers,"Content-Type":"application/json"});return res.end(JSON.stringify({status:"ok",service:"orrylo-home"}))}
  if(req.method!=="GET"&&req.method!=="HEAD"){res.writeHead(405,headers);return res.end()}
  const r=paths.get(path);if(!r){res.writeHead(404,headers);return res.end("Not found")}
+ if(path==="/.well-known/stellar.toml") headers["Access-Control-Allow-Origin"]="*";
  try{const [file,type]=r;const buf=await readFile(join(root,file));res.writeHead(200,{...headers,"Content-Type":type});res.end(req.method==="HEAD"?"":buf)}
  catch{res.writeHead(500,headers);res.end("Server error")}
 }).listen(port,"0.0.0.0",()=>console.log("Orrylo home on "+port));
