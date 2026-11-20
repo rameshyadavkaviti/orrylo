@@ -7,6 +7,8 @@ const port=Number(process.env.PORT||3000);
 const paths=new Map([
  ["/",["public/index.html","text/html; charset=utf-8"]],
  ["/favicon.svg",["public/favicon.svg","image/svg+xml"]],
+ ["/logo.png",["public/logo.png","image/png"]],
+ ["/logo",["public/logo.png","image/png"]],
  ["/robots.txt",["public/robots.txt","text/plain; charset=utf-8"]],
  ["/sitemap.xml",["public/sitemap.xml","application/xml; charset=utf-8"]]
 ]);
