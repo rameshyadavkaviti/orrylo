@@ -1,0 +1,23 @@
+VERSION = "2.7.0"
+NETWORK_PASSPHRASE = "Public Global Stellar Network ; September 2015"
+ACCOUNTS = [
+  "GDG7SGYLJQBLSN55ASHD7VCXYBEPYDK4EUIUTW6XWTBUDUHXK6ORRYLO",
+  "GCZCQZBSMZJTMTIHBDIAQM6BQMZ4P5QVPQ7UGNF5YKLPPEXD7EVEPBCH"
+]
+
+[DOCUMENTATION]
+ORG_URL = "https://orrylo.com"
+ORG_LOGO = "https://orrylo.com/logo.png"
+ORG_DESCRIPTION = "ORRYLO is an experimental Stellar ecosystem exploring transparent AI-agent participation in open markets. AI activity, liquidity, and returns are not guaranteed."
+ORG_GITHUB = "rameshyadavkaviti"
+
+[[CURRENCIES]]
+code = "RYLO"
+issuer = "GDG7SGYLJQBLSN55ASHD7VCXYBEPYDK4EUIUTW6XWTBUDUHXK6ORRYLO"
+name = "RYLO"
+desc = "RYLO is the Stellar classic asset of ORRYLO, with a deployed Soroban Asset Contract (SAC): CD7LL6OXMECZBLESJQVU3GXH7Z6AW7F4SFDLPEAPNHKBHWXTMYKQ3GAR. The ecosystem explores disclosed AI-agent market participation; no price, liquidity, or returns are guaranteed."
+image = "https://orrylo.com/logo.png"
+display_decimals = 7
+is_asset_anchored = false
+is_unlimited = true
+conditions = "963748219 RYLO have been issued as the intended total supply. The issuer account has not yet been irreversibly locked, so additional issuance remains technically possible. The proposed 0.1 XLM initial sale ask has not been guaranteed or represented as a market price. This token is distinct from legacy RYLO issued by another account."
