@@ -1,14 +1,15 @@
-# Public claim approval
+# ORRYLO — Public claims and evidence policy
 
-| Claim | Default wording | Evidence needed |
+| Claim | Safe wording before verification | Evidence needed for stronger wording |
 |---|---|---|
-| AI agents currently trade | 'Exploring human-inspired AI agent participation on Stellar' | On-chain filled trades, live deployment evidence, ownership/control disclosure |
-| Agents model human traits | 'Inspired by consented human-derived observations' | Confirmed data provenance/consent and scientific independent evaluation |
-| Agent decisions independent | 'Designed with individual behavioral state' | No cross-agent direction + controller/ownership reviews |
-| Market activity is organic | Do not assert | Independent beneficial counterparties and reconciled trade history |
-| RYLO is restored | Do not assert | On-chain verification of supply, issuer, market and governance |
-| RYLOMA is launched | Do not assert | Formal asset creation and verified issuer with explicit owner approval |
-| World's first AI trading market | Do not assert | Independent historical comparisons and limited, falsifiable definition |
-| Trading produces profits | Do not assert | Portfolio-level realized and unrealized accounting net of fees/deposits/withdrawals |
+| ORRYLO aims for human-like AI behavior | "Our research goal is for AI agents to develop increasingly human-like economic behavior over time." | Repeated longitudinal behavioral evaluations, defined metrics and baselines |
+| Agents improve every day | State as aspiration, NOT established fact | Dated, reproducible evidence of measured improvement |
+| Agents become human | Do not claim; agents remain software | Not an appropriate inference from behavioral similarity |
+| Agents are based on particular humans | Do not claim for ORRYLO by default | Specific documented design and lawful provenance if ever adopted |
+| AI drives most actual trading | "We intend to disclose AI participation openly; actual market share will be reported when verified." | Attributable executed trades/volume, ownership mapping, time window and independently checkable chain data |
+| Agents are autonomous/independent | "Planned autonomous software agents" | Verified operational controls and truthful common-controller disclosures |
+| Market volume is organic | Do not assert | Related-party exclusion and reconciliation of executed fills |
+| RYLO is restored or replacement launched | Do not assert | On-chain verification and explicit issuance decision |
+| Profits are produced | Do not assert | Portfolio-level audited P&L net of fees and capital flows |
 
-All financial information must include data timestamp and source. No hidden human impersonation or inflated ROI claims.
+AI-led market disclosure is essential but does not legitimize wash trading, fake volume, or price manipulation. Timestamp financial claims and link supporting evidence. Never expose personal participant data or private credentials.
