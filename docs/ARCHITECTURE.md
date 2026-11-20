@@ -1,20 +1,22 @@
-# Architecture & operational boundaries
+# ORRYLO — Architecture and operational boundaries
 
 ```text
-Visitors -> orrylo.com -> Public announcement/risks/(later) verified SEP-1 home-domain
-Human traders ---> existing Stellar public market / AMM / order book
-AI agents ------> existing Stellar public market / AMM / order book
+Visitors -> orrylo.com -> Public announcement / AI disclosures / possible SEP-1 home-domain
+
+Future ORRYLO-specific agent engine (design TBD by owner) --> Existing Stellar DEX / AMM
+Human market participants -------------------------------> Existing Stellar DEX / AMM
 ```
 
-The website is NOT an exchange, wallet, market maker, trade executor, or agent controller.
+## Architectural decisions
+- The ORRYLO website is NOT an exchange, wallet, market maker, order matcher, custodian, trading dashboard or agent controller.
+- A distinct ORRYLO agent system is planned, but its cognitive models, learning algorithms, trading rules, infrastructure and controls have NOT yet been designed or authorized for implementation.
+- VEYRIX is a separate historical project built around models of specific real humans. Do not reuse it as the new engine or import its private data/code.
+- ORRYLO's central objective is longitudinal improvement in human-like economic behavior by AI agents. This objective must be evaluated empirically; do not hard-code a claim of success.
+- Legacy human-profile-specific sleep/activity schedules and arbitrary trade-count quotas are not inherited. Economic risk, security, beneficial-ownership and market-integrity safeguards remain necessary.
+- Existing Stellar venues handle real matching and settlement; an ORRYLO system must not fabricate volume via related-wallet self-trading or coordinated artificial demand.
 
-## Components
-- Public repository `orrylo` — documentation and lightweight Node 20+ web server.
-- Separate private project VEYRIX — behavioral and trading research; do not import any private source/person data here.
-- Existing Stellar chain markets — actual matching and settlement, independent of Orrylo web server.
+## Railway and domains
+The informational site is deployed in isolated Railway project `orrylo-v2`. The old custom domains `orrylo.com` and `assets.orrylo.com` were removed from the legacy Railway service. Legacy signer services, storage and repository were not authorized for deletion. Cloudflare DNS and Railway ownership/certificate verification are separate steps.
 
-## Railway migration
-New isolated Railway project: `orrylo-v2`. Existing Railway project `orrylo` has old app domain `orrylo.com` and old asset hostname `assets.orrylo.com`. The user approved removing both custom domains from old service, but NOT deleting old signer services, file storage or legacy private repo. Transfer apex only after new app health verified. Changes to DNS at registrar/Cloudflare are separate from Railway custom-domain ownership.
-
-## Asset-specific home domain
-There is no approved issuer/asset to publish a new stellar.toml yet. Old home-domain association and metadata links MAY break after the old domains are removed. This impact is accepted as part of retiring old websites; any later official SEP-1 metadata must use verified issuer and explicit confirmation.
+## Asset-specific home-domain
+No replacement issuer/asset has been approved. RYLO legacy asset recovery remains unresolved. Do not publish a new issuer-specific stellar.toml until verified issuer and explicit approval.
