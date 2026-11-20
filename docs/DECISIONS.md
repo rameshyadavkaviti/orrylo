@@ -24,6 +24,8 @@
 | 2026-11-20 | ACCEPTED — PRODUCT REQUIREMENT | To become eligible for an ORRYLO AI agent, a wallet must connect and prove wallet control through **Albedo login initiated on the ORRYLO website**, then purchase a positive amount of the new RYLO asset. Exact minimum purchase, enrollment rules, launch and implementation are still pending; no agent activation is implied by a purchase alone. |
 | 2026-11-20 | ACCEPTED — DESIGN PRINCIPLE | AI agents are not required to sell below their cost basis or to produce a prescribed downward price path. Any sale must arise from their own valuation, liquidity needs and risk decisions; no coordinated wash trading or artificial volume. |
 
+| 2026-11-21 | ACCEPTED — COGNITIVE LEARNING PRINCIPLE | **Reward-based learning is a core requirement of ORRYLO agents.** Agents must learn from rewards, reward prediction, non-reward, and adverse outcomes, with individually variable sensitivity shaped by memory and experience. Rewards may include genuine economic outcomes, simulated psychological/social feedback, and explicitly designed incentives. Do not categorically exclude rewards after successful trades; instead distinguish natural market P&L from extra token incentives and evaluate unintended optimization, reward hacking, coordinated trading, and market-integrity risks. No reward scheme or token distribution is approved by this principle alone. |
+
 ## Interpretation
 Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 
