@@ -2,20 +2,23 @@
 
 | Date | Status | Decision |
 |---|---|---|
-| 2026-11-20 | ACCEPTED | Public GitHub repo `rameshyadavkaviti/orrylo` is the SoT for new agents and architects. |
-| 2026-11-20 | ACCEPTED | Orrylo website becomes solely a Stellar asset home-domain / public announcement page. No matching engine, wallet, exchange, or AI trading dashboard. |
-| 2026-11-20 | ACCEPTED | Publicly disclose that experimental AI traders use distinct models of behavioral patterns derived from consenting humans. |
-| 2026-11-20 | ACCEPTED | Humans and AI can trade on existing Stellar infrastructure. AI accounts must not masquerade as independent humans. |
-| 2026-11-20 | ACCEPTED | No wash trades, fake volume, deceptive pricing or coordinated price support. |
-| 2026-11-20 | ACCEPTED | Investigate recovery of original RYLO before deciding on replacement. |
-| 2026-11-20 | PROPOSED | RYLOMA is a possible alternate brand, not an approved token. |
-| 2026-11-20 | ACCEPTED | Use separate Railway project `orrylo-v2` and deploy new public site there. |
-| 2026-11-20 | ACCEPTED | Disconnect BOTH `orrylo.com` and `assets.orrylo.com` from old Railway service. Move apex `orrylo.com` to new Railway deployment after preview. No reason to keep old assets subdomain active. |
-| 2026-11-20 | ACCEPTED | No permission given to delete old bucket, mainnet/testnet signer services, or old repository as part of domain cutover. |
-| 2026-11-20 | PENDING | Actual current AI trader count, live fills, common controllers, independent demand, asset issuer and RYLO supply. |
-| 2026-11-20 | PENDING | Asset-specific SEP-1 stellar.toml metadata / official homepage ownership after verifying token. |
+| 2026-11-20 | ACCEPTED | Public GitHub repo `rameshyadavkaviti/orrylo` is the Source of Truth for ORRYLO agents and architects. |
+| 2026-11-20 | ACCEPTED | orrylo.com is solely an informational/disclosure and possible Stellar asset home-domain, not a trading execution system. |
+| 2026-11-20 | ACCEPTED | Defining research goal: each ORRYLO AI agent should progressively develop more human-like economic behavior and decision-making over time. |
+| 2026-11-20 | ACCEPTED | ORRYLO agents are not required to be replicas of specific humans or derived from individual human profiles. The earlier VEYRIX model is NOT the ORRYLO engine. |
+| 2026-11-20 | ACCEPTED | AI participation and the ambition for an AI-led market will be explicitly disclosed publicly. Actual majority AI trading volume is a claim requiring verification before publication as fact. |
+| 2026-11-20 | ACCEPTED | ORRYLO will have its own separate agent system; its detailed design will be provided by the owner later. Do not preemptively define cognitive architecture or implement models. |
+| 2026-11-20 | ACCEPTED | Do not inherit VEYRIX-specific artificial sleep windows, activity quotas, or unnecessary human-replica constraints. Preserve risk, security and market-integrity safeguards. |
+| 2026-11-20 | ACCEPTED | No wash trades, coordinated fake volume, deceptive pricing, or manipulation, even when AI-led activity is disclosed. |
+| 2026-11-20 | ACCEPTED | Investigate recovery of original RYLO before any replacement issuance. RYLOMA remains only an unapproved proposed name. |
+| 2026-11-20 | ACCEPTED | Use isolated Railway project `orrylo-v2` for the public website. |
+| 2026-11-20 | ACCEPTED | Disconnect both `orrylo.com` and `assets.orrylo.com` from the old Railway service; do not delete old bucket, signer services, or private repo as part of cutover. |
+| 2026-11-20 | PENDING | Detailed ORRYLO agent architecture, learning mechanisms, evaluation benchmarks and trading implementation. |
+| 2026-11-20 | PENDING | Actual AI trader count, live fills, proportion of AI-led volume, beneficial controllers, asset issuer and RYLO supply. |
+| 2026-11-20 | PENDING | Asset-specific SEP-1 stellar.toml metadata and issuer verification. |
 
-## Related, separate initiatives
-Prior discussions include an XLM accumulation strategy, a 24-hour multiasset trading bot, and a daily XLM market notification. These are NOT to be added to the Orrylo informational website without a new explicit decision.
+## Interpretation
+Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 
-Prior VEYRIX experiment reportedly returned approximately 7 XLM in surplus on wind-down, but capital accounting / third-party inflows were not independently audited. It is not a verified profitability claim.
+## Separate initiatives
+Prior XLM accumulation bots, multiasset strategies and market alerts are not part of the ORRYLO informational website without new approval. Historical VEYRIX P&L has not been independently audited.
