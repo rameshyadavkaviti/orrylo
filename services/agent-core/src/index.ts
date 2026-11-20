@@ -1,0 +1,22 @@
+import { loadConfig } from "./config.js";
+import { PostgresAgentRepository } from "./db/repository.js";
+import { buildServer } from "./http/server.js";
+import { startRuntime } from "./runtime/runtime.js";
+
+async function main(): Promise<void> {
+  const config = loadConfig(process.env);
+  const repository = PostgresAgentRepository.connect(config.databaseUrl);
+  const server = buildServer({ config, repository });
+  const runtime = await startRuntime({ config, repository, env: process.env, server, logger: console });
+  const shutdown = async () => {
+    await runtime.stop();
+    process.exit(0);
+  };
+  process.once("SIGTERM", () => { void shutdown(); });
+  process.once("SIGINT", () => { void shutdown(); });
+}
+
+main().catch((error: unknown) => {
+  console.error(JSON.stringify({ event: "startup_failed", error: error instanceof Error ? error.name : "UnknownError" }));
+  process.exit(1);
+});

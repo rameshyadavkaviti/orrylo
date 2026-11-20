@@ -3,13 +3,14 @@
 ```text
 Visitors -> orrylo.com -> Public announcement / AI disclosures / possible SEP-1 home-domain
 
-Future ORRYLO-specific agent engine (design TBD by owner) --> Existing Stellar DEX / AMM
+ORRYLO Agent Core Phase 1 (identity/memory/evaluation only; no execution)
+Future separately approved execution adapter ----------------> Existing Stellar DEX / AMM
 Human market participants -------------------------------> Existing Stellar DEX / AMM
 ```
 
 ## Architectural decisions
 - The ORRYLO website is NOT an exchange, wallet, market maker, order matcher, custodian, trading dashboard or agent controller.
-- A distinct ORRYLO agent system is planned, but its cognitive models, learning algorithms, trading rules, infrastructure and controls have NOT yet been designed or authorized for implementation.
+- Agent Core Phase 1 is approved and implemented as a separate TypeScript/PostgreSQL service. It enrolls environment-configured wallets, derives durable causal identities, stores independent memory/state/history and ingests ordered experiences. It contains no signing or transaction-submission adapter.
 - VEYRIX is a separate historical project built around models of specific real humans. Do not reuse it as the new engine or import its private data/code.
 - ORRYLO's central objective is longitudinal improvement in human-like economic behavior by AI agents. This objective must be evaluated empirically; do not hard-code a claim of success.
 - Legacy human-profile-specific sleep/activity schedules and arbitrary trade-count quotas are not inherited. Economic risk, security, beneficial-ownership and market-integrity safeguards remain necessary.

@@ -1,0 +1,83 @@
+export interface AppConfig {
+  databaseUrl: string;
+  identityMasterKey: string;
+  identityKeyVersion: number;
+  internalApiKey: string;
+  internalApiKeyPrevious?: string;
+  agentEnvPrefix: string;
+  executionEnabled: false;
+  paused: boolean;
+  port: number;
+  host: string;
+  reconcileIntervalMs: number;
+}
+
+export class ConfigError extends Error {
+  readonly code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "ConfigError";
+    this.code = code;
+  }
+
+  toJSON(): { name: string; code: string; message: string } {
+    return { name: this.name, code: this.code, message: this.message };
+  }
+}
+
+type Env = Record<string, string | undefined>;
+
+function required(env: Env, name: string): string {
+  const value = env[name];
+  if (!value) throw new ConfigError("CONFIG_REQUIRED", `Required variable ${name} is missing`);
+  return value;
+}
+
+function boolean(env: Env, name: string, fallback: boolean): boolean {
+  const raw = env[name];
+  if (raw === undefined) return fallback;
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  throw new ConfigError("CONFIG_INVALID", `${name} must be true or false`);
+}
+
+function integer(env: Env, name: string, fallback: number, min: number, max: number): number {
+  const raw = env[name];
+  const value = raw === undefined ? fallback : Number(raw);
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new ConfigError("CONFIG_INVALID", `${name} must be an integer in range ${min}..${max}`);
+  }
+  return value;
+}
+
+function key(env: Env, name: string, minimumLength: number, optional = false): string | undefined {
+  const value = env[name];
+  if (!value && optional) return undefined;
+  if (!value) throw new ConfigError("CONFIG_REQUIRED", `Required variable ${name} is missing`);
+  if (value.length < minimumLength) {
+    throw new ConfigError("CONFIG_INVALID", `${name} must contain at least ${minimumLength} characters`);
+  }
+  return value;
+}
+
+export function loadConfig(env: Env = process.env): AppConfig {
+  const executionEnabled = boolean(env, "ORRYLO_EXECUTION_ENABLED", false);
+  if (executionEnabled) {
+    throw new ConfigError("EXECUTION_FORBIDDEN", "Live execution is not available in phase one");
+  }
+
+  return {
+    databaseUrl: required(env, "DATABASE_URL"),
+    identityMasterKey: key(env, "ORRYLO_IDENTITY_MASTER_KEY", 32)!,
+    identityKeyVersion: integer(env, "ORRYLO_IDENTITY_KEY_VERSION", 1, 1, 2_147_483_647),
+    internalApiKey: key(env, "ORRYLO_INTERNAL_API_KEY", 32)!,
+    internalApiKeyPrevious: key(env, "ORRYLO_INTERNAL_API_KEY_PREVIOUS", 32, true),
+    agentEnvPrefix: env.ORRYLO_AGENT_ENV_PREFIX ?? "ORRYLO_AGENT_",
+    executionEnabled: false,
+    paused: boolean(env, "ORRYLO_PAUSED", false),
+    port: integer(env, "PORT", 3000, 1, 65_535),
+    host: env.HOST ?? "0.0.0.0",
+    reconcileIntervalMs: integer(env, "ORRYLO_RECONCILE_INTERVAL_MS", 30_000, 1_000, 86_400_000),
+  };
+}
