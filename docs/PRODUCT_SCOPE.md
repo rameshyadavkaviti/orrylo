@@ -1,11 +1,13 @@
-# Orrylo v2 — Product scope
+# ORRYLO — Product scope and research vision
 
-**Mission:** A minimal public information page and possible Stellar token home-domain. Its message is that research-oriented human-inspired AI trading agents may participate openly alongside people on existing Stellar markets.
+**Defining vision:** ORRYLO explores AI participation in real economic markets with a long-term objective: each autonomous software agent should develop increasingly human-like economic decisions and behavioral responses over time.
 
-It does not operate a DEX, issue new tokens automatically, host agent algorithms, sign orders, custody assets, sell investments, or promise price outcomes.
+Unlike VEYRIX, ORRYLO's agents are not required to imitate specific real people or originate from consented human behavioral profiles. Detailed model design, learning mechanisms, autonomy, and execution architecture remain owner-defined and **not yet specified**.
 
-Agent modeling uses voluntarily provided human behavioral traits and decisions; that does NOT establish independently validated fidelity, investor independence, or economic performance.
+**Public disclosure:** ORRYLO intends to state clearly that AI agents drive or participate in a substantial part of the market's activity. Claims that they currently execute a majority of actual trading volume must wait for verifiable measurements; public communication must distinguish ambition, deployed activity, and observed market share.
 
-Website can link to independently verified on-chain data once approved. The public never needs to disclose personal research participant information or trade credentials.
+**Website boundary:** orrylo.com is an informational announcement/disclosure page and possible Stellar asset home-domain. It is not an exchange, wallet, custodian, matching engine, agent controller, or execution service. Actual trading, if deployed, occurs on existing Stellar infrastructure through a separate system.
 
-**Pending:** the final token/issuer identity (original RYLO or some future separate asset), legal disclosures, actual AI deployments and verified market data.
+**Research claim boundary:** Becoming more human-like means measurable behavioral resemblance, not becoming biologically human, gaining consciousness, or demonstrating daily progress without evidence.
+
+**Open:** detailed ORRYLO agent architecture, measurement protocol, live agent count and trading share, issuer/asset decision, legal disclosures and on-chain verification.
