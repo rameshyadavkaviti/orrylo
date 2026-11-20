@@ -1,11 +1,10 @@
 # Deploy, migrate and rollback
 
-1. Deploy this public repository into new independent Railway project `orrylo-v2`, branch `main`, start command `npm start` (Node 20+).
-2. Verify auto-generated Railway domain, `/`, `/healthz`, responsive design, HTTPS, SEO and transparency statements.
-3. User explicitly requested removing **both** old domains `orrylo.com` and `assets.orrylo.com` from old Railway service. This will make the latter unavailable and may break old token metadata links; underlying assets bucket and signer services are NOT to be deleted.
-4. Remove old custom domain associations in Railway when ready; add `orrylo.com` to new project/service.
-5. Check Railway domain-status instructions and update DNS in Cloudflare using actual records (do not guess target).
-6. Verify certificate, DNS, apex homepage and health checks. If domain cutover is unavailable, retain preview and provide manual DNS steps.
-7. Keep old service and private repo intact for rollback. Do not restore obsolete `assets.orrylo.com` unless the user explicitly asks.
+1. This public repository's `main` branch deploys to isolated Railway project `orrylo-v2`, service `orrylo-home`.
+2. Next.js requires Node 20+, **build command `npm run build`**, and **start command `npm start`**. The start script respects Railway's `PORT`.
+3. Verify `/`, `/healthz`, `/logo.png`, mobile layout, HTTPS, metadata and public disclosures.
+4. Domain `orrylo.com` belongs to the new Railway service. Follow Railway's actual ownership and DNS instructions; do not guess Cloudflare records.
+5. Both `orrylo.com` and `assets.orrylo.com` were removed from old service at owner's request. Do not delete old buckets, signers, private repository or legacy service. Retain them for rollback.
+6. Do not publish `/.well-known/stellar.toml` until issuer and asset identity are verified and approved.
 
-`/.well-known/stellar.toml` must not be invented: asset identity and issuer-home-domain metadata remain pending approval.
+The site is informational only; no trading, wallet, custody, exchange, matching or agent execution functionality.
