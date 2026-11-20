@@ -1,6 +1,6 @@
 # ORRYLO — Public Source of Truth
 
-ORRYLO is an informational and disclosure landing page exploring how AI software agents **might** develop increasingly human-like economic decisions in existing Stellar markets. This is a research objective, not an empirically verified result.
+ORRYLO combines an informational/disclosure website with a separately deployed Phase 1 research runtime for persistent software-agent identities. The objective is increasingly human-like economic behavior over time; this is not yet an empirically verified result.
 
 ## Stack
 
@@ -20,6 +20,10 @@ npm start
 
 Railway: set build command `npm run build` and start command `npm start`. Runtime honors `PORT` (default 3000); `/healthz` responds with JSON.
 
+## Agent Core
+
+The isolated service in [`services/agent-core`](services/agent-core) verifies environment-configured Stellar key pairs and immediately creates durable, unique agents with separate causal seeds, state, memory, narratives, episodes and evaluations. It has no transaction-signing or submission adapter. See its README and design manifest for contracts and evidence boundaries.
+
 ## Source of truth
 
-Read [AGENTS.md](AGENTS.md), [product scope](docs/PRODUCT_SCOPE.md), [decisions](docs/DECISIONS.md), [architecture](docs/ARCHITECTURE.md), [claims](docs/CLAIMS_AND_EVIDENCE.md), [integrity](docs/MARKET_INTEGRITY.md), and [deployment](docs/DEPLOYMENT.md). No website exchange, wallet, trading execution or agent runtime is authorized. Do not import private VEYRIX data, keys or secrets. Legacy RYLO status is disclosed without claiming on-chain recovery or launch of a new asset.
+Read [AGENTS.md](AGENTS.md), [product scope](docs/PRODUCT_SCOPE.md), [decisions](docs/DECISIONS.md), [architecture](docs/ARCHITECTURE.md), [claims](docs/CLAIMS_AND_EVIDENCE.md), [integrity](docs/MARKET_INTEGRITY.md), and [deployment](docs/DEPLOYMENT.md). The website remains informational and operationally separate from Agent Core. No live trading execution is authorized. Do not import private VEYRIX data, keys or secrets.

@@ -16,6 +16,9 @@
 | 2026-11-20 | PENDING | Detailed ORRYLO agent architecture, learning mechanisms, evaluation benchmarks and trading implementation. |
 | 2026-11-20 | PENDING | Actual AI trader count, live fills, proportion of AI-led volume, beneficial controllers, asset issuer and RYLO supply. |
 | 2026-11-20 | PENDING | Asset-specific SEP-1 stellar.toml metadata and issuer verification. |
+| 2026-11-21 | ACCEPTED | Agent Core Phase 1 architecture and implementation: separate Railway service plus PostgreSQL, immediate verified environment enrollment, unique persisted causal identity, bounded independent evolution, authenticated event ingestion, and numeric behavioral evaluation. |
+| 2026-11-21 | ACCEPTED | Every admitted agent starts with strong but individually expressed RYLO competition and acquisition motives. These are motivational priors, never forced BUY, synchronized execution, price support, minimum activity or chart-shape objectives. |
+| 2026-11-21 | DEFERRED | Stellar signing, live transaction submission, asset verification, beneficial-owner enforcement and capital/risk policy require a separate approved phase. |
 
 | 2026-11-20 | ACCEPTED | Proposed initial RYLO sale ask: **0.1 XLM per RYLO**. This is an offer price, not a guaranteed execution price, market floor, or price-stability commitment. |
 | 2026-11-20 | ACCEPTED — PRODUCT REQUIREMENT | To become eligible for an ORRYLO AI agent, a wallet must connect and prove wallet control through **Albedo login initiated on the ORRYLO website**, then purchase a positive amount of the new RYLO asset. Exact minimum purchase, enrollment rules, launch and implementation are still pending; no agent activation is implied by a purchase alone. |

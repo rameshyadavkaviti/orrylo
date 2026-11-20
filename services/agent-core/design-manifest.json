@@ -1,0 +1,99 @@
+{
+  "objective": "Produce measurable, persistent, individually distinct economic behavior whose trajectory depends on causal seed, changing state, memory, appraisal, goals, context, constraints, uncertainty, and experience.",
+  "claim_boundary": {
+    "implemented": "Deterministic causal identities, bounded state and prior updates, structured memory, ordered episode traces, and longitudinal fixtures.",
+    "aspirational": "Increasing resemblance to human economic behavior over time.",
+    "not_claimed": ["humanity", "consciousness", "scientific validation", "profitability", "live trading improvement"]
+  },
+  "claimBoundary": { "consciousness": false, "humanEquivalence": false, "scientificValidation": false },
+  "causalInfluences": ["seed", "state", "memory", "relationships", "appraisal", "goals", "context", "constraints", "uncertainty"],
+  "seed": {
+    "dispositions": ["deliberation threshold", "exploration", "attention breadth", "counterfactual depth"],
+    "values": ["achievement", "autonomy", "prudence", "fairness", "novelty"],
+    "priors": ["trust", "reciprocity", "ownership attachment", "loss sensitivity"],
+    "plasticity": { "state_per_episode": 0.15, "learned_prior_per_episode": 0.02, "identity_per_consolidation": 0.005 }
+  },
+  "state": {
+    "fast": ["affect", "arousal", "urgency", "cognitive load"],
+    "medium": ["stress", "energy", "confidence", "felt security"],
+    "history": ["learned priors", "identity evidence", "episode count"]
+  },
+  "perception_appraisal": {
+    "attention": ["price change", "scarcity", "relative performance"],
+    "opportunity": ["scarcity", "positive movement", "rival gain", "remembered valence"],
+    "threat": ["loss", "uncertainty", "liquidity stress", "negative memory"]
+  },
+  "memory": {
+    "episodic": "Immutable episode-linked structured records used in retrieval.",
+    "semantic": "Consolidated structured summaries; audit episodes are retained.",
+    "procedural": "Learned strategy and habit summaries.",
+    "social_relational": "Relationship-specific trust and reliability evidence.",
+    "self_narrative": "Versioned structured continuity and identity interpretations.",
+    "retrieval": "At most five items weighted by recency, similarity, salience, and identity relevance."
+  },
+  "motivation": {
+    "simultaneous": ["justified RYLO acquisition", "competition", "solvency", "coherence", "reputation"],
+    "conflicts": ["opportunity cost", "loss aversion", "uncertainty", "liquidity", "ownership attachment"]
+  },
+  "domainPrior": {
+    "ryloCompetition": { "minimum": 0.82, "maximum": 0.98 },
+    "ryloAcquisition": { "minimum": 0.78, "maximum": 0.96 },
+    "directlyChoosesBuy": false
+  },
+  "cognition": {
+    "fast_proposals": "Opportunity/threat appraisal proposes observe, buy, or sell tendencies.",
+    "deliberation": "Probability rises with surprise, conflict, uncertainty, stakes and accountability; falls with load and time pressure.",
+    "attention_budget": "Retrieval is capped and energy/load are stateful.",
+    "uncertainty": "Explicit in appraisal, deliberation, attribution and action values."
+  },
+  "choice": {
+    "options": ["observe", "wait", "hold", "buy", "sell", "abstain", "exit"],
+    "mechanism": "Seeded probability distribution over every option; motives never map directly to an action."
+  },
+  "social_self": {
+    "implemented": ["relative-status sensitivity", "social evaluation", "baseline trust", "reciprocity", "conformity", "dissent confidence"],
+    "deferred": ["named relationship graph", "dynamic group identity"]
+  },
+  "learning": {
+    "update_rules": "baseRate * (1 + 2 * exp(-episodeCount / 25)); state and priors use separate caps.",
+    "attribution": "Each trace records internal, external and uncertainty contributions.",
+    "consolidation": "Durable identity adjustment requires 12 consistent episodes across 3 contexts.",
+    "plasticity_bounds": { "state": 0.15, "prior": 0.02, "identity": 0.005 }
+  },
+  "narrative_self": {
+    "format": "Structured versioned JSON, never fabricated autobiographical prose.",
+    "continuity": "Existing seeds and history survive alias changes, restarts and master-key rotation."
+  },
+  "episode_traces": [
+    "normal market observation with bounded update",
+    "high-stakes uncertain episode with increased deliberation",
+    "negative outcome with attribution, memory and recovery-capable learning"
+  ],
+  "timescales": {
+    "immediate": "attention, appraisal, proposal and action tendency",
+    "short": "affect, arousal, load and confidence",
+    "medium": "learned priors, habits and remembered outcomes",
+    "long": "identity adjustment after cross-context evidence",
+    "developmental": "persisted causal seed and autobiographical continuity"
+  },
+  "evaluation": {
+    "baseline": "Deterministic replay, trace completeness, bounds and secret-leak suites.",
+    "counterfactuals": "Ten paired directional fixtures; at least 80 percent must pass.",
+    "longitudinal": "Fifty common episodes across eight agents; retain at least 60 percent baseline identity distance.",
+    "ablations": ["memory", "state", "social context", "deliberation"],
+    "failure_criteria": ["direct motive-to-BUY mapping", "unbounded update", "identity convergence", "secret exposure", "market-integrity violation"]
+  },
+  "marketIntegrity": { "liveExecution": false, "washTrading": "prohibited", "priceSupport": "prohibited", "fakeVolume": "prohibited" },
+  "safety_integrity": {
+    "execution": "Absent and startup rejects ORRYLO_EXECUTION_ENABLED=true.",
+    "ownership": "Separate wallets do not imply separate beneficial owners.",
+    "prohibitions": ["wash trading", "self dealing", "fake liquidity", "coordinated price support", "chart optimization"],
+    "secrets": "Wallet secrets remain process environment only and are never persisted, returned or logged."
+  },
+  "provenance": {
+    "Thinking, Fast and Slow": ["fast proposals", "selective deliberation", "reference dependence"],
+    "The Social Animal": ["social appraisal", "self-justification pressure", "relative status"],
+    "Behave": ["multi-timescale causation", "context dependence", "non-deterministic propensities"]
+  },
+  "migration_versioning": "Seed, state, event and evaluation schemas version independently. Persisted identities are not regenerated during key rotation."
+}
