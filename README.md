@@ -32,3 +32,15 @@ The site listens on `PORT`, default 3000. The `/healthz` endpoint returns JSON.
 Do not publish private VEYRIX code or participant datasets, consent documentation, private wallet mappings, credentials, seeds, Railway secrets, private agreements, or unverified profitability figures. The underlying market is on Stellar. Orrylo does not manufacture trading activity and guarantees no price, liquidity, or return.
 
 No affiliation with or endorsement by Stellar Development Foundation is implied.
+
+## Deployment status (2026-11-20)
+
+- GitHub: public `rameshyadavkaviti/orrylo`, branch `main`.
+- Railway: independent project `orrylo-v2`, production service `orrylo-home`, connected to this repository. Initial deployment reported SUCCESS.
+- Preview: https://orrylo-home-production.up.railway.app/
+- `orrylo.com` has been removed from the old Railway service and attached to the new one, **awaiting DNS ownership verification and TLS validation**.
+- `assets.orrylo.com` was removed from the old Railway service at the owner's explicit request. Historical asset-file URLs may no longer work. No asset storage bucket or signer was deleted.
+- The old private repo, Railway app and signer services remain provisioned but no longer own the custom domains.
+- Asset-specific SEP-1 `stellar.toml` is intentionally not published until official RYLO/alternative-asset status is verified.
+
+See [deployment guide](docs/DEPLOYMENT.md) for the required Cloudflare DNS records and domain checks.
