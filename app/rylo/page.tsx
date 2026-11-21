@@ -4,7 +4,7 @@ import PageIntro from "@/components/page-intro";
 import RyloPurchase from "@/components/rylo-purchase";
 import { ArrowUpRight, BrainCircuit, ChartNoAxesCombined, Fingerprint, ShieldCheck, Wallet } from "lucide-react";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = {alternates:{canonical:"/rylo"},
   title: "RYLO",
   description: "Explore RYLO on Stellar and the research vision for more human-centered AI market participation. User-authorized purchases via Albedo."
 };
