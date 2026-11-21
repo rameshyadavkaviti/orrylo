@@ -122,3 +122,9 @@ createServer(async (req, res) => {
   }
 }).listen(port, "0.0.0.0", () => console.log("ORRYLO_OBSERVATORY_READY port=" + port));
 process.on("SIGTERM", async () => { await pool.end(); process.exit(0); });
+
+// Startup self-test exercises every dashboard SELECT before declaring telemetry usable.
+snapshot().then((data) => console.log("OBSERVATORY_DB_VERIFIED agents=" + data.counters.agents + " episodes=" + data.counters.episodes)).catch((error) => {
+  console.error("OBSERVATORY_DB_CHECK_FAILED", error instanceof Error ? error.message : "UnknownError");
+  process.exit(1);
+});
