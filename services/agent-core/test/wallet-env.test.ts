@@ -14,12 +14,19 @@ test("discovers and verifies valid wallet pairs", () => {
   assert.deepEqual(result.wallets, [{ alias: "ALPHA", publicKey: wallet.publicKey() }]);
 });
 
-test("reports missing halves without exposing present secret", () => {
-  const secret = Keypair.random().secret();
-  const result = discoverWallets({ ORRYLO_AGENT_ALPHA_SECRET_KEY: secret });
+test("derives a public key in memory for a secret-only wallet", () => {
+  const wallet = Keypair.random();
+  const result = discoverWallets({ ORRYLO_AGENT_ALPHA_SECRET_KEY: wallet.secret() });
+  assert.deepEqual(result.issues, []);
+  assert.deepEqual(result.wallets, [{ alias: "ALPHA", publicKey: wallet.publicKey() }]);
+  assert.equal(JSON.stringify(result).includes(wallet.secret()), false);
+});
+
+test("reports a public-only wallet without exposing credential material", () => {
+  const wallet = Keypair.random();
+  const result = discoverWallets({ ORRYLO_AGENT_ALPHA_PUBLIC_KEY: wallet.publicKey() });
   assert.equal(result.wallets.length, 0);
-  assert.equal(result.issues[0]?.code, "MISSING_PUBLIC_KEY");
-  assert.equal(JSON.stringify(result).includes(secret), false);
+  assert.equal(result.issues[0]?.code, "MISSING_SECRET_KEY");
 });
 
 test("rejects malformed aliases and malformed keys", () => {
@@ -44,6 +51,12 @@ test("rejects a secret that does not derive the configured public key", () => {
   });
   assert.equal(result.issues[0]?.code, "KEYPAIR_MISMATCH");
   assert.equal(result.wallets.length, 0);
+});
+
+test("rejects a malformed secret-only wallet", () => {
+  const result = discoverWallets({ ORRYLO_AGENT_ALPHA_SECRET_KEY: "not-a-secret" });
+  assert.equal(result.wallets.length, 0);
+  assert.equal(result.issues[0]?.code, "MALFORMED_KEYPAIR");
 });
 
 test("rejects a public key configured under multiple aliases", () => {

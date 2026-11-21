@@ -18,6 +18,9 @@ test("loads safe defaults and explicit required settings", () => {
   assert.equal(config.executionEnabled, false);
   assert.equal(config.agentEnvPrefix, "ORRYLO_AGENT_");
   assert.equal(config.identityKeyVersion, 1);
+  assert.equal(config.decisionEnabled, false);
+  assert.equal(config.decisionIntervalMs, 300_000);
+  assert.equal(config.ryloCode, "RYLO");
 });
 
 test("rejects missing required variables without echoing values", () => {
@@ -39,10 +42,28 @@ test("validates port, version, intervals, and key lengths", () => {
     { ...validEnv, PORT: "0" },
     { ...validEnv, ORRYLO_IDENTITY_KEY_VERSION: "0" },
     { ...validEnv, ORRYLO_RECONCILE_INTERVAL_MS: "99" },
+    { ...validEnv, ORRYLO_DECISION_INTERVAL_MS: "999" },
+    { ...validEnv, ORRYLO_REFERENCE_PRICE_XLM: "0" },
+    { ...validEnv, ORRYLO_RYLO_ISSUER: "not-a-public-key" },
     { ...validEnv, ORRYLO_INTERNAL_API_KEY: "short" },
   ]) {
     assert.throws(() => loadConfig(env), ConfigError);
   }
+});
+
+test("loads an explicitly enabled decision loop and verified market settings", () => {
+  const config = loadConfig({
+    ...validEnv,
+    ORRYLO_DECISION_ENABLED: "true",
+    ORRYLO_DECISION_INTERVAL_MS: "60000",
+    ORRYLO_HORIZON_URL: "https://horizon.stellar.org/",
+    ORRYLO_RYLO_ISSUER: "GDG7SGYLJQBLSN55ASHD7VCXYBEPYDK4EUIUTW6XWTBUDUHXK6ORRYLO",
+    ORRYLO_REFERENCE_PRICE_XLM: "0.1",
+  });
+  assert.equal(config.decisionEnabled, true);
+  assert.equal(config.decisionIntervalMs, 60_000);
+  assert.equal(config.horizonUrl, "https://horizon.stellar.org");
+  assert.equal(config.referencePriceXlm, 0.1);
 });
 
 test("supports pause and previous API key rotation", () => {

@@ -9,9 +9,9 @@
 
 The site is informational only; no trading, wallet, custody, exchange, matching or agent execution functionality.
 
-## Agent Core Phase 1
+## Agent Core
 
-Deploy `services/agent-core` as a separate Railway service with its own PostgreSQL service. Build with `npm run build`, start with `npm start`, and configure the variables documented in the service README. Keep `ORRYLO_EXECUTION_ENABLED=false`. `/healthz` is a process signal; `/readyz` requires database migration, healthy enrollment and an unpaused runtime.
+Deploy `services/agent-core` as a separate Railway service with its own PostgreSQL service. Build with `npm run build`, start with `npm start`, and configure the variables documented in the service README. Keep `ORRYLO_EXECUTION_ENABLED=false` until capital and related-wallet policy is complete. `/healthz` is a process signal; `/readyz` requires database migration, healthy enrollment and an unpaused runtime.
 
 ### Production record — 2026-11-21
 

@@ -1,3 +1,5 @@
+import { Keypair } from "@stellar/stellar-sdk";
+
 export interface AppConfig {
   databaseUrl: string;
   identityMasterKey: string;
@@ -10,6 +12,12 @@ export interface AppConfig {
   port: number;
   host: string;
   reconcileIntervalMs: number;
+  decisionEnabled: boolean;
+  decisionIntervalMs: number;
+  horizonUrl: string;
+  ryloCode: string;
+  ryloIssuer: string;
+  referencePriceXlm: number;
 }
 
 export class ConfigError extends Error {
@@ -51,6 +59,36 @@ function integer(env: Env, name: string, fallback: number, min: number, max: num
   return value;
 }
 
+function positiveNumber(env: Env, name: string, fallback: number): number {
+  const raw = env[name];
+  const value = raw === undefined ? fallback : Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new ConfigError("CONFIG_INVALID", `${name} must be a positive number`);
+  }
+  return value;
+}
+
+function stellarPublicKey(env: Env, name: string, fallback: string): string {
+  const value = env[name] ?? fallback;
+  try {
+    Keypair.fromPublicKey(value);
+    return value;
+  } catch {
+    throw new ConfigError("CONFIG_INVALID", `${name} must be a Stellar public key`);
+  }
+}
+
+function url(env: Env, name: string, fallback: string): string {
+  const raw = env[name] ?? fallback;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "https:") throw new Error("https required");
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    throw new ConfigError("CONFIG_INVALID", `${name} must be a valid HTTPS URL`);
+  }
+}
+
 function key(env: Env, name: string, minimumLength: number, optional = false): string | undefined {
   const value = env[name];
   if (!value && optional) return undefined;
@@ -79,5 +117,15 @@ export function loadConfig(env: Env = process.env): AppConfig {
     port: integer(env, "PORT", 3000, 1, 65_535),
     host: env.HOST ?? "0.0.0.0",
     reconcileIntervalMs: integer(env, "ORRYLO_RECONCILE_INTERVAL_MS", 30_000, 1_000, 86_400_000),
+    decisionEnabled: boolean(env, "ORRYLO_DECISION_ENABLED", false),
+    decisionIntervalMs: integer(env, "ORRYLO_DECISION_INTERVAL_MS", 300_000, 10_000, 86_400_000),
+    horizonUrl: url(env, "ORRYLO_HORIZON_URL", "https://horizon.stellar.org"),
+    ryloCode: env.ORRYLO_RYLO_CODE ?? "RYLO",
+    ryloIssuer: stellarPublicKey(
+      env,
+      "ORRYLO_RYLO_ISSUER",
+      "GDG7SGYLJQBLSN55ASHD7VCXYBEPYDK4EUIUTW6XWTBUDUHXK6ORRYLO",
+    ),
+    referencePriceXlm: positiveNumber(env, "ORRYLO_REFERENCE_PRICE_XLM", 0.1),
   };
 }

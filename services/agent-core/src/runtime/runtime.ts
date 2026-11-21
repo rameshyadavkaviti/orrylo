@@ -2,6 +2,7 @@ import type { AppConfig } from "../config.js";
 import type { AgentRepository } from "../db/repository.js";
 import { reconcileEnrollment } from "../enrollment/reconcile.js";
 import { EnrollmentLoop } from "./evolution-loop.js";
+import { DecisionRunner, HorizonMarketObserver } from "./decision-loop.js";
 
 interface ServerLike {
   listen(options?: { host: string; port: number }): Promise<unknown>;
@@ -41,12 +42,30 @@ export async function startRuntime(options: {
   });
   loop.start();
 
+  const marketObserver = new HorizonMarketObserver({
+    horizonUrl: config.horizonUrl,
+    ryloCode: config.ryloCode,
+    ryloIssuer: config.ryloIssuer,
+    referencePriceXlm: config.referencePriceXlm,
+  });
+  const decisionRunner = new DecisionRunner({ repository, observe: () => marketObserver.observe(), logger });
+  const decisionLoop = new EnrollmentLoop(config.decisionIntervalMs, () => decisionRunner.run().then(() => undefined), (error) => {
+    logger.error({ event: "decision_cycle_failed", error: error instanceof Error ? error.name : "UnknownError" });
+  });
+  if (config.decisionEnabled && !config.paused) {
+    await decisionLoop.tick().catch((error) => {
+      logger.error({ event: "initial_decision_failed", error: error instanceof Error ? error.name : "UnknownError" });
+    });
+    decisionLoop.start();
+  }
+
   let stopped = false;
   return {
     async stop() {
       if (stopped) return;
       stopped = true;
       loop.stop();
+      decisionLoop.stop();
       await server.close();
       await repository.close();
     },

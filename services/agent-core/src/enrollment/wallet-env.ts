@@ -64,15 +64,20 @@ export function discoverWallets(env: Env, prefix = "ORRYLO_AGENT_"): WalletDisco
 
   const candidates: VerifiedWallet[] = [];
   for (const [alias, entry] of grouped) {
-    if (!entry.publicKey) {
-      issues.push({ alias, code: "MISSING_PUBLIC_KEY" });
-      continue;
-    }
     if (!entry.secretKey) {
       issues.push({ alias, code: "MISSING_SECRET_KEY" });
       continue;
     }
-    const verified = verifyWalletCandidate(alias, entry.publicKey, entry.secretKey);
+    let publicKey = entry.publicKey;
+    if (!publicKey) {
+      try {
+        publicKey = Keypair.fromSecret(entry.secretKey).publicKey();
+      } catch {
+        issues.push({ alias, code: "MALFORMED_KEYPAIR" });
+        continue;
+      }
+    }
+    const verified = verifyWalletCandidate(alias, publicKey, entry.secretKey);
     if (verified.ok) candidates.push(verified.wallet);
     else issues.push(verified.issue);
   }

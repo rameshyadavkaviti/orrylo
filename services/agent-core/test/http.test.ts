@@ -20,6 +20,12 @@ const config: AppConfig = {
   port: 3000,
   host: "127.0.0.1",
   reconcileIntervalMs: 30_000,
+  decisionEnabled: false,
+  decisionIntervalMs: 300_000,
+  horizonUrl: "https://horizon.stellar.org",
+  ryloCode: "RYLO",
+  ryloIssuer: "GDG7SGYLJQBLSN55ASHD7VCXYBEPYDK4EUIUTW6XWTBUDUHXK6ORRYLO",
+  referencePriceXlm: 0.1,
 };
 
 async function fixture(overrides: Partial<AppConfig> = {}) {
