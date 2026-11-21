@@ -4,7 +4,7 @@ import { HORIZON_URL, RYLO_CODE, RYLO_ISSUER } from "@/lib/rylo";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type OrderLevel = { price: string; amount: string };
+type OrderLevel = { price: string; amount: string; price_r: { n: number; d: number } };
 type OrderBook = { asks?: OrderLevel[] };
 
 function toStroops(value: string): bigint {
@@ -32,15 +32,18 @@ export async function GET() {
     if (!response.ok) throw new Error("Unable to retrieve order book.");
     const book = await response.json() as OrderBook;
     if (!Array.isArray(book.asks)) throw new Error("Unexpected order book.");
-    const cap = 1000000n; // 0.1000000 XLM per RYLO
     let available = 0n;
     let bestAsk: string | null = null;
     let counted = 0;
     for (const level of book.asks) {
       if (typeof level.price !== "string" || typeof level.amount !== "string") continue;
+      const n = level.price_r?.n;
+      const d = level.price_r?.d;
+      if (!Number.isSafeInteger(n) || !Number.isSafeInteger(d) || n <= 0 || d <= 0) continue;
       const price = toStroops(level.price);
       if (bestAsk === null || price < toStroops(bestAsk)) bestAsk = level.price;
-      if (price <= cap) {
+      // Use the exact on-chain rational price, not a rounded decimal display value.
+      if (BigInt(n) * 10n <= BigInt(d)) {
         available += toStroops(level.amount);
         counted++;
       }
