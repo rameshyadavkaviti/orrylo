@@ -21,6 +21,8 @@ test("loads safe defaults and explicit required settings", () => {
   assert.equal(config.decisionEnabled, false);
   assert.equal(config.decisionIntervalMs, 300_000);
   assert.equal(config.ryloCode, "RYLO");
+  assert.equal(config.claimableObservationEnabled, false);
+  assert.equal(config.claimExecutionEnabled, false);
 });
 
 test("rejects missing required variables without echoing values", () => {
@@ -30,11 +32,20 @@ test("rejects missing required variables without echoing values", () => {
   );
 });
 
-test("rejects live execution in phase one", () => {
-  assert.throws(
-    () => loadConfig({ ...validEnv, ORRYLO_EXECUTION_ENABLED: "true" }),
-    (error: unknown) => error instanceof ConfigError && error.code === "EXECUTION_FORBIDDEN",
-  );
+test("requires explicit risk and related-wallet controls for live market execution", () => {
+  assert.throws(() => loadConfig({ ...validEnv, ORRYLO_EXECUTION_ENABLED: "true" }), ConfigError);
+  const config = loadConfig({
+    ...validEnv,
+    ORRYLO_EXECUTION_ENABLED: "true",
+    ORRYLO_EXECUTION_MAX_TRADE_XLM: "0.1",
+    ORRYLO_EXECUTION_DAILY_CAP_XLM: "0.5",
+    ORRYLO_EXECUTION_MIN_FREE_XLM: "2",
+    ORRYLO_EXECUTION_MAX_BUY_PRICE_XLM: "0.1",
+    ORRYLO_RELATED_PUBLIC_KEYS: "GCZCQZBSMZJTMTIHBDIAQM6BQMZ4P5QVPQ7UGNF5YKLPPEXD7EVEPBCH",
+  });
+  assert.equal(config.executionEnabled, true);
+  assert.equal(config.executionMaxTradeXlm, 0.1);
+  assert.equal(config.executionDailyCapXlm, 0.5);
 });
 
 test("validates port, version, intervals, and key lengths", () => {
@@ -64,6 +75,21 @@ test("loads an explicitly enabled decision loop and verified market settings", (
   assert.equal(config.decisionIntervalMs, 60_000);
   assert.equal(config.horizonUrl, "https://horizon.stellar.org");
   assert.equal(config.referencePriceXlm, 0.1);
+});
+
+test("enables only the asset-scoped claim path without enabling market execution", () => {
+  assert.throws(() => loadConfig({
+    ...validEnv,
+    ORRYLO_CLAIM_EXECUTION_ENABLED: "true",
+  }), ConfigError);
+  const config = loadConfig({
+    ...validEnv,
+    ORRYLO_CLAIMABLE_OBSERVATION_ENABLED: "true",
+    ORRYLO_CLAIM_EXECUTION_ENABLED: "true",
+  });
+  assert.equal(config.claimableObservationEnabled, true);
+  assert.equal(config.claimExecutionEnabled, true);
+  assert.equal(config.executionEnabled, false);
 });
 
 test("supports pause and previous API key rotation", () => {

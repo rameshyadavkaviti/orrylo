@@ -103,9 +103,9 @@ test("preserves every legitimate action and never guarantees BUY", () => {
     context: { contextTag: "scarce", scarcity: 1, rivalGain: 1, uncertainty: 0, stakes: 0.5 },
   }));
   assert.deepEqual(Object.keys(result.actionDistribution).sort(), ["abstain", "buy", "exit", "hold", "observe", "sell", "wait"]);
-  assert.ok(result.actionDistribution.buy < 1);
-  assert.ok(result.actionDistribution.abstain > 0);
-  assert.ok(result.actionDistribution.sell > 0);
+  assert.ok(result.actionDistribution.buy! < 1);
+  assert.ok(result.actionDistribution.abstain! > 0);
+  assert.ok(result.actionDistribution.sell! > 0);
 });
 
 test("learned priors and consolidated identity causally change later choices", () => {
@@ -211,4 +211,27 @@ test("legacy persisted states are upgraded causally without resetting their hist
   assert.ok(result.state.behavioralDynamics);
   assert.ok(result.state.referenceLearning);
   assert.ok(result.state.selfModel);
+});
+
+test("a RYLO gift is appraised through claim, defer, and decline rather than market actions", () => {
+  const result = evolveAgent(seed, createInitialState(seed), [], event({
+    eventId: "claimable-gift",
+    type: "claimable_balance_observation",
+    context: {
+      contextTag: "rylo_claimable_gift",
+      giftAmountRylo: 2,
+      giftUnconditional: 1,
+      hasRyloTrustline: 0,
+      feeBurden: 0.000001,
+      uncertainty: 0.05,
+      stakes: 0.1,
+      goalConflict: 0.05,
+      accountability: 1,
+      timePressure: 0,
+      socialReliability: 0.7,
+    },
+  }));
+  assert.deepEqual(Object.keys(result.actionDistribution).sort(), ["claim", "decline", "defer"]);
+  assert.ok(result.actionDistribution.claim! > result.actionDistribution.decline!);
+  assert.equal(result.trace.fastProposal, "claim");
 });

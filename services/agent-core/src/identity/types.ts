@@ -1,4 +1,6 @@
-export const availableActions = ["observe", "wait", "hold", "buy", "sell", "abstain", "exit"] as const;
+export const marketActions = ["observe", "wait", "hold", "buy", "sell", "abstain", "exit"] as const;
+export const claimableActions = ["claim", "defer", "decline"] as const;
+export const availableActions = [...marketActions, ...claimableActions] as const;
 export type AvailableAction = (typeof availableActions)[number];
 
 export interface CognitiveSeed {

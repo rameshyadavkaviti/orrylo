@@ -24,6 +24,11 @@ export interface AgentProjection {
     urgency: number;
     feltSecurity: number;
   };
+  behavioralSummary: {
+    lastAction: string | null;
+    actionRunLength: number;
+    lastEpisodeAt: string | null;
+  };
 }
 
 export interface EvolutionReceipt {
@@ -49,4 +54,14 @@ export interface RepositoryReadiness {
   migrated: boolean;
   enrollmentHealthy: boolean;
   invalidCandidates: number;
+}
+
+export interface ExecutionRecord {
+  transactionHash: string;
+  kind: "claim" | "trade";
+  action: "claim" | "buy" | "sell";
+  amountRylo: number;
+  priceXlm?: number;
+  maxXlm: number;
+  createdAt: string;
 }

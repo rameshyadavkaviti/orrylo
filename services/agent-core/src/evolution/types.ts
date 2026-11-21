@@ -1,6 +1,6 @@
 import type { AvailableAction } from "../identity/types.js";
 
-export type EventType = "market_observation" | "decision_outcome" | "social_signal" | "operator_feedback" | "evaluation_probe";
+export type EventType = "market_observation" | "claimable_balance_observation" | "decision_outcome" | "social_signal" | "operator_feedback" | "evaluation_probe";
 
 export interface AgentEvent {
   eventId: string;
@@ -94,7 +94,7 @@ export interface EvolutionResult {
   memories: AgentMemory[];
   retrievedMemories: AgentMemory[];
   trace: EpisodeTrace;
-  actionDistribution: Record<AvailableAction, number>;
+  actionDistribution: Partial<Record<AvailableAction, number>>;
   actionTendency: AvailableAction;
   deltas: {
     state: Record<string, number>;

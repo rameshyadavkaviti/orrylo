@@ -11,6 +11,7 @@
 | Market volume is organic | Do not assert | Related-party exclusion and reconciliation of executed fills |
 | RYLO is restored or replacement launched | Do not assert | On-chain verification and explicit issuance decision |
 | Profits are produced | Do not assert | Portfolio-level audited P&L net of fees and capital flows |
+| Agents trade live | "Agents can independently submit bounded RYLO/XLM offers; current fills are reported separately." | On-chain offer transactions plus fill reconciliation, related-wallet exclusion and a defined time window |
 
 AI-led market disclosure is essential but does not legitimize wash trading, fake volume, or price manipulation. Timestamp financial claims and link supporting evidence. Never expose personal participant data or private credentials.
 

@@ -1,4 +1,7 @@
+import type { Keypair } from "@stellar/stellar-sdk";
+
 import type { AgentRepository } from "../db/repository.js";
+import type { TradeExecutionIntent, TradeExecutionResult } from "./trade-execution.js";
 
 interface OrderBookEntry {
   price: string;
@@ -128,26 +131,83 @@ export class DecisionRunner {
     repository: AgentRepository;
     observe: () => Promise<MarketSnapshot>;
     logger: LoggerLike;
+    inspectPortfolio?: (publicKey: string) => Promise<{ nativeBalanceXlm: number; ryloBalance: number; hasRyloTrustline: boolean; openOffers: number }>;
+    signerForPublicKey?: (publicKey: string) => Keypair | undefined;
+    executeTrade?: (intent: TradeExecutionIntent, signer: Keypair) => Promise<TradeExecutionResult>;
+    executionEnabled?: boolean;
+    referencePriceXlm?: number;
   }) {}
 
-  async run(): Promise<{ decided: number; failed: number; actions: Record<string, number> }> {
+  async run(): Promise<{ decided: number; failed: number; actions: Record<string, number>; submitted: number; blocked: number }> {
     const snapshot = await this.options.observe();
     const agents = (await this.options.repository.list()).filter((agent) => agent.configured);
     const actions: Record<string, number> = {};
     let decided = 0;
     let failed = 0;
+    let submitted = 0;
+    let blocked = 0;
     for (const agent of agents) {
       try {
+        const portfolio = this.options.inspectPortfolio ? await this.options.inspectPortfolio(agent.publicKey) : undefined;
         const receipt = await this.options.repository.applyEvolution(agent.id, {
           eventId: `market:${snapshot.observedAt}:${agent.id}`,
           type: "market_observation",
           sequence: agent.revision + 1,
           occurredAt: snapshot.observedAt,
           source: "horizon_mainnet",
-          context: snapshot.context,
+          context: {
+            ...snapshot.context,
+            ...(portfolio ? {
+              nativeBalanceXlm: portfolio.nativeBalanceXlm,
+              ryloBalance: portfolio.ryloBalance,
+              hasRyloTrustline: portfolio.hasRyloTrustline ? 1 : 0,
+              ownership: clamp(portfolio.ryloBalance / 100),
+              feeBurden: clamp(0.00001 / Math.max(0.00001, portfolio.nativeBalanceXlm)),
+              openOffers: portfolio.openOffers,
+            } : {}),
+          },
         });
         decided += 1;
         actions[receipt.actionTendency] = (actions[receipt.actionTendency] ?? 0) + 1;
+        if ((receipt.actionTendency === "buy" || receipt.actionTendency === "sell") && this.options.executionEnabled) {
+          const signer = this.options.signerForPublicKey?.(agent.publicKey);
+          if (!signer || !this.options.executeTrade) throw new Error("TRADE_SIGNER_NOT_FOUND");
+          const dailyCommittedXlm = await this.options.repository.executionCommittedXlm24h(agent.id);
+          const execution = await this.options.executeTrade({
+            action: receipt.actionTendency,
+            publicKey: agent.publicKey,
+            bestAskXlm: snapshot.context.bestAskXlm,
+            bestBidXlm: snapshot.context.bestBidXlm,
+            referencePriceXlm: this.options.referencePriceXlm ?? 0.1,
+            confidence: agent.cognitiveSummary.confidence,
+            urgency: agent.cognitiveSummary.urgency,
+            dailyCommittedXlm,
+          }, signer);
+          if (execution.status === "submitted") {
+            submitted += 1;
+            await this.options.repository.recordExecution(agent.id, {
+              transactionHash: execution.hash,
+              kind: "trade",
+              action: execution.action,
+              amountRylo: execution.amountRylo,
+              priceXlm: execution.priceXlm,
+              maxXlm: execution.maxXlm,
+              createdAt: new Date().toISOString(),
+            });
+            const latest = await this.options.repository.get(agent.id);
+            if (latest) await this.options.repository.applyEvolution(agent.id, {
+              eventId: `trade-result:${execution.hash}`,
+              type: "decision_outcome",
+              sequence: latest.revision + 1,
+              occurredAt: new Date().toISOString(),
+              source: "stellar_mainnet",
+              context: { contextTag: "rylo_trade_execution", uncertainty: 0.1, stakes: clamp(execution.maxXlm / 0.5), transactionHash: execution.hash },
+              outcome: { reward: 0, action: execution.action },
+            });
+          } else {
+            blocked += 1;
+          }
+        }
       } catch (error) {
         failed += 1;
         this.options.logger.error({ event: "agent_decision_failed", agentId: agent.id, error: error instanceof Error ? error.name : "UnknownError" });
@@ -160,6 +220,7 @@ export class DecisionRunner {
       decided,
       failed,
       actions,
+      execution: { enabled: Boolean(this.options.executionEnabled), submitted, blocked },
       market: {
         bestBidXlm: snapshot.context.bestBidXlm,
         bestAskXlm: snapshot.context.bestAskXlm,
@@ -167,6 +228,6 @@ export class DecisionRunner {
         bidDepthRylo: snapshot.context.bidDepthRylo,
       },
     });
-    return { decided, failed, actions };
+    return { decided, failed, actions, submitted, blocked };
   }
 }

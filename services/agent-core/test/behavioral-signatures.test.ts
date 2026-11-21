@@ -16,7 +16,7 @@ test("design manifest represents all causal influences and integrity boundaries"
   const manifest = JSON.parse(await readFile(new URL("../design-manifest.json", import.meta.url), "utf8"));
   assert.deepEqual(manifest.causalInfluences.sort(), ["appraisal", "constraints", "context", "goals", "memory", "relationships", "seed", "state", "uncertainty"].sort());
   assert.equal(manifest.claimBoundary.consciousness, false);
-  assert.equal(manifest.marketIntegrity.liveExecution, false);
+  assert.equal(manifest.marketIntegrity.liveExecution, true);
   assert.equal(manifest.marketIntegrity.washTrading, "prohibited");
   assert.equal(manifest.domainPrior.ryloCompetition.minimum, 0.82);
   assert.equal(manifest.domainPrior.directlyChoosesBuy, false);
@@ -42,8 +42,8 @@ test("paired counterfactuals meet the preregistered directional threshold", () =
   for (const [name, lowContext, highContext, metric, direction] of pairs) {
     const low = evolveAgent(seed, state, [], { ...base, eventId: `${name}-low`, context: { contextTag: name, ...lowContext } });
     const high = evolveAgent(seed, state, [], { ...base, eventId: `${name}-high`, context: { contextTag: name, ...highContext } });
-    const lowValue = metric === "deliberationProbability" ? low.trace.deliberationProbability : low.actionDistribution[metric];
-    const highValue = metric === "deliberationProbability" ? high.trace.deliberationProbability : high.actionDistribution[metric];
+    const lowValue = metric === "deliberationProbability" ? low.trace.deliberationProbability : low.actionDistribution[metric]!;
+    const highValue = metric === "deliberationProbability" ? high.trace.deliberationProbability : high.actionDistribution[metric]!;
     if (direction === "up" ? highValue > lowValue : highValue < lowValue) passed += 1;
   }
   assert.ok(passed / pairs.length >= 0.8, `${passed}/${pairs.length} directional fixtures passed`);

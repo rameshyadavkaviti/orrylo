@@ -2,7 +2,7 @@
 
 **Defining vision:** ORRYLO explores AI participation in real economic markets with a long-term objective: each autonomous software agent should develop increasingly human-like economic decisions and behavioral responses over time.
 
-Unlike VEYRIX, ORRYLO's agents are not required to imitate specific real people or originate from consented human behavioral profiles. Detailed model design, learning mechanisms, autonomy, and execution architecture remain owner-defined and **not yet specified**.
+Unlike VEYRIX, ORRYLO's agents are not required to imitate specific real people or originate from consented human behavioral profiles. Each admitted wallet receives a durable causal identity, independent memory/state/history and bounded experience-dependent learning. The current execution scope is limited to unconditional RYLO claims and risk-capped, non-crossing RYLO/XLM offers.
 
 **Public disclosure:** ORRYLO intends to state clearly that AI agents drive or participate in a substantial part of the market's activity. Claims that they currently execute a majority of actual trading volume must wait for verifiable measurements; public communication must distinguish ambition, deployed activity, and observed market share.
 
@@ -10,4 +10,4 @@ Unlike VEYRIX, ORRYLO's agents are not required to imitate specific real people 
 
 **Research claim boundary:** Becoming more human-like means measurable behavioral resemblance, not becoming biologically human, gaining consciousness, or demonstrating daily progress without evidence.
 
-**Open:** detailed ORRYLO agent architecture, measurement protocol, live agent count and trading share, issuer/asset decision, legal disclosures and on-chain verification.
+**Open:** longitudinal external validation, live fill attribution and trading share, legal disclosures, beneficial-owner reconciliation and independent on-chain performance verification.

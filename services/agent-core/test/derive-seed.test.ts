@@ -51,7 +51,18 @@ test("contains mechanisms and bounds but no direct action or guaranteed buy", ()
   const serialized = JSON.stringify(seed).toLowerCase();
   assert.equal(serialized.includes("buyaction"), false);
   assert.equal(serialized.includes("guaranteed"), false);
-  assert.deepEqual(seed.availableActions, ["observe", "wait", "hold", "buy", "sell", "abstain", "exit"]);
+  assert.deepEqual(seed.availableActions, [
+    "observe",
+    "wait",
+    "hold",
+    "buy",
+    "sell",
+    "abstain",
+    "exit",
+    "claim",
+    "defer",
+    "decline",
+  ]);
 });
 
 test("reference fixture identities remain materially separated", () => {

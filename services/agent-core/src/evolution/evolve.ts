@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { availableActions, type CognitiveSeed, type AvailableAction } from "../identity/types.js";
+import { availableActions, claimableActions, marketActions, type CognitiveSeed, type AvailableAction } from "../identity/types.js";
 import type { AgentEvent, AgentMemory, AgentState, EvolutionResult } from "./types.js";
 
 const stages = [
@@ -150,27 +150,35 @@ function retrieveMemories(memories: AgentMemory[], event: AgentEvent): AgentMemo
     .map(({ memory }) => memory);
 }
 
-function distribution(scores: Record<AvailableAction, number>, temperature: number): Record<AvailableAction, number> {
-  const entries = Object.entries(scores) as [AvailableAction, number][];
+function distribution(
+  scores: Partial<Record<AvailableAction, number>>,
+  temperature: number,
+  candidates: readonly AvailableAction[],
+): Partial<Record<AvailableAction, number>> {
+  const entries = candidates.map((candidate) => [candidate, scores[candidate] ?? 0] as const);
   const safeTemperature = clamp(temperature, 0.45, 1.6);
   const exponents = entries.map(([candidate, score]) => [candidate, Math.exp(Math.min(8, Math.max(-8, score / safeTemperature)))] as const);
   const total = exponents.reduce((sum, [, value]) => sum + value, 0);
-  return Object.fromEntries(exponents.map(([candidate, value]) => [candidate, round(value / total)])) as Record<AvailableAction, number>;
+  return Object.fromEntries(exponents.map(([candidate, value]) => [candidate, round(value / total)])) as Partial<Record<AvailableAction, number>>;
 }
 
-function entropy(probabilities: Record<AvailableAction, number>): number {
+function entropy(probabilities: Partial<Record<AvailableAction, number>>): number {
   const raw = Object.values(probabilities).reduce((sum, probability) =>
     probability > 0 ? sum - probability * Math.log(probability) : sum, 0);
-  return round(raw / Math.log(availableActions.length));
+  return round(raw / Math.log(Math.max(2, Object.keys(probabilities).length)));
 }
 
-function selectAction(probabilities: Record<AvailableAction, number>, random: number): AvailableAction {
+function selectAction(
+  probabilities: Partial<Record<AvailableAction, number>>,
+  random: number,
+  candidates: readonly AvailableAction[],
+): AvailableAction {
   let cumulative = 0;
-  for (const candidate of availableActions) {
-    cumulative += probabilities[candidate];
+  for (const candidate of candidates) {
+    cumulative += probabilities[candidate] ?? 0;
     if (random <= cumulative) return candidate;
   }
-  return "abstain";
+  return candidates.at(-1) ?? "abstain";
 }
 
 function memoryKind(event: AgentEvent, consolidated: boolean, outcomeAction?: AvailableAction): AgentMemory["kind"] {
@@ -183,6 +191,8 @@ function memoryKind(event: AgentEvent, consolidated: boolean, outcomeAction?: Av
 
 export function evolveAgent(seed: CognitiveSeed, currentInput: AgentState, memories: AgentMemory[], event: AgentEvent): EvolutionResult {
   const current = normalizedState(seed, currentInput, event.occurredAt);
+  const isClaimableGift = event.type === "claimable_balance_observation";
+  const candidateActions: readonly AvailableAction[] = isClaimableGift ? claimableActions : marketActions;
   const random = draw(seed, event.eventId);
   const latencyDraw = draw(seed, event.eventId, "latency");
   const tag = contextTag(event);
@@ -196,6 +206,15 @@ export function evolveAgent(seed: CognitiveSeed, currentInput: AgentState, memor
   const timePressure = clamp(number(event.context, "timePressure"));
   const liquidityStress = clamp(number(event.context, "liquidityStress"));
   const explicitValence = clamp(number(event.context, "valence"), -1, 1);
+  const giftAmountRylo = Math.max(0, number(event.context, "giftAmountRylo"));
+  const giftMagnitude = clamp(Math.log1p(giftAmountRylo) / Math.log(11));
+  const giftUnconditional = clamp(number(event.context, "giftUnconditional"));
+  const hasRyloTrustline = clamp(number(event.context, "hasRyloTrustline"));
+  const feeBurden = clamp(number(event.context, "feeBurden"));
+  const observedRyloBalance = optionalNumber(event.context, "ryloBalance");
+  const ryloBalance = Math.max(0, observedRyloBalance ?? 0);
+  const hasPortfolioObservation = observedRyloBalance !== undefined;
+  const ownership = clamp(Math.log1p(ryloBalance) / Math.log(101));
   const outcomeReward = optionalNumber(event.outcome, "reward");
   const reward = clamp(outcomeReward ?? 0, -1, 1);
   const outcomeAction = action(event.outcome?.action) ?? (event.type === "decision_outcome" ? current.behavioralDynamics.recentAction ?? undefined : undefined);
@@ -206,19 +225,23 @@ export function evolveAgent(seed: CognitiveSeed, currentInput: AgentState, memor
 
   const attention = clamp(
     0.15 + Math.abs(priceChange) * 0.35 + scarcity * seed.sensitivities.scarcity * 0.25
-      + rivalGain * seed.sensitivities.relativeStatus * 0.25 + current.behavioralDynamics.postErrorChecking * 0.2,
+      + rivalGain * seed.sensitivities.relativeStatus * 0.25 + current.behavioralDynamics.postErrorChecking * 0.2
+      + (isClaimableGift ? 0.45 * giftMagnitude + 0.2 * giftUnconditional : 0),
   );
   const opportunity = clamp(
     Math.max(0, priceChange) * 0.25 + scarcity * seed.motives.ryloAcquisitionDrive * 0.35
-      + rivalGain * seed.motives.ryloCompetitionDrive * 0.25 + Math.max(0, rememberedValence) * 0.15,
+      + rivalGain * seed.motives.ryloCompetitionDrive * 0.25 + Math.max(0, rememberedValence) * 0.15
+      + (isClaimableGift ? 0.5 * giftMagnitude + 0.35 * giftUnconditional : 0),
   );
   const threat = clamp(
     Math.max(0, -priceChange) * seed.sensitivities.loss * 0.3
       + uncertainty * seed.inhibitors.uncertaintyAversion * 0.3
       + liquidityStress * seed.inhibitors.solvencyConcern * 0.3 + Math.max(0, -rememberedValence) * 0.1
-      + current.behavioralDynamics.recoveryLoad * 0.15,
+      + current.behavioralDynamics.recoveryLoad * 0.15
+      + (isClaimableGift ? feeBurden * seed.inhibitors.solvencyConcern * 0.25 + (1 - giftUnconditional) * 0.35 : 0),
   );
-  const surprise = clamp(Math.abs(priceChange) * 0.45 + Math.abs(explicitValence - rememberedValence) * 0.35 + uncertainty * 0.2);
+  const surprise = clamp(Math.abs(priceChange) * 0.45 + Math.abs(explicitValence - rememberedValence) * 0.35
+    + uncertainty * 0.2 + (isClaimableGift ? giftMagnitude * 0.3 : 0));
   const deliberationProbability = clamp(
     0.05 + 0.22 * surprise + 0.2 * goalConflict + 0.2 * uncertainty + 0.18 * stakes + 0.15 * accountability
       + 0.2 * current.behavioralDynamics.postErrorChecking - 0.15 * current.cognitiveLoad
@@ -272,7 +295,7 @@ export function evolveAgent(seed: CognitiveSeed, currentInput: AgentState, memor
   };
 
   const habits = current.behavioralDynamics.contextHabits[tag] ?? {};
-  const maximumHabit = Math.max(0, ...availableActions.map((candidate) => clamp(habits[candidate] ?? 0)));
+  const maximumHabit = Math.max(0, ...candidateActions.map((candidate) => clamp(habits[candidate] ?? 0)));
   const selectionTemperature = clamp(
     0.62 + seed.cognition.explorationTendency * 0.32 + uncertainty * 0.38 + goalConflict * 0.3
       + current.behavioralDynamics.recoveryLoad * 0.12 - current.confidence * 0.18 - maximumHabit * 0.22,
@@ -291,30 +314,42 @@ export function evolveAgent(seed: CognitiveSeed, currentInput: AgentState, memor
       : -0.2 * current.behavioralDynamics.postErrorChecking;
   };
   const habit = (candidate: AvailableAction): number => clamp(habits[candidate] ?? 0) * 0.65;
-  const scores: Record<AvailableAction, number> = {
+  const marketScores: Partial<Record<AvailableAction, number>> = {
     observe: 0.7 + uncertainty + seed.cognition.attentionBreadth * 0.4 + (deliberated ? 0.2 : 0)
       + current.behavioralDynamics.postErrorChecking * 0.35 + habit("observe") + inertia("observe"),
     wait: 0.6 + uncertainty * 0.8 + seed.inhibitors.opportunityCostConcern * 0.4 + (deliberated ? 0.12 : 0)
       + current.behavioralDynamics.recoveryLoad * 0.25 + habit("wait") + inertia("wait"),
-    hold: 0.7 + seed.referencePoints.ownershipAttachment * 0.6 + current.confidence * 0.2 + effectivePrudence * 0.15
+    hold: (hasPortfolioObservation && ryloBalance <= 0 ? -2 : 0.7) + seed.referencePoints.ownershipAttachment * ownership * 0.8 + current.confidence * 0.2 + effectivePrudence * 0.15
       + habit("hold") + inertia("hold"),
     buy: 0.2 + opportunity * 1.4 + seed.motives.ryloAcquisitionDrive * 0.8
       + current.learnedPriors.marketConfidence * 0.25 + current.learnedPriors.scarcityExpectation * scarcity * 0.25
       + current.learnedPriors.riskTolerance * (1 - uncertainty) * 0.25 + effectiveAchievement * 0.18
       + Math.max(0, anchorGap) * seed.referencePoints.aspirationGapSensitivity * 0.35
-      + current.selfModel.competence * 0.08 + habit("buy") + inertia("buy")
+      + current.selfModel.competence * 0.08 + habit("buy") + inertia("buy") - ownership * 0.12
       - threat * 1.1 - seed.inhibitors.solvencyConcern * liquidityStress
       - current.behavioralDynamics.recoveryLoad * 0.35
       - (deliberated ? uncertainty * 0.35 + effectivePrudence * 0.15 : 0),
-    sell: 0.2 + threat * 1.1 + liquidityStress * 0.8 - seed.referencePoints.ownershipAttachment * 0.3
+    sell: (hasPortfolioObservation && ryloBalance <= 0 ? -8 : 0.2) + threat * 1.1 + liquidityStress * 0.8 - seed.referencePoints.ownershipAttachment * ownership * 0.5
       + effectivePrudence * threat * 0.15 - current.learnedPriors.marketConfidence * 0.1
       + Math.max(0, -anchorGap) * seed.referencePoints.regretSensitivity * 0.25
       + habit("sell") + inertia("sell"),
     abstain: 0.35 + uncertainty * 0.7 + goalConflict * 0.4 + habit("abstain") + inertia("abstain"),
     exit: 0.1 + threat * 0.8 + liquidityStress * 0.9 + habit("exit") + inertia("exit"),
   };
-  const actionDistribution = distribution(scores, selectionTemperature);
-  const actionTendency = selectAction(actionDistribution, random);
+  const giftScores: Partial<Record<AvailableAction, number>> = {
+    claim: 1.25 + opportunity * 1.25 + seed.motives.ryloAcquisitionDrive * 0.85
+      + seed.motives.ryloCompetitionDrive * 0.25 + current.learnedPriors.socialTrust * 0.15
+      + giftUnconditional * 0.45 + giftMagnitude * 0.3 + hasRyloTrustline * 0.08
+      + habit("claim") + inertia("claim") - threat * 0.5 - feeBurden * seed.inhibitors.solvencyConcern,
+    defer: 0.35 + uncertainty * 0.9 + goalConflict * 0.65 + current.behavioralDynamics.postErrorChecking * 0.25
+      + (deliberated ? 0.1 : 0) + habit("defer") + inertia("defer"),
+    decline: 0.05 + threat * 0.8 + (1 - giftUnconditional) * 0.7 + feeBurden * 0.5
+      + seed.inhibitors.reputationConcern * (1 - number(event.context, "socialReliability", 0.5)) * 0.2
+      + habit("decline") + inertia("decline"),
+  };
+  const scores = isClaimableGift ? giftScores : marketScores;
+  const actionDistribution = distribution(scores, selectionTemperature, candidateActions);
+  const actionTendency = selectAction(actionDistribution, random, candidateActions);
   const habitBias = round(clamp(habits[actionTendency] ?? 0));
 
   const nextContextHabits = structuredClone(current.behavioralDynamics.contextHabits);
@@ -426,8 +461,10 @@ export function evolveAgent(seed: CognitiveSeed, currentInput: AgentState, memor
       deterministicDraw: round(random),
       attention: round(attention),
       appraisal: { opportunity: round(opportunity), threat: round(threat), surprise: round(surprise) },
-      activeGoals: ["acquire_rylo_when_justified", "preserve_solvency", "maintain_identity_continuity", "recover_after_error"],
-      fastProposal: opportunity > threat ? "buy" : threat > 0.7 ? "sell" : "observe",
+      activeGoals: isClaimableGift
+        ? ["evaluate_rylo_gift", "acquire_rylo_when_justified", "preserve_solvency", "maintain_identity_continuity"]
+        : ["acquire_rylo_when_justified", "preserve_solvency", "maintain_identity_continuity", "recover_after_error"],
+      fastProposal: isClaimableGift ? (opportunity >= threat ? "claim" : "defer") : opportunity > threat ? "buy" : threat > 0.7 ? "sell" : "observe",
       deliberationProbability: round(deliberationProbability),
       deliberated,
       attribution: {

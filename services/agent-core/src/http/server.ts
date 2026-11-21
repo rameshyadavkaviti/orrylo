@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import type { AppConfig } from "../config.js";
 import { RepositoryConflict, type AgentRepository } from "../db/repository.js";
 import type { AgentEvent, EventType } from "../evolution/types.js";
+import { availableActions } from "../identity/types.js";
 import { isAuthorized } from "./auth.js";
 
 interface ServerOptions {
@@ -11,19 +12,21 @@ interface ServerOptions {
   logger?: boolean;
 }
 
-const eventTypes = new Set<EventType>(["market_observation", "decision_outcome", "social_signal", "operator_feedback", "evaluation_probe"]);
+const eventTypes = new Set<EventType>(["market_observation", "claimable_balance_observation", "decision_outcome", "social_signal", "operator_feedback", "evaluation_probe"]);
 const allowedEventKeys = new Set(["eventId", "agentId", "publicKey", "type", "sequence", "occurredAt", "source", "context", "outcome"]);
 const commonContext = ["contextTag", "uncertainty", "stakes", "goalConflict", "accountability", "timePressure"] as const;
 const marketContext = ["priceChange", "scarcity", "rivalGain", "liquidityStress"] as const;
 const contextKeys: Record<EventType, ReadonlySet<string>> = {
   market_observation: new Set([...commonContext, ...marketContext]),
+  claimable_balance_observation: new Set([...commonContext, "giftAmountRylo", "giftUnconditional", "hasRyloTrustline", "feeBurden", "socialReliability", "valence"]),
   decision_outcome: new Set([...commonContext, ...marketContext]),
   social_signal: new Set([...commonContext, "socialReliability", "rivalGain"]),
   operator_feedback: new Set([...commonContext, "valence"]),
   evaluation_probe: new Set([...commonContext, ...marketContext, "socialReliability", "valence"]),
 };
-const unitFields = new Set(["uncertainty", "stakes", "goalConflict", "accountability", "timePressure", "scarcity", "rivalGain", "liquidityStress"]);
+const unitFields = new Set(["uncertainty", "stakes", "goalConflict", "accountability", "timePressure", "scarcity", "rivalGain", "liquidityStress", "giftUnconditional", "hasRyloTrustline", "feeBurden"]);
 const signedFields = new Set(["priceChange", "socialReliability", "valence"]);
+const nonNegativeFields = new Set(["giftAmountRylo"]);
 
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -43,6 +46,7 @@ function sanitizeContext(type: EventType, value: unknown): Record<string, unknow
     if (typeof raw !== "number" || !Number.isFinite(raw)) return undefined;
     if (unitFields.has(key) && (raw < 0 || raw > 1)) return undefined;
     if (signedFields.has(key) && (raw < -1 || raw > 1)) return undefined;
+    if (nonNegativeFields.has(key) && raw < 0) return undefined;
     sanitized[key] = raw;
   }
   return sanitized;
@@ -52,10 +56,11 @@ function sanitizeOutcome(type: EventType, value: unknown): Record<string, unknow
   if (value === undefined) return {};
   if (!object(value)) return undefined;
   const rewardAllowed = type === "decision_outcome" || type === "operator_feedback" || type === "evaluation_probe";
-  if (Object.keys(value).some((key) => key !== "reward") || (!rewardAllowed && Object.keys(value).length > 0)) return undefined;
-  if (value.reward === undefined) return {};
+  if (Object.keys(value).some((key) => key !== "reward" && key !== "action") || (!rewardAllowed && Object.keys(value).length > 0)) return undefined;
+  if (value.action !== undefined && (typeof value.action !== "string" || !(availableActions as readonly string[]).includes(value.action))) return undefined;
+  if (value.reward === undefined) return typeof value.action === "string" ? { action: value.action } : {};
   if (typeof value.reward !== "number" || !Number.isFinite(value.reward) || value.reward < -1 || value.reward > 1) return undefined;
-  return { reward: value.reward };
+  return { reward: value.reward, ...(typeof value.action === "string" ? { action: value.action } : {}) };
 }
 
 function parseEvent(body: unknown): { target: string; event: AgentEvent } | undefined {

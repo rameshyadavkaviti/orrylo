@@ -7,7 +7,15 @@ export interface AppConfig {
   internalApiKey: string;
   internalApiKeyPrevious?: string;
   agentEnvPrefix: string;
-  executionEnabled: false;
+  executionEnabled: boolean;
+  executionMaxTradeXlm: number;
+  executionDailyCapXlm: number;
+  executionMinFreeXlm: number;
+  executionMaxBuyPriceXlm: number;
+  executionMaxOpenOffers: number;
+  relatedPublicKeys: readonly string[];
+  claimableObservationEnabled: boolean;
+  claimExecutionEnabled: boolean;
   paused: boolean;
   port: number;
   host: string;
@@ -68,6 +76,25 @@ function positiveNumber(env: Env, name: string, fallback: number): number {
   return value;
 }
 
+function requiredPositiveNumber(env: Env, name: string): number {
+  const raw = required(env, name);
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) throw new ConfigError("CONFIG_INVALID", `${name} must be a positive number`);
+  return value;
+}
+
+function publicKeys(env: Env, name: string, requiredWhenEnabled: boolean): readonly string[] {
+  const raw = env[name];
+  if (!raw) {
+    if (requiredWhenEnabled) throw new ConfigError("CONFIG_REQUIRED", `Required variable ${name} is missing`);
+    return [];
+  }
+  const values = [...new Set(raw.split(",").map((value) => value.trim()).filter(Boolean))];
+  if (values.length === 0) throw new ConfigError("CONFIG_INVALID", `${name} must contain at least one Stellar public key`);
+  for (const value of values) stellarPublicKey({ [name]: value }, name, value);
+  return values;
+}
+
 function stellarPublicKey(env: Env, name: string, fallback: string): string {
   const value = env[name] ?? fallback;
   try {
@@ -101,9 +128,16 @@ function key(env: Env, name: string, minimumLength: number, optional = false): s
 
 export function loadConfig(env: Env = process.env): AppConfig {
   const executionEnabled = boolean(env, "ORRYLO_EXECUTION_ENABLED", false);
-  if (executionEnabled) {
-    throw new ConfigError("EXECUTION_FORBIDDEN", "Live execution is not available in phase one");
+  const claimableObservationEnabled = boolean(env, "ORRYLO_CLAIMABLE_OBSERVATION_ENABLED", false);
+  const claimExecutionEnabled = boolean(env, "ORRYLO_CLAIM_EXECUTION_ENABLED", false);
+  if (claimExecutionEnabled && !claimableObservationEnabled) {
+    throw new ConfigError("CONFIG_INVALID", "Claim execution requires claimable-balance observation");
   }
+  const executionMaxTradeXlm = executionEnabled ? requiredPositiveNumber(env, "ORRYLO_EXECUTION_MAX_TRADE_XLM") : positiveNumber(env, "ORRYLO_EXECUTION_MAX_TRADE_XLM", 0.1);
+  const executionDailyCapXlm = executionEnabled ? requiredPositiveNumber(env, "ORRYLO_EXECUTION_DAILY_CAP_XLM") : positiveNumber(env, "ORRYLO_EXECUTION_DAILY_CAP_XLM", 0.5);
+  const executionMinFreeXlm = executionEnabled ? requiredPositiveNumber(env, "ORRYLO_EXECUTION_MIN_FREE_XLM") : positiveNumber(env, "ORRYLO_EXECUTION_MIN_FREE_XLM", 2);
+  const executionMaxBuyPriceXlm = executionEnabled ? requiredPositiveNumber(env, "ORRYLO_EXECUTION_MAX_BUY_PRICE_XLM") : positiveNumber(env, "ORRYLO_EXECUTION_MAX_BUY_PRICE_XLM", 0.1);
+  if (executionDailyCapXlm < executionMaxTradeXlm) throw new ConfigError("CONFIG_INVALID", "Daily cap must be at least the per-trade cap");
 
   return {
     databaseUrl: required(env, "DATABASE_URL"),
@@ -112,7 +146,15 @@ export function loadConfig(env: Env = process.env): AppConfig {
     internalApiKey: key(env, "ORRYLO_INTERNAL_API_KEY", 32)!,
     internalApiKeyPrevious: key(env, "ORRYLO_INTERNAL_API_KEY_PREVIOUS", 32, true),
     agentEnvPrefix: env.ORRYLO_AGENT_ENV_PREFIX ?? "ORRYLO_AGENT_",
-    executionEnabled: false,
+    executionEnabled,
+    executionMaxTradeXlm,
+    executionDailyCapXlm,
+    executionMinFreeXlm,
+    executionMaxBuyPriceXlm,
+    executionMaxOpenOffers: integer(env, "ORRYLO_EXECUTION_MAX_OPEN_OFFERS", 3, 1, 20),
+    relatedPublicKeys: publicKeys(env, "ORRYLO_RELATED_PUBLIC_KEYS", executionEnabled),
+    claimableObservationEnabled,
+    claimExecutionEnabled,
     paused: boolean(env, "ORRYLO_PAUSED", false),
     port: integer(env, "PORT", 3000, 1, 65_535),
     host: env.HOST ?? "0.0.0.0",

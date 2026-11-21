@@ -41,7 +41,7 @@
     "directlyChoosesBuy": false
   },
   "cognition": {
-    "fast_proposals": "Opportunity/threat appraisal proposes observe, buy, or sell tendencies.",
+    "fast_proposals": "Market appraisal proposes observe, buy, or sell tendencies; claimable-gift appraisal proposes claim or defer.",
     "deliberation": "Probability rises with surprise, conflict, uncertainty, stakes, accountability and post-error checking; falls with load and time pressure.",
     "attention_budget": "Retrieval is capped and energy/load are stateful.",
     "uncertainty": "Explicit in appraisal, deliberation, attribution and action values.",
@@ -49,8 +49,8 @@
     "decision_latency": "Computed latency rises with attention, ambiguity, conflict, stakes, retrieval and deliberation; no artificial sleeping is introduced."
   },
   "choice": {
-    "options": ["observe", "wait", "hold", "buy", "sell", "abstain", "exit"],
-    "mechanism": "Seeded probability distribution over every option; motives never map directly to an action."
+    "options": ["observe", "wait", "hold", "buy", "sell", "abstain", "exit", "claim", "defer", "decline"],
+    "mechanism": "Seeded probability distribution over context-legitimate options; motives never map directly to an action."
   },
   "social_self": {
     "implemented": ["relative-status sensitivity", "social evaluation", "baseline trust", "reciprocity", "conformity", "dissent confidence"],
@@ -91,9 +91,9 @@
     "ablations": ["memory", "state", "social context", "deliberation", "context habits", "recovery"],
     "failure_criteria": ["direct motive-to-BUY mapping", "unbounded update", "identity convergence", "secret exposure", "market-integrity violation"]
   },
-  "marketIntegrity": { "liveExecution": false, "washTrading": "prohibited", "priceSupport": "prohibited", "fakeVolume": "prohibited" },
+  "marketIntegrity": { "liveExecution": true, "washTrading": "prohibited", "priceSupport": "prohibited", "fakeVolume": "prohibited" },
   "safety_integrity": {
-    "execution": "Absent and startup rejects ORRYLO_EXECUTION_ENABLED=true.",
+    "execution": "Mainnet execution is feature-gated and requires explicit per-order, rolling daily, free-reserve, maximum-price, open-offer and related-wallet controls. New offers never cross the observed opposite best price.",
     "ownership": "Separate wallets do not imply separate beneficial owners.",
     "prohibitions": ["wash trading", "self dealing", "fake liquidity", "coordinated price support", "chart optimization"],
     "secrets": "Wallet secrets remain process environment only and are never persisted, returned or logged."

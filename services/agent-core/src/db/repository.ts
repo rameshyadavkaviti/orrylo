@@ -5,7 +5,7 @@ import { evolveAgent } from "../evolution/evolve.js";
 import type { AgentEvent, AgentMemory, AgentState, EvolutionResult } from "../evolution/types.js";
 import type { CognitiveSeed } from "../identity/types.js";
 import { migrate as runMigrations } from "./migrate.js";
-import type { AgentProjection, EnrollInput, EvolutionReceipt, RepositoryMetrics, RepositoryReadiness } from "./types.js";
+import type { AgentProjection, EnrollInput, EvolutionReceipt, ExecutionRecord, RepositoryMetrics, RepositoryReadiness } from "./types.js";
 
 export class RepositoryConflict extends Error {
   constructor(readonly code: "ALIAS_CONFLICT" | "PUBLIC_KEY_CONFLICT" | "EVENT_ID_CONFLICT" | "SEQUENCE_CONFLICT" | "AGENT_NOT_FOUND") {
@@ -42,6 +42,11 @@ function projection(record: StoredAgent): AgentProjection {
       urgency: record.state.urgency,
       feltSecurity: record.state.feltSecurity,
     },
+    behavioralSummary: {
+      lastAction: record.state.behavioralDynamics?.recentAction ?? null,
+      actionRunLength: record.state.behavioralDynamics?.actionRunLength ?? 0,
+      lastEpisodeAt: record.state.lastEpisodeAt ?? null,
+    },
   };
 }
 
@@ -53,6 +58,8 @@ export interface AgentRepository {
   list(): Promise<AgentProjection[]>;
   get(idOrPublicKey: string): Promise<AgentProjection | undefined>;
   applyEvolution(idOrPublicKey: string, event: AgentEvent): Promise<EvolutionReceipt>;
+  executionCommittedXlm24h(idOrPublicKey: string): Promise<number>;
+  recordExecution(idOrPublicKey: string, record: ExecutionRecord): Promise<void>;
   metrics(): Promise<RepositoryMetrics>;
   readiness(): Promise<RepositoryReadiness>;
   close(): Promise<void>;
@@ -72,6 +79,7 @@ export class InMemoryAgentRepository implements AgentRepository {
   private readonly events = new Map<string, { agentId: string; hash: string; receipt: EvolutionReceipt }>();
   private invalidCandidates = 0;
   private migrated = false;
+  private readonly executions = new Map<string, ExecutionRecord[]>();
 
   constructor(private readonly options: { failEvolution?: boolean } = {}) {}
 
@@ -135,6 +143,22 @@ export class InMemoryAgentRepository implements AgentRepository {
     return receipt;
   }
 
+  async executionCommittedXlm24h(idOrPublicKey: string): Promise<number> {
+    const agent = this.agents.get(idOrPublicKey) ?? [...this.agents.values()].find((entry) => entry.publicKey === idOrPublicKey);
+    if (!agent) throw new RepositoryConflict("AGENT_NOT_FOUND");
+    const cutoff = Date.now() - 86_400_000;
+    return (this.executions.get(agent.id) ?? []).filter((record) => Date.parse(record.createdAt) >= cutoff)
+      .reduce((sum, record) => sum + record.maxXlm, 0);
+  }
+
+  async recordExecution(idOrPublicKey: string, record: ExecutionRecord): Promise<void> {
+    const agent = this.agents.get(idOrPublicKey) ?? [...this.agents.values()].find((entry) => entry.publicKey === idOrPublicKey);
+    if (!agent) throw new RepositoryConflict("AGENT_NOT_FOUND");
+    const records = this.executions.get(agent.id) ?? [];
+    if (!records.some((entry) => entry.transactionHash === record.transactionHash)) records.push(structuredClone(record));
+    this.executions.set(agent.id, records);
+  }
+
   async metrics(): Promise<RepositoryMetrics> {
     const agents = [...this.agents.values()];
     return {
@@ -163,6 +187,11 @@ function rowProjection(row: AgentRow): AgentProjection {
     revision: row.revision, episodeCount: row.state.episodeCount,
     createdAt: row.created_at.toISOString(), updatedAt: row.updated_at.toISOString(),
     cognitiveSummary: { affect: row.state.affect, stress: row.state.stress, confidence: row.state.confidence, urgency: row.state.urgency, feltSecurity: row.state.feltSecurity },
+    behavioralSummary: {
+      lastAction: row.state.behavioralDynamics?.recentAction ?? null,
+      actionRunLength: row.state.behavioralDynamics?.actionRunLength ?? 0,
+      lastEpisodeAt: row.state.lastEpisodeAt ?? null,
+    },
   };
 }
 
@@ -283,6 +312,22 @@ export class PostgresAgentRepository implements AgentRepository {
       COALESCE((SELECT (value->>'invalidCandidates')::int FROM system_status WHERE key='enrollment'),0) invalid`);
     const row = result.rows[0]!;
     return { agents: Number(row.agents), configuredAgents: Number(row.configured), episodes: Number(row.episodes), memories: Number(row.memories), invalidCandidates: row.invalid };
+  }
+  async executionCommittedXlm24h(idOrPublicKey: string): Promise<number> {
+    const result = await this.pool.query<{ committed: string }>(`
+      SELECT COALESCE(sum((details->>'maxXlm')::numeric),0)::text committed
+      FROM audit_events ae JOIN agents a ON a.id=ae.agent_id
+      WHERE (a.id::text=$1 OR a.public_key=$1) AND ae.code='EXECUTION_SUBMITTED' AND ae.created_at >= now() - interval '24 hours'`, [idOrPublicKey]);
+    return Number(result.rows[0]?.committed ?? 0);
+  }
+  async recordExecution(idOrPublicKey: string, record: ExecutionRecord): Promise<void> {
+    const result = await this.pool.query<{ id: string }>("SELECT id FROM agents WHERE id::text=$1 OR public_key=$1", [idOrPublicKey]);
+    const agentId = result.rows[0]?.id;
+    if (!agentId) throw new RepositoryConflict("AGENT_NOT_FOUND");
+    await this.pool.query(`INSERT INTO audit_events(agent_id,code,details)
+      SELECT $1,'EXECUTION_SUBMITTED',$2 WHERE NOT EXISTS (
+        SELECT 1 FROM audit_events WHERE code='EXECUTION_SUBMITTED' AND details->>'transactionHash'=$3
+      )`, [agentId, record, record.transactionHash]);
   }
   async readiness(): Promise<RepositoryReadiness> {
     try {
