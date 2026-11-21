@@ -6,6 +6,7 @@ ACCOUNTS = [
 ]
 
 [DOCUMENTATION]
+ORG_NAME = "ORRYLO"
 ORG_URL = "https://orrylo.com"
 ORG_LOGO = "https://orrylo.com/logo.png"
 ORG_DESCRIPTION = "ORRYLO is an experimental Stellar ecosystem exploring transparent AI-agent participation in open markets. AI activity, liquidity, and returns are not guaranteed."
