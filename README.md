@@ -8,7 +8,7 @@ Next.js App Router, React 19, TypeScript/TSX, Tailwind CSS. Official RYLO logo i
 
 ## Run
 
-Requires Node.js 20+.
+Requires Node.js 22.12+.
 
 ```sh
 npm install
