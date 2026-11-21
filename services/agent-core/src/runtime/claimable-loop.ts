@@ -47,6 +47,26 @@ interface HorizonLike {
 
 const clamp = (value: number, minimum = 0, maximum = 1): number => Math.min(maximum, Math.max(minimum, value));
 
+function safeStellarError(error: unknown): Record<string, unknown> {
+  const candidate = error as {
+    name?: unknown;
+    response?: {
+      status?: unknown;
+      data?: { extras?: { result_codes?: { transaction?: unknown; operations?: unknown } } };
+    };
+  };
+  const codes = candidate?.response?.data?.extras?.result_codes;
+  const operations = Array.isArray(codes?.operations)
+    ? codes.operations.filter((value): value is string => typeof value === "string").slice(0, 4)
+    : undefined;
+  return {
+    error: typeof candidate?.name === "string" ? candidate.name : "UnknownError",
+    ...(typeof candidate?.response?.status === "number" ? { horizonStatus: candidate.response.status } : {}),
+    ...(typeof codes?.transaction === "string" ? { transactionCode: codes.transaction } : {}),
+    ...(operations && operations.length > 0 ? { operationCodes: operations } : {}),
+  };
+}
+
 export class HorizonClaimableBalanceObserver {
   constructor(private readonly options: {
     horizonUrl: string;
@@ -223,7 +243,7 @@ export class ClaimableBalanceRunner {
         });
       } catch (error) {
         totals.failed += 1;
-        this.options.logger.error({ event: "claimable_agent_failed", error: error instanceof Error ? error.name : "UnknownError" });
+        this.options.logger.error({ event: "claimable_agent_failed", ...safeStellarError(error) });
       }
     }
     this.options.logger.info({ event: "claimable_cycle_completed", ...totals });
