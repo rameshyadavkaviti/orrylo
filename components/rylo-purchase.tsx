@@ -27,11 +27,17 @@ type Inventory = {
 };
 type Prepared = { xdr: string; quotedXlm: string; maximumXlm: string };
 type TxResponse = { tx_hash?: string; result?: unknown };
+type AlbedoClient = (typeof import("@albedo-link/intent"))["default"];
+type ReadyPurchase = Prepared & { quantity: number; pubkey: string; createdAt: number };
 
 export default function RyloPurchase({ variant = "primary" }: { variant?: "primary" | "outline" }) {
   const [open, setOpen] = useState(false);
   const [quantity, setQuantity] = useState(100);
   const [pubkey, setPubkey] = useState<string | null>(null);
+  const [albedoReady, setAlbedoReady] = useState(false);
+  const [hasTrustline, setHasTrustline] = useState<boolean | null>(null);
+  const [prepared, setPrepared] = useState<ReadyPurchase | null>(null);
+  const albedoRef = useRef<AlbedoClient | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [inventory, setInventory] = useState<Inventory | null>(null);
@@ -116,64 +122,136 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
 
   useEffect(() => { if (!open) buttonRef.current?.focus(); }, [open]);
 
+  useEffect(() => {
+    if (!open) {
+      setPrepared(null);
+      return;
+    }
+    let active = true;
+    void import("@albedo-link/intent").then((module) => {
+      if (active) { albedoRef.current = module.default; setAlbedoReady(true); }
+    }).catch(() => { if (active) setError("Unable to load Albedo. Try reloading the page."); });
+    return () => { active = false; };
+  }, [open]);
+
+  const verifyTrustline = useCallback(async (wallet: string) => {
+    setHasTrustline(null);
+    try {
+      const response = await fetch("/api/rylo/wallet?pubkey=" + encodeURIComponent(wallet), { cache: "no-store" });
+      const result = await response.json() as { hasTrustline?: boolean; error?: string };
+      if (!response.ok || typeof result.hasTrustline !== "boolean") {
+        throw new Error(result.error || "Unable to check RYLO trustline.");
+      }
+      setHasTrustline(result.hasTrustline);
+    } catch (error) {
+      setHasTrustline(null);
+      setError(error instanceof Error ? error.message : "Unable to check RYLO trustline.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open && pubkey) void verifyTrustline(pubkey);
+  }, [open, pubkey, verifyTrustline]);
+
   function setAmount(amount: number) {
     if (!Number.isFinite(amount)) return;
     setQuantity(Math.min(MAX, Math.max(1, Math.round(amount))));
     setError("");
     setTxHash("");
     setConfirmed(false);
+    setPrepared(null);
   }
 
   async function connect() {
+    const albedo = albedoRef.current;
+    if (!albedo) { setError("Albedo is still loading."); return; }
     setWorking(true);
     setError("");
     setStep("Opening Albedo to connect your wallet…");
     try {
-      const { default: albedo } = await import("@albedo-link/intent");
-      const response = await albedo.publicKey({ require_existing: true });
-      if (!response.pubkey || !/^G[A-Z2-7]{55}$/.test(response.pubkey)) throw new Error("No valid Stellar account selected.");
+      // Call the wallet intent directly from the user gesture so popup blockers do not interfere.
+      const intent = albedo.publicKey({ require_existing: true });
+      const response = await intent;
+      if (!response.pubkey || !/^G[A-Z2-7]{55}$/.test(response.pubkey)) {
+        throw new Error("No valid Stellar account selected.");
+      }
       setPubkey(response.pubkey);
+      setPrepared(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Albedo connection was cancelled.");
     } finally { setWorking(false); setStep(""); }
   }
 
-  async function buy() {
-    if (!pubkey || !quote?.available || quote.quantity !== quantity || quoteLoading || working) return;
-    setWorking(true); setError(""); setStep("Checking trustline and current market liquidity…");
-    setTxHash(""); setConfirmed(false);
+  async function addTrustline() {
+    const albedo = albedoRef.current;
+    if (!albedo || !pubkey || working) return;
+    setWorking(true);
+    setError("");
+    setStep("Review and approve the RYLO trustline in Albedo…");
     try {
-      const { default: albedo } = await import("@albedo-link/intent");
-      // A trustline is required for classic Stellar assets. The user approves it separately.
-      const accountResponse = await fetch("/api/rylo/wallet?pubkey=" + encodeURIComponent(pubkey), { cache: "no-store" });
-      const walletInfo = (await accountResponse.json()) as { hasTrustline?: boolean; error?: string };
-      if (!accountResponse.ok) throw new Error(walletInfo.error || "Unable to verify your Stellar wallet.");
-      if (!walletInfo.hasTrustline) {
-        setStep("Confirm the RYLO trustline in Albedo (requires Stellar reserves)…");
-        await albedo.trust({ asset_code: "RYLO", asset_issuer: ISSUER, pubkey, network: "public", submit: true });
-      }
-      setStep("Preparing a live order at no more than 0.1 XLM per RYLO…");
-      const prepResponse = await fetch("/api/rylo/prepare", {
+      const intent = albedo.trust({ asset_code: "RYLO", asset_issuer: ISSUER, pubkey, network: "public", submit: true });
+      await intent;
+      setStep("Checking new trustline on Stellar…");
+      await verifyTrustline(pubkey);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Trustline was not approved.");
+    } finally { setWorking(false); setStep(""); }
+  }
+
+  async function prepare() {
+    if (!pubkey || !hasTrustline || !quote?.available || quote.quantity !== quantity || quoteLoading || working) return;
+    setWorking(true);
+    setError("");
+    setPrepared(null);
+    setStep("Checking market liquidity and preparing a price-limited transaction…");
+    try {
+      const response = await fetch("/api/rylo/prepare", {
         method: "POST", cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pubkey, quantity })
       });
-      const prepared = (await prepResponse.json()) as Prepared & { error?: string };
-      if (!prepResponse.ok) throw new Error(prepared.error || "Unable to prepare a valid purchase.");
-      setStep("Review and approve the Stellar purchase in Albedo…");
-      const transaction = await albedo.tx({
-        xdr: prepared.xdr, pubkey, network: "public", submit: true,
-        description: "Buy " + quantity + " RYLO, spending at most " + prepared.maximumXlm + " XLM."
-      }) as TxResponse;
-      const hash = transaction.tx_hash;
-      if (!hash || !/^[a-fA-F0-9]{64}$/.test(hash)) throw new Error("Transaction submitted, but no verifiable hash was returned. Check your wallet before retrying.");
-      setTxHash(hash);
-      setStep("Verifying confirmation on Stellar…");
-      const verification = await fetch("/api/rylo/confirm?hash=" + encodeURIComponent(hash), { cache: "no-store" });
-      const result = (await verification.json()) as { confirmed?: boolean };
-      if (verification.ok && result.confirmed) { setConfirmed(true); void refreshInventory(); }
+      const result = await response.json() as Prepared & { error?: string };
+      if (!response.ok || !result.xdr) throw new Error(result.error || "Unable to prepare this purchase.");
+      setPrepared({ ...result, quantity, pubkey, createdAt: Date.now() });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Purchase was not completed.");
+      setError(reason instanceof Error ? reason.message : "Unable to prepare this purchase.");
+    } finally { setWorking(false); setStep(""); }
+  }
+
+  async function signAndSubmit() {
+    const albedo = albedoRef.current;
+    if (!albedo || !prepared || !pubkey || working || confirmed || txHash) return;
+    if (prepared.quantity !== quantity || prepared.pubkey !== pubkey || Date.now() - prepared.createdAt >= 100000) {
+      setPrepared(null);
+      setError("The order has expired. Prepare a fresh market quote.");
+      return;
+    }
+    setWorking(true);
+    setError("");
+    setStep("Review and approve your purchase in Albedo…");
+    try {
+      // This opens immediately on a direct user click; no asynchronous API call precedes it.
+      const intent = albedo.tx({
+        xdr: prepared.xdr, pubkey, network: "public", submit: true,
+        description: "Receive " + quantity + " RYLO; spend no more than " + prepared.maximumXlm + " XLM, excluding network fees."
+      });
+      const transaction = await intent as TxResponse;
+      const hash = transaction.tx_hash;
+      if (!hash || !/^[a-fA-F0-9]{64}$/.test(hash)) {
+        throw new Error("Transaction status is uncertain. Inspect your Stellar wallet before retrying.");
+      }
+      setTxHash(hash);
+      setPrepared(null);
+      setStep("Checking confirmation on Stellar…");
+      const verification = await fetch("/api/rylo/confirm?hash=" + encodeURIComponent(hash), { cache: "no-store" });
+      const result = await verification.json() as { confirmed?: boolean };
+      if (verification.ok && result.confirmed) {
+        setConfirmed(true);
+        void refreshInventory();
+      }
+    } catch (reason) {
+      setPrepared(null);
+      setError(reason instanceof Error ? reason.message : "Purchase could not be confirmed.");
     } finally { setWorking(false); setStep(""); }
   }
 
@@ -266,15 +344,47 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
           <a className="mt-2 inline-flex items-center gap-1 text-xs text-[#d6b1bd] underline" href={"https://stellar.expert/explorer/public/tx/" + txHash} target="_blank" rel="noopener noreferrer">View transaction <ExternalLink size={12}/></a>
         </div>}
         <div className="mt-5 flex flex-col gap-3">
-          {!pubkey ? <button type="button" disabled={working} onClick={() => void connect()} className="button-primary w-full justify-center disabled:opacity-50"><Wallet size={18}/> Connect Albedo</button> :
+          {!pubkey ? <button type="button" disabled={working || !albedoReady} onClick={() => void connect()}
+              className="button-primary w-full justify-center disabled:opacity-50">
+              <Wallet size={18}/>{albedoReady ? "Connect Albedo" : "Loading Albedo…"}
+            </button> :
             <>
-              <div className="flex items-center justify-between gap-3 text-[11px] text-[#b9bfc5]"><span className="flex items-center gap-2"><ShieldCheck size={15} className="text-[#c794a2]"/>Wallet: {pubkey.slice(0,7)}…{pubkey.slice(-7)}</span>
-                <button type="button" disabled={working} onClick={() => {setPubkey(null);setError("");}} className="underline underline-offset-4 hover:text-white">Change</button></div>
-              <button type="button" disabled={working || quoteLoading || !quote?.available || quote.quantity!==quantity || Boolean(txHash)}
-                onClick={() => void buy()}
-                className="button-primary w-full justify-center disabled:cursor-not-allowed disabled:bg-[#43383e] disabled:text-[#aeb0b5]">
-                {working ? <LoaderCircle size={17} className="animate-spin"/> : <ArrowRight size={17}/>} Confirm purchase with Albedo
-              </button>
+              <div className="flex items-center justify-between gap-3 text-[11px] text-[#b9bfc5]">
+                <span className="flex items-center gap-2"><ShieldCheck size={15} className="text-[#c794a2]"/>
+                  Wallet: {pubkey.slice(0,7)}…{pubkey.slice(-7)}
+                </span>
+                <button type="button" disabled={working} onClick={() => {
+                  setPubkey(null); setHasTrustline(null); setPrepared(null); setError("");
+                }} className="underline underline-offset-4 hover:text-white">Change</button>
+              </div>
+              {hasTrustline === null ? <button type="button" disabled={working} onClick={() => void verifyTrustline(pubkey)}
+                  className="button-outline w-full justify-center disabled:opacity-50">Check RYLO trustline</button> :
+                !hasTrustline ? <button type="button" disabled={working || !albedoReady}
+                  onClick={() => void addTrustline()}
+                  className="button-primary w-full justify-center disabled:opacity-50">
+                  <Wallet size={17}/> Add RYLO trustline via Albedo
+                </button> :
+                !prepared ? <button type="button"
+                  disabled={working || quoteLoading || !quote?.available || quote.quantity !== quantity || Boolean(txHash)}
+                  onClick={() => void prepare()}
+                  className="button-primary w-full justify-center disabled:cursor-not-allowed disabled:bg-[#43383e] disabled:text-[#aeb0b5]">
+                  <ArrowRight size={17}/> Prepare purchase
+                </button> :
+                <>
+                  <div className="rounded-xl border border-crimson/30 bg-crimson/[.05] p-3 text-xs leading-6 text-[#e4ccd3]">
+                    You will receive <strong>{prepared.quantity.toLocaleString("en-US")} RYLO</strong>.
+                    Maximum payment: <strong>{prepared.maximumXlm} XLM</strong> plus a network fee.
+                    A fresh market check was performed when this transaction was prepared.
+                  </div>
+                  <button type="button" disabled={working || !albedoReady || Boolean(txHash)}
+                    onClick={() => void signAndSubmit()}
+                    className="button-primary w-full justify-center disabled:opacity-50">
+                    <ArrowRight size={17}/> Sign and submit with Albedo
+                  </button>
+                  <button type="button" disabled={working} onClick={() => void prepare()}
+                    className="text-xs text-[#caa5b1] underline underline-offset-4">Refresh price and transaction</button>
+                </>
+              }
             </>}
         </div>
         <p className="mt-4 text-center text-[11px] leading-5 text-[#8d999d]">Albedo signs in your wallet. ORRYLO never asks for secret keys or holds your funds. If no live quote meets your price cap, no purchase will be submitted.</p>
