@@ -9,7 +9,7 @@
 <aside class="sidebar">
   <div class="brand"><span class="symbol">◈</span><div><strong>ORRYLO</strong><small>OBSERVATORY</small></div></div>
   <div class="menu-caption">INTELLIGENCE CENTER</div>
-  <nav aria-label="Sections"><a class="active" href="#overview">◉ &nbsp;Overview</a><a href="#agents">◈ &nbsp;Agent Registry</a><a href="#decisions">⌁ &nbsp;Decision Stream</a><a href="#alerts">◇ &nbsp;System Events</a></nav>
+  <nav aria-label="Sections"><a class="active" href="#overview">◉ &nbsp;Overview</a><a href="#balances">◎ &nbsp;Wallet Balances</a><a href="#agents">◈ &nbsp;Agent Registry</a><a href="#decisions">⌁ &nbsp;Decision Stream</a><a href="#alerts">◇ &nbsp;System Events</a></nav>
   <div class="sidefoot"><span class="live-dot"></span><span>Independent cognition<br><small>Research monitoring · Read only</small></span></div>
 </aside>
 <div class="main">
@@ -33,6 +33,17 @@
   <div class="market"><div><label>BEST BID</label><strong id="bid">—</strong></div><div><label>BEST ASK</label><strong id="ask">—</strong></div><div><label>ASK DEPTH / RYLO</label><strong id="depth">—</strong></div><div><label>LAST OBSERVED</label><strong class="small" id="market-time">—</strong></div></div>
   <p class="help">An order-book observation does not prove the system detected a specific user purchase or placed a new order.</p></div>
  </div>
+</section>
+<section id="balances">
+<div class="section-heading"><div><div class="eyebrow">STELLAR MAINNET · ON-CHAIN</div><h2>Wallet balances</h2></div><span class="last" id="balances-updated">Checking account balances…</span></div>
+<div class="stats balance-stats">
+  <div class="stat"><label>TOTAL XLM · VERIFIED ACCOUNTS</label><strong id="total-xlm">—</strong><small>Native XLM balance · not spendable balance</small></div>
+  <div class="stat"><label>TOTAL RYLO · VERIFIED ACCOUNTS</label><strong id="total-rylo">—</strong><small>Asset matched by code and issuer</small></div>
+  <div class="stat"><label>WALLETS VERIFIED</label><strong id="wallets-verified">—</strong><small id="wallets-sub">Balances awaiting Horizon</small></div>
+  <div class="stat"><label>AGGREGATE STATUS</label><strong id="balance-status" class="status-value">—</strong><small>Partial totals exclude unavailable wallets</small></div>
+</div>
+<div class="panel table-wrap"><table><thead><tr><th>AGENT WALLET</th><th>XLM BALANCE</th><th>RYLO BALANCE</th><th>RYLO TRUSTLINE</th><th>HORIZON STATUS</th></tr></thead><tbody id="balances-table"><tr><td colspan="5">Checking Stellar accounts…</td></tr></tbody></table></div>
+<p class="help">Balances are obtained from live Stellar Horizon account responses, refreshed every 45 seconds or later. A missing account, network error or invalid key is not zero; totals are marked partial whenever any account cannot be verified. No account secrets or signing is used.</p>
 </section>
 <section id="agents"><div class="section-heading"><div><div class="eyebrow">INDEPENDENT IDENTITIES</div><h2>Agent registry</h2></div><input id="search" type="search" placeholder="Search agent or wallet…" aria-label="Search agents"></div>
 <div class="panel table-wrap"><table><thead><tr><th>AGENT</th><th>CONFIGURATION</th><th>LAST TENDENCY</th><th>EPISODES</th><th>CONFIDENCE</th><th>STRESS</th><th>LAST DECISION</th><th></th></tr></thead><tbody id="agents-table"><tr><td colspan="8">Loading agents…</td></tr></tbody></table></div>

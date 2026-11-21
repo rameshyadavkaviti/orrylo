@@ -23,3 +23,10 @@ Authenticated, read-only monitoring frontend for the independent ORRYLO agent co
 - Custom domain: observatory.orrylo.com
 - Ensure private monitoring access is not linked from the public site.
 - After deploying, set a dedicated SELECT-only database credential and rotate the initial dashboard password.
+
+## Wallet balances
+- `/api/balances` is authenticated, performs bounded concurrent HTTPS GETs to Stellar Horizon for the registered public keys, and caches results for 45 seconds.
+- Displays individual XLM and RYLO holdings and sum of successfully verified accounts; RYLO is selected by both code and issuer, never code alone.
+- `account_not_found`, invalid keys and Horizon timeouts are explicitly unverified, not zero. Partial totals must not be represented as complete.
+- `ORRYLO_RYLO_ISSUER`, `ORRYLO_RYLO_CODE`, and `ORRYLO_HORIZON_URL` may override defaults. Set these to the exact current asset identity used by Agent Core.
+- On-chain native balance is not spendable amount after reserves/liabilities.

@@ -1,5 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
 let snapshot = null;
+let onchainBalances = null;
+let balanceLastFetched = 0;
 const asNum = (n) => { const v = Number(n); return Number.isFinite(v) ? v : null; };
 const safe = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const fmt = (n,d=0) => { const v=asNum(n); return v===null?"—":v.toLocaleString(undefined,{maximumFractionDigits:d}); };
@@ -40,9 +42,37 @@ function chart(rows) {
  return '<div class="bar" title="'+safe(when(r.bucket))+" · "+value+' episodes" style="height:'+h+'px">'+segments.map(([name,count])=>count?'<span class="'+name+'" style="height:'+(100*count/value).toFixed(2)+'%"></span>':"").join("")+"</div>";
  }).join("");
 }
+function balanceStatus(value) {
+ return value === "ok" ? badge("verified") : badge(value === "account_not_found" ? "not funded" : value || "unavailable");
+}
+function renderBalances(data) {
+ onchainBalances = data;
+ balanceLastFetched = Date.now();
+ $("#total-xlm").textContent = fmt(data.totals.xlm,7);
+ $("#total-rylo").textContent = fmt(data.totals.rylo,7);
+ $("#wallets-verified").textContent = fmt(data.verified) + " / " + fmt(data.totalAccounts);
+ $("#wallets-sub").textContent = fmt(data.totalAccounts - data.verified) + " accounts unverified";
+ $("#balance-status").textContent = data.allVerified ? "COMPLETE" : "PARTIAL";
+ $("#balances-updated").textContent = "Horizon checked " + when(data.checkedAt) + " · " + data.asset.code + " / " + data.asset.issuer.slice(0,8) + "…";
+ const lookup = new Map((snapshot?.agents || []).map(a=>[a.public_key,a.alias]));
+ $("#balances-table").innerHTML = (data.accounts || []).map(a=>'<tr><td><span class="agent-link">'+safe(lookup.get(a.publicKey)||"Unknown")+'</span><span class="wallet">'+safe(a.publicKey)+'</span></td><td class="tabular">'+(a.xlm===null?'—':fmt(a.xlm,7))+'</td><td class="tabular">'+(a.rylo===null?'—':fmt(a.rylo,7))+'</td><td>'+ (a.status==="ok" ? badge(a.hasRyloTrustline ? "present" : "absent") : "—")+'</td><td>'+balanceStatus(a.status)+'</td></tr>').join("") || '<tr><td colspan="5">No registered wallets.</td></tr>';
+ agentsTable();
+}
+async function refreshBalances(force=false) {
+ if (!force && onchainBalances && Date.now() - balanceLastFetched < 44000) return;
+ try {
+  const response=await fetch("/api/balances",{cache:"no-store"});
+  if(!response.ok)throw new Error("HTTP "+response.status);
+  renderBalances(await response.json());
+ } catch(err) {
+  $("#balance-status").textContent="UNAVAILABLE";
+  $("#balances-updated").textContent="Stellar balances unavailable · "+err.message;
+ }
+}
 function agentsTable(){
  if(!snapshot)return;
  const term=$("#search").value.trim().toLowerCase();
+ const lookup = new Map((onchainBalances?.accounts || []).map(a=>[a.publicKey,a]));
  const items=(snapshot.agents||[]).filter(a=>(a.alias+" "+a.public_key).toLowerCase().includes(term));
  $("#agents-table").innerHTML=items.length?items.map(a=>'<tr><td><button class="agent-link" data-id="'+safe(a.id)+'">'+safe(a.alias)+'</button><span class="wallet">'+safe((a.public_key||"").slice(0,8))+"…"+safe((a.public_key||"").slice(-6))+'</span></td><td>'+badge(a.configured?"configured":"inactive")+'</td><td>'+badge(a.action)+'</td><td>'+fmt(a.episode_count)+'</td><td>'+fmt(a.confidence,2)+'</td><td>'+fmt(a.stress,2)+'</td><td>'+safe(ago(a.last_decision))+'</td><td><button class="agent-link" data-id="'+safe(a.id)+'">Inspect ›</button></td></tr>').join(""):'<tr><td colspan="8">No matching agents.</td></tr>';
 }
@@ -55,6 +85,8 @@ async function inspect(id){
   $("#agent-title").textContent=agent.alias;
   const s=agent.state||{},m=agent.metrics||{};
   const kv=[["Wallet",agent.public_key],["Episodes",s.episodeCount],["Confidence",s.confidence],["Stress",s.stress],["Affect",s.affect],["Urgency",s.urgency],["Behavioral entropy",m.behavioralEntropy],["Prediction error",m.predictionError],["Decision latency (ms)",m.decisionLatencyMs],["Revision",agent.revision]];
+  const account = (onchainBalances?.accounts || []).find(a=>a.publicKey===agent.public_key);
+  if (account) kv.push(["On-chain XLM",account.xlm??"Unavailable"],["On-chain RYLO",account.rylo??"Unavailable"],["Horizon",account.status]);
   $("#agent-detail").innerHTML='<div class="grid">'+kv.map(([k,v])=>'<div class="kv"><span>'+safe(k)+'</span><strong>'+safe(v??"—")+'</strong></div>').join("")+'</div><h3>Initial cognitive seed</h3><pre>'+safe(JSON.stringify(agent.seed,null,2))+'</pre><h3>Current evolved state</h3><pre>'+safe(JSON.stringify(s,null,2))+'</pre><h3>Last 20 episodes: observations, traces, action tendencies</h3><pre>'+safe(JSON.stringify(episodes,null,2))+'</pre><h3>Recent memories</h3><pre>'+safe(JSON.stringify(memories,null,2))+'</pre>';
  }catch(err){$("#agent-detail").textContent="Agent data unavailable: "+err.message;}
 }
@@ -63,11 +95,12 @@ async function refresh(){
  const response=await fetch("/api/snapshot",{cache:"no-store"});
  if(!response.ok)throw new Error("HTTP "+response.status);
  show(await response.json());
+ await refreshBalances();
  }catch(err){$("#connection").textContent="Telemetry unavailable";$("#updated").textContent="Connection error · "+err.message;}
 }
 document.addEventListener("click",(ev)=>{const btn=ev.target.closest("[data-id]");if(btn)inspect(btn.dataset.id);});
 $("#search").addEventListener("input",agentsTable);
-$("#refresh").addEventListener("click",refresh);
+$("#refresh").addEventListener("click",()=>{refresh();refreshBalances(true);});
 $("#close").addEventListener("click",()=>{$("#overlay").hidden=true;});
 $("#overlay").addEventListener("click",(e)=>{if(e.target===$("#overlay"))$("#overlay").hidden=true;});
 document.addEventListener("keydown",(ev)=>{if(ev.key==="Escape")$("#overlay").hidden=true;});

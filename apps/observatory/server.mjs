@@ -4,6 +4,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import pg from "pg";
+import { createBalanceReader } from "./balances.mjs";
 
 const { Pool } = pg;
 const root = dirname(fileURLToPath(import.meta.url));
@@ -11,6 +12,11 @@ const port = Number(process.env.PORT || 3000);
 const username = process.env.OBSERVATORY_USERNAME;
 const password = process.env.OBSERVATORY_PASSWORD;
 const databaseUrl = process.env.DATABASE_URL;
+const readBalances = createBalanceReader({
+  horizonUrl: (process.env.ORRYLO_HORIZON_URL || "https://horizon.stellar.org").replace(/\/$/, ""),
+  ryloCode: process.env.ORRYLO_RYLO_CODE || "RYLO",
+  ryloIssuer: process.env.ORRYLO_RYLO_ISSUER || "GDG7SGYLJQBLSN55ASHD7VCXYBEPYDK4EUIUTW6XWTBUDUHXK6ORRYLO"
+});
 if (!username || !password || password.length < 24 || !databaseUrl) {
   console.error("OBSERVATORY_CONFIG_MISSING: configure DATABASE_URL, OBSERVATORY_USERNAME, and a >=24-character OBSERVATORY_PASSWORD");
   process.exit(1);
@@ -104,6 +110,10 @@ createServer(async (req, res) => {
     }
     attempts.delete(addr);
     if (url.pathname === "/api/snapshot") return json(res, 200, await snapshot());
+    if (url.pathname === "/api/balances") {
+      const list = await pool.query("SELECT public_key FROM agents ORDER BY alias");
+      return json(res, 200, await readBalances(list.rows));
+    }
     if (url.pathname === "/api/agent") {
       const id = url.searchParams.get("id") || "";
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return json(res, 400, { error: "INVALID_AGENT_ID" });
