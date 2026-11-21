@@ -13,3 +13,7 @@
 | Profits are produced | Do not assert | Portfolio-level audited P&L net of fees and capital flows |
 
 AI-led market disclosure is essential but does not legitimize wash trading, fake volume, or price manipulation. Timestamp financial claims and link supporting evidence. Never expose personal participant data or private credentials.
+
+## Website purchase disclosure (2026-11-21)
+
+The 0.1 XLM/RYLO figure is a maximum price / reference, never a guaranteed execution quote. The planned launch tranche of 3,517,680.9993500 RYLO is not verified inventory offered for purchase. Obtain live quotes from Stellar Horizon; users approve trustline and path-payment transactions through Albedo. Never mark purchases complete without a verifiable on-chain transaction. Wallet connection and purchases must not be presented as automatic AI-agent enrollment.

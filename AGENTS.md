@@ -8,7 +8,7 @@ ORRYLO explores a market on existing Stellar venues in which AI trading agents m
 ORRYLO agents are NOT VEYRIX human-profile replicas. They need not be derived from real individuals. The owner will provide the detailed cognitive architecture and implementation requirements later; do not invent them or build an execution engine without instruction.
 
 ## Scope and boundaries
-- orrylo.com remains an informational/disclosure and potential Stellar asset home-domain only; no exchange, wallet, custody, matching engine, trading dashboard, or execution runtime on the website.
+- orrylo.com is an informational/disclosure and Stellar asset home-domain. Owner-approved addition (2026-11-21): a **non-custodial purchase modal** may use Albedo for user-selected wallet connection and user-signed Stellar DEX swaps at a maximum 0.1 XLM/RYLO limit with live quote checks. It must never transfer funds to an unverified seller account, invent supply or claim a purchase is fulfilled without on-chain confirmation. No exchange, custody, matching engine, autonomous trading runtime or agent dashboard on the site.
 - A future ORRYLO-specific agent engine is a separate component; VEYRIX is not its execution engine or architecture template.
 - Do not transfer VEYRIX-specific artificial sleep schedules, fixed activity quotas, human-profile restrictions, or other irrelevant behavior constraints by default.
 - Retain capital/security controls and market-integrity safeguards: no wash/self-trades, coordinated controlled-wallet fake volume, deceptive demand, or price manipulation. Public disclosure of AI participation does not make these acceptable.

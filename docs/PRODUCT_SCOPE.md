@@ -6,7 +6,7 @@ Unlike VEYRIX, ORRYLO's agents are not required to imitate specific real people 
 
 **Public disclosure:** ORRYLO intends to state clearly that AI agents drive or participate in a substantial part of the market's activity. Claims that they currently execute a majority of actual trading volume must wait for verifiable measurements; public communication must distinguish ambition, deployed activity, and observed market share.
 
-**Website boundary:** orrylo.com is an informational announcement/disclosure page and possible Stellar asset home-domain. It is not an exchange, wallet, custodian, matching engine, agent controller, or execution service. Actual trading, if deployed, occurs on existing Stellar infrastructure through a separate system.
+**Website boundary (amended 2026-11-21):** orrylo.com remains an informational/disclosure and Stellar asset home-domain, and additionally exposes a **non-custodial purchase UI**. Users connect through Albedo and may authorize a trustline and a Stellar mainnet DEX path payment, when independently observable liquidity meets their explicit price cap. The website is not a custodian, centralized exchange, matching engine, standing-order creator, agent controller, or automated execution service. The user signs and submits via Albedo; settlement occurs on Stellar. No new off-chain sale inventory is represented as available.
 
 **Research claim boundary:** Becoming more human-like means measurable behavioral resemblance, not becoming biologically human, gaining consciousness, or demonstrating daily progress without evidence.
 

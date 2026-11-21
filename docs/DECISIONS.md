@@ -28,6 +28,9 @@
 
 | 2026-11-21 | ACCEPTED — TOKENOMICS POLICY (NOT YET EXECUTED) | RYLO V2 planned burn is **27%** of reference issuance (963,748,219), leaving **703,536,199.87 RYLO**; approved post-burn allocations: 30% agent learning/rewards, 20% ecosystem, 18% infrastructure/research, 15% strategic reserve, 10% team, 7% liquidity. **100% unlocked by month 18**, with month-0 limited liquidity and month-7 start for team/reserve. Initial ask reference **0.1 XLM/RYLO**. Full implementation, verification and precision schedule: `docs/RYLO_TOKENOMICS.md`. No burn, escrow or pool deployment is implied. |
 
+| 2026-11-21 | ACCEPTED — WEBSITE PURCHASE UX | Add a non-custodial RYLO V2 purchase modal with a 1–10,000 token slider, 0.1 XLM/RYLO maximum spend reference, Albedo-controlled wallet connection, user-approved trustline and user-signed Stellar mainnet path payment. Submit only when Stellar Horizon supplies an executable quote at or below the price cap. Never silently create standing offers or imply guaranteed fills, fixed price, or automatic agent activation. |
+| 2026-11-21 | DISCLOSURE | The tokenomics month-0 figure of 3,517,680.9993500 RYLO is a **planned unlock cap**, not verified inventory offered in the sale. Distinguish it from actual market liquidity and issued supply in the UI. |
+
 ## Interpretation
 Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 
