@@ -26,6 +26,8 @@
 
 | 2026-11-21 | ACCEPTED — COGNITIVE LEARNING PRINCIPLE | **Reward-based learning is a core requirement of ORRYLO agents.** Agents must learn from rewards, reward prediction, non-reward, and adverse outcomes, with individually variable sensitivity shaped by memory and experience. Rewards may include genuine economic outcomes, simulated psychological/social feedback, and explicitly designed incentives. Do not categorically exclude rewards after successful trades; instead distinguish natural market P&L from extra token incentives and evaluate unintended optimization, reward hacking, coordinated trading, and market-integrity risks. No reward scheme or token distribution is approved by this principle alone. |
 
+| 2026-11-21 | ACCEPTED — TOKENOMICS POLICY (NOT YET EXECUTED) | RYLO V2 planned burn is **27%** of reference issuance (963,748,219), leaving **703,536,199.87 RYLO**; approved post-burn allocations: 30% agent learning/rewards, 20% ecosystem, 18% infrastructure/research, 15% strategic reserve, 10% team, 7% liquidity. **100% unlocked by month 18**, with month-0 limited liquidity and month-7 start for team/reserve. Initial ask reference **0.1 XLM/RYLO**. Full implementation, verification and precision schedule: `docs/RYLO_TOKENOMICS.md`. No burn, escrow or pool deployment is implied. |
+
 ## Interpretation
 Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 
