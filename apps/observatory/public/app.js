@@ -27,7 +27,14 @@ function show(data) {
  chart(data.hourly||[]);
  agentsTable();
  const events=data.events||[];
- $("#timeline").innerHTML=events.length?events.map(e=>'<div class="episode"><time>'+safe(when(e.created_at))+'</time><div><b>'+safe(e.alias)+'</b><small>#'+safe(e.sequence)+" · "+safe(e.type)+" · "+safe(e.source)+'</small></div>'+badge(e.action)+'</div>').join(""):'<div class="empty">No cognitive episodes recorded yet.</div>';
+ const walletsByAgent = new Map((data.agents||[]).map(a=>[a.id,a.public_key]));
+ $("#timeline").innerHTML=events.length?events.map(e=>{
+   const key=walletsByAgent.get(e.agent_id);
+   const valid=typeof key==="string" && /^G[A-Z2-7]{55}$/.test(key);
+   const accountLink=valid?'<a class="decision-link" href="https://stellar.expert/explorer/public/account/'+key+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" title="View this wallet publicly on StellarExpert">View wallet ↗</a>':"";
+   const termLink=valid?'<a class="decision-link secondary" href="https://stellarterm.com/account/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" title="Open official StellarTerm. Sign-in is NOT automatic; no wallet key is shared.">StellarTerm ↗</a>':"";
+   return '<div class="episode"><time>'+safe(when(e.created_at))+'</time><div><b>'+safe(e.alias)+'</b><small>#'+safe(e.sequence)+" · "+safe(e.type)+" · "+safe(e.source)+'</small><div class="decision-links">'+accountLink+termLink+'</div></div>'+badge(e.action)+'</div>';
+ }).join(""):'<div class="empty">No cognitive episodes recorded yet.</div>';
  const alerts=data.alerts||[];
  $("#alerts-count").textContent=fmt(c.alerts_day)+" / 24h";
  $("#alerts-list").innerHTML=alerts.length?alerts.map(a=>'<div class="alert-line"><span>'+safe(a.alias)+" · "+safe(a.code)+'</span><small>'+safe(when(a.created_at))+"</small></div>").join(""):'<div class="empty">No non-routine audit events recorded.</div>';

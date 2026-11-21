@@ -30,3 +30,6 @@ Authenticated, read-only monitoring frontend for the independent ORRYLO agent co
 - `account_not_found`, invalid keys and Horizon timeouts are explicitly unverified, not zero. Partial totals must not be represented as complete.
 - `ORRYLO_RYLO_ISSUER`, `ORRYLO_RYLO_CODE`, and `ORRYLO_HORIZON_URL` may override defaults. Set these to the exact current asset identity used by Agent Core.
 - On-chain native balance is not spendable amount after reserves/liabilities.
+
+## Safe wallet navigation
+Each decision episode links to that agent's PUBLIC account page on StellarExpert and opens the verified official StellarTerm account page separately. The links do not include secrets, tokens, privileged auth credentials, or login sessions; StellarTerm does not automatically log in to the associated agent account. The agent ID-to-public-key association is derived from existing authenticated snapshot data. This deliberately does not import private Stellar keys into browser code.
