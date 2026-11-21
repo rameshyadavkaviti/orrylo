@@ -18,7 +18,7 @@ export interface IdentityEvidence {
 }
 
 export interface AgentState {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   revision: number;
   episodeCount: number;
   affect: number;
@@ -40,6 +40,25 @@ export interface AgentState {
     prudence: number;
   };
   identityEvidence: IdentityEvidence[];
+  lastEpisodeAt?: string;
+  behavioralDynamics?: {
+    recentAction: AvailableAction | null;
+    actionRunLength: number;
+    recentOutcomeValence: number;
+    recoveryLoad: number;
+    postErrorChecking: number;
+    contextHabits: Record<string, Partial<Record<AvailableAction, number>>>;
+  };
+  referenceLearning?: {
+    priceAnchorXlm: number;
+    expectedReward: number;
+  };
+  selfModel?: {
+    competence: number;
+    agency: number;
+    prudence: number;
+    consolidations: number;
+  };
 }
 
 export interface AgentMemory {
@@ -63,6 +82,11 @@ export interface EpisodeTrace {
   deliberationProbability: number;
   deliberated: boolean;
   attribution: { internal: number; external: number; uncertainty: number };
+  predictionError: number;
+  selectionTemperature: number;
+  decisionLatencyMs: number;
+  habitBias: number;
+  recoveryMode: boolean;
 }
 
 export interface EvolutionResult {
@@ -77,5 +101,13 @@ export interface EvolutionResult {
     learnedPriors: Record<string, number>;
     identity: Record<string, number>;
   };
-  metrics: { effectiveLearningRate: number; memoryCount: number };
+  metrics: {
+    effectiveLearningRate: number;
+    memoryCount: number;
+    predictionError: number;
+    behavioralEntropy: number;
+    decisionLatencyMs: number;
+    habitStrength: number;
+    recoveryLoad: number;
+  };
 }

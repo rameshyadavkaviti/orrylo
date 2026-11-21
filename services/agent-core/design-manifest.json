@@ -1,7 +1,7 @@
 {
   "objective": "Produce measurable, persistent, individually distinct economic behavior whose trajectory depends on causal seed, changing state, memory, appraisal, goals, context, constraints, uncertainty, and experience.",
   "claim_boundary": {
-    "implemented": "Deterministic causal identities, bounded state and prior updates, structured memory, ordered episode traces, and longitudinal fixtures.",
+    "implemented": "Deterministic causal identities, bounded multi-timescale adaptation, context habits, prediction-error learning, structured memory, ordered episode traces, and longitudinal fixtures.",
     "aspirational": "Increasing resemblance to human economic behavior over time.",
     "not_claimed": ["humanity", "consciousness", "scientific validation", "profitability", "live trading improvement"]
   },
@@ -16,7 +16,7 @@
   "state": {
     "fast": ["affect", "arousal", "urgency", "cognitive load"],
     "medium": ["stress", "energy", "confidence", "felt security"],
-    "history": ["learned priors", "identity evidence", "episode count"]
+    "history": ["learned priors", "identity evidence", "episode count", "context habits", "recovery state", "reference-price anchor", "expected reward", "structured self model"]
   },
   "perception_appraisal": {
     "attention": ["price change", "scarcity", "relative performance"],
@@ -26,7 +26,7 @@
   "memory": {
     "episodic": "Immutable episode-linked structured records used in retrieval.",
     "semantic": "Consolidated structured summaries; audit episodes are retained.",
-    "procedural": "Learned strategy and habit summaries.",
+    "procedural": "Decision outcomes update action-specific habits within the experienced context; procedural records participate in later retrieval.",
     "social_relational": "Relationship-specific trust and reliability evidence.",
     "self_narrative": "Versioned structured continuity and identity interpretations.",
     "retrieval": "At most five items weighted by recency, similarity, salience, and identity relevance."
@@ -42,9 +42,11 @@
   },
   "cognition": {
     "fast_proposals": "Opportunity/threat appraisal proposes observe, buy, or sell tendencies.",
-    "deliberation": "Probability rises with surprise, conflict, uncertainty, stakes and accountability; falls with load and time pressure.",
+    "deliberation": "Probability rises with surprise, conflict, uncertainty, stakes, accountability and post-error checking; falls with load and time pressure.",
     "attention_budget": "Retrieval is capped and energy/load are stateful.",
-    "uncertainty": "Explicit in appraisal, deliberation, attribution and action values."
+    "uncertainty": "Explicit in appraisal, deliberation, attribution and action values.",
+    "structured_variability": "Selection temperature rises near ambiguity and goal conflict, while confidence and established context habits reduce it.",
+    "decision_latency": "Computed latency rises with attention, ambiguity, conflict, stakes, retrieval and deliberation; no artificial sleeping is introduced."
   },
   "choice": {
     "options": ["observe", "wait", "hold", "buy", "sell", "abstain", "exit"],
@@ -55,9 +57,14 @@
     "deferred": ["named relationship graph", "dynamic group identity"]
   },
   "learning": {
-    "update_rules": "baseRate * (1 + 2 * exp(-episodeCount / 25)); state and priors use separate caps.",
+    "update_rules": "baseRate * (1 + 2 * exp(-episodeCount / 25)); state and priors use separate caps; reward prediction error drives bounded prior, expectation and habit updates.",
     "attribution": "Each trace records internal, external and uncertainty contributions.",
     "consolidation": "Durable identity adjustment requires 12 consistent episodes across 3 contexts.",
+    "habits": "Outcome-linked action habits are context-specific, bounded, individually rate-limited and weakened by adverse prediction errors.",
+    "recovery": "Adverse prediction errors temporarily raise recovery load and post-error checking; both decay with elapsed time.",
+    "state_decay": "Fast and medium state variables return toward individually derived baselines at distinct half-lives.",
+    "sequential_effects": "Recent action runs create bounded inertia after neutral or positive outcomes and interruption after adverse outcomes.",
+    "self_model": "Competence, agency and prudence change only during evidence-qualified cross-context consolidation.",
     "plasticity_bounds": { "state": 0.15, "prior": 0.02, "identity": 0.005 }
   },
   "narrative_self": {
@@ -71,16 +78,17 @@
   ],
   "timescales": {
     "immediate": "attention, appraisal, proposal and action tendency",
-    "short": "affect, arousal, load and confidence",
-    "medium": "learned priors, habits and remembered outcomes",
-    "long": "identity adjustment after cross-context evidence",
+    "short": "affect, arousal, load, recovery and post-error checking with elapsed-time decay",
+    "medium": "learned priors, reference expectations, context habits and remembered outcomes",
+    "long": "identity and structured self-model adjustment after cross-context evidence",
     "developmental": "persisted causal seed and autobiographical continuity"
   },
   "evaluation": {
-    "baseline": "Deterministic replay, trace completeness, bounds and secret-leak suites.",
+    "baseline": "Deterministic replay, trace completeness, bounds, schema migration and secret-leak suites.",
     "counterfactuals": "Ten paired directional fixtures; at least 80 percent must pass.",
     "longitudinal": "Fifty common episodes across eight agents; retain at least 60 percent baseline identity distance.",
-    "ablations": ["memory", "state", "social context", "deliberation"],
+    "metrics": ["prediction error", "behavioral entropy", "decision latency", "habit strength", "recovery load"],
+    "ablations": ["memory", "state", "social context", "deliberation", "context habits", "recovery"],
     "failure_criteria": ["direct motive-to-BUY mapping", "unbounded update", "identity convergence", "secret exposure", "market-integrity violation"]
   },
   "marketIntegrity": { "liveExecution": false, "washTrading": "prohibited", "priceSupport": "prohibited", "fakeVolume": "prohibited" },
@@ -95,5 +103,5 @@
     "The Social Animal": ["social appraisal", "self-justification pressure", "relative status"],
     "Behave": ["multi-timescale causation", "context dependence", "non-deterministic propensities"]
   },
-  "migration_versioning": "Seed, state, event and evaluation schemas version independently. Persisted identities are not regenerated during key rotation."
+  "migration_versioning": "State schema v1 is upgraded in place to v2 on the next episode without resetting revision, episode count, memory or identity. Seed, state, event and evaluation schemas version independently. Persisted identities are not regenerated during key rotation."
 }

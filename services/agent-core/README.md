@@ -26,6 +26,14 @@ Wallets use `ORRYLO_AGENT_<TOKEN>_SECRET_KEY`; the matching public key is derive
 
 When `ORRYLO_DECISION_ENABLED=true`, one Horizon snapshot is shared as environmental evidence per cycle, while each configured agent independently appraises it through its own identity, state, memory and deterministic decision draw. The service stores one audited episode per agent and logs only aggregate action counts and public market depth.
 
+## Behavioral evolution v2
+
+Each episode now combines stable identity with multiple adaptation timescales. Fast and medium states recover toward baselines over elapsed time. Genuine outcomes generate reward-prediction errors that update expectations and context-specific procedural habits within bounded individual learning rates. Recent outcomes also create temporary action inertia or post-error checking, while cross-context evidence is required before the structured self-model and durable identity can consolidate.
+
+Ambiguity and goal conflict raise measured selection temperature, behavioral entropy and decision latency. Established habits and confidence reduce unnecessary exploration. Latency is a computed behavioral signal only; the runtime does not add artificial sleep. Episode metrics expose prediction error, entropy, latency, habit strength and recovery load for longitudinal evaluation and ablation.
+
+State schema v1 records migrate to v2 on their next episode without resetting identity, revision, episode count or memory. The mechanisms support continuous, experience-dependent development; improvement in resemblance to human economic behavior remains an empirical result to evaluate rather than a guaranteed property.
+
 ## HTTP
 
 Open redacted endpoints: `GET /healthz`, `GET /readyz`.
@@ -36,4 +44,4 @@ Accepted external event types are `market_observation`, `decision_outcome`, `soc
 
 ## Operational boundary
 
-This service establishes mechanisms and measurements, not proof of consciousness, humanity, profit, scientific validation, or observed improvement. Strong RYLO competition/acquisition motives remain bounded inputs to appraisal; they never force BUY. Live signing and execution require explicit capital limits and related-wallet controls in addition to operator approval.
+This service establishes mechanisms and measurements, not proof of consciousness, humanity, profit, scientific validation, or observed improvement. Strong RYLO competition/acquisition motives remain bounded inputs to appraisal; they never force BUY. Agent Core still cannot sign or submit transactions; any future execution adapter requires explicit capital limits, related-wallet controls and separate operator approval.

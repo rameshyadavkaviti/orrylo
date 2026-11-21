@@ -258,8 +258,8 @@ export class PostgresAgentRepository implements AgentRepository {
       await client.query("INSERT INTO agent_episodes(agent_id,event_id,sequence,payload_hash,event,trace,result) VALUES($1,$2,$3,$4,$5,$6,$7)", [row.id, event.eventId, event.sequence, payloadHash, event, result.trace, receipt]);
       const memory = result.memories[result.memories.length - 1]!;
       await client.query("INSERT INTO agent_memories(agent_id,memory_id,kind,context_tag,occurred_at,memory) VALUES($1,$2,$3,$4,$5,$6)", [row.id, memory.id, memory.kind, memory.contextTag, memory.occurredAt, memory]);
-      await client.query("UPDATE agent_states SET revision=$2,last_sequence=$3,state=$4,updated_at=now() WHERE agent_id=$1", [row.id, result.state.revision, event.sequence, result.state]);
-      await client.query("INSERT INTO agent_evaluations(agent_id,schema_version,metrics) VALUES($1,1,$2) ON CONFLICT(agent_id) DO UPDATE SET metrics=EXCLUDED.metrics,updated_at=now()", [row.id, result.metrics]);
+      await client.query("UPDATE agent_states SET schema_version=$2,revision=$3,last_sequence=$4,state=$5,updated_at=now() WHERE agent_id=$1", [row.id, result.state.schemaVersion, result.state.revision, event.sequence, result.state]);
+      await client.query("INSERT INTO agent_evaluations(agent_id,schema_version,metrics) VALUES($1,2,$2) ON CONFLICT(agent_id) DO UPDATE SET schema_version=EXCLUDED.schema_version,metrics=EXCLUDED.metrics,updated_at=now()", [row.id, result.metrics]);
       await client.query("INSERT INTO audit_events(agent_id,code,details) VALUES($1,'EPISODE_APPLIED',$2)", [row.id, { eventId: event.eventId, sequence: event.sequence, revision: result.state.revision }]);
       await client.query("COMMIT");
       transactionActive = false;

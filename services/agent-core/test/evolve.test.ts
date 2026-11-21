@@ -4,7 +4,7 @@ import test from "node:test";
 import { Keypair } from "@stellar/stellar-sdk";
 
 import { evolveAgent, createInitialState } from "../src/evolution/evolve.js";
-import type { AgentEvent, AgentMemory } from "../src/evolution/types.js";
+import type { AgentEvent, AgentMemory, AgentState } from "../src/evolution/types.js";
 import { deriveCognitiveSeed } from "../src/identity/derive-seed.js";
 
 const publicKey = Keypair.fromRawEd25519Seed(createHash("sha256").update("evolution-agent").digest()).publicKey();
@@ -130,4 +130,85 @@ test("the deliberation gate changes valuation rather than only recording a flag"
   const automatic = results.find((result) => !result.trace.deliberated);
   assert.ok(deliberated && automatic, "fixture must exercise both gate branches");
   assert.notDeepEqual(deliberated.actionDistribution, automatic.actionDistribution);
+});
+
+test("ambiguity and goal conflict produce structured exploration and longer decisions", () => {
+  const state = createInitialState(seed);
+  const low = evolveAgent(seed, state, [], event({
+    eventId: "natural-variability",
+    context: { contextTag: "choice", uncertainty: 0.05, goalConflict: 0.05, stakes: 0.2, accountability: 0.2 },
+  }));
+  const high = evolveAgent(seed, state, [], event({
+    eventId: "natural-variability",
+    context: { contextTag: "choice", uncertainty: 0.95, goalConflict: 0.95, stakes: 0.8, accountability: 0.8 },
+  }));
+  assert.ok(high.trace.selectionTemperature > low.trace.selectionTemperature);
+  assert.ok(high.metrics.behavioralEntropy > low.metrics.behavioralEntropy);
+  assert.ok(high.trace.decisionLatencyMs > low.trace.decisionLatencyMs);
+});
+
+test("temporary state decays toward baseline while durable identity remains intact", () => {
+  const stressed = createInitialState(seed);
+  stressed.stress = 0.95;
+  stressed.energy = 0.1;
+  stressed.affect = -0.8;
+  stressed.lastEpisodeAt = "2026-11-20T00:00:00.000Z";
+  const immediate = evolveAgent(seed, { ...stressed, lastEpisodeAt: "2026-11-21T00:00:00.000Z" }, [], event({
+    eventId: "immediate-state", occurredAt: "2026-11-21T00:00:00.000Z", context: { contextTag: "calm", uncertainty: 0 },
+  }));
+  const recovered = evolveAgent(seed, stressed, [], event({
+    eventId: "recovered-state", occurredAt: "2026-11-21T00:00:00.000Z", context: { contextTag: "calm", uncertainty: 0 },
+  }));
+  assert.ok(recovered.state.stress < immediate.state.stress);
+  assert.ok(recovered.state.energy > immediate.state.energy);
+  assert.ok(recovered.state.affect > immediate.state.affect);
+  assert.deepEqual(recovered.state.identityAdjustments, immediate.state.identityAdjustments);
+});
+
+test("outcome prediction errors build context habits and negative outcomes trigger recovery", () => {
+  let state = createInitialState(seed);
+  let memories: AgentMemory[] = [];
+  for (let index = 1; index <= 8; index += 1) {
+    const result = evolveAgent(seed, state, memories, event({
+      eventId: `habit-win-${index}`,
+      type: "decision_outcome",
+      sequence: index,
+      occurredAt: new Date(Date.UTC(2026, 10, 21, 0, index)).toISOString(),
+      context: { contextTag: "scarce-market", uncertainty: 0.2 },
+      outcome: { reward: 1, action: "buy" },
+    }));
+    state = result.state;
+    memories = result.memories;
+  }
+  const strengthened = state.behavioralDynamics?.contextHabits["scarce-market"]?.buy ?? 0;
+  assert.ok(strengthened > 0);
+  const loss = evolveAgent(seed, state, memories, event({
+    eventId: "habit-loss",
+    type: "decision_outcome",
+    sequence: 9,
+    occurredAt: "2026-11-21T01:00:00.000Z",
+    context: { contextTag: "scarce-market", uncertainty: 0.2 },
+    outcome: { reward: -1, action: "buy" },
+  }));
+  assert.ok((loss.state.behavioralDynamics?.contextHabits["scarce-market"]?.buy ?? 0) < strengthened);
+  assert.ok((loss.state.behavioralDynamics?.recoveryLoad ?? 0) > 0);
+  assert.ok(loss.metrics.predictionError < 0);
+  assert.equal(loss.memories.at(-1)?.kind, "procedural");
+});
+
+test("legacy persisted states are upgraded causally without resetting their history", () => {
+  const legacy = createInitialState(seed) as AgentState;
+  legacy.schemaVersion = 1;
+  delete legacy.lastEpisodeAt;
+  delete legacy.behavioralDynamics;
+  delete legacy.referenceLearning;
+  delete legacy.selfModel;
+  legacy.episodeCount = 17;
+  legacy.revision = 17;
+  const result = evolveAgent(seed, legacy, [], event({ eventId: "legacy-upgrade", sequence: 18 }));
+  assert.equal(result.state.schemaVersion, 2);
+  assert.equal(result.state.episodeCount, 18);
+  assert.ok(result.state.behavioralDynamics);
+  assert.ok(result.state.referenceLearning);
+  assert.ok(result.state.selfModel);
 });
