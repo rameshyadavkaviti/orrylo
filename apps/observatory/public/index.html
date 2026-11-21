@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="color-scheme" content="dark">
+<title>ORRYLO / Observatory</title><link rel="stylesheet" href="/style.css">
+<script src="/app.js" defer></script>
+</head><body>
+<div class="shell">
+<aside class="sidebar">
+  <div class="brand"><span class="symbol">◈</span><div><strong>ORRYLO</strong><small>OBSERVATORY</small></div></div>
+  <div class="menu-caption">INTELLIGENCE CENTER</div>
+  <nav aria-label="Sections"><a class="active" href="#overview">◉ &nbsp;Overview</a><a href="#agents">◈ &nbsp;Agent Registry</a><a href="#decisions">⌁ &nbsp;Decision Stream</a><a href="#alerts">◇ &nbsp;System Events</a></nav>
+  <div class="sidefoot"><span class="live-dot"></span><span>Independent cognition<br><small>Research monitoring · Read only</small></span></div>
+</aside>
+<div class="main">
+<header class="topbar">
+  <div><div class="eyebrow">CONTROLLED ACCESS / INTERNAL TELEMETRY</div><h1>Agent Observatory <span class="tiny">/ v1.0</span></h1></div>
+  <div class="topright"><div class="online"><span class="live-dot"></span><span id="connection">Connecting</span></div><button id="refresh" type="button">↻ Refresh</button></div>
+</header>
+<div class="warning" role="note"><strong>RESEARCH TELEMETRY</strong> · BUY / SELL / HOLD below are <b>cognitive action tendencies</b>, not executed trades. No real-time trade execution is verified by this dashboard.</div>
+<main>
+<section id="overview">
+ <div class="section-heading"><div><div class="eyebrow">LIVE NETWORK STATE</div><h2>System overview</h2></div><span class="last" id="updated">Awaiting telemetry…</span></div>
+ <div class="stats">
+  <div class="stat"><label>REGISTERED AGENTS</label><strong id="agents-count">—</strong><small id="agents-sub">Configuration pending</small></div>
+  <div class="stat"><label>COGNITIVE EPISODES</label><strong id="episodes-count">—</strong><small id="episodes-sub">Lifetime events</small></div>
+  <div class="stat"><label>EPISODES / LAST HOUR</label><strong id="rate-count">—</strong><small>Observed independent episodes</small></div>
+  <div class="stat"><label>MEMORY RECORDS</label><strong id="memory-count">—</strong><small>Persisted cognitive memories</small></div>
+ </div>
+ <div class="two-panels">
+  <div class="panel"><div class="panel-top"><div><div class="eyebrow">COGNITIVE SIGNAL</div><h3>24-hour decision activity</h3></div><span class="pill">Episodes / hour</span></div><div class="chart" id="chart"><div class="empty">Waiting for events</div></div><div class="legend"><span><i class="key buy"></i>Buy tendency</span><span><i class="key sell"></i>Sell tendency</span><span><i class="key hold"></i>Hold tendency</span><span><i class="key other"></i>Other</span></div></div>
+  <div class="panel"><div class="panel-top"><div><div class="eyebrow">PUBLIC MARKET OBSERVATION</div><h3>RYLO / XLM market snapshot</h3></div><span class="pill">Horizon input</span></div>
+  <div class="market"><div><label>BEST BID</label><strong id="bid">—</strong></div><div><label>BEST ASK</label><strong id="ask">—</strong></div><div><label>ASK DEPTH / RYLO</label><strong id="depth">—</strong></div><div><label>LAST OBSERVED</label><strong class="small" id="market-time">—</strong></div></div>
+  <p class="help">An order-book observation does not prove the system detected a specific user purchase or placed a new order.</p></div>
+ </div>
+</section>
+<section id="agents"><div class="section-heading"><div><div class="eyebrow">INDEPENDENT IDENTITIES</div><h2>Agent registry</h2></div><input id="search" type="search" placeholder="Search agent or wallet…" aria-label="Search agents"></div>
+<div class="panel table-wrap"><table><thead><tr><th>AGENT</th><th>CONFIGURATION</th><th>LAST TENDENCY</th><th>EPISODES</th><th>CONFIDENCE</th><th>STRESS</th><th>LAST DECISION</th><th></th></tr></thead><tbody id="agents-table"><tr><td colspan="8">Loading agents…</td></tr></tbody></table></div>
+<p class="help">Select an agent to inspect its current state, initial cognitive seed, recent experiences, learning metrics and episodic traces.</p>
+</section>
+<section id="decisions"><div class="section-heading"><div><div class="eyebrow">EVENT-SOURCED COGNITION</div><h2>Decision timeline</h2></div><span class="pill">Latest 85 episodes</span></div><div id="timeline" class="timeline panel"><div class="empty">Waiting for data</div></div></section>
+<section id="alerts"><div class="section-heading"><div><div class="eyebrow">OPERATIONAL DIAGNOSTICS</div><h2>System events</h2></div><span class="pill" id="alerts-count">—</span></div><div id="alerts-list" class="panel alerts"><div class="empty">Awaiting events</div></div></section>
+<footer>ORRYLO OBSERVATORY · AUTHENTICATED · READ-ONLY · NEVER EXPOSE WALLET SECRET KEYS</footer>
+</main></div>
+</div>
+<div class="overlay" id="overlay" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="agent-title"><div class="modal-head"><div><div class="eyebrow">COGNITIVE INSPECTOR</div><h2 id="agent-title">Agent</h2></div><button id="close" type="button" aria-label="Close">✕</button></div><div id="agent-detail" class="detail">Loading…</div></div></div>
+</body></html>
