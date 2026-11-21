@@ -19,10 +19,10 @@ Deploy `services/agent-core` as a separate Railway service with its own PostgreS
 - Environment: `production` (`a2eb3b01-c879-42ca-ba3c-d61f76cc7df4`)
 - Agent Core: `orrylo-agent-core` (`9fda3715-4977-4b17-a51f-ff7297e6358f`)
 - PostgreSQL: `Postgres` (`db77d008-3bc6-4373-966e-fd98bcd3f4a1`)
-- Verified Agent Core deployment: `1a2b6782-5df5-4f57-9dcf-6c31cca14f5c`, status `SUCCESS`
-- Verified source commit: `63f578c2e91fe5518b90e60285543a552e031eb9`
+- Verified Agent Core deployment: `8013e7fc-b1b8-41e9-b858-57c17c13b1ce`, status `SUCCESS`
+- Verified source commit: `93ff46df3fbe7c40a815ea0a75fefc86279cc26a`
 - Service URL: `https://orrylo-agent-core-production.up.railway.app`
-- Pre-deploy evidence: 58/58 tests passed, including the PostgreSQL concurrency/atomicity integration test; TypeScript typecheck passed.
+- Pre-deploy evidence: 58/58 tests passed, including the PostgreSQL concurrency/atomicity integration test; TypeScript typecheck passed; the production dependency audit reported zero vulnerabilities.
 - Runtime evidence: `/healthz` returned `ok: true`; `/readyz` returned database, migration, and enrollment health as true with zero invalid candidates.
 - Expected empty-state behavior: zero enrolled agents is healthy until valid `ORRYLO_AGENT_<ALIAS>_PUBLIC_KEY` and `ORRYLO_AGENT_<ALIAS>_SECRET_KEY` pairs are configured.
 
