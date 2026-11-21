@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { ArrowRight, ArrowUpRight, CheckCircle2, ExternalLink, LoaderCircle, ShieldCheck, Wallet, X } from "lucide-react";
 
-const MAX = 10000;
+const TECHNICAL_MAX = 10000;
 const INITIAL_TRANCHE = "3,517,680.9993500";
 const ISSUER = "GDG7SGYLJQBLSN55ASHD7VCXYBEPYDK4EUIUTW6XWTBUDUHXK6ORRYLO";
 const PRICE = 0.1;
@@ -42,6 +42,14 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [inventory, setInventory] = useState<Inventory | null>(null);
   const [inventoryLoading, setInventoryLoading] = useState(false);
+  const listedAmount = inventory?.verified
+    ? Number(inventory.amountAtOrBelowLimit.replace(/,/g, ""))
+    : 0;
+  const maxQuantity = Number.isFinite(listedAmount)
+    ? Math.max(0, Math.min(TECHNICAL_MAX, Math.floor(listedAmount)))
+    : 0;
+  const canSelectAmount = !inventoryLoading && Boolean(inventory?.verified) && maxQuantity >= 1;
+  const selectedQuantity = maxQuantity > 0 ? Math.min(quantity, maxQuantity) : 1;
   const [working, setWorking] = useState(false);
   const [step, setStep] = useState("");
   const [error, setError] = useState("");
@@ -81,6 +89,10 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
       const result = await response.json() as Inventory;
       if (!result.verified) throw new Error("Unavailable");
       setInventory(result);
+      const amount = Number(result.amountAtOrBelowLimit.replace(/,/g, ""));
+      const limit = Number.isFinite(amount) ? Math.max(0, Math.min(TECHNICAL_MAX, Math.floor(amount))) : 0;
+      setQuantity((previous) => Math.max(1, Math.min(previous, Math.max(limit, 1))));
+      setPrepared(null);
     } catch {
       setInventory(null);
     } finally {
@@ -90,15 +102,20 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
 
   useEffect(() => {
     if (!open) return;
+    setInventory(null);
     void refreshInventory();
   }, [open, refreshInventory]);
 
   useEffect(() => {
     if (!open) return;
     setError("");
+    if (!canSelectAmount || quantity > maxQuantity) {
+      setQuote(null);
+      return;
+    }
     const timeout = setTimeout(() => { void refreshQuote(quantity); }, 350);
     return () => { clearTimeout(timeout); requestNumber.current++; };
-  }, [open, quantity, refreshQuote]);
+  }, [open, quantity, canSelectAmount, maxQuantity, refreshQuote]);
 
   useEffect(() => {
     if (!open) return;
@@ -155,7 +172,8 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
 
   function setAmount(amount: number) {
     if (!Number.isFinite(amount)) return;
-    setQuantity(Math.min(MAX, Math.max(1, Math.round(amount))));
+    if (!canSelectAmount) return;
+    setQuantity(Math.min(maxQuantity, Math.max(1, Math.round(amount))));
     setError("");
     setTxHash("");
     setConfirmed(false);
@@ -199,7 +217,8 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
   }
 
   async function prepare() {
-    if (!pubkey || !hasTrustline || !quote?.available || quote.quantity !== quantity || quoteLoading || working) return;
+    if (!pubkey || !hasTrustline || !canSelectAmount || quantity > maxQuantity ||
+      !quote?.available || quote.quantity !== quantity || quoteLoading || working) return;
     setWorking(true);
     setError("");
     setPrepared(null);
@@ -220,7 +239,7 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
 
   async function signAndSubmit() {
     const albedo = albedoRef.current;
-    if (!albedo || !prepared || !pubkey || working || confirmed || txHash) return;
+    if (!albedo || !prepared || !pubkey || !canSelectAmount || quantity > maxQuantity || working || confirmed || txHash) return;
     if (prepared.quantity !== quantity || prepared.pubkey !== pubkey || Date.now() - prepared.createdAt >= 100000) {
       setPrepared(null);
       setError("The order has expired. Prepare a fresh market quote.");
@@ -281,17 +300,17 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
         <div className="rounded-2xl border border-white/10 bg-[#0d1015] p-5">
           <div className="mb-5 flex items-center justify-between gap-3">
             <label htmlFor={sliderId} className="text-xs font-semibold text-[#acacb5]">Select token amount</label>
-            <div className="flex items-end gap-2"><input type="number" min={1} max={MAX} step={1} disabled={working}
-                aria-label="RYLO quantity" value={quantity} onChange={(e) => setAmount(Number(e.target.value))}
+            <div className="flex items-end gap-2"><input type="number" min={1} max={Math.max(1, maxQuantity)} step={1} disabled={working || !canSelectAmount}
+                aria-label="RYLO quantity" value={selectedQuantity} onChange={(e) => setAmount(Number(e.target.value))}
                 className="w-[110px] rounded-lg border border-white/15 bg-[#1b2028] px-2 py-2 text-right text-lg font-semibold outline-none focus:border-crimson"/>
               <span className="mb-2 text-xs text-[#aeb0b9]">RYLO</span></div>
           </div>
-          <input id={sliderId} type="range" min={1} max={MAX} step={1} value={quantity}
-            disabled={working} onChange={(e) => setAmount(Number(e.target.value))}
+          <input id={sliderId} type="range" min={1} max={Math.max(1, maxQuantity)} step={1} value={selectedQuantity}
+            disabled={working || !canSelectAmount} onChange={(e) => setAmount(Number(e.target.value))}
             className="w-full cursor-pointer accent-[#B76B7C] disabled:cursor-not-allowed"/>
-          <div className="mt-1 flex justify-between text-[11px] text-[#8b929b]"><span>1 RYLO</span><span>{MAX.toLocaleString("en-US")} RYLO</span></div>
-          <div className="mt-4 flex flex-wrap gap-2">{[100,500,1000,5000].map((n) =>
-            <button key={n} type="button" disabled={working} onClick={() => setAmount(n)}
+          <div className="mt-1 flex justify-between text-[11px] text-[#8b929b]"><span>1 RYLO</span><span>{canSelectAmount ? maxQuantity.toLocaleString("en-US") + " RYLO" : "Checking availability…"}</span></div>
+          <div className="mt-4 flex flex-wrap gap-2">{[100,500,1000,5000].filter((n) => n <= maxQuantity).map((n) =>
+            <button key={n} type="button" disabled={working || !canSelectAmount} onClick={() => setAmount(n)}
               className={"rounded-full border px-3 py-1.5 text-xs transition " + (quantity===n?"border-crimson/70 bg-crimson/20 text-white":"border-white/10 text-[#9faab1] hover:border-crimson/40")}>{n.toLocaleString("en-US")}</button>)}</div>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3">
@@ -321,7 +340,7 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
             Live direct RYLO/XLM sell orders, not the total issuance or guaranteed sale inventory.
             {inventory?.limitedToTop200Levels ? " Shows only the top 200 order-book price levels." : ""}
             {inventory ? " Checked " + new Date(inventory.checkedAt).toLocaleTimeString() + "." : ""}
-            Orders can change or be filled at any time.
+            Orders can change or be filled at any time. The selector follows currently listed quantities.
           </p>
           <button type="button" disabled={inventoryLoading} onClick={() => void refreshInventory()}
             className="mt-2 text-[11px] font-semibold text-[#d7a5b4] underline underline-offset-4 disabled:opacity-50">Refresh market depth</button>
@@ -365,7 +384,7 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
                   <Wallet size={17}/> Add RYLO trustline via Albedo
                 </button> :
                 !prepared ? <button type="button"
-                  disabled={working || quoteLoading || !quote?.available || quote.quantity !== quantity || Boolean(txHash)}
+                  disabled={working || !canSelectAmount || quantity > maxQuantity || quoteLoading || !quote?.available || quote.quantity !== quantity || Boolean(txHash)}
                   onClick={() => void prepare()}
                   className="button-primary w-full justify-center disabled:cursor-not-allowed disabled:bg-[#43383e] disabled:text-[#aeb0b5]">
                   <ArrowRight size={17}/> Prepare purchase
@@ -376,7 +395,7 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
                     Maximum payment: <strong>{prepared.maximumXlm} XLM</strong> plus a network fee.
                     A fresh market check was performed when this transaction was prepared.
                   </div>
-                  <button type="button" disabled={working || !albedoReady || Boolean(txHash)}
+                  <button type="button" disabled={working || !albedoReady || !canSelectAmount || quantity > maxQuantity || Boolean(txHash)}
                     onClick={() => void signAndSubmit()}
                     className="button-primary w-full justify-center disabled:opacity-50">
                     <ArrowRight size={17}/> Sign and submit with Albedo
