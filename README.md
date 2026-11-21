@@ -2,6 +2,10 @@
 
 ORRYLO combines an informational/disclosure website with a separately deployed Phase 1 research runtime for persistent software-agent identities. The objective is increasingly human-like economic behavior over time; this is not yet an empirically verified result.
 
+## Public site architecture
+
+The website provides independent routes: `/`, `/vision`, `/technology`, `/rylo`, `/transparency`, and `/status`. Shared fixed navigation and footer live in the Next.js App Router root layout. The non-custodial RYLO buy modal remains Albedo-signed and subject to real Stellar liquidity and a 0.1 XLM/RYLO price cap. Tokenomics figures are documented plans or reference values unless independently verified. Next.js generates the sitemap at `/sitemap.xml`.
+
 ## Stack
 
 Next.js App Router, React 19, TypeScript/TSX, Tailwind CSS. Official RYLO logo is available at `/logo.png`.

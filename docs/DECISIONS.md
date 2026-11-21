@@ -35,6 +35,8 @@
 
 | 2026-11-21 | IMPLEMENTED — LIVE ORDER BOOK | Public RYLO purchase dialog separately displays live directly listed RYLO quantity at or below 0.1 XLM from the Stellar mainnet order book (up to 200 price levels). This is distinct from the planned month-0 unlock cap; no specific beneficial seller or unverified first-offer inventory is asserted. |
 
+| 2026-11-21 | ACCEPTED — MULTI-PAGE WEB UX | ORRYLO public site routes Home, Vision, Technology, RYLO, Transparency and Status independently with global fixed responsive navigation, consistent footer, current and evidence-qualified disclosures, and generated sitemap. Preserve Albedo buy functionality and Agent Core service. |
+
 ## Interpretation
 Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 
