@@ -6,7 +6,6 @@ import Image from "next/image";
 import { ArrowRight, ArrowUpRight, CheckCircle2, ExternalLink, LoaderCircle, ShieldCheck, Wallet, X } from "lucide-react";
 
 const TECHNICAL_MAX = 10000;
-const INITIAL_TRANCHE = "3,517,680.9993500";
 const ISSUER = "GDG7SGYLJQBLSN55ASHD7VCXYBEPYDK4EUIUTW6XWTBUDUHXK6ORRYLO";
 const PRICE = 0.1;
 
@@ -344,13 +343,6 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
           </p>
           <button type="button" disabled={inventoryLoading} onClick={() => void refreshInventory()}
             className="mt-2 text-[11px] font-semibold text-[#d7a5b4] underline underline-offset-4 disabled:opacity-50">Refresh market depth</button>
-        </div>
-        <div className="mt-3 rounded-2xl border border-crimson/20 bg-crimson/[.035] p-4">
-          <div className="flex justify-between gap-2">
-            <span className="text-xs font-semibold text-[#ebd0d5]">Planned initial release</span>
-            <span className="text-sm font-semibold">{INITIAL_TRANCHE} RYLO</span>
-          </div>
-          <p className="mt-2 text-[11px] leading-5 text-[#aeb1b8]">This is the tokenomics month-0 release cap, <strong>not verified tokens offered for sale</strong>. Actual executable inventory depends on Stellar liquidity. Transaction fees and potential trustline reserves are separate.</p>
         </div>
         <p className="mt-3 break-all text-[10px] leading-5 text-[#8b969e]">Issuer (RYLO V2): <a href={"https://stellar.expert/explorer/public/account/" + ISSUER} target="_blank" rel="noopener noreferrer" className="text-[#d3a1af] underline underline-offset-2">{ISSUER.slice(0,14)}…{ISSUER.slice(-9)}</a></p>
         {quote?.reason && <p className="mt-3 text-xs leading-5 text-[#dec0c7]" role="status">{quote.reason}</p>}

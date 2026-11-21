@@ -37,6 +37,8 @@
 
 | 2026-11-21 | ACCEPTED — MULTI-PAGE WEB UX | ORRYLO public site routes Home, Vision, Technology, RYLO, Transparency and Status independently with global fixed responsive navigation, consistent footer, current and evidence-qualified disclosures, and generated sitemap. Preserve Albedo buy functionality and Agent Core service. |
 
+| 2026-11-21 | ACCEPTED — PUBLIC INFORMATION SCOPE | Keep unreleased tokenomics, future allocations, burn proposals and vesting schedules out of published website routes, purchase modal, and public quote API responses. Focus public product pages on potential benefits of behaviorally diverse, human-centered AI agents while qualifying unproven market effects. Retain truthful issuer, live liquidity, price-limit, risk and AI-participation disclosures. Internal planning remains distinct from public marketing. |
+
 ## Interpretation
 Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 

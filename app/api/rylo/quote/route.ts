@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getQuote, INITIAL_TRANCHE, MAX_AMOUNT, PRICE_XLM, REFERENCE_ISSUED, RYLO_CODE, RYLO_ISSUER, validQuantity } from "@/lib/rylo";
+import { getQuote, MAX_AMOUNT, PRICE_XLM, RYLO_CODE, RYLO_ISSUER, validQuantity } from "@/lib/rylo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,9 +14,7 @@ export async function GET(request: NextRequest) {
     const { path: _path, ...quote } = await getQuote(quantity);
     void _path;
     return NextResponse.json({
-      ...quote, issuer: RYLO_ISSUER, code: RYLO_CODE, unitPriceCapXlm: PRICE_XLM,
-      initialTranchePlanned: INITIAL_TRANCHE, referenceIssued: REFERENCE_ISSUED,
-      initialTrancheVerifiedForSale: false
+      ...quote, issuer: RYLO_ISSUER, code: RYLO_CODE, unitPriceCapXlm: PRICE_XLM
     }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({ error: "Live Stellar quote is temporarily unavailable." }, { status: 503, headers: { "Cache-Control": "no-store" } });

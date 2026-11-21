@@ -4,7 +4,7 @@ ORRYLO combines an informational/disclosure website with a separately deployed P
 
 ## Public site architecture
 
-The website provides independent routes: `/`, `/vision`, `/technology`, `/rylo`, `/transparency`, and `/status`. Shared fixed navigation and footer live in the Next.js App Router root layout. The non-custodial RYLO buy modal remains Albedo-signed and subject to real Stellar liquidity and a 0.1 XLM/RYLO price cap. Tokenomics figures are documented plans or reference values unless independently verified. Next.js generates the sitemap at `/sitemap.xml`.
+The website provides independent routes: `/`, `/vision`, `/technology`, `/rylo`, `/transparency`, and `/status`. Shared fixed navigation and footer live in the Next.js App Router root layout. The non-custodial RYLO buy modal remains Albedo-signed and subject to real Stellar liquidity and a 0.1 XLM/RYLO price cap. Unreleased financial roadmaps and token-allocation proposals are not presented in public website routes or quote API responses. The public focus is human-centered AI research, with clear limitations and market-risk disclosures. Next.js generates the sitemap at `/sitemap.xml`.
 
 ## Stack
 

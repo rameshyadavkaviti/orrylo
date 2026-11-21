@@ -2,8 +2,6 @@ import { Asset, Horizon, Networks, Operation, StrKey, TransactionBuilder } from 
 
 export const RYLO_ISSUER = "GDG7SGYLJQBLSN55ASHD7VCXYBEPYDK4EUIUTW6XWTBUDUHXK6ORRYLO";
 export const RYLO_CODE = "RYLO";
-export const INITIAL_TRANCHE = "3,517,680.9993500";
-export const REFERENCE_ISSUED = "963,748,219";
 export const MAX_AMOUNT = 10000;
 export const PRICE_XLM = 0.1;
 export const HORIZON_URL = "https://horizon.stellar.org";
