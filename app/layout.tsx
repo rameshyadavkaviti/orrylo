@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   title: { default: "ORRYLO — Human-Centered AI & Economic Research", template: "%s | ORRYLO" },
   description,
   applicationName: "ORRYLO",
-  alternates: { canonical: "./" },
+  alternates: { canonical: "/" },
   openGraph: {
     siteName: "ORRYLO",
     title: "ORRYLO — Human-Centered AI & Economic Research",
