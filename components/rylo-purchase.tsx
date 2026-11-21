@@ -18,6 +18,13 @@ type Quote = {
   checkedAt: string;
   reason: string | null;
 };
+type Inventory = {
+  verified: boolean;
+  amountAtOrBelowLimit: string;
+  bestAskXlm: string | null;
+  checkedAt: string;
+  limitedToTop200Levels: boolean;
+};
 type Prepared = { xdr: string; quotedXlm: string; maximumXlm: string };
 type TxResponse = { tx_hash?: string; result?: unknown };
 
@@ -27,6 +34,8 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
   const [pubkey, setPubkey] = useState<string | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
+  const [inventory, setInventory] = useState<Inventory | null>(null);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
   const [working, setWorking] = useState(false);
   const [step, setStep] = useState("");
   const [error, setError] = useState("");
@@ -57,6 +66,26 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
       if (requestNumber.current === current) setQuoteLoading(false);
     }
   }, []);
+
+  const refreshInventory = useCallback(async () => {
+    setInventoryLoading(true);
+    try {
+      const response = await fetch("/api/rylo/orderbook", { cache: "no-store" });
+      if (!response.ok) throw new Error("Unavailable");
+      const result = await response.json() as Inventory;
+      if (!result.verified) throw new Error("Unavailable");
+      setInventory(result);
+    } catch {
+      setInventory(null);
+    } finally {
+      setInventoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    void refreshInventory();
+  }, [open, refreshInventory]);
 
   useEffect(() => {
     if (!open) return;
@@ -142,7 +171,7 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
       setStep("Verifying confirmation on Stellar…");
       const verification = await fetch("/api/rylo/confirm?hash=" + encodeURIComponent(hash), { cache: "no-store" });
       const result = (await verification.json()) as { confirmed?: boolean };
-      if (verification.ok && result.confirmed) setConfirmed(true);
+      if (verification.ok && result.confirmed) { setConfirmed(true); void refreshInventory(); }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Purchase was not completed.");
     } finally { setWorking(false); setStep(""); }
@@ -203,7 +232,23 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
             {quoteLoading ? "Checking…" : quote?.quotedXlm ? quote.quotedXlm + " XLM" : "Unavailable"}
           </span>
         </div>
-        <div className="mt-4 rounded-2xl border border-crimson/20 bg-crimson/[.035] p-4">
+        <div className="mt-4 rounded-2xl border border-white/10 bg-[#0d1015] p-4" role="status">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-[#ebd0d5]">Currently listed at ≤ 0.1 XLM</span>
+            <span className="text-base font-semibold text-white">
+              {inventoryLoading ? "Checking…" : inventory ? inventory.amountAtOrBelowLimit + " RYLO" : "Not verifiable"}
+            </span>
+          </div>
+          <p className="mt-2 text-[11px] leading-5 text-[#aeb1b8]">
+            Live direct RYLO/XLM sell orders, not the total issuance or guaranteed sale inventory.
+            {inventory?.limitedToTop200Levels ? " Shows only the top 200 order-book price levels." : ""}
+            {inventory ? " Checked " + new Date(inventory.checkedAt).toLocaleTimeString() + "." : ""}
+            Orders can change or be filled at any time.
+          </p>
+          <button type="button" disabled={inventoryLoading} onClick={() => void refreshInventory()}
+            className="mt-2 text-[11px] font-semibold text-[#d7a5b4] underline underline-offset-4 disabled:opacity-50">Refresh market depth</button>
+        </div>
+        <div className="mt-3 rounded-2xl border border-crimson/20 bg-crimson/[.035] p-4">
           <div className="flex justify-between gap-2">
             <span className="text-xs font-semibold text-[#ebd0d5]">Planned initial release</span>
             <span className="text-sm font-semibold">{INITIAL_TRANCHE} RYLO</span>

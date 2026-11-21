@@ -31,6 +31,8 @@
 | 2026-11-21 | ACCEPTED — WEBSITE PURCHASE UX | Add a non-custodial RYLO V2 purchase modal with a 1–10,000 token slider, 0.1 XLM/RYLO maximum spend reference, Albedo-controlled wallet connection, user-approved trustline and user-signed Stellar mainnet path payment. Submit only when Stellar Horizon supplies an executable quote at or below the price cap. Never silently create standing offers or imply guaranteed fills, fixed price, or automatic agent activation. |
 | 2026-11-21 | DISCLOSURE | The tokenomics month-0 figure of 3,517,680.9993500 RYLO is a **planned unlock cap**, not verified inventory offered in the sale. Distinguish it from actual market liquidity and issued supply in the UI. |
 
+| 2026-11-21 | IMPLEMENTED — LIVE ORDER BOOK | Public RYLO purchase dialog separately displays live directly listed RYLO quantity at or below 0.1 XLM from the Stellar mainnet order book (up to 200 price levels). This is distinct from the planned month-0 unlock cap; no specific beneficial seller or unverified first-offer inventory is asserted. |
+
 ## Interpretation
 Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 
