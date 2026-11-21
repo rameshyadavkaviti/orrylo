@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { ArrowRight, ArrowUpRight, CheckCircle2, ExternalLink, LoaderCircle, ShieldCheck, Wallet, X } from "lucide-react";
 
@@ -35,6 +36,8 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
   const dialogTitleId = useId();
   const sliderId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
 
   const refreshQuote = useCallback(async (amount: number) => {
     const current = ++requestNumber.current;
@@ -66,8 +69,17 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
     if (!open) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape" && !working) setOpen(false);
+      if (event.key === "Tab") {
+        const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled), a[href]") || []);
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => { document.body.style.overflow = previousOverflow; window.removeEventListener("keydown", onKeyDown); };
@@ -142,11 +154,11 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
       Buy RYLO <ArrowUpRight size={17} />
     </button>
 
-    {open && <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/75 px-4 py-6 backdrop-blur-md"
+    {open && createPortal(<div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/75 px-4 py-6 backdrop-blur-md"
       onMouseDown={(e) => { if (e.target === e.currentTarget && !working) setOpen(false); }}>
-      <section role="dialog" aria-modal="true" aria-labelledby={dialogTitleId}
+      <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={dialogTitleId}
         className="relative my-auto w-full max-w-[530px] rounded-[26px] border border-white/15 bg-[#15181e] p-5 text-white shadow-[0_30px_100px_rgba(0,0,0,.65)] sm:p-8">
-        <button type="button" disabled={working} aria-label="Close purchase dialog" onClick={() => setOpen(false)}
+        <button ref={closeRef} type="button" disabled={working} aria-label="Close purchase dialog" onClick={() => setOpen(false)}
           className="absolute right-4 top-4 rounded-full border border-white/10 p-2 text-[#c8b9bf] transition hover:text-white disabled:opacity-40">
           <X size={19}/>
         </button>
@@ -222,6 +234,6 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
         </div>
         <p className="mt-4 text-center text-[11px] leading-5 text-[#8d999d]">Albedo signs in your wallet. ORRYLO never asks for secret keys or holds your funds. If no live quote meets your price cap, no purchase will be submitted.</p>
       </section>
-    </div>}
+    </div>, document.body)}
   </>;
 }
