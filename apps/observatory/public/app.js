@@ -26,18 +26,36 @@ function show(data) {
  $("#market-time").textContent=ago(market.created_at);
  chart(data.hourly||[]);
  agentsTable();
- const events=data.events||[];
- const walletsByAgent = new Map((data.agents||[]).map(a=>[a.id,a.public_key]));
- $("#timeline").innerHTML=events.length?events.map(e=>{
-   const key=walletsByAgent.get(e.agent_id);
-   const valid=typeof key==="string" && /^G[A-Z2-7]{55}$/.test(key);
-   const accountLink=valid?'<a class="decision-link" href="https://stellar.expert/explorer/public/account/'+key+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" title="View this wallet publicly on StellarExpert">View wallet ↗</a>':"";
-   const termLink=valid?'<a class="decision-link secondary" href="https://stellarterm.com/account/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" title="Open official StellarTerm. Sign-in is NOT automatic; no wallet key is shared.">StellarTerm ↗</a>':"";
-   return '<div class="episode"><time>'+safe(when(e.created_at))+'</time><div><b>'+safe(e.alias)+'</b><small>#'+safe(e.sequence)+" · "+safe(e.type)+" · "+safe(e.source)+'</small><div class="decision-links">'+accountLink+termLink+'</div></div>'+badge(e.action)+'</div>';
- }).join(""):'<div class="empty">No cognitive episodes recorded yet.</div>';
+ const ds=data.decisionStatus||{};
+ $("#last-persisted").textContent=ds.lastPersistedAt?ago(ds.lastPersistedAt):"NEVER";
+ $("#last-persisted").title=ds.lastPersistedAt?when(ds.lastPersistedAt):"No stored episodes";
+ $("#recent-decisions").textContent=fmt(ds.recent5m);
+ $("#submitted-day").textContent=fmt(ds.submitted24h);
+ const age=ds.lastPersistedAt?Date.now()-new Date(ds.lastPersistedAt).getTime():Infinity;
+ $("#decision-health").textContent=age<180000?"RECORDING":age<900000?"DELAYED":"STALE";
+ const filter=$("#decision-agent-filter"),previous=filter.value;
+ const list=(data.agents||[]).slice().sort((a,b)=>a.alias.localeCompare(b.alias));
+ filter.innerHTML='<option value="">All agents</option>'+list.map(a=>'<option value="'+safe(a.id)+'">'+safe(a.alias)+'</option>').join("");
+ filter.value=previous;
+ renderDecisionTimeline();
  const alerts=data.alerts||[];
  $("#alerts-count").textContent=fmt(c.alerts_day)+" / 24h";
  $("#alerts-list").innerHTML=alerts.length?alerts.map(a=>'<div class="alert-line"><span>'+safe(a.alias)+" · "+safe(a.code)+'</span><small>'+safe(when(a.created_at))+"</small></div>").join(""):'<div class="empty">No non-routine audit events recorded.</div>';
+}
+function renderDecisionTimeline() {
+ if(!snapshot)return;
+ const events=snapshot.events||[];
+ const agentFilter=$("#decision-agent-filter").value, actionFilter=$("#decision-action-filter").value;
+ const displayed=events.filter(e=>(!agentFilter||e.agent_id===agentFilter)&&(!actionFilter||e.action===actionFilter));
+ const walletsByAgent=new Map((snapshot.agents||[]).map(a=>[a.id,a.public_key]));
+ $("#decision-results").textContent=displayed.length+" shown / "+events.length+" recent records";
+ $("#timeline").innerHTML=displayed.length?displayed.map(e=>{
+   const key=walletsByAgent.get(e.agent_id);
+   const valid=typeof key==="string"&&/^G[A-Z2-7]{55}$/.test(key);
+   const accountLink=valid?'<a class="decision-link" href="https://stellar.expert/explorer/public/account/'+key+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">View wallet ↗</a>':"";
+   const termLink=valid?'<a class="decision-link secondary" href="https://stellarterm.com/account/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">StellarTerm ↗</a>':"";
+   return '<div class="episode"><time>'+safe(when(e.created_at))+'</time><div><b>'+safe(e.alias)+'</b><small>#'+safe(e.sequence)+" · "+safe(e.type)+" · "+safe(e.source)+'</small><div class="decision-links">'+accountLink+termLink+'</div></div>'+badge(e.action)+'</div>';
+ }).join(""):'<div class="empty">No matching decisions in the latest 250 records. Reset filters or inspect an agent for older episodes.</div>';
 }
 function chart(rows) {
  const target=$("#chart"); if(!rows.length){target.innerHTML='<div class="empty">No episodes in the last 24 hours.</div>';return;}
@@ -107,6 +125,8 @@ async function refresh(){
 }
 document.addEventListener("click",(ev)=>{const btn=ev.target.closest("[data-id]");if(btn)inspect(btn.dataset.id);});
 $("#search").addEventListener("input",agentsTable);
+$("#decision-agent-filter").addEventListener("change",renderDecisionTimeline);
+$("#decision-action-filter").addEventListener("change",renderDecisionTimeline);
 $("#refresh").addEventListener("click",()=>{refresh();refreshBalances(true);});
 $("#close").addEventListener("click",()=>{$("#overlay").hidden=true;});
 $("#overlay").addEventListener("click",(e)=>{if(e.target===$("#overlay"))$("#overlay").hidden=true;});
