@@ -39,7 +39,7 @@ export interface TradeExecutionIntent {
 
 export type TradeExecutionResult =
   | { status: "submitted"; hash: string; action: "buy" | "sell"; priceXlm: number; amountRylo: number; maxXlm: number }
-  | { status: "blocked"; reason: "DAILY_CAP" | "OPEN_OFFER_CAP" | "FREE_RESERVE" | "NO_RYLO" | "INVALID_PRICE" | "SIGNER_MISMATCH" };
+  | { status: "blocked"; reason: "FREE_RESERVE" | "NO_RYLO" | "INVALID_PRICE" | "SIGNER_MISMATCH" };
 
 const fixed7 = (value: number): string => value.toFixed(7);
 const number = (value: unknown): number => {
@@ -86,14 +86,8 @@ export class StellarTradeExecutor {
 
   async execute(intent: TradeExecutionIntent, signer: Keypair): Promise<TradeExecutionResult> {
     if (signer.publicKey() !== intent.publicKey) return { status: "blocked", reason: "SIGNER_MISMATCH" };
-    const remainingDaily = this.options.dailyCapXlm - intent.dailyCommittedXlm;
-    if (remainingDaily < 0.0000001) return { status: "blocked", reason: "DAILY_CAP" };
     const server = this.server();
-    const [account, offers] = await Promise.all([
-      server.loadAccount(intent.publicKey),
-      server.offers().forAccount(intent.publicKey).limit(200).call(),
-    ]);
-    if (offers.records.length >= this.options.maxOpenOffers) return { status: "blocked", reason: "OPEN_OFFER_CAP" };
+    const account = await server.loadAccount(intent.publicKey);
     const native = account.balances.find((balance) => balance.asset_type === "native");
     const trustline = account.balances.find((balance) =>
       balance.asset_code === this.options.ryloCode && balance.asset_issuer === this.options.ryloIssuer);
@@ -101,7 +95,7 @@ export class StellarTradeExecutor {
     const nativeLiabilities = number(native?.selling_liabilities);
     const minimumReserve = 0.5 * (2 + number(account.subentry_count));
     const freeXlm = nativeBalance - nativeLiabilities - minimumReserve - this.options.minFreeXlm;
-    const budget = Math.min(this.options.maxTradeXlm, remainingDaily, Math.max(0, freeXlm));
+    const budget = Math.min(this.options.maxTradeXlm, Math.max(0, freeXlm));
     if (budget < 0.0000001) return { status: "blocked", reason: "FREE_RESERVE" };
 
     let priceXlm: number;
