@@ -1,5 +1,22 @@
-import type {MetadataRoute} from "next";
-export default function sitemap():MetadataRoute.Sitemap{
-const urls=["","/vision","/technology","/rylo","/transparency","/status"];
-return urls.map((path)=>({url:"https://orrylo.com"+(path||"/"),lastModified:new Date("2026-11-21T00:00:00Z"),changeFrequency:path?"monthly":"weekly",priority:path?0.7:1}));
+import type { MetadataRoute } from "next";
+
+/**
+ * Canonical, public, indexable pages only.
+ * Do not publish fabricated lastModified dates or private/API routes.
+ * When reviewed articles go live, add their real canonical URLs here.
+ */
+const SITE_URL = "https://orrylo.com";
+const indexableRoutes = [
+  "/",
+  "/vision",
+  "/technology",
+  "/rylo",
+  "/transparency",
+  "/status",
+] as const;
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  return indexableRoutes.map((pathname) => ({
+    url: new URL(pathname, SITE_URL).toString(),
+  }));
 }
