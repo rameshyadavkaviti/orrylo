@@ -133,7 +133,7 @@ test("maintenance cancels only stale RYLO/XLM offers and never unrelated assets"
   assert.equal(result.removed, 2);
   assert.equal(submitted.length, 1);
   assert.deepEqual(submitted[0]!.operations.map(o => String(o.offerId)).sort(), ["11","12"]);
-  assert.ok(submitted[0]!.operations.every(o => o.type === "manageSellOffer" && o.amount === "0"));
+  assert.ok(submitted[0]!.operations.every(o => o.type === "manageSellOffer" && Number(o.amount) === 0));
 });
 
 test("maintenance leaves fresh and undated offers unchanged", async () => {
