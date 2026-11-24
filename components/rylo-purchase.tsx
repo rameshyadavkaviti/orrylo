@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
+import {bonusForQuantity, BONUS_CAMPAIGN_ACTIVE, BONUS_THRESHOLD_RYLO} from "@/lib/bonus";
 import { ArrowRight, ArrowUpRight, CheckCircle2, ExternalLink, LoaderCircle, ShieldCheck, Wallet, X } from "lucide-react";
 
 const TECHNICAL_MAX = 10000;
@@ -321,6 +322,19 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
             <div className="text-[11px] text-[#9faab2]">Maximum spend (excl. fees)</div>
             <div className="mt-2 text-xl font-semibold">{(quantity * PRICE).toFixed(1)} <span className="text-xs text-[#9faab2]">XLM</span></div>
           </div>
+        </div>
+        <div className="mt-3 rounded-xl border border-[#dca2af]/30 bg-[#dca2af]/[.08] p-4" role="status">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs font-semibold text-[#ead2d9]">50% RYLO bonus · purchases over 1,000</span>
+            <span className="text-lg font-bold text-[#f0b6c4]">
+              {quantity > BONUS_THRESHOLD_RYLO ? "+" + bonusForQuantity(quantity).toLocaleString("en-US") + " RYLO" : "Select more than 1,000"}
+            </span>
+          </div>
+          <p className="mt-2 text-[11px] leading-5 text-[#ceb8bf]">
+            {BONUS_CAMPAIGN_ACTIVE
+              ? "Bonus is subject to verified on-chain purchase and campaign eligibility."
+              : "Campaign preview: bonus fulfillment is not yet active. A successful purchase currently delivers only the amount shown in the transaction."}
+          </p>
         </div>
         <div className="mt-3 flex justify-between gap-3 rounded-xl border border-white/10 px-4 py-3 text-xs">
           <span className="text-[#a9b4b7]">Live market quote</span>

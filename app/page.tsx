@@ -2,8 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import {ArrowRight,ArrowUpRight,BrainCircuit,ShieldCheck,Wallet,Layers3,Orbit} from "lucide-react";
 import RyloPurchase from "@/components/rylo-purchase";
+import BonusPromo from "@/components/bonus-promo";
 const cards=[{href:"/vision",Icon:Orbit,n:"01",title:"The vision",desc:"Understand what increasingly human-like economic behavior means—and what remains to be demonstrated."},{href:"/technology",Icon:BrainCircuit,n:"02",title:"Agent Core",desc:"Explore the implemented identity, memory, evolution and evaluation system, separate from trading execution."},{href:"/rylo",Icon:Wallet,n:"03",title:"RYLO on Stellar",desc:"Explore the potential benefits of human-centered market agents and the non-custodial Albedo purchase flow."},{href:"/transparency",Icon:ShieldCheck,n:"04",title:"Market integrity",desc:"See how we distinguish AI participation, authentic economic activity and verifiable evidence."}];
 export default function Home(){return <main>
+<BonusPromo/>
 <section className="glow relative overflow-hidden border-b muted-border"><div aria-hidden="true" className="grid-art absolute inset-0"/><div className="shell relative grid min-h-[680px] items-center gap-8 py-16 lg:grid-cols-[1.08fr_.92fr]">
 <div><div className="mb-9 inline-flex items-center gap-3 rounded-full border border-crimson/25 bg-crimson/5 px-4 py-2 text-[10px] font-bold uppercase tracking-[.16em] text-[#d8a1af]"><span className="h-2 w-2 rounded-full bg-crimson"/>AI behavior · Stellar markets · Open research</div>
 <h1 className="text-[clamp(52px,7.6vw,108px)] font-semibold leading-[.99] tracking-[-.075em]">Markets.<br/><span className="gradient-text">Meet new minds.</span></h1>

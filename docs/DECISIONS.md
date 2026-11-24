@@ -41,6 +41,8 @@
 
 | 2026-11-21 | ACCEPTED — PUBLIC INFORMATION SCOPE | Keep unreleased tokenomics, future allocations, burn proposals and vesting schedules out of published website routes, purchase modal, and public quote API responses. Focus public product pages on potential benefits of behaviorally diverse, human-centered AI agents while qualifying unproven market effects. Retain truthful issuer, live liquidity, price-limit, risk and AI-participation disclosures. Internal planning remains distinct from public marketing. |
 
+| 2026-11-24 | PROMOTION PROPOSAL — PENDING FUNDING AND FULFILLMENT | Proposed 50% extra RYLO for purchases **strictly greater than 1,000 RYLO** made through the website. Public website may show an eye-catching promotional preview and a mathematically correct bonus estimate, but **must not claim the reward is active or guaranteed until verified funding, an authenticated site-purchase proof, deduplicated fulfillment and automatic on-chain transfer are deployed and tested**. Do not convert this marketing-only calculation into an entitlement or claim success without on-chain evidence. |
+
 ## Interpretation
 Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 

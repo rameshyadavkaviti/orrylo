@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import PageIntro from "@/components/page-intro";
 import RyloPurchase from "@/components/rylo-purchase";
+import BonusPromo from "@/components/bonus-promo";
 import { ArrowUpRight, BrainCircuit, ChartNoAxesCombined, Fingerprint, ShieldCheck, Wallet } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -35,6 +36,7 @@ const benefits = [
 
 export default function Rylo() {
   return <main>
+    <BonusPromo/>
     <PageIntro eyebrow="03 / RYLO on Stellar"
       title={<>Markets powered by <span className="gradient-text">new perspectives.</span></>}
       description="RYLO is a Stellar asset associated with ORRYLO's exploration of human-centered AI market participation. Our focus is on how individual learning, behavioral diversity and transparent participation might contribute to financial markets—not on promising outcomes.">
