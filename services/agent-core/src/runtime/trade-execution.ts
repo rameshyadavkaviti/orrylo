@@ -52,6 +52,20 @@ const number = (value: unknown): number => {
 export class StellarTradeExecutor {
   private readonly rylo: Asset;
   private readonly lastSweep = new Map<string, number>();
+  private readonly accountLocks = new Map<string, Promise<void>>();
+
+  private async exclusive<T>(publicKey: string, work: () => Promise<T>): Promise<T> {
+    const previous = this.accountLocks.get(publicKey) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => { release = resolve; });
+    this.accountLocks.set(publicKey, current);
+    await previous;
+    try { return await work(); }
+    finally {
+      release();
+      if (this.accountLocks.get(publicKey) === current) this.accountLocks.delete(publicKey);
+    }
+  }
 
   constructor(private readonly options: {
     ryloCode: string;
@@ -87,6 +101,11 @@ export class StellarTradeExecutor {
   // Safe maintenance: cancellation only, scoped to the agent's RYLO/XLM pair.
   // Runs irrespective of BUY/SELL/HOLD and never produces a trade match.
   async maintain(publicKey: string, signer: Keypair, now = Date.now()):
+    Promise<{ status: "noop" | "submitted" | "blocked"; removed: number; hash?: string; reason?: string }> {
+    return this.exclusive(publicKey, () => this.maintainUnlocked(publicKey, signer, now));
+  }
+
+  private async maintainUnlocked(publicKey: string, signer: Keypair, now: number):
     Promise<{ status: "noop" | "submitted" | "blocked"; removed: number; hash?: string; reason?: string }> {
     if (signer.publicKey() !== publicKey) return { status: "blocked", removed: 0, reason: "SIGNER_MISMATCH" };
     if (now - (this.lastSweep.get(publicKey) ?? 0) < 120_000) return { status: "noop", removed: 0 };
@@ -147,6 +166,10 @@ export class StellarTradeExecutor {
   }
 
   async execute(intent: TradeExecutionIntent, signer: Keypair): Promise<TradeExecutionResult> {
+    return this.exclusive(intent.publicKey, () => this.executeUnlocked(intent, signer));
+  }
+
+  private async executeUnlocked(intent: TradeExecutionIntent, signer: Keypair): Promise<TradeExecutionResult> {
     if (signer.publicKey() !== intent.publicKey) return { status: "blocked", reason: "SIGNER_MISMATCH" };
     const server = this.server();
     const [account, open] = await Promise.all([

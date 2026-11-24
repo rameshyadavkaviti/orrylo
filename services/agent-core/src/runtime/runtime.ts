@@ -69,7 +69,7 @@ export async function startRuntime(options: {
     observe: () => marketObserver.observe(),
     logger,
     inspectPortfolio: (publicKey) => tradeExecutor.inspect(publicKey),
-    maintainOffers: (publicKey, keypair) => tradeExecutor.maintain(publicKey, keypair),
+
     signerForPublicKey: signer,
     executeTrade: (intent, keypair) => tradeExecutor.execute(intent, keypair),
     executionEnabled: config.executionEnabled,
@@ -108,6 +108,36 @@ export async function startRuntime(options: {
     decisionLoop.start();
   }
 
+  // Stale-offer cancellation runs outside the cognitive loop. Work is bounded
+  // to four accounts per sweep so slow Stellar confirmations never hold up all agents.
+  let maintenanceCursor = 0;
+  const maintenanceLoop = new EnrollmentLoop(30_000, async () => {
+    const accounts = (await repository.list()).filter((agent) => agent.configured);
+    if (accounts.length === 0) return;
+    const count = Math.min(4, accounts.length);
+    const batch = Array.from({ length: count }, (_, i) => accounts[(maintenanceCursor + i) % accounts.length]!);
+    maintenanceCursor = (maintenanceCursor + count) % accounts.length;
+    await Promise.all(batch.map(async (agent) => {
+      try {
+        const keypair = signer(agent.publicKey);
+        if (!keypair) {
+          logger.error({ event: "offer_cleanup_signer_missing", agentId: agent.id });
+          return;
+        }
+        const result = await tradeExecutor.maintain(agent.publicKey, keypair);
+        if (result.status === "submitted") logger.info({ event: "offer_cleanup_submitted", agentId: agent.id, removed: result.removed });
+        else if (result.status === "blocked") logger.error({ event: "offer_cleanup_blocked", agentId: agent.id, reason: result.reason });
+      } catch (error) {
+        logger.error({ event: "offer_cleanup_failed", agentId: agent.id, error: error instanceof Error ? error.name : "UnknownError" });
+      }
+    }));
+  }, (error) => logger.error({ event: "offer_cleanup_cycle_failed", error: error instanceof Error ? error.name : "UnknownError" }));
+  if (config.executionEnabled && !config.paused) {
+    maintenanceLoop.start();
+    void maintenanceLoop.tick().catch((error) =>
+      logger.error({ event: "offer_cleanup_initial_failed", error: error instanceof Error ? error.name : "UnknownError" }));
+  }
+
   let stopped = false;
   return {
     async stop() {
@@ -115,6 +145,7 @@ export async function startRuntime(options: {
       stopped = true;
       loop.stop();
       decisionLoop.stop();
+      maintenanceLoop.stop();
       await server.close();
       await repository.close();
     },

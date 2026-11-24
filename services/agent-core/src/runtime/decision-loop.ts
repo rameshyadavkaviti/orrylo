@@ -1,6 +1,7 @@
 import type { Keypair } from "@stellar/stellar-sdk";
 
-import type { AgentRepository } from "../db/repository.js";
+import { RepositoryConflict, type AgentRepository } from "../db/repository.js";
+import type { AgentEvent } from "../evolution/types.js";
 import type { TradeExecutionIntent, TradeExecutionResult } from "./trade-execution.js";
 
 interface OrderBookEntry {
@@ -169,7 +170,7 @@ export class DecisionRunner {
           }
         }
         const portfolio = this.options.inspectPortfolio ? await this.options.inspectPortfolio(agent.publicKey) : undefined;
-        const receipt = await this.options.repository.applyEvolution(agent.id, {
+        const episode: AgentEvent = {
           eventId: `market:${snapshot.observedAt}:${agent.id}`,
           type: "market_observation",
           sequence: agent.revision + 1,
@@ -186,7 +187,17 @@ export class DecisionRunner {
               openOffers: portfolio.openOffers,
             } : {}),
           },
-        });
+        };
+        let receipt;
+        try {
+          receipt = await this.options.repository.applyEvolution(agent.id, episode);
+        } catch (error) {
+          if (!(error instanceof RepositoryConflict) || error.code !== "SEQUENCE_CONFLICT") throw error;
+          // Rolling deployments may overlap briefly; retry with the latest persisted revision.
+          const latest = await this.options.repository.get(agent.id);
+          if (!latest) throw error;
+          receipt = await this.options.repository.applyEvolution(agent.id, { ...episode, sequence: latest.revision + 1 });
+        }
         decided += 1;
         actions[receipt.actionTendency] = (actions[receipt.actionTendency] ?? 0) + 1;
         if ((receipt.actionTendency === "buy" || receipt.actionTendency === "sell") && this.options.executionEnabled) {
@@ -236,7 +247,7 @@ export class DecisionRunner {
         }
       } catch (error) {
         failed += 1;
-        this.options.logger.error({ event: "agent_decision_failed", agentId: agent.id, error: error instanceof Error ? error.name : "UnknownError" });
+        this.options.logger.error({ event: "agent_decision_failed", agentId: agent.id, error: error instanceof Error ? error.name : "UnknownError", code: error instanceof RepositoryConflict ? error.code : undefined });
       }
     }
     this.options.logger.info({
