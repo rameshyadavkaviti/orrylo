@@ -20,7 +20,8 @@
     "@albedo-link/intent": "^0.13.0",
     "@stellar/stellar-sdk": "^16.4.0",
     "pg": "^8.16.3",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "@albedo-link/signature-verification": "^0.1.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

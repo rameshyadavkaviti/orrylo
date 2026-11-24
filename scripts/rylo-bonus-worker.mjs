@@ -6,6 +6,7 @@ const network = "https://horizon.stellar.org";
 const campaign = "rylo_bonus_v1";
 const active = process.env.RYLO_BONUS_PAYOUT_ENABLED === "true";
 const pollingMs = 15000;
+const runOnce = process.env.RYLO_BONUS_RUN_ONCE === "true";
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function units(amount) {
@@ -162,6 +163,7 @@ async function main() {
       }
     } catch(error) { console.error("RYLO bonus worker cycle failed",error?.message?.slice(0,180)); }
     finally {client?.release();}
+    if(runOnce) stopped = true;
     if(!stopped) await sleep(pollingMs);
   }
   await db.end();

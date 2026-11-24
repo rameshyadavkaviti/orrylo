@@ -45,6 +45,8 @@
 
 | 2026-11-24 | IMPLEMENTED — BONUS BACKEND (INACTIVE UNTIL FUNDED) | Server-side website purchase transaction hash registry, PostgreSQL durable eligibility ledger, exact post-settlement Horizon verification, per-wallet/campaign deduplication, budget reservations and independently signed bounded payout worker are implemented. Public bonus remains in preview until a dedicated funded payout wallet is configured in a restricted Railway worker service and verified. Do not reuse agent keys or represent the campaign as live before test payout confirmation. |
 
+| 2026-11-24 | SECURITY ADDENDUM — BONUS | Active bonus reservation requires a recent nonce-bound Albedo wallet signature verified server-side; nonce is consumed atomically on PostgreSQL to reduce unauthenticated reward-budget exhaustion. Website and payout worker remain independent. Worker can run every five minutes under Railway cron, signs only with dedicated bonus wallet, and never automatically signs a second transaction for ambiguous payouts. |
+
 ## Interpretation
 Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 

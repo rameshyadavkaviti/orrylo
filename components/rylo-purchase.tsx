@@ -27,6 +27,7 @@ type Inventory = {
 };
 type Prepared = { xdr: string; quotedXlm: string; maximumXlm: string; purchaseHash: string; bonusRegistered: boolean; bonusAmount: string | null };
 type TxResponse = { tx_hash?: string; result?: unknown };
+type BonusProof = { nonce: string; message: string; signature: string };
 type AlbedoClient = (typeof import("@albedo-link/intent"))["default"];
 type ReadyPurchase = Prepared & { quantity: number; pubkey: string; createdAt: number };
 
@@ -56,6 +57,9 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
   const [txHash, setTxHash] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [bonusActive, setBonusActive] = useState(false);
+  const [bonusChallenge, setBonusChallenge] = useState<{nonce:string;message:string}|null>(null);
+  const [bonusProof, setBonusProof] = useState<BonusProof|null>(null);
+  const [challengeLoading, setChallengeLoading] = useState(false);
   const [bonusReceipt, setBonusReceipt] = useState<{status:string;bonusAmountRylo:string;payoutHash:string|null}|null>(null);
   const requestNumber = useRef(0);
   const dialogTitleId = useId();
@@ -148,6 +152,28 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
       .catch(() => setBonusActive(false));
   }, [open]);
 
+  const getBonusChallenge = useCallback(async (wallet: string) => {
+    setChallengeLoading(true);
+    setBonusChallenge(null);
+    try {
+      const response = await fetch("/api/rylo/bonus/challenge", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({pubkey:wallet}), cache:"no-store"
+      });
+      const body = await response.json() as {nonce?:string;message?:string;error?:string};
+      if (!response.ok || !body.nonce || !body.message) throw new Error(body.error || "Unable to verify bonus eligibility.");
+      setBonusChallenge({nonce:body.nonce,message:body.message});
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Bonus verification unavailable.");
+    } finally {setChallengeLoading(false);}
+  }, []);
+
+  useEffect(() => {
+    setBonusProof(null);
+    setBonusChallenge(null);
+    if (open && pubkey && bonusActive) void getBonusChallenge(pubkey);
+  }, [open, pubkey, bonusActive, getBonusChallenge]);
+
   useEffect(() => {
     if (!open || !txHash || !bonusActive) return;
     let mounted = true;
@@ -227,6 +253,26 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
     } finally { setWorking(false); setStep(""); }
   }
 
+  async function verifyBonusWallet() {
+    const albedo = albedoRef.current;
+    if (!albedo || !pubkey || !bonusChallenge || working) return;
+    setError(""); setWorking(true); setStep("Verify wallet ownership for the RYLO bonus in Albedo…");
+    try {
+      const intent = albedo.signMessage({pubkey, message:bonusChallenge.message});
+      const signed = await intent;
+      if (signed.pubkey !== pubkey || signed.original_message !== bonusChallenge.message
+        || typeof signed.message_signature !== "string"
+        || !/^[a-f0-9]{128}$/i.test(signed.message_signature)) throw new Error("Albedo wallet proof could not be verified.");
+      setBonusProof({
+        nonce: bonusChallenge.nonce,
+        message: bonusChallenge.message,
+        signature: signed.message_signature
+      });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Wallet verification was cancelled.");
+    } finally {setWorking(false);setStep("");}
+  }
+
   async function addTrustline() {
     const albedo = albedoRef.current;
     if (!albedo || !pubkey || working) return;
@@ -246,6 +292,10 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
   async function prepare() {
     if (!pubkey || !hasTrustline || !canSelectAmount || quantity > maxQuantity ||
       !quote?.available || quote.quantity !== quantity || quoteLoading || working) return;
+    if (bonusActive && quantity > BONUS_THRESHOLD_RYLO && !bonusProof) {
+      setError("Verify your Albedo wallet before preparing a bonus-eligible purchase.");
+      return;
+    }
     setWorking(true);
     setError("");
     setPrepared(null);
@@ -254,13 +304,17 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
       const response = await fetch("/api/rylo/prepare", {
         method: "POST", cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pubkey, quantity })
+        body: JSON.stringify({ pubkey, quantity, bonusProof: bonusActive && quantity > BONUS_THRESHOLD_RYLO ? bonusProof : undefined })
       });
       const result = await response.json() as Prepared & { error?: string };
       if (!response.ok || !result.xdr) throw new Error(result.error || "Unable to prepare this purchase.");
       setPrepared({ ...result, quantity, pubkey, createdAt: Date.now() });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to prepare this purchase.");
+      if (bonusActive && pubkey && quantity > BONUS_THRESHOLD_RYLO) {
+        setBonusProof(null);
+        void getBonusChallenge(pubkey);
+      }
     } finally { setWorking(false); setStep(""); }
   }
 
@@ -417,7 +471,7 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
                   Wallet: {pubkey.slice(0,7)}…{pubkey.slice(-7)}
                 </span>
                 <button type="button" disabled={working} onClick={() => {
-                  setPubkey(null); setHasTrustline(null); setPrepared(null); setError("");
+                  setPubkey(null); setHasTrustline(null); setPrepared(null); setBonusProof(null); setBonusChallenge(null); setError("");
                 }} className="underline underline-offset-4 hover:text-white">Change</button>
               </div>
               {hasTrustline === null ? <button type="button" disabled={working} onClick={() => void verifyTrustline(pubkey)}
@@ -427,6 +481,12 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
                   className="button-primary w-full justify-center disabled:opacity-50">
                   <Wallet size={17}/> Add RYLO trustline via Albedo
                 </button> :
+                bonusActive && quantity > BONUS_THRESHOLD_RYLO && !bonusProof
+                  ? <button type="button" disabled={working || challengeLoading || !bonusChallenge || !albedoReady}
+                    onClick={() => void verifyBonusWallet()}
+                    className="button-primary w-full justify-center disabled:opacity-50">
+                    <ShieldCheck size={17}/>{challengeLoading ? "Preparing wallet verification…" : "Verify wallet for 50% bonus"}
+                  </button> :
                 !prepared ? <button type="button"
                   disabled={working || !canSelectAmount || quantity > maxQuantity || quoteLoading || !quote?.available || quote.quantity !== quantity || Boolean(txHash)}
                   onClick={() => void prepare()}
