@@ -11,3 +11,7 @@
 9. A submitted offer is not a fill, revenue, profit or proof of successful trading. Learning from economic success must use reconciled settlement/P&L evidence, not submission alone.
 
 Orrylo's homepage is informational and cannot by itself enforce any network-wide trading rules.
+
+10. Prevent unbounded agent offer accumulation with an enforced per-wallet cap scoped to RYLO/XLM. The cognitive loop must continue even if a BUY/SELL attempt is blocked; record the precise reason.
+11. Old agent-wallet RYLO/XLM offers are eligible for signed cancellation after 45 minutes without an update; when above the cap, offers older than five minutes may also be retired. Limit each cleanup transaction to four cancellations and rate-limit sweeps to every two minutes per wallet. Do not touch non-RYLO asset pairs or create matching trades while cleaning.
+12. Maintenance transaction submission is not proof of profit or trading volume; count cancelled offers separately from executed trades. A Horizon maintenance failure must not suspend agent learning.

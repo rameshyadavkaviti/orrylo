@@ -134,6 +134,7 @@ export class DecisionRunner {
     inspectPortfolio?: (publicKey: string) => Promise<{ nativeBalanceXlm: number; ryloBalance: number; hasRyloTrustline: boolean; openOffers: number }>;
     signerForPublicKey?: (publicKey: string) => Keypair | undefined;
     executeTrade?: (intent: TradeExecutionIntent, signer: Keypair) => Promise<TradeExecutionResult>;
+    maintainOffers?: (publicKey: string, signer: Keypair) => Promise<{ status: "noop" | "submitted" | "blocked"; removed: number; reason?: string }>;
     executionEnabled?: boolean;
     referencePriceXlm?: number;
   }) {}
@@ -146,8 +147,27 @@ export class DecisionRunner {
     let failed = 0;
     let submitted = 0;
     let blocked = 0;
+    let cleaned = 0;
+    const blockReasons: Record<string, number> = {};
     for (const agent of agents) {
       try {
+        // Offer maintenance must not stop the cognitive loop if Horizon or signing fails.
+        if (this.options.executionEnabled && this.options.maintainOffers) {
+          const agentSigner = this.options.signerForPublicKey?.(agent.publicKey);
+          if (agentSigner) {
+            try {
+              const maintenance = await this.options.maintainOffers(agent.publicKey, agentSigner);
+              if (maintenance.status === "submitted") {
+                cleaned += maintenance.removed;
+                this.options.logger.info({ event: "offer_cleanup_submitted", agentId: agent.id, removed: maintenance.removed });
+              } else if (maintenance.status === "blocked") {
+                this.options.logger.info({ event: "offer_cleanup_blocked", agentId: agent.id, reason: maintenance.reason });
+              }
+            } catch (error) {
+              this.options.logger.error({ event: "offer_cleanup_failed", agentId: agent.id, error: error instanceof Error ? error.name : "UnknownError" });
+            }
+          }
+        }
         const portfolio = this.options.inspectPortfolio ? await this.options.inspectPortfolio(agent.publicKey) : undefined;
         const receipt = await this.options.repository.applyEvolution(agent.id, {
           eventId: `market:${snapshot.observedAt}:${agent.id}`,
@@ -170,6 +190,7 @@ export class DecisionRunner {
         decided += 1;
         actions[receipt.actionTendency] = (actions[receipt.actionTendency] ?? 0) + 1;
         if ((receipt.actionTendency === "buy" || receipt.actionTendency === "sell") && this.options.executionEnabled) {
+          try {
           const signer = this.options.signerForPublicKey?.(agent.publicKey);
           if (!signer || !this.options.executeTrade) throw new Error("TRADE_SIGNER_NOT_FOUND");
           const dailyCommittedXlm = await this.options.repository.executionCommittedXlm24h(agent.id);
@@ -206,6 +227,11 @@ export class DecisionRunner {
             });
           } else {
             blocked += 1;
+            blockReasons[execution.reason] = (blockReasons[execution.reason] ?? 0) + 1;
+            this.options.logger.info({ event: "trade_execution_blocked", agentId: agent.id, reason: execution.reason });
+          }
+          } catch (error) {
+            this.options.logger.error({ event: "trade_execution_failed", agentId: agent.id, error: error instanceof Error ? error.name : "UnknownError" });
           }
         }
       } catch (error) {
@@ -220,7 +246,7 @@ export class DecisionRunner {
       decided,
       failed,
       actions,
-      execution: { enabled: Boolean(this.options.executionEnabled), submitted, blocked },
+      execution: { enabled: Boolean(this.options.executionEnabled), submitted, blocked, reasons: blockReasons, cleaned },
       market: {
         bestBidXlm: snapshot.context.bestBidXlm,
         bestAskXlm: snapshot.context.bestAskXlm,

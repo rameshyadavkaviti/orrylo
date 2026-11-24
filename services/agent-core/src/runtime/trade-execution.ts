@@ -15,6 +15,8 @@ type LoadedAccount = Account & {
 };
 type BuiltTransaction = ReturnType<TransactionBuilder["build"]>;
 
+type OrderAsset = { asset_type: string; asset_code?: string; asset_issuer?: string };
+type AccountOffer = { id: string; selling: OrderAsset; buying: OrderAsset; price?: string; last_modified_time?: string };
 interface TradeServer {
   loadAccount(publicKey: string): Promise<LoadedAccount>;
   fetchBaseFee(): Promise<number>;
@@ -39,7 +41,7 @@ export interface TradeExecutionIntent {
 
 export type TradeExecutionResult =
   | { status: "submitted"; hash: string; action: "buy" | "sell"; priceXlm: number; amountRylo: number; maxXlm: number }
-  | { status: "blocked"; reason: "FREE_RESERVE" | "NO_RYLO" | "INVALID_PRICE" | "SIGNER_MISMATCH" };
+  | { status: "blocked"; reason: "FREE_RESERVE" | "NO_RYLO" | "INVALID_PRICE" | "SIGNER_MISMATCH" | "OPEN_OFFER_CAP" };
 
 const fixed7 = (value: number): string => value.toFixed(7);
 const number = (value: unknown): number => {
@@ -49,6 +51,7 @@ const number = (value: unknown): number => {
 
 export class StellarTradeExecutor {
   private readonly rylo: Asset;
+  private readonly lastSweep = new Map<string, number>();
 
   constructor(private readonly options: {
     ryloCode: string;
@@ -67,6 +70,65 @@ export class StellarTradeExecutor {
     return this.options.server ?? new Horizon.Server("https://horizon.stellar.org") as unknown as TradeServer;
   }
 
+
+  private relevantOffers(records: unknown[]): AccountOffer[] {
+    return records.filter((value): value is AccountOffer => {
+      if (!value || typeof value !== "object") return false;
+      const o = value as Partial<AccountOffer>;
+      const rylo = (asset?: OrderAsset) =>
+        asset?.asset_code === this.options.ryloCode && asset?.asset_issuer === this.options.ryloIssuer &&
+        (asset.asset_type === "credit_alphanum4" || asset.asset_type === "credit_alphanum12");
+      return typeof o.id === "string" && /^\d+$/.test(o.id) &&
+        ((o.selling?.asset_type === "native" && rylo(o.buying)) ||
+         (rylo(o.selling) && o.buying?.asset_type === "native"));
+    });
+  }
+
+  // Safe maintenance: cancellation only, scoped to the agent's RYLO/XLM pair.
+  // Runs irrespective of BUY/SELL/HOLD and never produces a trade match.
+  async maintain(publicKey: string, signer: Keypair, now = Date.now()):
+    Promise<{ status: "noop" | "submitted" | "blocked"; removed: number; hash?: string; reason?: string }> {
+    if (signer.publicKey() !== publicKey) return { status: "blocked", removed: 0, reason: "SIGNER_MISMATCH" };
+    if (now - (this.lastSweep.get(publicKey) ?? 0) < 120_000) return { status: "noop", removed: 0 };
+    const server = this.server();
+    const book = await server.offers().forAccount(publicKey).limit(200).call();
+    const offers = this.relevantOffers(book.records);
+    const dated = offers.map((offer) => ({
+      offer,
+      age: offer.last_modified_time ? now - Date.parse(offer.last_modified_time) : NaN,
+    })).filter((item) => Number.isFinite(item.age) && item.age >= 0)
+      .sort((a, b) => b.age - a.age);
+    const stale = dated.filter((item) => item.age >= 45 * 60_000);
+    const excess = Math.max(0, offers.length - this.options.maxOpenOffers - stale.length);
+    const candidates = [...stale, ...dated.filter((item) => item.age >= 5 * 60_000 &&
+      !stale.includes(item)).slice(0, excess)];
+    const cancel = candidates.slice(0, 4).map((item) => item.offer);
+    if (!cancel.length) {
+      this.lastSweep.set(publicKey, now);
+      return { status: "noop", removed: 0 };
+    }
+    const [account, baseFee] = await Promise.all([server.loadAccount(publicKey), server.fetchBaseFee()]);
+    const fee = String(Math.max(Number(BASE_FEE), baseFee));
+    const native = account.balances.find((item) => item.asset_type === "native");
+    const reserve = 0.5 * (2 + number(account.subentry_count));
+    if (number(native?.balance) - reserve < (Number(fee) * cancel.length) / 10_000_000) {
+      return { status: "blocked", removed: 0, reason: "FEE_RESERVE" };
+    }
+    let builder = new TransactionBuilder(account, { fee, networkPassphrase: Networks.PUBLIC });
+    for (const offer of cancel) {
+      const selling = offer.selling.asset_type === "native" ? Asset.native() : this.rylo;
+      const buying = offer.buying.asset_type === "native" ? Asset.native() : this.rylo;
+      builder = builder.addOperation(Operation.manageSellOffer({
+        selling, buying, amount: "0", price: offer.price && Number(offer.price) > 0 ? offer.price : "1", offerId: offer.id,
+      }));
+    }
+    const transaction = builder.setTimeout(60).build();
+    transaction.sign(signer);
+    const submitted = await server.submitTransaction(transaction);
+    this.lastSweep.set(publicKey, now);
+    return { status: "submitted", removed: cancel.length, hash: submitted.hash };
+  }
+
   async inspect(publicKey: string): Promise<{ nativeBalanceXlm: number; ryloBalance: number; hasRyloTrustline: boolean; openOffers: number }> {
     const server = this.server();
     const [account, offers] = await Promise.all([
@@ -80,14 +142,19 @@ export class StellarTradeExecutor {
       nativeBalanceXlm: number(native?.balance),
       ryloBalance: number(trustline?.balance) - number(trustline?.selling_liabilities),
       hasRyloTrustline: Boolean(trustline),
-      openOffers: offers.records.length,
+      openOffers: this.relevantOffers(offers.records).length,
     };
   }
 
   async execute(intent: TradeExecutionIntent, signer: Keypair): Promise<TradeExecutionResult> {
     if (signer.publicKey() !== intent.publicKey) return { status: "blocked", reason: "SIGNER_MISMATCH" };
     const server = this.server();
-    const account = await server.loadAccount(intent.publicKey);
+    const [account, open] = await Promise.all([
+      server.loadAccount(intent.publicKey),
+      server.offers().forAccount(intent.publicKey).limit(200).call(),
+    ]);
+    if (this.relevantOffers(open.records).length >= this.options.maxOpenOffers)
+      return { status: "blocked", reason: "OPEN_OFFER_CAP" };
     const native = account.balances.find((balance) => balance.asset_type === "native");
     const trustline = account.balances.find((balance) =>
       balance.asset_code === this.options.ryloCode && balance.asset_issuer === this.options.ryloIssuer);

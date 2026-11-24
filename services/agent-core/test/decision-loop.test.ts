@@ -40,3 +40,26 @@ test("one market observation creates one independent decision episode per config
   assert.equal((await repository.metrics()).episodes, 2);
   assert.equal(JSON.stringify(logs).includes("S"), false);
 });
+
+test("failed offer maintenance never stops independent cognitive decisions", async () => {
+  const repository = new InMemoryAgentRepository();
+  await repository.migrate();
+  const publicKey = Keypair.random().publicKey();
+  const seed = deriveCognitiveSeed("master-key-material-that-is-long-enough", publicKey, 1);
+  await repository.enroll({ alias: "TEST", publicKey, seed, state: createInitialState(seed) });
+  const errorCodes: string[] = [];
+  const runner = new DecisionRunner({
+    repository,
+    observe: async () => ({ observedAt: "2026-11-24T12:00:00Z",
+      context: marketContextFromOrderBook({ bids: [], asks: [{ price: "0.1", amount: "5000" }] }, 0.1) }),
+    logger: { info() {}, error(value: unknown) { errorCodes.push(String((value as {event?:string}).event)); } },
+    executionEnabled: true,
+    signerForPublicKey: () => Keypair.random(),
+    maintainOffers: async () => { throw new Error("Horizon temporarily unavailable"); },
+  });
+  const result = await runner.run();
+  assert.equal(result.decided, 1);
+  assert.equal(result.failed, 0);
+  assert.equal((await repository.metrics()).episodes, 1);
+  assert.ok(errorCodes.includes("offer_cleanup_failed"));
+});

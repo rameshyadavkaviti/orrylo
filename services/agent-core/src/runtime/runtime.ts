@@ -69,6 +69,7 @@ export async function startRuntime(options: {
     observe: () => marketObserver.observe(),
     logger,
     inspectPortfolio: (publicKey) => tradeExecutor.inspect(publicKey),
+    maintainOffers: (publicKey, keypair) => tradeExecutor.maintain(publicKey, keypair),
     signerForPublicKey: signer,
     executeTrade: (intent, keypair) => tradeExecutor.execute(intent, keypair),
     executionEnabled: config.executionEnabled,
