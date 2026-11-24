@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prepareRyloPurchase, validPublicKey, validQuantity } from "@/lib/rylo";
+import { Networks, TransactionBuilder } from "@stellar/stellar-sdk";
+import { recordWebsitePurchase } from "@/lib/bonus-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,12 +18,16 @@ export async function POST(request: NextRequest) {
   }
   try {
     const result = await prepareRyloPurchase(pubkey, quantity);
-    return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
+    const purchaseTx = TransactionBuilder.fromXDR(result.xdr, Networks.PUBLIC);
+    const purchaseHash = Buffer.from(purchaseTx.hash()).toString("hex");
+    // Fail closed: never return a buyable XDR that promises an unregistered active reward.
+    const bonus = await recordWebsitePurchase(purchaseHash, pubkey, quantity);
+    return NextResponse.json({ ...result, purchaseHash, ...bonus }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Purchase could not be prepared.";
-    const userFacing = /trustline|route|liquidity|costs more|quote/i.test(message)
+    const userFacing = /trustline|route|liquidity|costs more|quote|bonus|campaign|excluded/i.test(message)
       ? message
-      : "Stellar could not verify the wallet or prepare this transaction.";
+      : "Purchase preparation is unavailable. No transaction was submitted.";
     return NextResponse.json({ error: userFacing }, { status: 409, headers: { "Cache-Control": "no-store" } });
   }
 }

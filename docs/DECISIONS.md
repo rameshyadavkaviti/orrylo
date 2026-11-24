@@ -43,6 +43,8 @@
 
 | 2026-11-24 | PROMOTION PROPOSAL — PENDING FUNDING AND FULFILLMENT | Proposed 50% extra RYLO for purchases **strictly greater than 1,000 RYLO** made through the website. Public website may show an eye-catching promotional preview and a mathematically correct bonus estimate, but **must not claim the reward is active or guaranteed until verified funding, an authenticated site-purchase proof, deduplicated fulfillment and automatic on-chain transfer are deployed and tested**. Do not convert this marketing-only calculation into an entitlement or claim success without on-chain evidence. |
 
+| 2026-11-24 | IMPLEMENTED — BONUS BACKEND (INACTIVE UNTIL FUNDED) | Server-side website purchase transaction hash registry, PostgreSQL durable eligibility ledger, exact post-settlement Horizon verification, per-wallet/campaign deduplication, budget reservations and independently signed bounded payout worker are implemented. Public bonus remains in preview until a dedicated funded payout wallet is configured in a restricted Railway worker service and verified. Do not reuse agent keys or represent the campaign as live before test payout confirmation. |
+
 ## Interpretation
 Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 

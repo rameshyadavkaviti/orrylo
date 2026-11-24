@@ -31,3 +31,13 @@ The isolated service in [`services/agent-core`](services/agent-core) verifies en
 ## Source of truth
 
 Read [AGENTS.md](AGENTS.md), [product scope](docs/PRODUCT_SCOPE.md), [decisions](docs/DECISIONS.md), [architecture](docs/ARCHITECTURE.md), [claims](docs/CLAIMS_AND_EVIDENCE.md), [integrity](docs/MARKET_INTEGRITY.md), and [deployment](docs/DEPLOYMENT.md). The website remains informational and operationally separate from Agent Core. No live trading execution is authorized. Do not import private VEYRIX data, keys or secrets.
+
+## RYLO bonus campaign (inactive until provisioned)
+
+Code provides a 50% RYLO promotional bonus for **strictly more than 1,000 RYLO purchased through the official site**, limited to one successfully paid reward per wallet per campaign. The promotional preview is not a claim that any reward has been funded or issued. The website must never sign bonus transfers itself.
+
+Server-side API stores a transaction hash **when the site prepares the buyer's exact Stellar XDR**, then the isolated payout worker independently verifies its successful source account, path payment and destination on Horizon. Durable PostgreSQL records, an advisory lock and an on-chain-identifiable signed payout envelope prevent duplicate transfers. A payout that cannot be reconciled stays in manual review, not auto re-signed.
+
+Provision the web service's `DATABASE_URL` via Railway Postgres reference and supply `RYLO_BONUS_CAMPAIGN_MAX_RYLO` (a pre-funded, limited budget). Keep `RYLO_BONUS_CAMPAIGN_ACTIVE=false` and `RYLO_BONUS_FULFILLMENT_READY=false` until the worker is configured and a test receipt has confirmed. **Never put a funding wallet secret into the web service**.
+
+In a separate Railway service from this repository, set start command `npm run bonus:worker`, then configure `DATABASE_URL`, `RYLO_BONUS_SECRET` (sealed secret), `RYLO_BONUS_PUBLIC_KEY`, `RYLO_BONUS_CAMPAIGN_MAX_RYLO`, `RYLO_BONUS_CAMPAIGN_ACTIVE=true` and `RYLO_BONUS_PAYOUT_ENABLED=true`. The source wallet must be different from the issuer and funded with transferable RYLO and XLM. Set optional comma-separated `RYLO_BONUS_EXCLUDED_PUBLIC_KEYS` on both services to exclude related owners. The website can display the campaign as active only after the worker has passed live signing and balance checks and the campaign has been funded.

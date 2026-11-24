@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "node start.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "bonus:worker": "node scripts/rylo-bonus-worker.mjs"
   },
   "engines": {
     "node": ">=22.12.0"
@@ -17,7 +18,9 @@
     "react-dom": "19.2.9",
     "lucide-react": "^0.468.0",
     "@albedo-link/intent": "^0.13.0",
-    "@stellar/stellar-sdk": "^16.4.0"
+    "@stellar/stellar-sdk": "^16.4.0",
+    "pg": "^8.16.3",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
@@ -26,6 +29,7 @@
     "typescript": "~5.7.3",
     "tailwindcss": "^3.4.17",
     "postcss": "^8.4.49",
-    "autoprefixer": "^10.4.20"
+    "autoprefixer": "^10.4.20",
+    "@types/pg": "^8.15.5"
   }
 }

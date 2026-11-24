@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import {bonusForQuantity, BONUS_CAMPAIGN_ACTIVE, BONUS_THRESHOLD_RYLO} from "@/lib/bonus";
+import {bonusForQuantity, BONUS_THRESHOLD_RYLO} from "@/lib/bonus";
 import { ArrowRight, ArrowUpRight, CheckCircle2, ExternalLink, LoaderCircle, ShieldCheck, Wallet, X } from "lucide-react";
 
 const TECHNICAL_MAX = 10000;
@@ -25,7 +25,7 @@ type Inventory = {
   checkedAt: string;
   limitedToTop200Levels: boolean;
 };
-type Prepared = { xdr: string; quotedXlm: string; maximumXlm: string };
+type Prepared = { xdr: string; quotedXlm: string; maximumXlm: string; purchaseHash: string; bonusRegistered: boolean; bonusAmount: string | null };
 type TxResponse = { tx_hash?: string; result?: unknown };
 type AlbedoClient = (typeof import("@albedo-link/intent"))["default"];
 type ReadyPurchase = Prepared & { quantity: number; pubkey: string; createdAt: number };
@@ -55,6 +55,8 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
   const [error, setError] = useState("");
   const [txHash, setTxHash] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const [bonusActive, setBonusActive] = useState(false);
+  const [bonusReceipt, setBonusReceipt] = useState<{status:string;bonusAmountRylo:string;payoutHash:string|null}|null>(null);
   const requestNumber = useRef(0);
   const dialogTitleId = useId();
   const sliderId = useId();
@@ -138,6 +140,30 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
   }, [open, working]);
 
   useEffect(() => { if (!open) buttonRef.current?.focus(); }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    void fetch("/api/rylo/bonus/status", {cache:"no-store"})
+      .then(r => r.json())
+      .then((body: {active?: boolean}) => setBonusActive(body.active === true))
+      .catch(() => setBonusActive(false));
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !txHash || !bonusActive) return;
+    let mounted = true;
+    async function checkBonus() {
+      try {
+        const response = await fetch("/api/rylo/bonus/receipt?hash=" + txHash, {cache:"no-store"});
+        if (!response.ok) return;
+        const body = await response.json() as {found:boolean;status:string;bonusAmountRylo:string;payoutHash:string|null};
+        if (mounted && body.found) setBonusReceipt(body);
+      } catch { /* Show existing last known state, not a false success. */ }
+    }
+    void checkBonus();
+    const interval = setInterval(() => { void checkBonus(); }, 15000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, [open, txHash, bonusActive]);
+
 
   useEffect(() => {
     if (!open) {
@@ -178,6 +204,7 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
     setTxHash("");
     setConfirmed(false);
     setPrepared(null);
+    setBonusReceipt(null);
   }
 
   async function connect() {
@@ -331,9 +358,9 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
             </span>
           </div>
           <p className="mt-2 text-[11px] leading-5 text-[#ceb8bf]">
-            {BONUS_CAMPAIGN_ACTIVE
-              ? "Bonus is subject to verified on-chain purchase and campaign eligibility."
-              : "Campaign preview: bonus fulfillment is not yet active. A successful purchase currently delivers only the amount shown in the transaction."}
+            {bonusActive
+              ? "One reward per wallet per campaign, after verified website purchase and available reward budget."
+              : "Campaign preview: automatic bonus fulfillment is not yet active. Only the purchased amount is delivered."}
           </p>
         </div>
         <div className="mt-3 flex justify-between gap-3 rounded-xl border border-white/10 px-4 py-3 text-xs">
@@ -368,6 +395,17 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
           </div>
           <a className="mt-2 inline-flex items-center gap-1 text-xs text-[#d6b1bd] underline" href={"https://stellar.expert/explorer/public/tx/" + txHash} target="_blank" rel="noopener noreferrer">View transaction <ExternalLink size={12}/></a>
         </div>}
+        {bonusReceipt && <div className="mt-3 rounded-xl border border-[#dca2af]/30 bg-[#dca2af]/[.06] p-4 text-xs leading-6" role="status">
+          <strong>Bonus status:</strong> {bonusReceipt.status === "paid" ? "Paid" :
+            bonusReceipt.status === "verified" ? "Purchase verified, awaiting payout" :
+            bonusReceipt.status === "paying" ? "Payout submitted, checking confirmation" :
+            bonusReceipt.status === "rejected" ? "Not eligible" :
+            bonusReceipt.status === "review" ? "Manual review needed" :
+            bonusReceipt.status === "expired" ? "Purchase not confirmed before expiry" : "Awaiting purchase verification"}
+          {bonusReceipt.status === "paid" && <span className="ml-2">+{bonusReceipt.bonusAmountRylo} RYLO</span>}
+          {bonusReceipt.payoutHash && <a className="ml-2 underline underline-offset-4 text-[#f0b6c4]" rel="noopener noreferrer" target="_blank"
+            href={"https://stellar.expert/explorer/public/tx/" + bonusReceipt.payoutHash}>Inspect payout</a>}
+        </div>}
         <div className="mt-5 flex flex-col gap-3">
           {!pubkey ? <button type="button" disabled={working || !albedoReady} onClick={() => void connect()}
               className="button-primary w-full justify-center disabled:opacity-50">
@@ -400,6 +438,7 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
                     You will receive <strong>{prepared.quantity.toLocaleString("en-US")} RYLO</strong>.
                     Maximum payment: <strong>{prepared.maximumXlm} XLM</strong> plus a network fee.
                     A fresh market check was performed when this transaction was prepared.
+                    {prepared.bonusRegistered && <p className="mt-2 font-semibold text-[#f1bcca]">Bonus registered: +{Number(prepared.bonusAmount).toLocaleString("en-US")} RYLO, pending on-chain verification and payout.</p>}
                   </div>
                   <button type="button" disabled={working || !albedoReady || !canSelectAmount || quantity > maxQuantity || Boolean(txHash)}
                     onClick={() => void signAndSubmit()}

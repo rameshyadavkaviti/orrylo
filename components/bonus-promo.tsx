@@ -1,21 +1,25 @@
 import Link from "next/link";
 import {ArrowUpRight, Gift, Sparkles} from "lucide-react";
-import {BONUS_CAMPAIGN_ACTIVE, BONUS_RATE, BONUS_THRESHOLD_RYLO} from "@/lib/bonus";
+import {BONUS_RATE, BONUS_THRESHOLD_RYLO} from "@/lib/bonus";
 
 export default function BonusPromo() {
+  const active = process.env.RYLO_BONUS_CAMPAIGN_ACTIVE === "true"
+    && process.env.RYLO_BONUS_FULFILLMENT_READY === "true"
+    && Boolean(process.env.DATABASE_URL)
+    && Number(process.env.RYLO_BONUS_CAMPAIGN_MAX_RYLO || 0) > 0;
   return <section aria-labelledby="bonus-campaign-heading" className="relative isolate overflow-hidden border-y border-[#edb6b8]/25 bg-[radial-gradient(ellipse_at_75%_5%,rgba(239,182,167,.24),transparent_58%),linear-gradient(110deg,#34212b,#17141b_72%)]">
     <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-32 h-96 w-96 rounded-full border-[46px] border-[#e5a0ae]/[.07]"/>
     <div className="shell relative grid gap-7 py-9 sm:py-12 md:grid-cols-[1.15fr_.85fr] md:items-center">
       <div>
-        <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#e9aab4]/35 bg-white/[.04] px-4 py-2 text-[11px] font-bold uppercase tracking-[.16em] text-[#f1c1c7]"><Sparkles size={15}/> {BONUS_CAMPAIGN_ACTIVE ? "Limited bonus offer" : "Upcoming bonus campaign"}</p>
+        <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#e9aab4]/35 bg-white/[.04] px-4 py-2 text-[11px] font-bold uppercase tracking-[.16em] text-[#f1c1c7]"><Sparkles size={15}/> {active ? "Limited bonus offer" : "Upcoming bonus campaign"}</p>
         <h2 id="bonus-campaign-heading" className="max-w-2xl text-[clamp(32px,4.4vw,62px)] font-bold leading-[1.05] tracking-[-.05em]">
           More RYLO. <span className="text-[#f4b7c3]">50% extra.</span>
         </h2>
         <p className="mt-4 max-w-[670px] text-sm leading-7 text-[#dfcdd3] sm:text-base">
-          A proposed bonus for buying <strong>more than {BONUS_THRESHOLD_RYLO.toLocaleString("en-US")} RYLO</strong> through ORRYLO.
-          Example: 1,200 RYLO would earn an additional 600 RYLO.
+          A bonus campaign for buying <strong>more than {BONUS_THRESHOLD_RYLO.toLocaleString("en-US")} RYLO</strong> through ORRYLO.
+          Example: 1,200 RYLO may qualify for 600 extra RYLO, once per wallet after verification.
         </p>
-        {!BONUS_CAMPAIGN_ACTIVE && <p className="mt-3 max-w-[670px] text-xs leading-6 text-[#f3c6ce]">
+        {!active && <p className="mt-3 max-w-[670px] text-xs leading-6 text-[#f3c6ce]">
           Promotion preview only — bonus distribution has not been activated or funded and no bonus is currently guaranteed.
         </p>}
       </div>
