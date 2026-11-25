@@ -59,6 +59,7 @@ export async function startRuntime(options: {
     ryloCode: config.ryloCode,
     ryloIssuer: config.ryloIssuer,
     maxTradeXlm: config.executionMaxTradeXlm,
+    minOrderXlm: config.executionMinOrderXlm,
     dailyCapXlm: config.executionDailyCapXlm,
     minFreeXlm: config.executionMinFreeXlm,
     maxBuyPriceXlm: config.executionMaxBuyPriceXlm,

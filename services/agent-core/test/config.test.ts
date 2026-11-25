@@ -112,3 +112,16 @@ test("serialized errors never contain secret environment values", () => {
     assert.equal(String(error).includes(secret), false);
   }
 });
+
+
+test("minimum live order notional must not exceed per-order trade cap",()=>{
+  assert.throws(()=>loadConfig({
+    ...validEnv,ORRYLO_EXECUTION_ENABLED:"true",
+    ORRYLO_EXECUTION_MAX_TRADE_XLM:"0.1",
+    ORRYLO_EXECUTION_MIN_ORDER_XLM:"2",
+    ORRYLO_EXECUTION_DAILY_CAP_XLM:"2.25",
+    ORRYLO_EXECUTION_MIN_FREE_XLM:"2",
+    ORRYLO_EXECUTION_MAX_BUY_PRICE_XLM:"0.1",
+    ORRYLO_RELATED_PUBLIC_KEYS:"GCZCQZBSMZJTMTIHBDIAQM6BQMZ4P5QVPQ7UGNF5YKLPPEXD7EVEPBCH",
+  }),ConfigError);
+});

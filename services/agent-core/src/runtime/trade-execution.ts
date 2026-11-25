@@ -41,7 +41,7 @@ export interface TradeExecutionIntent {
 
 export type TradeExecutionResult =
   | { status: "submitted"; hash: string; action: "buy" | "sell"; priceXlm: number; amountRylo: number; maxXlm: number }
-  | { status: "blocked"; reason: "FREE_RESERVE" | "NO_RYLO" | "INVALID_PRICE" | "SIGNER_MISMATCH" | "OPEN_OFFER_CAP" };
+  | { status: "blocked"; reason: "FREE_RESERVE" | "NO_RYLO" | "INVALID_PRICE" | "SIGNER_MISMATCH" | "OPEN_OFFER_CAP" | "MIN_ORDER_NOTIONAL" };
 
 const fixed7 = (value: number): string => value.toFixed(7);
 const number = (value: unknown): number => {
@@ -71,6 +71,7 @@ export class StellarTradeExecutor {
     ryloCode: string;
     ryloIssuer: string;
     maxTradeXlm: number;
+    minOrderXlm?: number;
     dailyCapXlm: number;
     minFreeXlm: number;
     maxBuyPriceXlm: number;
@@ -190,6 +191,10 @@ export class StellarTradeExecutor {
     const freeXlm = nativeBalance - nativeLiabilities - minimumReserve - this.options.minFreeXlm;
     const budget = Math.min(this.options.maxTradeXlm, Math.max(0, freeXlm));
     if (budget < 0.0000001) return { status: "blocked", reason: "FREE_RESERVE" };
+    const minimum = this.options.minOrderXlm ?? 0;
+    if (budget + 0.00000000001 < minimum) return { status: "blocked", reason: "MIN_ORDER_NOTIONAL" };
+    const confidence = Math.min(1, Math.max(0, intent.confidence));
+    const targetXlm = minimum + (budget - minimum) * confidence;
 
     let priceXlm: number;
     let amountRylo: number;
@@ -199,7 +204,16 @@ export class StellarTradeExecutor {
       const nonCrossing = intent.bestAskXlm === null ? this.options.maxBuyPriceXlm : Math.max(0.0000001, intent.bestAskXlm - 0.0000001);
       priceXlm = Math.min(subjective, this.options.maxBuyPriceXlm, nonCrossing);
       if (!Number.isFinite(priceXlm) || priceXlm <= 0) return { status: "blocked", reason: "INVALID_PRICE" };
-      amountRylo = Math.floor((budget / priceXlm) * 10_000_000) / 10_000_000;
+      // Round the offer price first: the submitted notional must be >= minimum
+      // even after the Stellar 7-decimal amount and price conversions.
+      priceXlm = Number(fixed7(priceXlm));
+      if (priceXlm <= 0) return { status: "blocked", reason: "INVALID_PRICE" };
+      amountRylo = Math.floor((targetXlm / priceXlm) * 10_000_000) / 10_000_000;
+      if (amountRylo * priceXlm < minimum) {
+        const exactMin = Math.ceil((minimum / priceXlm) * 10_000_000) / 10_000_000;
+        if (exactMin * priceXlm > budget + 0.00000000001) return { status: "blocked", reason: "MIN_ORDER_NOTIONAL" };
+        amountRylo = exactMin;
+      }
       operation = Operation.manageBuyOffer({ selling: Asset.native(), buying: this.rylo, buyAmount: fixed7(amountRylo), price: fixed7(priceXlm) });
     } else {
       const availableRylo = number(trustline?.balance) - number(trustline?.selling_liabilities);
@@ -208,7 +222,10 @@ export class StellarTradeExecutor {
       const nonCrossing = intent.bestBidXlm === null ? intent.referencePriceXlm : intent.bestBidXlm + 0.0000001;
       priceXlm = Math.max(subjective, nonCrossing);
       if (!Number.isFinite(priceXlm) || priceXlm <= 0) return { status: "blocked", reason: "INVALID_PRICE" };
-      amountRylo = Math.min(availableRylo, Math.floor((budget / priceXlm) * 10_000_000) / 10_000_000);
+      priceXlm = Number(fixed7(priceXlm));
+      if (priceXlm <= 0) return { status: "blocked", reason: "INVALID_PRICE" };
+      amountRylo = Math.min(availableRylo, Math.floor((targetXlm / priceXlm) * 10_000_000) / 10_000_000);
+      if (amountRylo * priceXlm < minimum) return { status: "blocked", reason: "MIN_ORDER_NOTIONAL" };
       operation = Operation.manageSellOffer({ selling: this.rylo, buying: Asset.native(), amount: fixed7(amountRylo), price: fixed7(priceXlm) });
     }
     if (amountRylo < 0.0000001) return { status: "blocked", reason: intent.action === "sell" ? "NO_RYLO" : "FREE_RESERVE" };

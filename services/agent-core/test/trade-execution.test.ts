@@ -191,3 +191,52 @@ test("buy execution is permitted below eight RYLO offers but blocked at eight", 
     assert.equal(submitted.length,count===7?1:0);
   }
 });
+
+
+test("live minimum order creates a genuinely funded bid worth at least 2 XLM", async () => {
+  const wallet = Keypair.random();
+  const submitted: Array<{ operations: Array<Record<string, unknown>> }> = [];
+  const executor = new StellarTradeExecutor({
+    server: server(wallet,submitted),ryloCode:"RYLO",ryloIssuer:issuer,
+    maxTradeXlm:2.25,minOrderXlm:2,dailyCapXlm:2.25,minFreeXlm:2,maxBuyPriceXlm:0.1,maxOpenOffers:8,
+  });
+  const result=await executor.execute({
+    action:"buy",publicKey:wallet.publicKey(),bestAskXlm:0.1,bestBidXlm:null,
+    referencePriceXlm:0.1,confidence:0.5,urgency:0.2,dailyCommittedXlm:0,
+  },wallet);
+  assert.equal(result.status,"submitted");
+  if (result.status !== "submitted") return;
+  assert.ok(result.maxXlm >= 2);
+  assert.ok(result.maxXlm <= 2.25);
+  assert.equal(submitted.length,1);
+});
+
+test("insufficient free XLM blocks sub-2-XLM offer instead of sending a tiny bid",async()=>{
+  const wallet=Keypair.random();
+  const submitted: Array<{ operations:Array<Record<string,unknown>> }>=[];
+  const executor=new StellarTradeExecutor({
+    server:server(wallet,submitted),ryloCode:"RYLO",ryloIssuer:issuer,
+    maxTradeXlm:1.99,minOrderXlm:2,dailyCapXlm:2.25,minFreeXlm:2,maxBuyPriceXlm:0.1,maxOpenOffers:8,
+  });
+  const result=await executor.execute({
+    action:"buy",publicKey:wallet.publicKey(),bestAskXlm:0.1,bestBidXlm:null,
+    referencePriceXlm:0.1,confidence:0.5,urgency:0.2,dailyCommittedXlm:0,
+  },wallet);
+  assert.deepEqual(result,{status:"blocked",reason:"MIN_ORDER_NOTIONAL"});
+  assert.equal(submitted.length,0);
+});
+
+test("sell cannot submit a below-minimum notional when RYLO holdings are small",async()=>{
+  const wallet=Keypair.random();
+  const submitted: Array<{ operations:Array<Record<string,unknown>> }>=[];
+  const executor=new StellarTradeExecutor({
+    server:server(wallet,submitted),ryloCode:"RYLO",ryloIssuer:issuer,
+    maxTradeXlm:2.25,minOrderXlm:2,dailyCapXlm:2.25,minFreeXlm:2,maxBuyPriceXlm:0.1,maxOpenOffers:8,
+  });
+  const result=await executor.execute({
+    action:"sell",publicKey:wallet.publicKey(),bestAskXlm:0.1,bestBidXlm:0.09,
+    referencePriceXlm:0.1,confidence:0.5,urgency:0.2,dailyCommittedXlm:0,
+  },wallet);
+  assert.deepEqual(result,{status:"blocked",reason:"MIN_ORDER_NOTIONAL"});
+  assert.equal(submitted.length,0);
+});

@@ -9,6 +9,7 @@ export interface AppConfig {
   agentEnvPrefix: string;
   executionEnabled: boolean;
   executionMaxTradeXlm: number;
+  executionMinOrderXlm: number;
   executionDailyCapXlm: number;
   executionMinFreeXlm: number;
   executionMaxBuyPriceXlm: number;
@@ -135,6 +136,8 @@ export function loadConfig(env: Env = process.env): AppConfig {
   }
   const executionMaxTradeXlm = executionEnabled ? requiredPositiveNumber(env, "ORRYLO_EXECUTION_MAX_TRADE_XLM") : positiveNumber(env, "ORRYLO_EXECUTION_MAX_TRADE_XLM", 0.1);
   const executionDailyCapXlm = executionEnabled ? requiredPositiveNumber(env, "ORRYLO_EXECUTION_DAILY_CAP_XLM") : positiveNumber(env, "ORRYLO_EXECUTION_DAILY_CAP_XLM", 0.5);
+  const executionMinOrderXlm = positiveNumber(env, "ORRYLO_EXECUTION_MIN_ORDER_XLM", 0.01);
+  if (executionEnabled && executionMinOrderXlm > executionMaxTradeXlm) throw new ConfigError("CONFIG_INVALID", "Minimum order notional must not exceed the maximum trade XLM");
   const executionMinFreeXlm = executionEnabled ? requiredPositiveNumber(env, "ORRYLO_EXECUTION_MIN_FREE_XLM") : positiveNumber(env, "ORRYLO_EXECUTION_MIN_FREE_XLM", 2);
   const executionMaxBuyPriceXlm = executionEnabled ? requiredPositiveNumber(env, "ORRYLO_EXECUTION_MAX_BUY_PRICE_XLM") : positiveNumber(env, "ORRYLO_EXECUTION_MAX_BUY_PRICE_XLM", 0.1);
   if (executionDailyCapXlm < executionMaxTradeXlm) throw new ConfigError("CONFIG_INVALID", "Daily cap must be at least the per-trade cap");
@@ -148,6 +151,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
     agentEnvPrefix: env.ORRYLO_AGENT_ENV_PREFIX ?? "ORRYLO_AGENT_",
     executionEnabled,
     executionMaxTradeXlm,
+    executionMinOrderXlm,
     executionDailyCapXlm,
     executionMinFreeXlm,
     executionMaxBuyPriceXlm,
