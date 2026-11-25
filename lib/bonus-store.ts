@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { verifyMessageSignature } from "@albedo-link/signature-verification";
 import { BONUS_THRESHOLD_RYLO, bonusForQuantity } from "./bonus";
 
-export const BONUS_CAMPAIGN_ID = "rylo_bonus_v1";
+export const BONUS_CAMPAIGN_ID = "rylo_bonus_v2";
 const maximumCampaignRylo = process.env.RYLO_BONUS_CAMPAIGN_MAX_RYLO || "0";
 export const BONUS_ENABLED = process.env.RYLO_BONUS_CAMPAIGN_ACTIVE === "true"
   && process.env.RYLO_BONUS_FULFILLMENT_READY === "true"
@@ -29,12 +29,15 @@ const schema = [
   "purchase_hash TEXT PRIMARY KEY CHECK (purchase_hash ~ '^[a-f0-9]{64}$'),",
   "campaign_id TEXT NOT NULL,",
   "buyer TEXT NOT NULL CHECK (length(buyer) = 56),",
-  "quantity INTEGER NOT NULL CHECK (quantity BETWEEN 1001 AND 10000),",
+  "quantity INTEGER NOT NULL CHECK (quantity BETWEEN 500 AND 10000),",
   "bonus_amount TEXT NOT NULL,",
   "status TEXT NOT NULL DEFAULT 'prepared' CHECK (status IN ('prepared','verified','paying','paid','review','rejected','expired')),",
   "payout_hash TEXT UNIQUE, payout_xdr TEXT, rejection_reason TEXT,",
   "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),",
   "updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
+  // ALTER is needed because CREATE TABLE IF NOT EXISTS does not update existing CHECK constraints.
+  "ALTER TABLE rylo_bonus_purchases DROP CONSTRAINT IF EXISTS rylo_bonus_purchases_quantity_check",
+  "ALTER TABLE rylo_bonus_purchases ADD CONSTRAINT rylo_bonus_purchases_quantity_check CHECK (quantity BETWEEN 500 AND 10000)",
   "CREATE INDEX IF NOT EXISTS rylo_bonus_pending_idx ON rylo_bonus_purchases(created_at) WHERE status IN ('prepared','verified','paying')",
   "CREATE UNIQUE INDEX IF NOT EXISTS rylo_bonus_one_wallet_per_campaign ON rylo_bonus_purchases(campaign_id, buyer) WHERE status IN ('verified','paying','paid','review')",
   "CREATE TABLE IF NOT EXISTS rylo_bonus_challenges (nonce TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, buyer TEXT NOT NULL, message TEXT NOT NULL, expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())",
@@ -51,7 +54,7 @@ async function ready() {
 }
 
 export function eligibleBonus(quantity: number) {
-  return Number.isSafeInteger(quantity) && quantity > BONUS_THRESHOLD_RYLO
+  return Number.isSafeInteger(quantity) && quantity >= BONUS_THRESHOLD_RYLO
     ? bonusForQuantity(quantity).toFixed(7) : null;
 }
 

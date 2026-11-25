@@ -292,7 +292,7 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
   async function prepare() {
     if (!pubkey || !hasTrustline || !canSelectAmount || quantity > maxQuantity ||
       !quote?.available || quote.quantity !== quantity || quoteLoading || working) return;
-    if (bonusActive && quantity > BONUS_THRESHOLD_RYLO && !bonusProof) {
+    if (bonusActive && quantity >= BONUS_THRESHOLD_RYLO && !bonusProof) {
       setError("Verify your Albedo wallet before preparing a bonus-eligible purchase.");
       return;
     }
@@ -304,14 +304,14 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
       const response = await fetch("/api/rylo/prepare", {
         method: "POST", cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pubkey, quantity, bonusProof: bonusActive && quantity > BONUS_THRESHOLD_RYLO ? bonusProof : undefined })
+        body: JSON.stringify({ pubkey, quantity, bonusProof: bonusActive && quantity >= BONUS_THRESHOLD_RYLO ? bonusProof : undefined })
       });
       const result = await response.json() as Prepared & { error?: string };
       if (!response.ok || !result.xdr) throw new Error(result.error || "Unable to prepare this purchase.");
       setPrepared({ ...result, quantity, pubkey, createdAt: Date.now() });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to prepare this purchase.");
-      if (bonusActive && pubkey && quantity > BONUS_THRESHOLD_RYLO) {
+      if (bonusActive && pubkey && quantity >= BONUS_THRESHOLD_RYLO) {
         setBonusProof(null);
         void getBonusChallenge(pubkey);
       }
@@ -406,9 +406,9 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
         </div>
         <div className="mt-3 rounded-xl border border-[#dca2af]/30 bg-[#dca2af]/[.08] p-4" role="status">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-xs font-semibold text-[#ead2d9]">50% RYLO bonus · purchases over 1,000</span>
+            <span className="text-xs font-semibold text-[#ead2d9]">36% RYLO bonus · purchases from 500</span>
             <span className="text-lg font-bold text-[#f0b6c4]">
-              {quantity > BONUS_THRESHOLD_RYLO ? "+" + bonusForQuantity(quantity).toLocaleString("en-US") + " RYLO" : "Select more than 1,000"}
+              {quantity >= BONUS_THRESHOLD_RYLO ? "+" + bonusForQuantity(quantity).toLocaleString("en-US") + " RYLO" : "Select at least 500"}
             </span>
           </div>
           <p className="mt-2 text-[11px] leading-5 text-[#ceb8bf]">
@@ -481,11 +481,11 @@ export default function RyloPurchase({ variant = "primary" }: { variant?: "prima
                   className="button-primary w-full justify-center disabled:opacity-50">
                   <Wallet size={17}/> Add RYLO trustline via Albedo
                 </button> :
-                bonusActive && quantity > BONUS_THRESHOLD_RYLO && !bonusProof
+                bonusActive && quantity >= BONUS_THRESHOLD_RYLO && !bonusProof
                   ? <button type="button" disabled={working || challengeLoading || !bonusChallenge || !albedoReady}
                     onClick={() => void verifyBonusWallet()}
                     className="button-primary w-full justify-center disabled:opacity-50">
-                    <ShieldCheck size={17}/>{challengeLoading ? "Preparing wallet verification…" : "Verify wallet for 50% bonus"}
+                    <ShieldCheck size={17}/>{challengeLoading ? "Preparing wallet verification…" : "Verify wallet for 36% bonus"}
                   </button> :
                 !prepared ? <button type="button"
                   disabled={working || !canSelectAmount || quantity > maxQuantity || quoteLoading || !quote?.available || quote.quantity !== quantity || Boolean(txHash)}

@@ -13,14 +13,14 @@ export default function BonusPromo() {
       <div>
         <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#e9aab4]/35 bg-white/[.04] px-4 py-2 text-[11px] font-bold uppercase tracking-[.16em] text-[#f1c1c7]"><Sparkles size={15}/> {active ? "Limited bonus offer" : "Upcoming bonus campaign"}</p>
         <h2 id="bonus-campaign-heading" className="max-w-2xl text-[clamp(32px,4.4vw,62px)] font-bold leading-[1.05] tracking-[-.05em]">
-          More RYLO. <span className="text-[#f4b7c3]">50% extra.</span>
+          More RYLO. <span className="text-[#f4b7c3]">{BONUS_RATE * 100}% extra.</span>
         </h2>
         <p className="mt-4 max-w-[670px] text-sm leading-7 text-[#dfcdd3] sm:text-base">
-          A bonus campaign for buying <strong>more than {BONUS_THRESHOLD_RYLO.toLocaleString("en-US")} RYLO</strong> through ORRYLO.
-          Example: 1,200 RYLO may qualify for 600 extra RYLO, once per wallet after verification.
+          A bonus campaign for buying <strong>at least {BONUS_THRESHOLD_RYLO.toLocaleString("en-US")} RYLO</strong> through ORRYLO.
+          Example: 500 RYLO may qualify for 180 extra RYLO, once per wallet after verification.
         </p>
         {!active && <p className="mt-3 max-w-[670px] text-xs leading-6 text-[#f3c6ce]">
-          Promotion preview only — bonus distribution has not been activated or funded and no bonus is currently guaranteed.
+          Promotion preview only — automatic bonus distribution is not active and no bonus is currently guaranteed.
         </p>}
       </div>
       <div className="flex flex-wrap items-center gap-5 md:justify-end">

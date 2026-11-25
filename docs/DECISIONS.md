@@ -47,6 +47,8 @@
 
 | 2026-11-24 | SECURITY ADDENDUM — BONUS | Active bonus reservation requires a recent nonce-bound Albedo wallet signature verified server-side; nonce is consumed atomically on PostgreSQL to reduce unauthenticated reward-budget exhaustion. Website and payout worker remain independent. Worker can run every five minutes under Railway cron, signs only with dedicated bonus wallet, and never automatically signs a second transaction for ambiguous payouts. |
 
+| 2026-11-25 | ACCEPTED — BONUS PROMOTION V2 | Replace the unactivated 50%-for-purchases-over-1,000 proposal with a new **36% bonus** for **website purchases of at least 500 RYLO (inclusive)**, once per wallet after verification and subject to funded fulfillment. Keep the promotional preview clearly inactive while the payout service is not provisioned. Use a new campaign identifier `rylo_bonus_v2` to avoid retroactively changing previous claim terms. The bonus ledger constraint must also accept quantity 500, including existing installations. |
+
 ## Interpretation
 Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 

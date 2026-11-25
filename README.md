@@ -34,7 +34,7 @@ Read [AGENTS.md](AGENTS.md), [product scope](docs/PRODUCT_SCOPE.md), [decisions]
 
 ## RYLO bonus campaign (inactive until provisioned)
 
-Code provides a 50% RYLO promotional bonus for **strictly more than 1,000 RYLO purchased through the official site**, limited to one successfully paid reward per wallet per campaign. The promotional preview is not a claim that any reward has been funded or issued. The website must never sign bonus transfers itself.
+Code provides a 36% RYLO promotional bonus for **at least 500 RYLO purchased through the official site**, limited to one successfully paid reward per wallet per campaign. The promotional preview is not a claim that any reward has been funded or issued. The website must never sign bonus transfers itself.
 
 Server-side API stores a transaction hash **when the site prepares the buyer's exact Stellar XDR**, then the isolated payout worker independently verifies its successful source account, path payment and destination on Horizon. Durable PostgreSQL records, an advisory lock and an on-chain-identifiable signed payout envelope prevent duplicate transfers. A payout that cannot be reconciled stays in manual review, not auto re-signed.
 
@@ -44,6 +44,10 @@ In a separate Railway service from this repository, set start command `npm run b
 
 ### Bonus anti-abuse and payout activation
 
-For a bonus-eligible purchase, Albedo signs a fresh, short-lived wallet-ownership challenge before the website prepares a transaction. The server verifies the signature and consumes the nonce atomically with the budget reservation. A purchase prepared without a valid challenge is not enrolled for a bonus. The website also displays that the reward is **one per wallet per campaign** and only applies to purchases **strictly greater than 1,000 RYLO**.
+For a bonus-eligible purchase, Albedo signs a fresh, short-lived wallet-ownership challenge before the website prepares a transaction. The server verifies the signature and consumes the nonce atomically with the budget reservation. A purchase prepared without a valid challenge is not enrolled for a bonus. The website also displays that the reward is **one per wallet per campaign** and only applies to purchases **500 RYLO or more (inclusive)**.
 
 The separate payout worker may use Railway cron with `RYLO_BONUS_RUN_ONCE=true` and a 5-minute schedule, with `RYLO_BONUS_PAYOUT_ENABLED=false` until a dedicated funded and verified wallet is available. Its secret belongs **only** in the worker's sealed Railway environment variable. The external-facing web service should have a **dedicated, least-privileged** bonus ledger database role or separate database before activating bonus recording.
+
+### Updated bonus promotion terms (2026-11-25)
+
+Promotion `rylo_bonus_v2` replaces the original unactivated 50%-over-1,000 preview. The new minimum is **500 RYLO inclusive**; the bonus is **36% of the verified purchase** (500 → 180 RYLO, 1,000 → 360 RYLO). The website remains in preview until the dedicated bonus-distribution service has a funded signer, a provisioned ledger, and verified activation. Previous campaign identifiers are retained only in the database history; they are not silently rewritten to new reward amounts.

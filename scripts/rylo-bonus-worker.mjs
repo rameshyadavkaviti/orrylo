@@ -3,7 +3,7 @@ import { Asset, Horizon, Keypair, Memo, Networks, Operation, TransactionBuilder 
 
 const issuer = "GDG7SGYLJQBLSN55ASHD7VCXYBEPYDK4EUIUTW6XWTBUDUHXK6ORRYLO";
 const network = "https://horizon.stellar.org";
-const campaign = "rylo_bonus_v1";
+const campaign = "rylo_bonus_v2";
 const active = process.env.RYLO_BONUS_PAYOUT_ENABLED === "true";
 const pollingMs = 15000;
 const runOnce = process.env.RYLO_BONUS_RUN_ONCE === "true";

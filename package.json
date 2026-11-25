@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "node start.mjs",
     "typecheck": "tsc --noEmit",
-    "bonus:worker": "node scripts/rylo-bonus-worker.mjs"
+    "bonus:worker": "node scripts/rylo-bonus-worker.mjs",
+    "test:bonus": "node --experimental-strip-types --test tests/rylo-bonus.test.mjs"
   },
   "engines": {
     "node": ">=22.12.0"
