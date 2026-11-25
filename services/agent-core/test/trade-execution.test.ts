@@ -112,43 +112,82 @@ test("RYLO/XLM open-offer cap prevents unbounded new offers", async () => {
   assert.equal(submitted.length, 0);
 });
 
-test("maintenance cancels only stale RYLO/XLM offers and never unrelated assets", async () => {
+test("keeps eight standing bids indefinitely, regardless of age", async () => {
+  const wallet = Keypair.random();
+  const submitted: Array<{ operations: Array<Record<string, unknown>> }> = [];
+  const rylo = { asset_type: "credit_alphanum4", asset_code: "RYLO", asset_issuer: issuer };
+  const offers = Array.from({length: 8}, (_, i) => ({
+    id: String(i + 1), selling: { asset_type: "native" }, buying: rylo,
+    price: "0.09", last_modified_time: "2026-01-01T00:00:00Z",
+  }));
+  const executor = new StellarTradeExecutor({
+    server: server(wallet, submitted, offers), ryloCode: "RYLO", ryloIssuer: issuer,
+    maxTradeXlm: 0.1, dailyCapXlm: 0.5, minFreeXlm: 2, maxBuyPriceXlm: 0.1, maxOpenOffers: 8,
+  });
+  const result = await executor.maintain(wallet.publicKey(), wallet, Date.parse("2026-11-25T00:00:00Z"));
+  assert.deepEqual(result, { status: "noop", removed: 0 });
+  assert.equal(submitted.length, 0);
+});
+
+test("only trims the two oldest excess orders from ten RYLO/XLM offers", async () => {
   const wallet = Keypair.random();
   const submitted: Array<{ operations: Array<Record<string, unknown>> }> = [];
   const native = { asset_type: "native" };
   const rylo = { asset_type: "credit_alphanum4", asset_code: "RYLO", asset_issuer: issuer };
-  const old = "2026-11-22T08:00:00Z", fresh = "2026-11-24T08:59:00Z";
   const offers = [
-    { id: "11", selling: native, buying: rylo, price: "1", last_modified_time: old },
-    { id: "12", selling: rylo, buying: native, price: "1", last_modified_time: old },
-    { id: "13", selling: native, buying: { ...rylo, asset_code: "USDC" }, price: "1", last_modified_time: old },
-    { id: "14", selling: native, buying: rylo, price: "1", last_modified_time: fresh },
+    ...Array.from({length: 10}, (_, i) => ({
+      id: String(i + 1), selling: native, buying: rylo, price: "0.09",
+      last_modified_time: new Date(Date.parse("2026-11-24T00:00:00Z") + i * 60_000).toISOString(),
+    })),
+    { id: "13", selling: native, buying: { ...rylo, asset_code: "USDC" },
+      price: "1", last_modified_time: "2026-01-01T00:00:00Z" },
   ];
   const executor = new StellarTradeExecutor({
     server: server(wallet, submitted, offers), ryloCode: "RYLO", ryloIssuer: issuer,
-    maxTradeXlm: 0.1, dailyCapXlm: 0.5, minFreeXlm: 2, maxBuyPriceXlm: 0.1, maxOpenOffers: 3,
+    maxTradeXlm: 0.1, dailyCapXlm: 0.5, minFreeXlm: 2, maxBuyPriceXlm: 0.1, maxOpenOffers: 8,
   });
-  const result = await executor.maintain(wallet.publicKey(), wallet, Date.parse("2026-11-24T09:00:00Z"));
+  const result = await executor.maintain(wallet.publicKey(), wallet, Date.parse("2026-11-25T00:00:00Z"));
   assert.equal(result.status, "submitted");
   assert.equal(result.removed, 2);
   assert.equal(submitted.length, 1);
-  assert.deepEqual(submitted[0]!.operations.map(o => String(o.offerId)).sort(), ["11","12"]);
+  assert.deepEqual(submitted[0]!.operations.map(o => String(o.offerId)).sort(), ["1","2"]);
   assert.ok(submitted[0]!.operations.every(o => o.type === "manageSellOffer" && Number(o.amount) === 0));
 });
 
-test("maintenance leaves fresh and undated offers unchanged", async () => {
+test("excess offers with missing timestamps are trimmed by oldest offer ID", async () => {
   const wallet = Keypair.random();
   const submitted: Array<{ operations: Array<Record<string, unknown>> }> = [];
+  const native = { asset_type: "native" };
   const rylo = { asset_type: "credit_alphanum4", asset_code: "RYLO", asset_issuer: issuer };
-  const offers = [
-    { id: "1", selling: { asset_type: "native" }, buying: rylo, price: "1", last_modified_time: "2026-11-24T08:59:00Z" },
-    { id: "2", selling: { asset_type: "native" }, buying: rylo, price: "1" },
-  ];
+  const offers = Array.from({length: 9}, (_, i) => ({
+    id: String(i + 10), selling: native, buying: rylo, price: "0.09",
+  }));
   const executor = new StellarTradeExecutor({
     server: server(wallet, submitted, offers), ryloCode: "RYLO", ryloIssuer: issuer,
-    maxTradeXlm: 0.1, dailyCapXlm: 0.5, minFreeXlm: 2, maxBuyPriceXlm: 0.1, maxOpenOffers: 3,
+    maxTradeXlm: 0.1, dailyCapXlm: 0.5, minFreeXlm: 2, maxBuyPriceXlm: 0.1, maxOpenOffers: 8,
   });
-  const result = await executor.maintain(wallet.publicKey(), wallet, Date.parse("2026-11-24T09:00:00Z"));
-  assert.deepEqual(result, { status: "noop", removed: 0 });
-  assert.equal(submitted.length, 0);
+  const result = await executor.maintain(wallet.publicKey(), wallet, Date.parse("2026-11-25T00:00:00Z"));
+  assert.equal(result.status, "submitted");
+  assert.equal(result.removed, 1);
+  assert.equal(String(submitted[0]!.operations[0]!.offerId), "10");
+});
+
+test("buy execution is permitted below eight RYLO offers but blocked at eight", async () => {
+  const wallet = Keypair.random();
+  const native = { asset_type: "native" };
+  const rylo = { asset_type: "credit_alphanum4", asset_code: "RYLO", asset_issuer: issuer };
+  for (const count of [7,8]) {
+    const submitted: Array<{ operations: Array<Record<string, unknown>> }> = [];
+    const offers = Array.from({length:count}, (_, i) => ({id:String(i+1), selling:native, buying:rylo}));
+    const executor = new StellarTradeExecutor({
+      server:server(wallet, submitted, offers), ryloCode:"RYLO", ryloIssuer:issuer,
+      maxTradeXlm:0.1, dailyCapXlm:0.5, minFreeXlm:2, maxBuyPriceXlm:0.1, maxOpenOffers:8,
+    });
+    const result = await executor.execute({
+      action:"buy", publicKey:wallet.publicKey(), bestAskXlm:0.1,bestBidXlm:null,
+      referencePriceXlm:0.1,confidence:0.5,urgency:0.2,dailyCommittedXlm:0,
+    },wallet);
+    assert.equal(result.status,count===7?"submitted":"blocked");
+    assert.equal(submitted.length,count===7?1:0);
+  }
 });

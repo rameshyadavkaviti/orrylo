@@ -112,16 +112,19 @@ export class StellarTradeExecutor {
     const server = this.server();
     const book = await server.offers().forAccount(publicKey).limit(200).call();
     const offers = this.relevantOffers(book.records);
-    const dated = offers.map((offer) => ({
-      offer,
-      age: offer.last_modified_time ? now - Date.parse(offer.last_modified_time) : NaN,
-    })).filter((item) => Number.isFinite(item.age) && item.age >= 0)
-      .sort((a, b) => b.age - a.age);
-    const stale = dated.filter((item) => item.age >= 45 * 60_000);
-    const excess = Math.max(0, offers.length - this.options.maxOpenOffers - stale.length);
-    const candidates = [...stale, ...dated.filter((item) => item.age >= 5 * 60_000 &&
-      !stale.includes(item)).slice(0, excess)];
-    const cancel = candidates.slice(0, 4).map((item) => item.offer);
+    // Preserve every legitimate standing order while this wallet is at or below its
+    // configured cap, even if the order is old. Only cancel surplus RYLO/XLM orders.
+    const excess = Math.max(0, offers.length - this.options.maxOpenOffers);
+    const oldestFirst = [...offers].sort((a, b) => {
+      const at = a.last_modified_time ? Date.parse(a.last_modified_time) : NaN;
+      const bt = b.last_modified_time ? Date.parse(b.last_modified_time) : NaN;
+      if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return at - bt;
+      // Horizon offer IDs increase as offers are created; use them as a fallback
+      // if a timestamp is absent or equal. Never touch another asset pair.
+      const aid = BigInt(a.id), bid = BigInt(b.id);
+      return aid < bid ? -1 : aid > bid ? 1 : 0;
+    });
+    const cancel = oldestFirst.slice(0, Math.min(4, excess));
     if (!cancel.length) {
       this.lastSweep.set(publicKey, now);
       return { status: "noop", removed: 0 };

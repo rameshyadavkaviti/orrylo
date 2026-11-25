@@ -151,7 +151,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
     executionDailyCapXlm,
     executionMinFreeXlm,
     executionMaxBuyPriceXlm,
-    executionMaxOpenOffers: integer(env, "ORRYLO_EXECUTION_MAX_OPEN_OFFERS", 3, 1, 20),
+    executionMaxOpenOffers: integer(env, "ORRYLO_EXECUTION_MAX_OPEN_OFFERS", 8, 1, 20),
     relatedPublicKeys: publicKeys(env, "ORRYLO_RELATED_PUBLIC_KEYS", executionEnabled),
     claimableObservationEnabled,
     claimExecutionEnabled,
