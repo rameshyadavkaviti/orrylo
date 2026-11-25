@@ -35,6 +35,10 @@ function projection(record: StoredAgent): AgentProjection {
     episodeCount: record.state.episodeCount,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
+    valuationSummary: {
+      learnedPriceAnchorXlm: record.state.referenceLearning?.priceAnchorXlm ?? 0.1,
+      riskTolerance: record.state.learnedPriors.riskTolerance,
+    },
     cognitiveSummary: {
       affect: record.state.affect,
       stress: record.state.stress,
@@ -186,6 +190,7 @@ function rowProjection(row: AgentRow): AgentProjection {
     id: row.id, alias: row.alias, publicKey: row.public_key, configured: row.configured,
     revision: row.revision, episodeCount: row.state.episodeCount,
     createdAt: row.created_at.toISOString(), updatedAt: row.updated_at.toISOString(),
+    valuationSummary: { learnedPriceAnchorXlm: row.state.referenceLearning?.priceAnchorXlm ?? 0.1, riskTolerance: row.state.learnedPriors.riskTolerance },
     cognitiveSummary: { affect: row.state.affect, stress: row.state.stress, confidence: row.state.confidence, urgency: row.state.urgency, feltSecurity: row.state.feltSecurity },
     behavioralSummary: {
       lastAction: row.state.behavioralDynamics?.recentAction ?? null,

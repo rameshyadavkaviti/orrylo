@@ -17,6 +17,10 @@ export interface AgentProjection {
   episodeCount: number;
   createdAt: string;
   updatedAt: string;
+  valuationSummary?: {
+    learnedPriceAnchorXlm: number;
+    riskTolerance: number;
+  };
   cognitiveSummary: {
     affect: number;
     stress: number;

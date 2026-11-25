@@ -34,6 +34,9 @@ export interface TradeExecutionIntent {
   bestAskXlm: number | null;
   bestBidXlm: number | null;
   referencePriceXlm: number;
+  // Stored, independently learned valuation; never substitute submitted offer prices for actual fills.
+  learnedPriceAnchorXlm?: number;
+  riskTolerance?: number;
   confidence: number;
   urgency: number;
   dailyCommittedXlm: number;
@@ -193,14 +196,25 @@ export class StellarTradeExecutor {
     if (budget < 0.0000001) return { status: "blocked", reason: "FREE_RESERVE" };
     const minimum = this.options.minOrderXlm ?? 0;
     if (budget + 0.00000000001 < minimum) return { status: "blocked", reason: "MIN_ORDER_NOTIONAL" };
-    const confidence = Math.min(1, Math.max(0, intent.confidence));
+    const clamp01 = (value: number): number => Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0.5;
+    const confidence = clamp01(intent.confidence);
+    const urgency = clamp01(intent.urgency);
+    const riskTolerance = clamp01(intent.riskTolerance ?? 0.5);
+    // Market evidence refines the personal anchor gradually; it is NOT a verified cost basis.
+    // Bound its influence to avoid a learned outlier producing runaway quoted prices.
+    const learned = Number.isFinite(intent.learnedPriceAnchorXlm) && (intent.learnedPriceAnchorXlm ?? 0) > 0
+      ? Math.max(intent.referencePriceXlm * 0.5, Math.min(intent.referencePriceXlm * 1.5, intent.learnedPriceAnchorXlm!))
+      : intent.referencePriceXlm;
+    const personalAnchor = intent.referencePriceXlm * 0.2 + learned * 0.8;
     const targetXlm = minimum + (budget - minimum) * confidence;
 
     let priceXlm: number;
     let amountRylo: number;
     let operation;
     if (intent.action === "buy") {
-      const subjective = intent.referencePriceXlm * (0.9 + 0.08 * intent.confidence + 0.04 * intent.urgency);
+      // Willingness to pay varies with evidence, confidence and learned risk tolerance.
+      // Market-integrity and capital controls remain hard constraints.
+      const subjective = personalAnchor * (0.90 + 0.10 * confidence + 0.08 * riskTolerance + 0.05 * urgency);
       const nonCrossing = intent.bestAskXlm === null ? this.options.maxBuyPriceXlm : Math.max(0.0000001, intent.bestAskXlm - 0.0000001);
       priceXlm = Math.min(subjective, this.options.maxBuyPriceXlm, nonCrossing);
       if (!Number.isFinite(priceXlm) || priceXlm <= 0) return { status: "blocked", reason: "INVALID_PRICE" };
@@ -218,7 +232,10 @@ export class StellarTradeExecutor {
     } else {
       const availableRylo = number(trustline?.balance) - number(trustline?.selling_liabilities);
       if (!trustline || availableRylo < 0.0000001) return { status: "blocked", reason: "NO_RYLO" };
-      const subjective = intent.referencePriceXlm * (1.02 + 0.12 * (1 - intent.confidence) + 0.04 * intent.urgency);
+      // An agent can ask above its reference when conviction/prudence justify it,
+      // or voluntarily accept less when liquidity needs are high. Never force a sale
+      // below a presumed acquisition cost (which is unknown until fills reconcile).
+      const subjective = personalAnchor * (0.96 + 0.16 * (1 - riskTolerance) + 0.055 * (1 - confidence) - 0.045 * urgency);
       const nonCrossing = intent.bestBidXlm === null ? intent.referencePriceXlm : intent.bestBidXlm + 0.0000001;
       priceXlm = Math.max(subjective, nonCrossing);
       if (!Number.isFinite(priceXlm) || priceXlm <= 0) return { status: "blocked", reason: "INVALID_PRICE" };

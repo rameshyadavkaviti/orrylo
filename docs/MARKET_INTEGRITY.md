@@ -17,3 +17,5 @@ Orrylo's homepage is informational and cannot by itself enforce any network-wide
 12. Maintenance transaction submission is not proof of profit or trading volume; count cancelled offers separately from executed trades. A Horizon maintenance failure must not suspend agent learning.
 
 13. Live RYLO/XLM orders can be configured with a minimum notional (ORRYLO_EXECUTION_MIN_ORDER_XLM). A minimum is a strict funding filter, not a mandate to create bids. If free balance or RYLO holdings are insufficient, skip the offer without reducing reserve or changing independent agent decisions. Do not portray larger offers from commonly controlled wallets as organic independent demand.
+
+14. Agent pricing must consume each agent's own persisted, gradually learned price anchor and learned risk tolerance. A sell order may be above or below reference according to valuation and liquidity stress; no agent is allocated a mandatory price tier, and a submitted offer must never be treated as verified acquisition cost. Higher buy bids remain subject to the configured buy-price cap, non-crossing guard, related-account prohibitions and available capital.

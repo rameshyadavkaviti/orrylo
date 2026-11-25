@@ -211,6 +211,8 @@ export class DecisionRunner {
             bestAskXlm: snapshot.context.bestAskXlm,
             bestBidXlm: snapshot.context.bestBidXlm,
             referencePriceXlm: this.options.referencePriceXlm ?? 0.1,
+            learnedPriceAnchorXlm: agent.valuationSummary?.learnedPriceAnchorXlm,
+            riskTolerance: agent.valuationSummary?.riskTolerance,
             confidence: agent.cognitiveSummary.confidence,
             urgency: agent.cognitiveSummary.urgency,
             dailyCommittedXlm,

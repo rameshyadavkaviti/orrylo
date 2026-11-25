@@ -240,3 +240,62 @@ test("sell cannot submit a below-minimum notional when RYLO holdings are small",
   assert.deepEqual(result,{status:"blocked",reason:"MIN_ORDER_NOTIONAL"});
   assert.equal(submitted.length,0);
 });
+
+
+test("different learned valuation and risk tolerance produce different genuine sell asks", async () => {
+  const wallet = Keypair.random();
+  async function quote(learnedPriceAnchorXlm: number, riskTolerance: number, urgency: number) {
+    const submitted: Array<{operations:Array<Record<string,unknown>>}> = [];
+    const executor = new StellarTradeExecutor({
+      server: server(wallet, submitted), ryloCode: "RYLO", ryloIssuer: issuer,
+      maxTradeXlm: 0.1, dailyCapXlm: 0.5, minFreeXlm: 2, maxBuyPriceXlm: 0.1, maxOpenOffers: 8,
+    });
+    const result=await executor.execute({
+      action:"sell",publicKey:wallet.publicKey(),bestAskXlm:0.1,bestBidXlm:0.09,
+      referencePriceXlm:0.1,learnedPriceAnchorXlm,riskTolerance,
+      confidence:0.6,urgency,dailyCommittedXlm:0,
+    },wallet);
+    assert.equal(result.status,"submitted");
+    return result.status==="submitted" ? result.priceXlm : NaN;
+  }
+  const patientSeller=await quote(0.12,0.15,0.1);
+  const liquiditySeller=await quote(0.09,0.95,1);
+  assert.ok(patientSeller > 0.1, "Patient valuation supports an ask above the 0.1 reference");
+  assert.ok(liquiditySeller < 0.1, "Liquidity pressure can justify accepting below reference");
+  assert.ok(patientSeller > liquiditySeller, "No centrally imposed uniform sell level");
+});
+
+test("agent valuation can support bids above 0.1 only if authorized cap and non-crossing book permit", async () => {
+  const wallet=Keypair.random();
+  const submitted: Array<{operations:Array<Record<string,unknown>>}> = [];
+  const executor=new StellarTradeExecutor({
+    server:server(wallet,submitted),ryloCode:"RYLO",ryloIssuer:issuer,
+    maxTradeXlm:2.25,minOrderXlm:2,dailyCapXlm:2.25,minFreeXlm:2,maxBuyPriceXlm:0.15,maxOpenOffers:8,
+  });
+  const result=await executor.execute({
+    action:"buy",publicKey:wallet.publicKey(),bestAskXlm:0.14,bestBidXlm:0.1,
+    referencePriceXlm:0.1,learnedPriceAnchorXlm:0.12,riskTolerance:0.9,
+    confidence:0.85,urgency:0.5,dailyCommittedXlm:0,
+  },wallet);
+  assert.equal(result.status,"submitted");
+  if(result.status==="submitted") {
+    assert.ok(result.priceXlm>0.1 && result.priceXlm<0.14);
+    assert.ok(result.maxXlm>=2 && result.maxXlm<=2.25);
+  }
+});
+
+test("same aggressive valuation cannot evade 0.1 buy cap or cross a 0.1 ask", async () => {
+  const wallet=Keypair.random();
+  const submitted: Array<{operations:Array<Record<string,unknown>>}> = [];
+  const executor=new StellarTradeExecutor({
+    server:server(wallet,submitted),ryloCode:"RYLO",ryloIssuer:issuer,
+    maxTradeXlm:2.25,minOrderXlm:2,dailyCapXlm:2.25,minFreeXlm:2,maxBuyPriceXlm:0.1,maxOpenOffers:8,
+  });
+  const result=await executor.execute({
+    action:"buy",publicKey:wallet.publicKey(),bestAskXlm:0.1,bestBidXlm:0.09,
+    referencePriceXlm:0.1,learnedPriceAnchorXlm:0.14,riskTolerance:1,
+    confidence:1,urgency:1,dailyCommittedXlm:0,
+  },wallet);
+  assert.equal(result.status,"submitted");
+  if(result.status==="submitted") assert.ok(result.priceXlm<0.1);
+});
