@@ -14,6 +14,7 @@ const config: AppConfig = {
   agentEnvPrefix: "ORRYLO_AGENT_",
   executionEnabled: false,
   executionMaxTradeXlm: 0.1,
+  executionMinOrderXlm: 0.01,
   executionDailyCapXlm: 0.5,
   executionMinFreeXlm: 2,
   executionMaxBuyPriceXlm: 0.1,
