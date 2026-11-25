@@ -37,6 +37,10 @@ export interface TradeExecutionIntent {
   // Stored, independently learned valuation; never substitute submitted offer prices for actual fills.
   learnedPriceAnchorXlm?: number;
   riskTolerance?: number;
+  optimism?: number;
+  patience?: number;
+  scarcityExpectation?: number;
+  marketPriceChange?: number;
   confidence: number;
   urgency: number;
   dailyCommittedXlm: number;
@@ -200,6 +204,10 @@ export class StellarTradeExecutor {
     const confidence = clamp01(intent.confidence);
     const urgency = clamp01(intent.urgency);
     const riskTolerance = clamp01(intent.riskTolerance ?? 0.5);
+    const optimism = clamp01(intent.optimism ?? 0.5);
+    const patience = clamp01(intent.patience ?? 0.5);
+    const scarcityExpectation = clamp01(intent.scarcityExpectation ?? 0.5);
+    const trend = Math.max(-0.15, Math.min(0.15, Number.isFinite(intent.marketPriceChange) ? intent.marketPriceChange! : 0));
     // Market evidence refines the personal anchor gradually; it is NOT a verified cost basis.
     // Bound its influence to avoid a learned outlier producing runaway quoted prices.
     const learned = Number.isFinite(intent.learnedPriceAnchorXlm) && (intent.learnedPriceAnchorXlm ?? 0) > 0
@@ -214,9 +222,25 @@ export class StellarTradeExecutor {
     if (intent.action === "buy") {
       // Willingness to pay varies with evidence, confidence and learned risk tolerance.
       // Market-integrity and capital controls remain hard constraints.
-      const subjective = personalAnchor * (0.90 + 0.10 * confidence + 0.08 * riskTolerance + 0.05 * urgency);
-      const nonCrossing = intent.bestAskXlm === null ? this.options.maxBuyPriceXlm : Math.max(0.0000001, intent.bestAskXlm - 0.0000001);
-      priceXlm = Math.min(subjective, this.options.maxBuyPriceXlm, nonCrossing);
+      const subjective = personalAnchor * (0.87 + 0.16 * confidence + 0.14 * optimism
+        + 0.08 * riskTolerance + 0.10 * (scarcityExpectation - 0.5) + 0.16 * trend);
+      // Individually preferred price aggression within the actual bid/ask spread.
+      // This avoids bunching every bullish agent exactly one price tick below the ask.
+      // A bullish agent may quote ABOVE the current best bid, but never cross an ask:
+      // controlled Stellar accounts must not match each other's orders.
+      const pursuit = Math.min(0.95, Math.max(0.04, 0.08 + 0.49 * optimism
+        + 0.23 * riskTolerance + 0.13 * confidence + 0.10 * urgency
+        - 0.18 * patience + 0.10 * trend));
+      const ask = intent.bestAskXlm;
+      const bid = intent.bestBidXlm;
+      if (ask !== null && ask <= 0.0000002) return { status: "blocked", reason: "INVALID_PRICE" };
+      const marketMakersLimit = ask === null ? Number.POSITIVE_INFINITY : (() => {
+        const baseBid = bid !== null && bid < ask ? bid : ask * 0.85;
+        const withinSpread = baseBid + Math.max(0, ask - baseBid) * pursuit;
+        const safetyGap = Math.max(0.0000001, ask * 0.00025);
+        return Math.min(withinSpread, ask - safetyGap);
+      })();
+      priceXlm = Math.min(subjective, this.options.maxBuyPriceXlm, marketMakersLimit);
       if (!Number.isFinite(priceXlm) || priceXlm <= 0) return { status: "blocked", reason: "INVALID_PRICE" };
       // Round the offer price first: the submitted notional must be >= minimum
       // even after the Stellar 7-decimal amount and price conversions.
@@ -235,7 +259,9 @@ export class StellarTradeExecutor {
       // An agent can ask above its reference when conviction/prudence justify it,
       // or voluntarily accept less when liquidity needs are high. Never force a sale
       // below a presumed acquisition cost (which is unknown until fills reconcile).
-      const subjective = personalAnchor * (0.96 + 0.16 * (1 - riskTolerance) + 0.055 * (1 - confidence) - 0.045 * urgency);
+      const subjective = personalAnchor * (0.91 + 0.20 * patience
+        + 0.09 * (1 - riskTolerance) + 0.06 * optimism + 0.08 * trend
+        - 0.06 * urgency - 0.04 * confidence);
       const nonCrossing = intent.bestBidXlm === null ? intent.referencePriceXlm : intent.bestBidXlm + 0.0000001;
       priceXlm = Math.max(subjective, nonCrossing);
       if (!Number.isFinite(priceXlm) || priceXlm <= 0) return { status: "blocked", reason: "INVALID_PRICE" };

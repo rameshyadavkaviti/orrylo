@@ -299,3 +299,54 @@ test("same aggressive valuation cannot evade 0.1 buy cap or cross a 0.1 ask", as
   assert.equal(result.status,"submitted");
   if(result.status==="submitted") assert.ok(result.priceXlm<0.1);
 });
+
+
+test("independent conviction and patience generate distinct bids inside the same live spread",async()=>{
+  const wallet=Keypair.random();
+  async function bid(optimism:number,patience:number,riskTolerance:number,trend:number) {
+    const submitted:Array<{operations:Array<Record<string,unknown>>}>=[];
+    const executor=new StellarTradeExecutor({
+      server:server(wallet,submitted),ryloCode:"RYLO",ryloIssuer:issuer,
+      maxTradeXlm:2.25,minOrderXlm:2,dailyCapXlm:2.25,
+      minFreeXlm:2,maxBuyPriceXlm:0.1,maxOpenOffers:8,
+    });
+    const result=await executor.execute({
+      action:"buy",publicKey:wallet.publicKey(),bestBidXlm:0.09,bestAskXlm:0.1,
+      referencePriceXlm:0.1,learnedPriceAnchorXlm:0.1,
+      riskTolerance,optimism,patience,scarcityExpectation:0.7,marketPriceChange:trend,
+      confidence:0.8,urgency:0.5,dailyCommittedXlm:0,
+    },wallet);
+    assert.equal(result.status,"submitted");
+    assert.equal(submitted.length,1);
+    if(result.status!=="submitted")return NaN;
+    assert.ok(result.maxXlm>=2 && result.maxXlm<=2.25);
+    assert.ok(result.priceXlm<0.1,"No matching against an ask at 0.1");
+    return result.priceXlm;
+  }
+  const optimistic=await bid(0.9,0.1,0.85,0.08);
+  const cautious=await bid(0.1,0.95,0.1,-0.1);
+  assert.ok(optimistic>0.09,"Bullish buy can outbid the existing best bid");
+  assert.ok(optimistic>cautious+0.001,"Preferences should yield a material quote difference, not a one-tick cluster");
+  assert.ok(cautious>0,"A cautious bid remains possible");
+});
+
+test("strong conviction permits a higher bid when the market ask is higher, without taking related liquidity",async()=>{
+  const wallet=Keypair.random();
+  const submitted:Array<{operations:Array<Record<string,unknown>>}>=[];
+  const executor=new StellarTradeExecutor({
+    server:server(wallet,submitted),ryloCode:"RYLO",ryloIssuer:issuer,
+    maxTradeXlm:2.25,minOrderXlm:2,dailyCapXlm:2.25,
+    minFreeXlm:2,maxBuyPriceXlm:0.15,maxOpenOffers:8,
+  });
+  const result=await executor.execute({
+    action:"buy",publicKey:wallet.publicKey(),bestBidXlm:0.1,bestAskXlm:0.15,
+    referencePriceXlm:0.1,learnedPriceAnchorXlm:0.14,
+    riskTolerance:0.9,optimism:0.95,patience:0.1,scarcityExpectation:0.95,
+    marketPriceChange:0.1,confidence:0.95,urgency:0.8,dailyCommittedXlm:0,
+  },wallet);
+  assert.equal(result.status,"submitted");
+  if(result.status!=="submitted")return;
+  assert.ok(result.priceXlm>0.11,"Personal valuation may justify quoting above the former market bid");
+  assert.ok(result.priceXlm<0.15,"Automatic controlled-account matches remain prohibited");
+  assert.ok(result.maxXlm<=2.25,"Strong conviction never overrides authorized capital limits");
+});

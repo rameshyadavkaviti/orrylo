@@ -20,6 +20,9 @@ export interface AgentProjection {
   valuationSummary?: {
     learnedPriceAnchorXlm: number;
     riskTolerance: number;
+    optimism?: number;
+    patience?: number;
+    scarcityExpectation?: number;
   };
   cognitiveSummary: {
     affect: number;

@@ -25,6 +25,23 @@ function hashEvent(event: AgentEvent): string {
   return createHash("sha256").update(canonicalize(event)).digest("hex");
 }
 
+function priceProfile(seed: CognitiveSeed | undefined, state: AgentState): NonNullable<AgentProjection["valuationSummary"]> {
+  const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+  return {
+    learnedPriceAnchorXlm: state.referenceLearning?.priceAnchorXlm ?? 0.1,
+    riskTolerance: state.learnedPriors.riskTolerance,
+    // Independently derived, persistent preferences; never allocate quotation tiers.
+    optimism: clamp01(0.35 * (seed?.cognition.explorationTendency ?? 0.5)
+      + 0.30 * (seed?.motives.ryloAcquisitionDrive ?? 0.5)
+      + 0.20 * (seed?.socialPriors.dissentConfidence ?? 0.5)
+      + 0.15 * state.learnedPriors.marketConfidence),
+    patience: clamp01(0.40 * (seed?.values.prudence ?? 0.5)
+      + 0.30 * (seed?.inhibitors.opportunityCostConcern ?? 0.5)
+      + 0.30 * (seed?.referencePoints.ownershipAttachment ?? 0.5)),
+    scarcityExpectation: clamp01(state.learnedPriors.scarcityExpectation),
+  };
+}
+
 function projection(record: StoredAgent): AgentProjection {
   return {
     id: record.id,
@@ -35,10 +52,7 @@ function projection(record: StoredAgent): AgentProjection {
     episodeCount: record.state.episodeCount,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
-    valuationSummary: {
-      learnedPriceAnchorXlm: record.state.referenceLearning?.priceAnchorXlm ?? 0.1,
-      riskTolerance: record.state.learnedPriors.riskTolerance,
-    },
+    valuationSummary: priceProfile(record.seed, record.state),
     cognitiveSummary: {
       affect: record.state.affect,
       stress: record.state.stress,
@@ -182,7 +196,7 @@ export class InMemoryAgentRepository implements AgentRepository {
 
 interface AgentRow {
   id: string; alias: string; public_key: string; configured: boolean; created_at: Date; updated_at: Date;
-  state: AgentState; revision: number; episode_count?: number;
+  state: AgentState; seed?: CognitiveSeed; revision: number; episode_count?: number;
 }
 
 function rowProjection(row: AgentRow): AgentProjection {
@@ -190,7 +204,7 @@ function rowProjection(row: AgentRow): AgentProjection {
     id: row.id, alias: row.alias, publicKey: row.public_key, configured: row.configured,
     revision: row.revision, episodeCount: row.state.episodeCount,
     createdAt: row.created_at.toISOString(), updatedAt: row.updated_at.toISOString(),
-    valuationSummary: { learnedPriceAnchorXlm: row.state.referenceLearning?.priceAnchorXlm ?? 0.1, riskTolerance: row.state.learnedPriors.riskTolerance },
+    valuationSummary: priceProfile(row.seed, row.state),
     cognitiveSummary: { affect: row.state.affect, stress: row.state.stress, confidence: row.state.confidence, urgency: row.state.urgency, feltSecurity: row.state.feltSecurity },
     behavioralSummary: {
       lastAction: row.state.behavioralDynamics?.recentAction ?? null,
@@ -254,11 +268,11 @@ export class PostgresAgentRepository implements AgentRepository {
     await this.pool.query("INSERT INTO system_status(key,value) VALUES('enrollment',$1) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=now()", [{ issueCodes, invalidCandidates: issueCodes.length }]);
   }
   async list(): Promise<AgentProjection[]> {
-    const result = await this.pool.query<AgentRow>("SELECT a.*, s.state, s.revision FROM agents a JOIN agent_states s ON s.agent_id=a.id ORDER BY a.alias");
+    const result = await this.pool.query<AgentRow>("SELECT a.*, s.state, s.revision, se.seed FROM agents a JOIN agent_states s ON s.agent_id=a.id LEFT JOIN agent_seeds se ON se.agent_id=a.id ORDER BY a.alias");
     return result.rows.map(rowProjection);
   }
   async get(idOrPublicKey: string): Promise<AgentProjection | undefined> {
-    const result = await this.pool.query<AgentRow>("SELECT a.*, s.state, s.revision FROM agents a JOIN agent_states s ON s.agent_id=a.id WHERE a.id::text=$1 OR a.public_key=$1", [idOrPublicKey]);
+    const result = await this.pool.query<AgentRow>("SELECT a.*, s.state, s.revision, se.seed FROM agents a JOIN agent_states s ON s.agent_id=a.id LEFT JOIN agent_seeds se ON se.agent_id=a.id WHERE a.id::text=$1 OR a.public_key=$1", [idOrPublicKey]);
     return result.rows[0] ? rowProjection(result.rows[0]) : undefined;
   }
 

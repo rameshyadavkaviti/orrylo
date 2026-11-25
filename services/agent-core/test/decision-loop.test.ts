@@ -63,3 +63,20 @@ test("failed offer maintenance never stops independent cognitive decisions", asy
   assert.equal((await repository.metrics()).episodes, 1);
   assert.ok(errorCodes.includes("offer_cleanup_failed"));
 });
+
+
+test("individual pricing preferences originate in each persistent agent profile",async()=>{
+  const repository=new InMemoryAgentRepository();
+  await repository.migrate();
+  const keys=[Keypair.random().publicKey(),Keypair.random().publicKey()];
+  for (const [i,publicKey] of keys.entries()){
+    const seed=deriveCognitiveSeed("master-key-material-that-is-long-enough",publicKey,1);
+    await repository.enroll({alias:"AGENT_"+i,publicKey,seed,state:createInitialState(seed)});
+  }
+  const profiles=await repository.list();
+  const a=profiles[0]!.valuationSummary!;
+  const b=profiles[1]!.valuationSummary!;
+  assert.ok(a.optimism!==undefined && b.optimism!==undefined);
+  assert.ok(a.patience!==undefined && b.patience!==undefined);
+  assert.notDeepEqual([a.optimism,a.patience],[b.optimism,b.patience]);
+});
