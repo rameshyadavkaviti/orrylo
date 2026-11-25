@@ -350,3 +350,63 @@ test("strong conviction permits a higher bid when the market ask is higher, with
   assert.ok(result.priceXlm<0.15,"Automatic controlled-account matches remain prohibited");
   assert.ok(result.maxXlm<=2.25,"Strong conviction never overrides authorized capital limits");
 });
+
+
+test("without the 2-XLM floor, distinct agent budgets are derived from decisions and capital",async()=>{
+  const wallet=Keypair.random();
+  async function quote(input:{confidence:number;riskTolerance:number;optimism:number;patience:number;urgency:number}){
+    const submitted:Array<{operations:Array<Record<string,unknown>>}>=[];
+    const executor=new StellarTradeExecutor({
+      server:server(wallet,submitted),ryloCode:"RYLO",ryloIssuer:issuer,
+      maxTradeXlm:2.25,minOrderXlm:0,dailyCapXlm:2.25,
+      minFreeXlm:2,maxBuyPriceXlm:0.1,maxOpenOffers:8,
+    });
+    const result=await executor.execute({
+      action:"buy",publicKey:wallet.publicKey(),
+      bestBidXlm:0.09,bestAskXlm:0.1,referencePriceXlm:0.1,
+      learnedPriceAnchorXlm:0.1,marketPriceChange:0,
+      scarcityExpectation:0.6,dailyCommittedXlm:0,...input,
+    },wallet);
+    assert.equal(result.status,"submitted");
+    assert.equal(submitted.length,1);
+    return result.status==="submitted"?result.maxXlm:NaN;
+  }
+  const cautious=await quote({confidence:0.2,riskTolerance:0.1,optimism:0.2,patience:0.95,urgency:0.1});
+  const confident=await quote({confidence:0.9,riskTolerance:0.95,optimism:0.9,patience:0.1,urgency:0.8});
+  assert.ok(cautious>0 && cautious<2, "Smaller economically meaningful funded bids are allowed");
+  assert.ok(confident>cautious+0.5,"Independent conviction and risk lead to materially different allocations");
+  assert.ok(confident<=2.25,"Hard per-order maximum still applies");
+});
+
+test("zero minimum also permits smaller RYLO sell offers without forcing two XLM",async()=>{
+  const wallet=Keypair.random();
+  const submitted:Array<{operations:Array<Record<string,unknown>>}>=[];
+  const executor=new StellarTradeExecutor({
+    server:server(wallet,submitted),ryloCode:"RYLO",ryloIssuer:issuer,
+    maxTradeXlm:2.25,minOrderXlm:0,dailyCapXlm:2.25,minFreeXlm:2,
+    maxBuyPriceXlm:0.1,maxOpenOffers:8,
+  });
+  const result=await executor.execute({
+    action:"sell",publicKey:wallet.publicKey(),bestBidXlm:0.09,bestAskXlm:0.1,
+    referencePriceXlm:0.1,confidence:0.5,urgency:0.3,
+    riskTolerance:0.5,optimism:0.5,patience:0.5,dailyCommittedXlm:0,
+  },wallet);
+  assert.equal(result.status,"submitted");
+  if(result.status==="submitted")assert.ok(result.maxXlm>0 && result.maxXlm<2);
+});
+
+test("small remaining capital never bypasses the zero-free-reserve guard",async()=>{
+  const wallet=Keypair.random();
+  const submitted:Array<{operations:Array<Record<string,unknown>>}>=[];
+  const executor=new StellarTradeExecutor({
+    server:server(wallet,submitted),ryloCode:"RYLO",ryloIssuer:issuer,
+    maxTradeXlm:0.00001,minOrderXlm:0,dailyCapXlm:0.5,
+    minFreeXlm:2,maxBuyPriceXlm:0.1,maxOpenOffers:8,
+  });
+  const result=await executor.execute({
+    action:"buy",publicKey:wallet.publicKey(),bestBidXlm:0.09,bestAskXlm:0.1,
+    referencePriceXlm:0.1,confidence:0.5,urgency:0.2,dailyCommittedXlm:0,
+  },wallet);
+  assert.deepEqual(result,{status:"blocked",reason:"DUST_ORDER"});
+  assert.equal(submitted.length,0);
+});

@@ -48,7 +48,7 @@ export interface TradeExecutionIntent {
 
 export type TradeExecutionResult =
   | { status: "submitted"; hash: string; action: "buy" | "sell"; priceXlm: number; amountRylo: number; maxXlm: number }
-  | { status: "blocked"; reason: "FREE_RESERVE" | "NO_RYLO" | "INVALID_PRICE" | "SIGNER_MISMATCH" | "OPEN_OFFER_CAP" | "MIN_ORDER_NOTIONAL" };
+  | { status: "blocked"; reason: "FREE_RESERVE" | "NO_RYLO" | "INVALID_PRICE" | "SIGNER_MISMATCH" | "OPEN_OFFER_CAP" | "MIN_ORDER_NOTIONAL" | "DUST_ORDER" };
 
 const fixed7 = (value: number): string => value.toFixed(7);
 const number = (value: unknown): number => {
@@ -214,7 +214,18 @@ export class StellarTradeExecutor {
       ? Math.max(intent.referencePriceXlm * 0.5, Math.min(intent.referencePriceXlm * 1.5, intent.learnedPriceAnchorXlm!))
       : intent.referencePriceXlm;
     const personalAnchor = intent.referencePriceXlm * 0.2 + learned * 0.8;
-    const targetXlm = minimum + (budget - minimum) * confidence;
+    // Capital allocation is a *decision*, not a shared fixed order-size target.
+    // Stable preferences, recent conviction and available funds each contribute.
+    // No random padding is added to make orders look human.
+    const personalAllocation = Math.min(0.93, Math.max(0.07,
+      0.16 + 0.30 * confidence + 0.28 * riskTolerance
+      + 0.14 * optimism + 0.10 * urgency - 0.23 * patience,
+    ));
+    const targetXlm = minimum + (budget - minimum) * personalAllocation;
+    // Tiny offers cost disproportionate Stellar fees. This is a fee-efficiency
+    // floor (0.0001 XLM), not the removed 2-XLM universal notional minimum.
+    const economicalNotional = 0.0001;
+    if (targetXlm < economicalNotional) return { status: "blocked", reason: "DUST_ORDER" };
 
     let priceXlm: number;
     let amountRylo: number;
@@ -272,6 +283,7 @@ export class StellarTradeExecutor {
       operation = Operation.manageSellOffer({ selling: this.rylo, buying: Asset.native(), amount: fixed7(amountRylo), price: fixed7(priceXlm) });
     }
     if (amountRylo < 0.0000001) return { status: "blocked", reason: intent.action === "sell" ? "NO_RYLO" : "FREE_RESERVE" };
+    if (amountRylo * priceXlm < economicalNotional) return { status: "blocked", reason: "DUST_ORDER" };
     const fee = String(Math.max(Number(BASE_FEE), await server.fetchBaseFee()));
     const transaction = new TransactionBuilder(account, { fee, networkPassphrase: Networks.PUBLIC })
       .addOperation(operation)

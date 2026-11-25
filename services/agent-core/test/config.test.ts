@@ -125,3 +125,24 @@ test("minimum live order notional must not exceed per-order trade cap",()=>{
     ORRYLO_RELATED_PUBLIC_KEYS:"GCZCQZBSMZJTMTIHBDIAQM6BQMZ4P5QVPQ7UGNF5YKLPPEXD7EVEPBCH",
   }),ConfigError);
 });
+
+
+test("allows zero minimum order notional, removing the mandatory 2-XLM floor",()=>{
+  const config=loadConfig({
+    ...validEnv,ORRYLO_EXECUTION_ENABLED:"true",
+    ORRYLO_EXECUTION_MAX_TRADE_XLM:"2.25",
+    ORRYLO_EXECUTION_MIN_ORDER_XLM:"0",
+    ORRYLO_EXECUTION_DAILY_CAP_XLM:"2.25",
+    ORRYLO_EXECUTION_MIN_FREE_XLM:"2",
+    ORRYLO_EXECUTION_MAX_BUY_PRICE_XLM:"0.1",
+    ORRYLO_RELATED_PUBLIC_KEYS:"GCZCQZBSMZJTMTIHBDIAQM6BQMZ4P5QVPQ7UGNF5YKLPPEXD7EVEPBCH",
+  });
+  assert.equal(config.executionMinOrderXlm,0);
+  assert.equal(loadConfig(validEnv).executionMinOrderXlm,0);
+});
+
+test("disallows negative or NaN minimum amounts",()=>{
+  for(const value of ["-0.01","NaN","Infinity"]){
+    assert.throws(()=>loadConfig({...validEnv,ORRYLO_EXECUTION_MIN_ORDER_XLM:value}),ConfigError);
+  }
+});

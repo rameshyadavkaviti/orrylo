@@ -77,6 +77,15 @@ function positiveNumber(env: Env, name: string, fallback: number): number {
   return value;
 }
 
+function nonNegativeNumber(env: Env, name: string, fallback: number): number {
+  const raw = env[name];
+  const value = raw === undefined ? fallback : Number(raw);
+  if (!Number.isFinite(value) || value < 0) {
+    throw new ConfigError("CONFIG_INVALID", name + " must be a non-negative number");
+  }
+  return value;
+}
+
 function requiredPositiveNumber(env: Env, name: string): number {
   const raw = required(env, name);
   const value = Number(raw);
@@ -136,7 +145,8 @@ export function loadConfig(env: Env = process.env): AppConfig {
   }
   const executionMaxTradeXlm = executionEnabled ? requiredPositiveNumber(env, "ORRYLO_EXECUTION_MAX_TRADE_XLM") : positiveNumber(env, "ORRYLO_EXECUTION_MAX_TRADE_XLM", 0.1);
   const executionDailyCapXlm = executionEnabled ? requiredPositiveNumber(env, "ORRYLO_EXECUTION_DAILY_CAP_XLM") : positiveNumber(env, "ORRYLO_EXECUTION_DAILY_CAP_XLM", 0.5);
-  const executionMinOrderXlm = positiveNumber(env, "ORRYLO_EXECUTION_MIN_ORDER_XLM", 0.01);
+  // Zero disables the formerly mandatory order-size floor. A technical dust filter stays in execution.
+  const executionMinOrderXlm = nonNegativeNumber(env, "ORRYLO_EXECUTION_MIN_ORDER_XLM", 0);
   if (executionEnabled && executionMinOrderXlm > executionMaxTradeXlm) throw new ConfigError("CONFIG_INVALID", "Minimum order notional must not exceed the maximum trade XLM");
   const executionMinFreeXlm = executionEnabled ? requiredPositiveNumber(env, "ORRYLO_EXECUTION_MIN_FREE_XLM") : positiveNumber(env, "ORRYLO_EXECUTION_MIN_FREE_XLM", 2);
   const executionMaxBuyPriceXlm = executionEnabled ? requiredPositiveNumber(env, "ORRYLO_EXECUTION_MAX_BUY_PRICE_XLM") : positiveNumber(env, "ORRYLO_EXECUTION_MAX_BUY_PRICE_XLM", 0.1);
