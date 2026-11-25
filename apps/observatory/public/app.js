@@ -52,9 +52,9 @@ function renderDecisionTimeline() {
  $("#timeline").innerHTML=displayed.length?displayed.map(e=>{
    const key=walletsByAgent.get(e.agent_id);
    const valid=typeof key==="string"&&/^G[A-Z2-7]{55}$/.test(key);
-   const accountLink=valid?'<a class="decision-link" href="https://stellar.expert/explorer/public/account/'+key+'" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">View wallet ↗</a>':"";
+   const copyButton=valid?'<button type="button" class="decision-link copy-public" data-copy-public="'+safe(key)+'" aria-label="Copy public key for agent '+safe(e.alias)+'" aria-live="polite">Copy public</button>':"";
    const termLink=valid?'<a class="decision-link secondary" href="https://stellarterm.com/account/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">StellarTerm ↗</a>':"";
-   return '<div class="episode"><time>'+safe(when(e.created_at))+'</time><div><b>'+safe(e.alias)+'</b><small>#'+safe(e.sequence)+" · "+safe(e.type)+" · "+safe(e.source)+'</small><div class="decision-links">'+accountLink+termLink+'</div></div>'+badge(e.action)+'</div>';
+   return '<div class="episode"><time>'+safe(when(e.created_at))+'</time><div><b>'+safe(e.alias)+'</b><small>#'+safe(e.sequence)+" · "+safe(e.type)+" · "+safe(e.source)+'</small><div class="decision-links">'+copyButton+termLink+'</div></div>'+badge(e.action)+'</div>';
  }).join(""):'<div class="empty">No matching decisions in the latest 250 records. Reset filters or inspect an agent for older episodes.</div>';
 }
 function chart(rows) {
@@ -123,7 +123,49 @@ async function refresh(){
  await refreshBalances();
  }catch(err){$("#connection").textContent="Telemetry unavailable";$("#updated").textContent="Connection error · "+err.message;}
 }
-document.addEventListener("click",(ev)=>{const btn=ev.target.closest("[data-id]");if(btn)inspect(btn.dataset.id);});
+async function copyAgentPublicKey(button) {
+  const key = button.dataset.copyPublic;
+  if (!key || !/^G[A-Z2-7]{55}$/.test(key)) return;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(key);
+    } else {
+      // Compatibility fallback for browsers without the modern Clipboard API.
+      const input = document.createElement("textarea");
+      input.value = key;
+      input.readOnly = true;
+      input.setAttribute("aria-hidden", "true");
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.focus();
+      input.select();
+      try {
+        if (!document.execCommand("copy")) throw new Error("Clipboard unavailable");
+      } finally {
+        input.remove();
+      }
+    }
+    button.textContent = "Copied ✓";
+    button.classList.add("copied");
+    button.title = "Public key copied to clipboard";
+  } catch {
+    button.textContent = "Copy failed";
+    button.title = "Clipboard access denied; check browser permissions";
+  }
+  window.setTimeout(() => {
+    if (!button.isConnected) return;
+    button.textContent = "Copy public";
+    button.classList.remove("copied");
+    button.title = "";
+  }, 1800);
+}
+document.addEventListener("click",(ev)=>{
+  const copy=ev.target.closest("[data-copy-public]");
+  if (copy) { void copyAgentPublicKey(copy); return; }
+  const btn=ev.target.closest("[data-id]");
+  if(btn) inspect(btn.dataset.id);
+});
 $("#search").addEventListener("input",agentsTable);
 $("#decision-agent-filter").addEventListener("change",renderDecisionTimeline);
 $("#decision-action-filter").addEventListener("change",renderDecisionTimeline);
