@@ -31,5 +31,9 @@ Authenticated, read-only monitoring frontend for the independent ORRYLO agent co
 - `ORRYLO_RYLO_ISSUER`, `ORRYLO_RYLO_CODE`, and `ORRYLO_HORIZON_URL` may override defaults. Set these to the exact current asset identity used by Agent Core.
 - On-chain native balance is not spendable amount after reserves/liabilities.
 
+## Decision Timeline wallet balances
+
+Each visible decision episode also shows its agent's **read-only XLM and RYLO balances** inline with Copy public and StellarTerm. Values are matched to the current agent's public key using the existing authenticated `/api/balances` response from Stellar Horizon; RYLO is identified by code **and issuer**. The display refreshes as balance data arrives (with the existing 45-second Horizon cache). Missing/unverified accounts show **Unavailable**, never an invented zero. A valid account with no RYLO trustline may legitimately display zero RYLO. These figures are account balances, **not** spendable XLM after minimum reserves.
+
 ## Safe wallet navigation
 Each decision episode offers a **Copy public** action that copies the selected agent's Stellar public key into the visitor's clipboard, with visible success/failure feedback. The independent StellarTerm link remains available and opens the official StellarTerm account page separately. The links do not include secrets, tokens, privileged auth credentials, or login sessions; StellarTerm does not automatically log in to the associated agent account. The agent ID-to-public-key association is derived from existing authenticated snapshot data. This deliberately does not import private Stellar keys into browser code.

@@ -2,6 +2,7 @@ const $ = (selector) => document.querySelector(selector);
 let snapshot = null;
 let onchainBalances = null;
 let balanceLastFetched = 0;
+let balanceLastFetchFailed = false;
 const asNum = (n) => { const v = Number(n); return Number.isFinite(v) ? v : null; };
 const safe = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const fmt = (n,d=0) => { const v=asNum(n); return v===null?"—":v.toLocaleString(undefined,{maximumFractionDigits:d}); };
@@ -48,13 +49,24 @@ function renderDecisionTimeline() {
  const agentFilter=$("#decision-agent-filter").value, actionFilter=$("#decision-action-filter").value;
  const displayed=events.filter(e=>(!agentFilter||e.agent_id===agentFilter)&&(!actionFilter||e.action===actionFilter));
  const walletsByAgent=new Map((snapshot.agents||[]).map(a=>[a.id,a.public_key]));
+ const balancesByPublicKey=new Map((onchainBalances?.accounts||[]).map(a=>[a.publicKey,a]));
  $("#decision-results").textContent=displayed.length+" shown / "+events.length+" recent records";
  $("#timeline").innerHTML=displayed.length?displayed.map(e=>{
    const key=walletsByAgent.get(e.agent_id);
    const valid=typeof key==="string"&&/^G[A-Z2-7]{55}$/.test(key);
    const copyButton=valid?'<button type="button" class="decision-link copy-public" data-copy-public="'+safe(key)+'" aria-label="Copy public key for agent '+safe(e.alias)+'" aria-live="polite">Copy public</button>':"";
    const termLink=valid?'<a class="decision-link secondary" href="https://stellarterm.com/account/" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">StellarTerm ↗</a>':"";
-   return '<div class="episode"><time>'+safe(when(e.created_at))+'</time><div><b>'+safe(e.alias)+'</b><small>#'+safe(e.sequence)+" · "+safe(e.type)+" · "+safe(e.source)+'</small><div class="decision-links">'+copyButton+termLink+'</div></div>'+badge(e.action)+'</div>';
+   const balance=valid?balancesByPublicKey.get(key):null;
+   const verified=balance?.status==="ok" && balance.xlm!==null && balance.rylo!==null;
+   const balanceDate=verified&&onchainBalances?.checkedAt?"Horizon checked "+when(onchainBalances.checkedAt):"Stellar balance not verified";
+   const balanceValue=(value) => {
+     if (typeof value!=="string" || !/^\d+(?:\.\d{1,7})?$/.test(value)) return "Unavailable";
+     const [whole,fraction] = value.split(".");
+     return Number(whole).toLocaleString(undefined,{maximumFractionDigits:0})+(fraction?"."+fraction:"");
+   };
+   const amount=verified?'<span class="decision-balance" title="'+safe(balanceDate)+'"><span class="balance-label">XLM</span> <strong>'+safe(balanceValue(balance.xlm))+'</strong></span><span class="decision-balance" title="'+safe(balanceDate)+'"><span class="balance-label">RYLO</span> <strong>'+safe(balanceValue(balance.rylo))+'</strong></span>'
+     :'<span class="decision-balance unavailable" title="'+safe(balanceDate)+'"><span class="balance-label">XLM</span> <strong>'+(balanceLastFetchFailed||Boolean(onchainBalances)?"Unavailable":"Checking…")+'</strong></span><span class="decision-balance unavailable" title="'+safe(balanceDate)+'"><span class="balance-label">RYLO</span> <strong>'+(balanceLastFetchFailed||Boolean(onchainBalances)?"Unavailable":"Checking…")+'</strong></span>';
+   return '<div class="episode"><time>'+safe(when(e.created_at))+'</time><div><b>'+safe(e.alias)+'</b><small>#'+safe(e.sequence)+" · "+safe(e.type)+" · "+safe(e.source)+'</small><div class="decision-links">'+copyButton+termLink+amount+'</div></div>'+badge(e.action)+'</div>';
  }).join(""):'<div class="empty">No matching decisions in the latest 250 records. Reset filters or inspect an agent for older episodes.</div>';
 }
 function chart(rows) {
@@ -73,6 +85,8 @@ function balanceStatus(value) {
 function renderBalances(data) {
  onchainBalances = data;
  balanceLastFetched = Date.now();
+ balanceLastFetchFailed = false;
+ renderDecisionTimeline();
  $("#total-xlm").textContent = fmt(data.totals.xlm,7);
  $("#total-rylo").textContent = fmt(data.totals.rylo,7);
  $("#wallets-verified").textContent = fmt(data.verified) + " / " + fmt(data.totalAccounts);
@@ -90,6 +104,10 @@ async function refreshBalances(force=false) {
   if(!response.ok)throw new Error("HTTP "+response.status);
   renderBalances(await response.json());
  } catch(err) {
+  balanceLastFetchFailed = true;
+  onchainBalances = null;
+  balanceLastFetched = 0;
+  renderDecisionTimeline();
   $("#balance-status").textContent="UNAVAILABLE";
   $("#balances-updated").textContent="Stellar balances unavailable · "+err.message;
  }
