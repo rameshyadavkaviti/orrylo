@@ -29,3 +29,11 @@ Start: `npm start`. Test: `node --check main.mjs`.
 - Outstanding before production integration: validate Horizon quote formats/headers against real responses; timestamp-aligned snapshots, independent execution-slippage modeling, issuer trustline authorization and balance constraints, one-transaction atomic execution design, persistent journal, replay-based backtests, kill switch, daily realized-loss controls, user authorization for any live trading.
 
 Do not merge or switch Railway's start command until those validations have been reviewed. The wallet-research script, if separately supplied, only uses public account APIs.
+
+## Target wallet report (public data only)
+
+Run from a Python 3.10+ terminal:
+```bash
+python3 services/arbitrage/investigate_target_wallet.py
+```
+The script writes `~/Documents/orrylo/target_wallet_analysis.zip`, with public account, transactions, operations, trades, open offers and effects data, plus `analysis.json`. Counts and hour distributions are descriptive; they are not a proof of profitability. The default cap is 10,000 records per collection. Adjust `--max-records` and `--max-pages` to extend coverage. No trading keys are requested.
