@@ -1,6 +1,7 @@
 import { Asset, BASE_FEE, Horizon, Keypair, Networks, Operation, TransactionBuilder } from "@stellar/stellar-sdk";
 import { discoverWallets } from "../enrollment/wallet-env.js";
 
+// Operator-confirmed emergency cancellation; use the service's fresh deploy configuration.
 // One-off, idempotent emergency procedure. It NEVER places an offer, trades,
 // transfers assets or alters trustlines. Wallet secrets never enter the logs.
 type OfferAsset = { asset_type: string; asset_code?: string; asset_issuer?: string };
