@@ -51,6 +51,8 @@
 
 | 2026-11-27 | IMPLEMENTED — EXPERIMENTAL PAPER ONLY | Network Hunter v3 uses 700 XLM paper capital, 595 XLM protected reserve (85%), 10.5 XLM maximum route notional (1.5%), and a 3.5 XLM daily loss stop (0.5%). An opt-in local simulator confirms quotes, journals simulated fills and failures, and stops on cumulative UTC-day losses. See `services/arbitrage/NETWORK_HUNTER.md`. |
 
+| 2026-11-27 | IMPLEMENTED — EXPERIMENTAL TRANSACTION PREPARATION | Network Hunter can prepare an unsigned atomic Stellar path payment for a fresh eligible XLM cycle, with bounded fee, minimum return, reserve, notional, and expiration checks. This stage uses the paper risk snapshot for preparation. It does not approve live policy or enable signing and submission. |
+
 ## Interpretation
 Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 

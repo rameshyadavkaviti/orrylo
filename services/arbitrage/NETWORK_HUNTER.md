@@ -67,3 +67,25 @@ atomically under an exclusive local lock. If a terminated process leaves a
 - https://developers.stellar.org/docs/data/apis/horizon/api-reference/structure/consistency
 - https://developers.stellar.org/docs/data/apis/horizon/api-reference/aggregations/order-books/object
 - https://stellar.org/blog/developers/failed-transaction-mitigation-faq
+
+## Prepare a candidate as a Stellar transaction
+
+From `services/arbitrage/`, install the isolated worker's dependencies with
+`npm install`, then run:
+
+```bash
+npm run prepare:arbitrage -- --account PUBLIC_STELLAR_ACCOUNT --journal /path/to/paper-results.json --fee-stroops 1000
+```
+
+The command reads public quotes and, for an eligible candidate, the account's
+public sequence and native balance. It builds one unsigned Mainnet
+`PathPaymentStrictSend` envelope ending at the same account. The envelope
+requires a minimum XLM return large enough to cover the input, the encoded fee
+ceiling and the minimum net edge. It expires after 20 seconds or after the
+ledger bound. The builder applies the experimental reserve and loss limits to
+preparation and checks the Stellar minimum balance and native selling liabilities.
+
+Output contains `unsignedXdr`, the transaction ID to expect if signed without
+changing the envelope, and the bound amounts. If no candidate qualifies, the
+command prints `NO_PAPER_CANDIDATE`. Preparation does not sign, submit, or
+reconcile any transaction. The paper journal tracks simulated outcomes only.

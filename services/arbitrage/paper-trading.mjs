@@ -10,7 +10,7 @@ const dateUtc = time => new Date(time).toISOString().slice(0, 10);
 const roundXlm = amount => Number(amount.toFixed(7));
 const validAmount = amount => Number.isFinite(amount) && amount >= 0;
 
-async function readJournal(path, today) {
+export async function readJournal(path, today) {
   let content;
   try {
     content = await readFile(path, 'utf8');
@@ -51,7 +51,7 @@ async function saveJournal(path, state) {
   }
 }
 
-async function quotePaperCycles(size, fetcher, approved, cfg, nowFn) {
+export async function quotePaperCycles(size, fetcher, approved, cfg, nowFn) {
   const started = nowFn();
   const native = await quoteCycles(size, fetcher, approved, cfg, nowFn);
   if (!native.identityOnly) return native;
