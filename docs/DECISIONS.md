@@ -55,6 +55,8 @@
 
 | 2026-11-27 | ACCEPTED — MAINNET ARBITRAGE LIMITS | The owner confirmed 700 XLM reference capital, 595 XLM protected reserve, 10.5 XLM maximum order, and 3.5 XLM maximum cumulative daily loss for the treasury account configured in `orrylo-arbitrage`. Market-integrity controls still apply. |
 
+| 2026-11-27 | ACCEPTED — ARBITRAGE ACCOUNT SCOPE | The owner confirmed the configured treasury is the only controlled account participating in these routes. Mainnet arbitrage checks the treasury for standing offers and pool shares before submission. Settlement and uncertain submissions are recorded durably for the approved account. |
+
 ## Interpretation
 Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 

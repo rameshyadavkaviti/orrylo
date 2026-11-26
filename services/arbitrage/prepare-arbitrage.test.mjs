@@ -1,9 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Keypair, Networks, TransactionBuilder, xdr } from '@stellar/stellar-sdk';
 import { APPROVED } from './network-hunter.mjs';
 import { buildArbitrageTransaction, prepareLatestArbitrage, signArbitrageTransaction } from './prepare-arbitrage.mjs';
 import { reconcileArbitrageSettlement } from './arbitrage-settlement.mjs';
+import { openLiveJournal, runLiveCycle } from './live-arbitrage.mjs';
 
 const signer = Keypair.random();
 const publicKey = signer.publicKey();
@@ -155,4 +159,69 @@ test('reconciles exact settled return and charges the ledger fee on failed cycle
   assert.throws(() => reconcileArbitrageSettlement(prepared, { ...fill, hash: '0'.repeat(64) }), /MISMATCHED/);
   assert.throws(() => reconcileArbitrageSettlement(prepared, { ...fill, fee_charged: '1' }), /FEE/);
   assert.throws(() => reconcileArbitrageSettlement(prepared, { ...fill, successful: false }), /STATUS/);
+});
+
+test('a timed-out submission is reserved durably before POST and reconciled after restart', async t => {
+  const directory = mkdtempSync(join(tmpdir(), 'orrylo-live-test-'));
+  const path = join(directory, 'live.sqlite');
+  let db = openLiveJournal(path, publicKey);
+  t.after(() => {
+    db.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  let postCount = 0;
+  let settledReceipt;
+  const fetcher = async (url, init) => {
+    const { pathname, searchParams } = new URL(url);
+    let body;
+    if (pathname === '/transactions' && init.method === 'POST') {
+      postCount++;
+      const signedXdr = init.body.get('tx');
+      const tx = TransactionBuilder.fromXDR(signedXdr, Networks.PUBLIC);
+      const transactionHash = tx.hash().toString('hex');
+      assert.equal(db.prepare('SELECT hash FROM pending').get().hash, transactionHash);
+      settledReceipt = receiptFor({ signedXdr, transactionHash }, { successful: false });
+      throw new Error('TIMEOUT_AFTER_SUBMIT');
+    } else if (pathname === '/transactions/' + settledReceipt?.hash) {
+      body = settledReceipt;
+    } else if (pathname === '/ledgers') {
+      body = { _embedded: { records: [input.ledger] } };
+    } else if (pathname === '/ledgers/100') {
+      body = input.ledger;
+    } else if (pathname === '/fee_stats') {
+      body = { fee_charged: { p90: '1000' } };
+    } else if (pathname === '/accounts/' + publicKey) {
+      body = { ...input.account,
+        thresholds: { med_threshold: 1 },
+        signers: [{ type: 'ed25519_public_key', key: publicKey, weight: 1 }],
+        balances: [{ ...input.account.balances[0], buying_liabilities: '0.0000000' }]
+      };
+    } else {
+      assert.equal(pathname, '/paths/strict-send');
+      const size = Number(searchParams.get('source_amount'));
+      body = { _embedded: { records: [{
+        source_asset_type: 'native', destination_asset_type: 'native',
+        source_amount: String(size), destination_amount: String(size * 1.1),
+        path: assets.map(key => {
+          const [asset_code, asset_issuer] = key.split(':');
+          return { asset_type: 'credit_alphanum4', asset_code, asset_issuer };
+        })
+      }] } };
+    }
+    return { ok: true, json: async () => body, headers: { get: () => '100' } };
+  };
+  const run = () => runLiveCycle({ db, accountId: publicKey, signer, fetcher, nowFn: () => nowMs });
+  await assert.rejects(run(), /TIMEOUT_AFTER_SUBMIT/);
+  db.close();
+  db = openLiveJournal(path, publicKey);
+  const outcome = await run();
+  assert.equal(outcome.status, 'SETTLED');
+  assert.equal(outcome.netPnlStroops, -900);
+  assert.equal(postCount, 1);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM settled').get().count, 1);
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM pending').get().count, 0);
+
+  db.prepare('INSERT INTO settled VALUES (?, ?, ?, ?)').run('other', outcome.dateUtc, -34_999_100, '{}');
+  assert.deepEqual(await run(), { status: 'DAILY_LOSS_STOP', lossStroops: 35_000_000 });
+  assert.equal(postCount, 1);
 });

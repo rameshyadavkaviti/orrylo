@@ -119,11 +119,11 @@ export function signArbitrageTransaction(input, signer) {
   return { signedXdr: transaction.toXDR(), transactionHash, expiresAt, maxLedger };
 }
 
-export async function prepareLatestArbitrage({ accountId, paperState, feeStroops }, fetcher = fetch, nowFn = Date.now) {
+export async function findArbitrageInput({ accountId, paperState, feeStroops }, fetcher = fetch, nowFn = Date.now) {
   if (!validAccountId(accountId)) throw new Error('INVALID_PUBLIC_ACCOUNT');
   const scan = await scanOnce(fetcher, cfg, nowFn, paperState, quotePaperCycles);
   const candidate = scan.candidates.find(row => row.status === 'PAPER_CANDIDATE');
-  if (!candidate) return { status: 'NO_PAPER_CANDIDATE', ledger: scan.ledger };
+  if (!candidate) return { candidate: null, ledger: scan.ledger };
 
   const [{ body: account, ledger: accountLedger }, { body: ledger }] = await Promise.all([
     request('/accounts/' + accountId, fetcher),
@@ -133,7 +133,13 @@ export async function prepareLatestArbitrage({ accountId, paperState, feeStroops
       Math.abs(accountLedger - scan.ledger) > cfg.maxQuoteLagLedgers) {
     throw new Error('INCONSISTENT_ACCOUNT_OR_LEDGER');
   }
-  return buildArbitrageTransaction({ candidate, account, ledger, feeStroops, paperState, nowMs: nowFn() });
+  return { candidate, account, ledger, feeStroops, paperState, nowMs: nowFn() };
+}
+
+export async function prepareLatestArbitrage(options, fetcher = fetch, nowFn = Date.now) {
+  const input = await findArbitrageInput(options, fetcher, nowFn);
+  if (!input.candidate) return { status: 'NO_PAPER_CANDIDATE', ledger: input.ledger };
+  return buildArbitrageTransaction(input);
 }
 
 async function main() {

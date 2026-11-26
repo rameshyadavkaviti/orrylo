@@ -59,7 +59,7 @@ atomically under an exclusive local lock. If a terminated process leaves a
 - Horizon path search can omit paths or return no native→native cycles; this scanner does **not** exhaustively enumerate every order or AMM pool and cannot guarantee discovering every profit opportunity.
 - The simulation uses consecutive indicative quotes. It does not model order-book consumption, transaction inclusion, or actual network fees.
 - Self-match prevention, executed path reconciliation, fee estimation from current network, safe signing, trustline and account-reserve checks, event journal, replay-based backtest, daily-loss kill switch and execution approval are prerequisites to any live phase.
-- **Do not connect this source to the production service start command or set a LIVE mode.** This module has no LIVE mode; adding one requires a separate reviewed implementation and user confirmation.
+- The research scanner and simulator use read-only public requests. Mainnet execution uses the separate service entry point below.
 
 ## References
 
@@ -89,3 +89,22 @@ Output contains `unsignedXdr`, the transaction ID to expect if signed without
 changing the envelope, and the bound amounts. If no candidate qualifies, the
 command prints `NO_PAPER_CANDIDATE`. Preparation does not sign, submit, or
 reconcile any transaction. The paper journal tracks simulated outcomes only.
+
+## Mainnet service
+
+The separately authorized Railway worker runs `npm run start:live` when
+`ORRYLO_LIVE_ARBITRAGE=true`. It uses the existing treasury key variables and
+requires a persistent volume. Keep the worker at one replica. Its account must
+have no open offers or liquidity-pool shares. The approved account is the only
+owner-controlled account in the XLM/USDC/VELO routes.
+
+The worker commits one pending transaction to SQLite before submitting it and
+checks that hash before considering another trade. An expired transaction is
+released only after the Horizon ledger and account sequence show it was not
+included. A confirmed result records actual XLM proceeds minus the input and
+network fee. Cumulative negative results for the UTC day stop the worker at
+3.5 XLM, including the maximum fee allowance for a new submission.
+
+Railway logs distinguish startup, scans without candidates, submission pending
+settlement, and settled results. Disable `ORRYLO_LIVE_ARBITRAGE` to stop new
+submissions and retain the volume for transaction reconciliation.
