@@ -109,12 +109,47 @@ export async function startRuntime(options: {
     decisionLoop.start();
   }
 
-  // Stale-offer cancellation runs outside the cognitive loop. Work is bounded
-  // to four accounts per sweep so slow Stellar confirmations never hold up all agents.
+  // Independent observer: maintenance sampling must not alter the cognitive
+  // observer's temporal market-change signal.
+  const maintenanceObserver = new HorizonMarketObserver({
+    horizonUrl: config.horizonUrl,
+    ryloCode: config.ryloCode,
+    ryloIssuer: config.ryloIssuer,
+    referencePriceXlm: config.referencePriceXlm,
+  });
+  let lastMaintenanceMid: number | null = null;
+  let stableMarketSamples = 0;
+  // Maintenance never forces a new trade. It only cancels aged, implausible
+  // offers after independent, consistent market observations.
   let maintenanceCursor = 0;
   const maintenanceLoop = new EnrollmentLoop(30_000, async () => {
     const accounts = (await repository.list()).filter((agent) => agent.configured);
     if (accounts.length === 0) return;
+    let market: { bestBidXlm: number; bestAskXlm: number } | undefined;
+    try {
+      const observed = (await maintenanceObserver.observe()).context;
+      const bid = observed.bestBidXlm;
+      const ask = observed.bestAskXlm;
+      const mid = bid !== null && ask !== null ? (bid + ask) / 2 : null;
+      const reliable = mid !== null && bid !== null && ask !== null &&
+        bid > 0 && ask > bid && (ask - bid) / mid <= 0.10 &&
+        observed.askDepthRylo >= 5 && observed.bidDepthRylo >= 5;
+      if (reliable && mid !== null && bid !== null && ask !== null) {
+        stableMarketSamples = lastMaintenanceMid !== null &&
+          Math.abs(mid / lastMaintenanceMid - 1) <= 0.03
+          ? Math.min(stableMarketSamples + 1, 100) : 1;
+        lastMaintenanceMid = mid;
+        if (stableMarketSamples >= 3) market = { bestBidXlm: bid, bestAskXlm: ask };
+      } else {
+        stableMarketSamples = 0;
+        lastMaintenanceMid = null;
+      }
+    } catch (error) {
+      stableMarketSamples = 0;
+      lastMaintenanceMid = null;
+      logger.error({ event: "market_maintenance_observation_failed",
+        error: error instanceof Error ? error.name : "UnknownError" });
+    }
     const count = Math.min(4, accounts.length);
     const batch = Array.from({ length: count }, (_, i) => accounts[(maintenanceCursor + i) % accounts.length]!);
     maintenanceCursor = (maintenanceCursor + count) % accounts.length;
@@ -125,7 +160,7 @@ export async function startRuntime(options: {
           logger.error({ event: "offer_cleanup_signer_missing", agentId: agent.id });
           return;
         }
-        const result = await tradeExecutor.maintain(agent.publicKey, keypair);
+        const result = await tradeExecutor.maintain(agent.publicKey, keypair, Date.now(), market);
         if (result.status === "submitted") logger.info({ event: "offer_cleanup_submitted", agentId: agent.id, removed: result.removed });
         else if (result.status === "blocked") logger.error({ event: "offer_cleanup_blocked", agentId: agent.id, reason: result.reason });
       } catch (error) {

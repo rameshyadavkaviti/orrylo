@@ -410,3 +410,113 @@ test("small remaining capital never bypasses the zero-free-reserve guard",async(
   assert.deepEqual(result,{status:"blocked",reason:"DUST_ORDER"});
   assert.equal(submitted.length,0);
 });
+
+
+test("sell execution uses RYLO holdings even if discretionary free XLM is below 2", async () => {
+  const wallet = Keypair.random();
+  const submitted: Array<{ operations: Array<Record<string, unknown>> }> = [];
+  const fixture = server(wallet, submitted);
+  const serverWithSmallNativeBalance = {
+    ...fixture,
+    loadAccount: async () => {
+      const account = await fixture.loadAccount();
+      account.balances[0]!.balance = "2.1000000";
+      return account;
+    },
+  };
+  const executor = new StellarTradeExecutor({
+    server: serverWithSmallNativeBalance,
+    ryloCode: "RYLO", ryloIssuer: issuer, maxTradeXlm: 2.25,
+    minOrderXlm: 0, dailyCapXlm: 2.25, minFreeXlm: 2,
+    maxBuyPriceXlm: 0.1, maxOpenOffers: 8,
+  });
+  const intent = {
+    publicKey: wallet.publicKey(), bestBidXlm: 0.0054, bestAskXlm: 0.0055,
+    referencePriceXlm: 0.1, learnedPriceAnchorXlm: 0.1,
+    confidence: 0.6, urgency: 0.3, riskTolerance: 0.5,
+    optimism: 0.5, patience: 0.6, dailyCommittedXlm: 0,
+  };
+  const result = await executor.execute({ ...intent, action: "sell" }, wallet);
+  assert.equal(result.status, "submitted");
+  if (result.status === "submitted") {
+    assert.ok(result.priceXlm < 0.02, "Outdated 0.1 reference should not blindly dominate the current market");
+    assert.ok(result.amountRylo > 0 && result.amountRylo <= 2);
+  }
+  assert.equal(submitted.length, 1);
+  const buyer = await executor.execute({ ...intent, action: "buy" }, wallet);
+  assert.deepEqual(buyer, { status: "blocked", reason: "FREE_RESERVE" });
+});
+
+test("sell cannot create an offer if network subentry reserve and fee are unavailable", async () => {
+  const wallet = Keypair.random();
+  const submitted: Array<{ operations: Array<Record<string, unknown>> }> = [];
+  const fixture = server(wallet, submitted);
+  const low = {
+    ...fixture,
+    loadAccount: async () => {
+      const account = await fixture.loadAccount();
+      account.balances[0]!.balance = "1.6000000";
+      return account;
+    },
+  };
+  const executor = new StellarTradeExecutor({
+    server: low, ryloCode: "RYLO", ryloIssuer: issuer,
+    maxTradeXlm: 2.25, minOrderXlm: 0, dailyCapXlm: 2.25,
+    minFreeXlm: 2, maxBuyPriceXlm: 0.1, maxOpenOffers: 8,
+  });
+  const result = await executor.execute({
+    action: "sell", publicKey: wallet.publicKey(),
+    bestBidXlm: 0.0054, bestAskXlm: 0.0055,
+    referencePriceXlm: 0.1, confidence: 0.6, urgency: 0.3,
+    dailyCommittedXlm: 0,
+  }, wallet);
+  assert.deepEqual(result, { status: "blocked", reason: "FEE_RESERVE" });
+  assert.equal(submitted.length, 0);
+});
+
+test("confirmed market regime change retires aged far-off BUY offers, not patient high SELL asks", async () => {
+  const wallet = Keypair.random();
+  const submitted: Array<{ operations: Array<Record<string, unknown>> }> = [];
+  const native = { asset_type: "native" };
+  const rylo = { asset_type: "credit_alphanum4", asset_code: "RYLO", asset_issuer: issuer };
+  const old = "2026-11-25T08:00:00Z";
+  const fresh = "2026-11-26T12:59:00Z";
+  const offers = [
+    { id: "11", selling: native, buying: rylo, price: "11.1111111", last_modified_time: old },
+    { id: "12", selling: rylo, buying: native, price: "0.0900000", last_modified_time: old },
+    { id: "13", selling: native, buying: rylo, price: "184.5000000", last_modified_time: old },
+    { id: "14", selling: native, buying: rylo, price: "11.1111111", last_modified_time: fresh },
+    { id: "15", selling: native,
+      buying: { ...rylo, asset_code: "USDC" }, price: "11.1111111", last_modified_time: old },
+  ];
+  const executor = new StellarTradeExecutor({
+    server: server(wallet, submitted, offers), ryloCode: "RYLO", ryloIssuer: issuer,
+    maxTradeXlm: 0.1, minOrderXlm: 0, dailyCapXlm: 0.1,
+    minFreeXlm: 2, maxBuyPriceXlm: 0.1, maxOpenOffers: 8,
+  });
+  const result = await executor.maintain(wallet.publicKey(), wallet,
+    Date.parse("2026-11-26T13:00:00Z"),
+    { bestBidXlm: 0.0054, bestAskXlm: 0.0055 });
+  assert.equal(result.status, "submitted");
+  assert.equal(result.removed, 1);
+  assert.deepEqual(submitted[0]!.operations.map((op) => String(op.offerId)), ["11"]);
+  assert.equal(Number(submitted[0]!.operations[0]!.amount), 0);
+});
+
+test("unconfirmed market change does not automatically expire standing offers below cap", async () => {
+  const wallet = Keypair.random();
+  const submitted: Array<{ operations: Array<Record<string, unknown>> }> = [];
+  const offers = [{
+    id: "11", selling: { asset_type: "native" },
+    buying: { asset_type: "credit_alphanum4", asset_code: "RYLO", asset_issuer: issuer },
+    price: "11.1111111", last_modified_time: "2026-11-25T08:00:00Z",
+  }];
+  const executor = new StellarTradeExecutor({
+    server: server(wallet, submitted, offers), ryloCode: "RYLO", ryloIssuer: issuer,
+    maxTradeXlm: 0.1, minOrderXlm: 0, dailyCapXlm: 0.1,
+    minFreeXlm: 2, maxBuyPriceXlm: 0.1, maxOpenOffers: 8,
+  });
+  assert.deepEqual(await executor.maintain(wallet.publicKey(), wallet,
+    Date.parse("2026-11-26T13:00:00Z")), { status: "noop", removed: 0 });
+  assert.equal(submitted.length, 0);
+});

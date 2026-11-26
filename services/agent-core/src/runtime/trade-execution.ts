@@ -17,6 +17,11 @@ type BuiltTransaction = ReturnType<TransactionBuilder["build"]>;
 
 type OrderAsset = { asset_type: string; asset_code?: string; asset_issuer?: string };
 type AccountOffer = { id: string; selling: OrderAsset; buying: OrderAsset; price?: string; last_modified_time?: string };
+
+export interface ConfirmedMarketQuote {
+  bestBidXlm: number;
+  bestAskXlm: number;
+}
 interface TradeServer {
   loadAccount(publicKey: string): Promise<LoadedAccount>;
   fetchBaseFee(): Promise<number>;
@@ -48,7 +53,7 @@ export interface TradeExecutionIntent {
 
 export type TradeExecutionResult =
   | { status: "submitted"; hash: string; action: "buy" | "sell"; priceXlm: number; amountRylo: number; maxXlm: number }
-  | { status: "blocked"; reason: "FREE_RESERVE" | "NO_RYLO" | "INVALID_PRICE" | "SIGNER_MISMATCH" | "OPEN_OFFER_CAP" | "MIN_ORDER_NOTIONAL" | "DUST_ORDER" };
+  | { status: "blocked"; reason: "FREE_RESERVE" | "NO_RYLO" | "INVALID_PRICE" | "SIGNER_MISMATCH" | "OPEN_OFFER_CAP" | "MIN_ORDER_NOTIONAL" | "DUST_ORDER" | "FEE_RESERVE" };
 
 const fixed7 = (value: number): string => value.toFixed(7);
 const number = (value: unknown): number => {
@@ -108,12 +113,12 @@ export class StellarTradeExecutor {
 
   // Safe maintenance: cancellation only, scoped to the agent's RYLO/XLM pair.
   // Runs irrespective of BUY/SELL/HOLD and never produces a trade match.
-  async maintain(publicKey: string, signer: Keypair, now = Date.now()):
+  async maintain(publicKey: string, signer: Keypair, now = Date.now(), market?: ConfirmedMarketQuote):
     Promise<{ status: "noop" | "submitted" | "blocked"; removed: number; hash?: string; reason?: string }> {
-    return this.exclusive(publicKey, () => this.maintainUnlocked(publicKey, signer, now));
+    return this.exclusive(publicKey, () => this.maintainUnlocked(publicKey, signer, now, market));
   }
 
-  private async maintainUnlocked(publicKey: string, signer: Keypair, now: number):
+  private async maintainUnlocked(publicKey: string, signer: Keypair, now: number, market?: ConfirmedMarketQuote):
     Promise<{ status: "noop" | "submitted" | "blocked"; removed: number; hash?: string; reason?: string }> {
     if (signer.publicKey() !== publicKey) return { status: "blocked", removed: 0, reason: "SIGNER_MISMATCH" };
     if (now - (this.lastSweep.get(publicKey) ?? 0) < 120_000) return { status: "noop", removed: 0 };
@@ -132,7 +137,33 @@ export class StellarTradeExecutor {
       const aid = BigInt(a.id), bid = BigInt(b.id);
       return aid < bid ? -1 : aid > bid ? 1 : 0;
     });
-    const cancel = oldestFirst.slice(0, Math.min(4, excess));
+    // Use only a separately confirmed, adequately liquid, non-crossed market
+    // snapshot to identify genuinely stale orders. Horizon represents BUY offers
+    // as selling XLM / buying RYLO: its price must be inverted to XLM/RYLO.
+    // Do not cancel a deliberate high-priced SELL just because the market fell.
+    const midpoint = market && market.bestBidXlm > 0 &&
+      market.bestAskXlm > market.bestBidXlm &&
+      market.bestAskXlm / market.bestBidXlm <= 1.10
+      ? (market.bestBidXlm + market.bestAskXlm) / 2 : null;
+    const marketStale = midpoint === null ? [] : oldestFirst.filter((offer) => {
+      if (!offer.last_modified_time) return false;
+      const age = now - Date.parse(offer.last_modified_time);
+      if (!Number.isFinite(age) || age < 20 * 60_000) return false;
+      const horizonPrice = Number(offer.price);
+      if (!Number.isFinite(horizonPrice) || horizonPrice <= 0) return false;
+      if (offer.selling.asset_type === "native") {
+        const originalBuyXlm = 1 / horizonPrice;
+        // Significant regime shift in either direction, not a tiny quote change.
+        return originalBuyXlm > midpoint * 1.65 || originalBuyXlm < midpoint / 1.65;
+      }
+      // Only stale, substantially UNDERPRICED sells are at risk. A seller can
+      // knowingly hold an aspirational ask above the market without deletion.
+      return horizonPrice < midpoint / 1.65;
+    });
+    const toRemove = new Map<string, AccountOffer>();
+    for (const offer of oldestFirst.slice(0, excess)) toRemove.set(offer.id, offer);
+    for (const offer of marketStale) toRemove.set(offer.id, offer);
+    const cancel = [...toRemove.values()].slice(0, 4);
     if (!cancel.length) {
       this.lastSweep.set(publicKey, now);
       return { status: "noop", removed: 0 };
@@ -196,8 +227,13 @@ export class StellarTradeExecutor {
     const nativeLiabilities = number(native?.selling_liabilities);
     const minimumReserve = 0.5 * (2 + number(account.subentry_count));
     const freeXlm = nativeBalance - nativeLiabilities - minimumReserve - this.options.minFreeXlm;
-    const budget = Math.min(this.options.maxTradeXlm, Math.max(0, freeXlm));
-    if (budget < 0.0000001) return { status: "blocked", reason: "FREE_RESERVE" };
+    // BUY orders sell/lock XLM; SELL orders sell/lock RYLO. The discretionary
+    // XLM purchase buffer must never prevent a solvent RYLO seller from quoting.
+    // A new SELL offer still needs an extra Stellar subentry reserve and fees.
+    const budget = intent.action === "buy"
+      ? Math.min(this.options.maxTradeXlm, Math.max(0, freeXlm))
+      : this.options.maxTradeXlm;
+    if (intent.action === "buy" && budget < 0.0000001) return { status: "blocked", reason: "FREE_RESERVE" };
     const minimum = this.options.minOrderXlm ?? 0;
     if (budget + 0.00000000001 < minimum) return { status: "blocked", reason: "MIN_ORDER_NOTIONAL" };
     const clamp01 = (value: number): number => Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0.5;
@@ -214,6 +250,15 @@ export class StellarTradeExecutor {
       ? Math.max(intent.referencePriceXlm * 0.5, Math.min(intent.referencePriceXlm * 1.5, intent.learnedPriceAnchorXlm!))
       : intent.referencePriceXlm;
     const personalAnchor = intent.referencePriceXlm * 0.2 + learned * 0.8;
+    const marketMid = intent.bestBidXlm !== null && intent.bestAskXlm !== null &&
+      intent.bestBidXlm > 0 && intent.bestAskXlm > intent.bestBidXlm
+      ? (intent.bestBidXlm + intent.bestAskXlm) / 2 : null;
+    // A stale fixed 0.1 initial reference must not dominate the live 0.005 market.
+    // This is an observation-based soft adjustment, NOT rewriting the learned
+    // valuation or forcing the agent to liquidate below acquisition cost.
+    const valuationAnchor = marketMid && (personalAnchor / marketMid > 2 || marketMid / personalAnchor > 2)
+      ? 0.70 * marketMid + 0.30 * Math.min(marketMid * 1.5, Math.max(marketMid * 0.75, personalAnchor))
+      : personalAnchor;
     // Capital allocation is a *decision*, not a shared fixed order-size target.
     // Stable preferences, recent conviction and available funds each contribute.
     // No random padding is added to make orders look human.
@@ -233,7 +278,7 @@ export class StellarTradeExecutor {
     if (intent.action === "buy") {
       // Willingness to pay varies with evidence, confidence and learned risk tolerance.
       // Market-integrity and capital controls remain hard constraints.
-      const subjective = personalAnchor * (0.87 + 0.16 * confidence + 0.14 * optimism
+      const subjective = valuationAnchor * (0.87 + 0.16 * confidence + 0.14 * optimism
         + 0.08 * riskTolerance + 0.10 * (scarcityExpectation - 0.5) + 0.16 * trend);
       // Individually preferred price aggression within the actual bid/ask spread.
       // This avoids bunching every bullish agent exactly one price tick below the ask.
@@ -270,7 +315,7 @@ export class StellarTradeExecutor {
       // An agent can ask above its reference when conviction/prudence justify it,
       // or voluntarily accept less when liquidity needs are high. Never force a sale
       // below a presumed acquisition cost (which is unknown until fills reconcile).
-      const subjective = personalAnchor * (0.91 + 0.20 * patience
+      const subjective = valuationAnchor * (0.91 + 0.20 * patience
         + 0.09 * (1 - riskTolerance) + 0.06 * optimism + 0.08 * trend
         - 0.06 * urgency - 0.04 * confidence);
       const nonCrossing = intent.bestBidXlm === null ? intent.referencePriceXlm : intent.bestBidXlm + 0.0000001;
@@ -285,6 +330,13 @@ export class StellarTradeExecutor {
     if (amountRylo < 0.0000001) return { status: "blocked", reason: intent.action === "sell" ? "NO_RYLO" : "FREE_RESERVE" };
     if (amountRylo * priceXlm < economicalNotional) return { status: "blocked", reason: "DUST_ORDER" };
     const fee = String(Math.max(Number(BASE_FEE), await server.fetchBaseFee()));
+    if (intent.action === "sell") {
+      const feeXlm = Number(fee) / 10_000_000;
+      const xlmAfterExistingLiabilitiesAndReserve = nativeBalance - nativeLiabilities - minimumReserve;
+      if (xlmAfterExistingLiabilitiesAndReserve < 0.5 + feeXlm) {
+        return { status: "blocked", reason: "FEE_RESERVE" };
+      }
+    }
     const transaction = new TransactionBuilder(account, { fee, networkPassphrase: Networks.PUBLIC })
       .addOperation(operation)
       .setTimeout(60)
