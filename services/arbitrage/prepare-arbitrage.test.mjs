@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Keypair, Networks, TransactionBuilder } from '@stellar/stellar-sdk';
 import { APPROVED } from './network-hunter.mjs';
-import { buildArbitrageTransaction, prepareLatestArbitrage } from './prepare-arbitrage.mjs';
+import { buildArbitrageTransaction, prepareLatestArbitrage, signArbitrageTransaction } from './prepare-arbitrage.mjs';
 
-const publicKey = Keypair.random().publicKey();
+const signer = Keypair.random();
+const publicKey = signer.publicKey();
 const assets = [...APPROVED].filter(key => key !== 'native');
 const nowMs = Date.parse('2026-11-27T12:00:05Z');
 const input = {
@@ -108,4 +109,16 @@ test('prepares an envelope from a live-scan-shaped response using read-only endp
   assert.equal(out.sendXlm, '10.5000000');
   assert.ok(paths.includes('/accounts/' + publicKey));
   assert.equal(paths.filter(path => path === '/paths/strict-send').length, 3);
+});
+
+test('signs only a freshly rebuilt envelope with the matching account key', () => {
+  const out = signArbitrageTransaction(input, signer);
+  const unsigned = buildArbitrageTransaction(input);
+  const tx = TransactionBuilder.fromXDR(out.signedXdr, Networks.PUBLIC);
+  assert.equal(out.transactionHash, unsigned.transactionHash);
+  assert.equal(tx.signatures.length, 1);
+  assert.ok(signer.verify(tx.hash(), tx.signatures[0].signature));
+  assert.throws(() => signArbitrageTransaction(input, Keypair.random()), /SIGNER_ACCOUNT_MISMATCH/);
+  assert.throws(() => signArbitrageTransaction(input, Keypair.fromPublicKey(publicKey)), /SIGNER_CANNOT_SIGN/);
+  assert.throws(() => signArbitrageTransaction({ ...input, nowMs: nowMs + 30000 }, signer), /STALE_OPPORTUNITY/);
 });

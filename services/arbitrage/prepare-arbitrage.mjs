@@ -109,6 +109,16 @@ export function buildArbitrageTransaction({ candidate, account, ledger, feeStroo
   };
 }
 
+export function signArbitrageTransaction(input, signer) {
+  if (signer.publicKey() !== input.account?.account_id) throw new Error('SIGNER_ACCOUNT_MISMATCH');
+  if (!signer.canSign()) throw new Error('SIGNER_CANNOT_SIGN');
+
+  const { unsignedXdr, transactionHash, expiresAt, maxLedger } = buildArbitrageTransaction(input);
+  const transaction = TransactionBuilder.fromXDR(unsignedXdr, Networks.PUBLIC);
+  transaction.sign(signer);
+  return { signedXdr: transaction.toXDR(), transactionHash, expiresAt, maxLedger };
+}
+
 export async function prepareLatestArbitrage({ accountId, paperState, feeStroops }, fetcher = fetch, nowFn = Date.now) {
   if (!validAccountId(accountId)) throw new Error('INVALID_PUBLIC_ACCOUNT');
   const scan = await scanOnce(fetcher, cfg, nowFn, paperState, quotePaperCycles);
