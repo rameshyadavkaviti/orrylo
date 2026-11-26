@@ -49,6 +49,8 @@
 
 | 2026-11-25 | ACCEPTED — BONUS PROMOTION V2 | Replace the unactivated 50%-for-purchases-over-1,000 proposal with a new **36% bonus** for **website purchases of at least 500 RYLO (inclusive)**, once per wallet after verification and subject to funded fulfillment. Keep the promotional preview clearly inactive while the payout service is not provisioned. Use a new campaign identifier `rylo_bonus_v2` to avoid retroactively changing previous claim terms. The bonus ledger constraint must also accept quantity 500, including existing installations. |
 
+| 2026-11-27 | IMPLEMENTED — EXPERIMENTAL PAPER ONLY | Network Hunter v3 uses 700 XLM paper capital, 595 XLM protected reserve (85%), 10.5 XLM maximum route notional (1.5%), and a 3.5 XLM daily loss stop (0.5%). An opt-in local simulator confirms quotes, journals simulated fills and failures, and stops on cumulative UTC-day losses. See `services/arbitrage/NETWORK_HUNTER.md`. |
+
 ## Interpretation
 Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 

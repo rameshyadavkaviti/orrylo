@@ -8,37 +8,56 @@ From `services/arbitrage/`:
 
 ```bash
 npm test
-node network-hunter.mjs --once
+node paper-trading.mjs --once --journal /path/to/paper-results.json
 ```
 
-Or run continuous, read-only monitoring:
+Omit `--once` to poll every 30 seconds. The journal saves the latest successful
+scan in `lastScan` and simulated fills or failures in `results`. The terminal
+prints the same scan as a JSON line with candidate count, paper balance and
+daily loss. Use a local journal path outside the checkout.
 
-```bash
-node network-hunter.mjs
-```
-
-It prints JSON lines: `started`, `market_scan`, `paper_candidate`, `network_activity_sample`, `fail_closed` and `discovery_warning`.
+For quote discovery only, use `node network-hunter.mjs --once` or omit
+`--once` for continuous monitoring.
 
 ## What it does
 
-- Uses `/paths/strict-send` with `source_asset_type=native` and `destination_assets=native` at 2, 5 and 10 XLM. **Provider support for circular native→native quote paths must be tested against live Horizon** before this approach can be relied on. If no supported paths are returned, no trade is inferred.
-- Validates full-path response, exact asset identifiers, per-quote `Latest-Ledger` headers, current ledger close time and cross-request ledger consistency. Rejects empty/self-only routes.
+- Uses `/paths/strict-send` with `source_asset_type=native` and `destination_assets=native` at up to three sizes (2, 5 and 10.5 XLM), subject to the paper budget. If Horizon returns only the same-asset identity path, the simulator checks the vetted XLM–USDC–VELO–XLM and XLM–VELO–USDC–XLM routes using separate direct quotes. Each accepted route must pass the same quote window, ledger checks and risk limits.
+- Validates full-path response, exact asset identifiers, per-quote `Latest-Ledger` quote headers, current ledger close time and cross-request ledger consistency. The latest ledger collection can supply its sequence from the validated record body. Rejects empty/self-only routes.
 - Classifies quotes involving assets outside an exact issuer allowlist as `UNVETTED_RESEARCH_ONLY` regardless of apparent gains. Default eligible research assets: native XLM, USDC issued by Circle, and VELO by the explicitly configured issuer. **All are subject to independent issuer and market-risk diligence before any real execution.**
-- Quotes that pass a profit threshold are labeled `PAPER_CANDIDATE`. This is **not executed profit**. Simulated quote amounts can change or vanish before execution.
+- Eligible quotes with current, in-budget paper state are labeled `PAPER_CANDIDATE`. Without paper state, those quotes are `PAPER_RISK_UNAVAILABLE`. Candidates are indicative quotes and can change or vanish.
 - Samples the network-wide latest 200 trade records for activity statistics. This is a **sample**, not an exhaustive crawl of every token or venue.
 - Makes no changes to existing `main.mjs`, no transactions, no signatures and does not read `TREASURY_SECRET_KEY`.
 
-## Risk assumptions (NOT validated forecasts)
+## Experimental paper limits
 
-700 XLM reference capital, 600 XLM paper reserve, 10 XLM maximum per examined path; round-trip friction haircut of 100 bps, assumed 0.03 XLM maximum fee and 0.01 XLM failure-cost allowance. Candidates need both a minimum 0.03 XLM conservative net *estimated* edge and 70 bps. These assumptions do not guarantee positive expected profit. Fees can rise in surge conditions and can be paid for failed transactions.
+The scanner uses 700 XLM of reference capital, a protected reserve of 595 XLM (85%),
+an initial active budget of 105 XLM, and a maximum route notional of 10.5 XLM (1.5%).
+Quote sizing leaves room for the modeled 0.03 XLM fee above the reserve, using the lower
+of the reported paper balance and the reference capital. A 100 bps friction haircut
+and 0.01 XLM failure-cost allowance also apply to the estimated edge. Candidates need
+both 0.03 XLM and 70 bps of conservative net estimated edge.
 
-The paper engine has **no live execution path** and no realized PnL. Runtime JSON logs are ephemeral on Railway unless explicitly persisted to a database or external logging sink.
+The simulator starts with 700 XLM on an empty journal path. It checks the
+current paper balance and the recorded loss before scanning. It then takes the
+highest-ranked eligible candidate and asks Horizon for a fresh quote for the
+same path and size. An eligible confirmation produces `PAPER_FILL` with the
+modeled net result. If the fresh quote loses that path or falls below the
+threshold, `PAPER_NO_FILL` charges a modeled 0.01 XLM failure cost. Stale or
+failed requests stop the cycle without a simulated fill.
+
+The journal enforces the daily loss limit of 3.5 XLM (0.5%) using cumulative
+simulated losses, including failure costs. Gains do not replenish the loss
+allowance. The simulator budgets the failure cost before a new attempt. Losses
+reset at midnight UTC while the balance and prior results carry forward. The
+journal prevents retrying the same ledger after a restart. It is replaced
+atomically under an exclusive local lock. If a terminated process leaves a
+`.lock` file, verify the process has stopped before removing that lock.
 
 ## Scope limitations
 
 - Only the classic Stellar SDEX and liquidity pools surfaced by Horizon path finding are in scope; Soroban DEX/AMMs and centralized exchanges are **not** automatically included.
 - Horizon path search can omit paths or return no native→native cycles; this scanner does **not** exhaustively enumerate every order or AMM pool and cannot guarantee discovering every profit opportunity.
-- The quote engine does not yet simulate ledger-level path consumption by other arbitrageurs, dynamically forecast failed-tx fees, or maintain a historical strategy equity curve.
+- The simulation uses consecutive indicative quotes. It does not model order-book consumption, transaction inclusion, or actual network fees.
 - Self-match prevention, executed path reconciliation, fee estimation from current network, safe signing, trustline and account-reserve checks, event journal, replay-based backtest, daily-loss kill switch and execution approval are prerequisites to any live phase.
 - **Do not connect this source to the production service start command or set a LIVE mode.** This module has no LIVE mode; adding one requires a separate reviewed implementation and user confirmation.
 

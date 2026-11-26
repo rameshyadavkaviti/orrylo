@@ -5,7 +5,7 @@
  * Self-routes depend on Horizon provider support and must be integration-tested.
  */
 import { setTimeout as sleep } from 'node:timers/promises';
-import { createHash } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 
 export const HORIZON = 'https://horizon.stellar.org';
 export const APPROVED = Object.freeze(new Set([
@@ -14,8 +14,8 @@ export const APPROVED = Object.freeze(new Set([
   'VELO:GDM4RQUQQUVSKQA7S6EM7XBZP3FCGH4Q7CL6TABQ7B2BEJ5ERARM2M5M'
 ]));
 export const DEFAULTS = Object.freeze({
-  capitalXlm: 700, reserveXlm: 600, sizesXlm: [2, 5, 10],
-  maxTradeXlm: 10, minNetXlm: 0.03, minNetBps: 70,
+  capitalXlm: 700, reserveXlm: 595, sizesXlm: Object.freeze([2, 5, 10.5]),
+  maxTradeXlm: 10.5, dailyLossCapXlm: 3.5, minNetXlm: 0.03, minNetBps: 70,
   executionHaircutBps: 100, maxFeeXlm: 0.03, failureReserveXlm: 0.01,
   maxQuoteLagLedgers: 2, maxLedgerAgeMs: 25000,
   maxQuoteWindowMs: 8000, maxHourSamplePages: 1,
@@ -38,17 +38,26 @@ export function assetKey(asset) {
 function recordAssetKey(record, prefix) {
   return assetKey({asset_type: record?.[prefix+'_asset_type'],asset_code:record?.[prefix+'_asset_code'],asset_issuer:record?.[prefix+'_asset_issuer']});
 }
-export function riskConfig(config = DEFAULTS) {
-  const vals = [config.capitalXlm,config.reserveXlm,config.maxTradeXlm,config.minNetXlm,config.minNetBps,
+export function riskConfig(config = DEFAULTS, balanceXlm = config.capitalXlm) {
+  const vals = [config.capitalXlm,config.reserveXlm,config.maxTradeXlm,config.dailyLossCapXlm,config.minNetXlm,config.minNetBps,
     config.executionHaircutBps,config.maxFeeXlm,config.failureReserveXlm,config.maxLedgerAgeMs,config.maxQuoteWindowMs];
-  if (!vals.every(x=>validNum(Number(x)))) throw new Error('INVALID_RISK_NUMBERS');
+  if (!vals.every(validNum) || !validNum(balanceXlm)) throw new Error('INVALID_RISK_NUMBERS');
   if (config.capitalXlm < 1 || config.reserveXlm >= config.capitalXlm || config.maxTradeXlm <= 0 ||
-      config.executionHaircutBps > 5000 || !Array.isArray(config.sizesXlm) || config.sizesXlm.length > 10) throw new Error('INVALID_RISK_CONFIG');
-  const ceiling = Math.min(config.maxTradeXlm,config.capitalXlm-config.reserveXlm);
+      config.dailyLossCapXlm <= 0 || config.executionHaircutBps > 5000 || !Array.isArray(config.sizesXlm) || config.sizesXlm.length > 10) throw new Error('INVALID_RISK_CONFIG');
+  const available = Math.min(config.capitalXlm, balanceXlm) - config.reserveXlm - config.maxFeeXlm;
+  const ceiling = Math.min(config.maxTradeXlm, Number(available.toFixed(7)));
   const sizes = [...new Set(config.sizesXlm.map(Number))].filter(x=>Number.isFinite(x) && x >= 1 && x <= ceiling).sort((a,b)=>a-b);
   if (!sizes.length) throw new Error('INSUFFICIENT_PAPER_BUDGET');
   return sizes;
 }
+function checkPaperState(state, now, cfg) {
+  if (!validNum(state?.balanceXlm) || !validNum(state?.lossXlm) ||
+      state.dateUtc !== new Date(now).toISOString().slice(0, 10)) {
+    throw new Error('INVALID_OR_STALE_PAPER_STATE');
+  }
+  if (state.lossXlm >= cfg.dailyLossCapXlm) throw new Error('PAPER_DAILY_LOSS_CAP_REACHED');
+}
+
 export function netEstimate(input, output, cfg = DEFAULTS) {
   if (!finitePositive(input) || !validNum(Number(output))) throw new Error('INVALID_NET_INPUT');
   const uncertainty = input * cfg.executionHaircutBps / 10000;
@@ -58,28 +67,30 @@ export function netEstimate(input, output, cfg = DEFAULTS) {
   return { grossXlm: fix7(output - input), conservativeNetXlm: net, conservativeNetBps: netBps,
     assumedCostsXlm: cost, eligible: net >= cfg.minNetXlm && netBps >= cfg.minNetBps };
 }
-export async function request(path, fetcher = fetch, origin = HORIZON) {
+export async function request(path, fetcher = fetch, origin = HORIZON, requireLedger = true) {
   if (!path.startsWith('/')) throw new Error('INVALID_PATH');
   const response = await fetcher(origin + path, {headers:{Accept:'application/json'}, signal:AbortSignal.timeout(9000)});
   if (!response.ok) throw new Error('HORIZON_HTTP_'+response.status);
   const ledgerText = response.headers.get('latest-ledger') ?? response.headers.get('x-last-ledger');
   // Per official Horizon consistency docs, the canonical header is Latest-Ledger.
   const ledger = ledgerText !== null && /^\d+$/.test(ledgerText) ? Number(ledgerText) : null;
-  if (!Number.isSafeInteger(ledger) || ledger <= 0) throw new Error('MISSING_LATEST_LEDGER');
+  if ((requireLedger || ledgerText !== null) && (!Number.isSafeInteger(ledger) || ledger <= 0)) {
+    throw new Error('MISSING_LATEST_LEDGER');
+  }
   return { body: await response.json(), ledger };
 }
 export async function networkLedger(fetcher=fetch, now=Date.now(),cfg=DEFAULTS) {
-  const {body,ledger} = await request('/ledgers?limit=1&order=desc',fetcher);
+  const {body,ledger} = await request('/ledgers?limit=1&order=desc',fetcher,HORIZON,false);
   const last = body?._embedded?.records?.[0];
   const sequence = Number(last?.sequence), closed=Date.parse(last?.closed_at);
   if (!Number.isSafeInteger(sequence)||sequence <= 0 || !Number.isFinite(closed)) throw new Error('INVALID_LEDGER');
-  if (Math.abs(sequence-ledger)>cfg.maxQuoteLagLedgers) throw new Error('INCONSISTENT_HORIZON_LEDGER');
+  if (ledger !== null && Math.abs(sequence-ledger)>cfg.maxQuoteLagLedgers) throw new Error('INCONSISTENT_HORIZON_LEDGER');
   if (now-closed > cfg.maxLedgerAgeMs || closed-now > 3000) throw new Error('STALE_LEDGER');
   return { sequence, closedAt: last.closed_at };
 }
 export function parseCycle(record, sendXlm, approved=APPROVED, cfg=DEFAULTS) {
   if (recordAssetKey(record,'source') !== 'native' || recordAssetKey(record,'destination') !== 'native') return null;
-  if (Math.abs(Number(record.source_amount) - sendXlm)>1e-7) return null;
+  if (Number(record.source_amount) !== Number(amount7(sendXlm))) return null;
   if (!Array.isArray(record.path) || record.path.length<1 || record.path.length>5) return null;
   const path = record.path.map(assetKey);
   if(path.some(x=>!x)) return null;
@@ -97,15 +108,23 @@ export async function quoteCycles(size, fetcher=fetch, approved=APPROVED, cfg=DE
   const records=body?._embedded?.records;
   if(!Array.isArray(records)) throw new Error('INVALID_PATH_RESPONSE');
   const parsed=records.map(r=>parseCycle(r,size,approved,cfg)).filter(Boolean);
-  return {ledger,size,paths:parsed};
+  const identityOnly = records.length > 0 && records.every(record =>
+    recordAssetKey(record, 'source') === 'native' && recordAssetKey(record, 'destination') === 'native' &&
+    Array.isArray(record.path) && record.path.length === 0);
+  return {ledger,size,paths:parsed,identityOnly};
 }
-export function settleCandidates(quoteSet, ledger, cfg=DEFAULTS) {
+export function settleCandidates(quoteSet, ledger, cfg=DEFAULTS, paperEnabled=false) {
   const dedup = new Map();
   for(const quote of quoteSet){
-    if(Math.abs(quote.ledger-ledger.sequence)>cfg.maxQuoteLagLedgers) throw new Error('STALE_QUOTE_LEDGER');
+    if (Math.abs(quote.ledger-ledger.sequence)>cfg.maxQuoteLagLedgers ||
+        Math.abs((quote.ledgerMin ?? quote.ledger)-ledger.sequence)>cfg.maxQuoteLagLedgers) {
+      throw new Error('STALE_QUOTE_LEDGER');
+    }
     for(const candidate of quote.paths){
       const path=candidate.path.join('>');
-      const status=!candidate.approvedPath?'UNVETTED_RESEARCH_ONLY':!candidate.eligible?'BELOW_THRESHOLD':'PAPER_CANDIDATE';
+      const eligibleStatus = paperEnabled ? 'PAPER_CANDIDATE' : 'PAPER_RISK_UNAVAILABLE';
+      const status = !candidate.approvedPath ? 'UNVETTED_RESEARCH_ONLY'
+        : !candidate.eligible ? 'BELOW_THRESHOLD' : eligibleStatus;
       const key=path+'|'+candidate.amountInXlm;
       if(!dedup.has(key)||dedup.get(key).conservativeNetXlm<candidate.conservativeNetXlm)
         dedup.set(key,{...candidate,status,quoteLedger:quote.ledger,path});
@@ -134,14 +153,16 @@ export function journalLog(kind,data={}) {
   const message={ts:new Date().toISOString(),component:'orrylo-network-hunter',mode:'PAPER_ONLY',kind,...data};
   console.log(JSON.stringify(message));
 }
-export async function scanOnce(fetcher=fetch,cfg=DEFAULTS,nowFn=Date.now) {
-  const sizes=riskConfig(cfg);
-  const before=await networkLedger(fetcher,nowFn(),cfg);
-  const quotes=[];
-  for(const size of sizes){quotes.push(await quoteCycles(size,fetcher,APPROVED,cfg,nowFn));}
+export async function scanOnce(fetcher=fetch,cfg=DEFAULTS,nowFn=Date.now,paperState=null,quoteForSize=quoteCycles) {
+  const startedAt = nowFn();
+  if (paperState !== null) checkPaperState(paperState, startedAt, cfg);
+  const sizes = riskConfig(cfg, paperState?.balanceXlm);
+  const before=await networkLedger(fetcher,startedAt,cfg);
+  const quotes = await Promise.all(sizes.map(size => quoteForSize(size, fetcher, APPROVED, cfg, nowFn)));
   const after=await networkLedger(fetcher,nowFn(),cfg);
   if(after.sequence-before.sequence>cfg.maxQuoteLagLedgers) throw new Error('SCAN_SPANS_TOO_MANY_LEDGERS');
-  const candidates=settleCandidates(quotes,after,cfg);
+  if (paperState !== null) checkPaperState(paperState, nowFn(), cfg);
+  const candidates=settleCandidates(quotes,after,cfg,paperState !== null);
   return {ledger:after.sequence,sizesXlm:sizes,pathsFound:candidates.length,
     approvedCandidates:candidates.filter(c=>c.status==='PAPER_CANDIDATE').length,
     candidates:candidates.slice(0,40),coverage:'HORIZON_PATH_SEARCH_NOT_EXHAUSTIVE',
@@ -151,23 +172,19 @@ export async function runOne(fetcher=fetch,cfg=DEFAULTS,nowFn=Date.now) {
   const result=await scanOnce(fetcher,cfg,nowFn);
   journalLog('market_scan',{ledger:result.ledger,pathsFound:result.pathsFound,approvedCandidates:result.approvedCandidates,coverage:result.coverage});
   for(const c of result.candidates){
-    if(c.status==='PAPER_CANDIDATE') journalLog('paper_candidate',c);
+    if(c.status==='PAPER_RISK_UNAVAILABLE') journalLog('research_candidate',c);
   }
   return result;
 }
 async function main(){
   journalLog('started',{safety:'NO_SIGNING_NO_ORDERS',config:DEFAULTS,approvedAssetKeys:[...APPROVED]});
-  let previous='';
   const once=process.argv.includes('--once');
   do{
     try{
-      const result=await runOne();
-      const key=createHash('sha256').update(JSON.stringify(result.candidates.map(c=>[c.path,c.amountInXlm,c.quoteLedger]))).digest('hex');
-      if(key!==previous && result.approvedCandidates>0)journalLog('new_paper_opportunity_set',{candidateCount:result.approvedCandidates,ledger:result.ledger});
-      previous=key;
+      await runOne();
       try{const sample=await sampleNetwork();journalLog('network_activity_sample',sample)}catch(e){journalLog('discovery_warning',{reason:String(e.message)})}
     }catch(e){journalLog('fail_closed',{reason:String(e.message)});if(once)process.exitCode=1;}
     if(!once)await sleep(DEFAULTS.pollMs);
   }while(!once);
 }
-if(process.argv[1] && import.meta.url===new URL('file://'+process.argv[1]).href)main().catch(e=>{journalLog('fatal',{reason:String(e.message)});process.exitCode=1});
+if(process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(e=>{journalLog('fatal',{reason:String(e.message)});process.exitCode=1});
