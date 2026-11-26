@@ -131,10 +131,16 @@ async function main(): Promise<void> {
   }
   console.log(JSON.stringify({ event: "cancel_agent_offers_summary", accounts: discovered.wallets.length,
     succeeded, failed, cancelled, remainingAtLeast: remaining }));
+  // Railway's structured-log viewer can blank out compact JSON lines. Report
+  // operational counts separately as plain text; secrets are never included.
+  console.log("CANCEL_RESULT accounts=" + discovered.wallets.length +
+    " succeeded=" + succeeded + " failed=" + failed + " cancelled=" + cancelled +
+    " remainingAtLeast=" + remaining);
   if (failed !== 0 || remaining !== 0) process.exitCode = 2;
 }
 
 main().catch((error: unknown) => {
   console.error(JSON.stringify({event: "cancel_agent_offers_fatal", error: error instanceof Error ? error.message : "UNKNOWN_ERROR"}));
+  console.error("CANCEL_FATAL_NAME=" + (error instanceof Error ? error.name : "UnknownError"));
   process.exitCode = 3;
 });
