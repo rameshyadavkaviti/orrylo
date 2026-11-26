@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Keypair, Networks, TransactionBuilder } from '@stellar/stellar-sdk';
+import { Keypair, Networks, TransactionBuilder, xdr } from '@stellar/stellar-sdk';
 import { APPROVED } from './network-hunter.mjs';
 import { buildArbitrageTransaction, prepareLatestArbitrage, signArbitrageTransaction } from './prepare-arbitrage.mjs';
+import { reconcileArbitrageSettlement } from './arbitrage-settlement.mjs';
 
 const signer = Keypair.random();
 const publicKey = signer.publicKey();
@@ -121,4 +122,37 @@ test('signs only a freshly rebuilt envelope with the matching account key', () =
   assert.throws(() => signArbitrageTransaction(input, Keypair.random()), /SIGNER_ACCOUNT_MISMATCH/);
   assert.throws(() => signArbitrageTransaction(input, Keypair.fromPublicKey(publicKey)), /SIGNER_CANNOT_SIGN/);
   assert.throws(() => signArbitrageTransaction({ ...input, nowMs: nowMs + 30000 }, signer), /STALE_OPPORTUNITY/);
+});
+
+function receiptFor(prepared, { successful = true, fee = 900n } = {}) {
+  const tx = TransactionBuilder.fromXDR(prepared.signedXdr, Networks.PUBLIC);
+  const payment = new xdr.SimplePaymentResult({
+    destination: signer.xdrPublicKey(), asset: xdr.Asset.assetTypeNative(), amount: 109_000_000n
+  });
+  const success = new xdr.PathPaymentStrictSendResultSuccess({ offers: [], last: payment });
+  const result = successful ? xdr.TransactionResultResult.txSuccess([
+    xdr.OperationResult.opInner(xdr.OperationResultTr.pathPaymentStrictSend(
+      xdr.PathPaymentStrictSendResult.pathPaymentStrictSendSuccess(success)
+    ))
+  ]) : xdr.TransactionResultResult.txFailed([
+    xdr.OperationResult.opInner(xdr.OperationResultTr.pathPaymentStrictSend(
+      xdr.PathPaymentStrictSendResult.pathPaymentStrictSendUnderDestmin()
+    ))
+  ]);
+  return {
+    hash: prepared.transactionHash, source_account: publicKey, source_account_sequence: tx.sequence,
+    ledger: 101, created_at: '2026-11-27T12:00:10Z', successful, fee_charged: String(fee),
+    result_xdr: new xdr.TransactionResult({ feeCharged: fee, result, ext: xdr.TransactionResultExt.v0() }).toXDR('base64')
+  };
+}
+
+test('reconciles exact settled return and charges the ledger fee on failed cycles', () => {
+  const prepared = signArbitrageTransaction(input, signer);
+  const fill = receiptFor(prepared);
+  assert.equal(reconcileArbitrageSettlement(prepared, fill).netPnlStroops, 3_999_100);
+  const failed = receiptFor(prepared, { successful: false });
+  assert.equal(reconcileArbitrageSettlement(prepared, failed).netPnlStroops, -900);
+  assert.throws(() => reconcileArbitrageSettlement(prepared, { ...fill, hash: '0'.repeat(64) }), /MISMATCHED/);
+  assert.throws(() => reconcileArbitrageSettlement(prepared, { ...fill, fee_charged: '1' }), /FEE/);
+  assert.throws(() => reconcileArbitrageSettlement(prepared, { ...fill, successful: false }), /STATUS/);
 });

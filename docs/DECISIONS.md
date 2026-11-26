@@ -53,6 +53,8 @@
 
 | 2026-11-27 | IMPLEMENTED — EXPERIMENTAL TRANSACTION PREPARATION | Network Hunter can prepare an unsigned atomic Stellar path payment for a fresh eligible XLM cycle, with bounded fee, minimum return, reserve, notional, and expiration checks. This stage uses the paper risk snapshot for preparation. It does not approve live policy or enable signing and submission. |
 
+| 2026-11-27 | ACCEPTED — MAINNET ARBITRAGE LIMITS | The owner confirmed 700 XLM reference capital, 595 XLM protected reserve, 10.5 XLM maximum order, and 3.5 XLM maximum cumulative daily loss for the treasury account configured in `orrylo-arbitrage`. Market-integrity controls still apply. |
+
 ## Interpretation
 Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 
