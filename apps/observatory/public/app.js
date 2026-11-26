@@ -3,6 +3,7 @@ let snapshot = null;
 let onchainBalances = null;
 let balanceLastFetched = 0;
 let balanceLastFetchFailed = false;
+let decisionBalanceSortEnabled = false;
 const asNum = (n) => { const v = Number(n); return Number.isFinite(v) ? v : null; };
 const safe = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const fmt = (n,d=0) => { const v=asNum(n); return v===null?"—":v.toLocaleString(undefined,{maximumFractionDigits:d}); };
@@ -50,7 +51,35 @@ function renderDecisionTimeline() {
  const displayed=events.filter(e=>(!agentFilter||e.agent_id===agentFilter)&&(!actionFilter||e.action===actionFilter));
  const walletsByAgent=new Map((snapshot.agents||[]).map(a=>[a.id,a.public_key]));
  const balancesByPublicKey=new Map((onchainBalances?.accounts||[]).map(a=>[a.publicKey,a]));
- $("#decision-results").textContent=displayed.length+" shown / "+events.length+" recent records";
+ const balanceFor=(event)=>balancesByPublicKey.get(walletsByAgent.get(event.agent_id));
+ const amountFor=(account,asset)=>{
+   if(account?.status!=="ok")return null;
+   const value=account[asset];
+   if(typeof value!=="string" || !/^\\d+(?:\\.\\d{1,7})?$/.test(value))return null;
+   const amount=Number(value);
+   return Number.isFinite(amount)?amount:null;
+ };
+ if(decisionBalanceSortEnabled){
+   // Sort the current 250-record view: highest verified XLM first,
+   // then highest verified RYLO. Missing balances always come last.
+   // Array.sort is stable, preserving the recent-first order for ties.
+   displayed.sort((left,right)=>{
+     const a=balanceFor(left),b=balanceFor(right);
+     const compare=(asset)=>{
+       const x=amountFor(a,asset),y=amountFor(b,asset);
+       if(x===null&&y===null)return 0;
+       if(x===null)return 1;
+       if(y===null)return -1;
+       return y-x;
+     };
+     return compare("xlm") || compare("rylo");
+   });
+ }
+ const sortButton=$("#decision-sort-balance");
+ sortButton.setAttribute("aria-pressed",String(decisionBalanceSortEnabled));
+ sortButton.classList.toggle("active",decisionBalanceSortEnabled);
+ sortButton.textContent=decisionBalanceSortEnabled?"Sorted: XLM ↓ · RYLO ↓":"Sort: XLM ↓ · RYLO ↓";
+ $("#decision-results").textContent=displayed.length+" shown / "+events.length+" recent records"+(decisionBalanceSortEnabled?" · XLM then RYLO":"");
  $("#timeline").innerHTML=displayed.length?displayed.map(e=>{
    const key=walletsByAgent.get(e.agent_id);
    const valid=typeof key==="string"&&/^G[A-Z2-7]{55}$/.test(key);
@@ -187,6 +216,10 @@ document.addEventListener("click",(ev)=>{
 $("#search").addEventListener("input",agentsTable);
 $("#decision-agent-filter").addEventListener("change",renderDecisionTimeline);
 $("#decision-action-filter").addEventListener("change",renderDecisionTimeline);
+$("#decision-sort-balance").addEventListener("click",()=>{
+ decisionBalanceSortEnabled=!decisionBalanceSortEnabled;
+ renderDecisionTimeline();
+});
 $("#refresh").addEventListener("click",()=>{refresh();refreshBalances(true);});
 $("#close").addEventListener("click",()=>{$("#overlay").hidden=true;});
 $("#overlay").addEventListener("click",(e)=>{if(e.target===$("#overlay"))$("#overlay").hidden=true;});
