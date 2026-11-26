@@ -200,7 +200,8 @@ export class DecisionRunner {
         }
         decided += 1;
         actions[receipt.actionTendency] = (actions[receipt.actionTendency] ?? 0) + 1;
-        if ((receipt.actionTendency === "buy" || receipt.actionTendency === "sell") && this.options.executionEnabled) {
+        // BUY remains a cognitive action but must never be submitted as a new on-chain offer.
+        if (receipt.actionTendency === "sell" && this.options.executionEnabled) {
           try {
           const signer = this.options.signerForPublicKey?.(agent.publicKey);
           if (!signer || !this.options.executeTrade) throw new Error("TRADE_SIGNER_NOT_FOUND");

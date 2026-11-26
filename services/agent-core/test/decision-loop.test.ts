@@ -80,3 +80,44 @@ test("individual pricing preferences originate in each persistent agent profile"
   assert.ok(a.patience!==undefined && b.patience!==undefined);
   assert.notDeepEqual([a.optimism,a.patience],[b.optimism,b.patience]);
 });
+
+
+test("disabled BUY-offer execution preserves cognitive BUY decisions and SELL submissions", async () => {
+  let nextAction = 0;
+  const actions = ["buy", "sell"] as const;
+  class ControlledDecisionRepository extends InMemoryAgentRepository {
+    override async applyEvolution(...args: Parameters<InMemoryAgentRepository["applyEvolution"]>): ReturnType<InMemoryAgentRepository["applyEvolution"]> {
+      const receipt = await super.applyEvolution(...args);
+      return { ...receipt, actionTendency: actions[nextAction++ % actions.length]! };
+    }
+  }
+  const repository = new ControlledDecisionRepository();
+  await repository.migrate();
+  for (const alias of ["BUY_TEST", "SELL_TEST"]) {
+    const publicKey = Keypair.random().publicKey();
+    const seed = deriveCognitiveSeed("master-key-material-that-is-long-enough", publicKey, 1);
+    await repository.enroll({ alias, publicKey, seed, state: createInitialState(seed) });
+  }
+  const executed: string[] = [];
+  const result = await new DecisionRunner({
+    repository,
+    observe: async () => ({
+      observedAt: "2026-11-26T20:00:00.000Z",
+      context: marketContextFromOrderBook({
+        bids: [{ price: "0.0054", amount: "5000" }],
+        asks: [{ price: "0.0055", amount: "5000" }],
+      }, 0.1),
+    }),
+    logger: { info() {}, error() {} },
+    executionEnabled: true,
+    signerForPublicKey: () => Keypair.random(),
+    executeTrade: async (intent) => {
+      executed.push(intent.action);
+      return { status: "blocked", reason: "FREE_RESERVE" };
+    },
+  }).run();
+  assert.equal(result.decided, 2);
+  assert.equal(result.failed, 0);
+  assert.deepEqual(executed, ["sell"]);
+  assert.equal((await repository.metrics()).episodes, 2);
+});
