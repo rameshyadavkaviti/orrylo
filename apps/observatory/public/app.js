@@ -55,7 +55,7 @@ function renderDecisionTimeline() {
  const amountFor=(account,asset)=>{
    if(account?.status!=="ok")return null;
    const value=account[asset];
-   if(typeof value!=="string" || !/^\\d+(?:\\.\\d{1,7})?$/.test(value))return null;
+   if(typeof value!=="string" || !/^\d+(?:\.\d{1,7})?$/.test(value))return null;
    const amount=Number(value);
    return Number.isFinite(amount)?amount:null;
  };
