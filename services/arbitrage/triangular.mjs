@@ -36,7 +36,7 @@ export async function fetchHorizon(path, fetcher = fetch, base = HORIZON) {
   const response = await fetcher(base + path, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(9000) });
   if (!response.ok) throw Error('HORIZON_HTTP_' + response.status);
   const json = await response.json();
-  const ledger = Number(response.headers.get('x-last-ledger'));
+  const ledger = Number(response.headers.get('latest-ledger') ?? response.headers.get('x-last-ledger'));
   return { json, ledger: Number.isSafeInteger(ledger) && ledger > 0 ? ledger : null };
 }
 export async function latestLedger(fetcher = fetch, now = Date.now(), cfg = DEFAULTS) {
