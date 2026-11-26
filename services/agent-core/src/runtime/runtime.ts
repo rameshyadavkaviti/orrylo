@@ -130,15 +130,13 @@ export async function startRuntime(options: {
       const observed = (await maintenanceObserver.observe()).context;
       const bid = observed.bestBidXlm;
       const ask = observed.bestAskXlm;
-      const mid = bid !== null && ask !== null ? (bid + ask) / 2 : null;
-      const reliable = mid !== null && bid !== null && ask !== null &&
-        bid > 0 && ask > bid && (ask - bid) / mid <= 0.10 &&
-        observed.askDepthRylo >= 5 && observed.bidDepthRylo >= 5;
-      if (reliable && mid !== null && bid !== null && ask !== null) {
+      const reliableBid = bid !== null && ask !== null && bid > 0 && ask > bid &&
+        observed.bidDepthRylo >= 5 && observed.askDepthRylo >= 5;
+      if (reliableBid && bid !== null && ask !== null) {
         stableMarketSamples = lastMaintenanceMid !== null &&
-          Math.abs(mid / lastMaintenanceMid - 1) <= 0.03
+          Math.abs(bid / lastMaintenanceMid - 1) <= 0.03
           ? Math.min(stableMarketSamples + 1, 100) : 1;
-        lastMaintenanceMid = mid;
+        lastMaintenanceMid = bid;
         if (stableMarketSamples >= 3) market = { bestBidXlm: bid, bestAskXlm: ask };
       } else {
         stableMarketSamples = 0;

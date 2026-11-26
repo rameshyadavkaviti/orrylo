@@ -520,3 +520,28 @@ test("unconfirmed market change does not automatically expire standing offers be
     Date.parse("2026-11-26T13:00:00Z")), { status: "noop", removed: 0 });
   assert.equal(submitted.length, 0);
 });
+
+
+test("wide spreads do not freeze removal of aged, obsolete RYLO BUY liabilities", async () => {
+  const wallet = Keypair.random();
+  const submitted: Array<{ operations: Array<Record<string, unknown>> }> = [];
+  const offers = [
+    { id: "91", selling: { asset_type: "native" },
+      buying: { asset_type: "credit_alphanum4", asset_code: "RYLO", asset_issuer: issuer },
+      price: "11.1111111", last_modified_time: "2026-11-25T08:00:00Z" },
+    { id: "92", selling: { asset_type: "credit_alphanum4", asset_code: "RYLO", asset_issuer: issuer },
+      buying: { asset_type: "native" },
+      price: "0.0900000", last_modified_time: "2026-11-25T08:00:00Z" },
+  ];
+  const executor = new StellarTradeExecutor({
+    server: server(wallet, submitted, offers), ryloCode: "RYLO", ryloIssuer: issuer,
+    maxTradeXlm: 0.1, minOrderXlm: 0, dailyCapXlm: 0.1,
+    minFreeXlm: 2, maxBuyPriceXlm: 0.1, maxOpenOffers: 8,
+  });
+  const result = await executor.maintain(wallet.publicKey(), wallet,
+    Date.parse("2026-11-26T13:00:00Z"),
+    { bestBidXlm: 0.00542, bestAskXlm: 0.0864503 });
+  assert.equal(result.status, "submitted");
+  assert.equal(result.removed, 1);
+  assert.deepEqual(submitted[0]!.operations.map((op) => String(op.offerId)), ["91"]);
+});

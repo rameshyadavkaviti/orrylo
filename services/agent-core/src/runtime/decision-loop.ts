@@ -223,6 +223,11 @@ export class DecisionRunner {
           }, signer);
           if (execution.status === "submitted") {
             submitted += 1;
+            this.options.logger.info({
+              event: "trade_execution_submitted", agentId: agent.id,
+              action: execution.action, priceXlm: execution.priceXlm,
+              maxXlm: execution.maxXlm, transactionHash: execution.hash,
+            });
             await this.options.repository.recordExecution(agent.id, {
               transactionHash: execution.hash,
               kind: "trade",

@@ -141,11 +141,14 @@ export class StellarTradeExecutor {
     // snapshot to identify genuinely stale orders. Horizon represents BUY offers
     // as selling XLM / buying RYLO: its price must be inverted to XLM/RYLO.
     // Do not cancel a deliberate high-priced SELL just because the market fell.
-    const midpoint = market && market.bestBidXlm > 0 &&
-      market.bestAskXlm > market.bestBidXlm &&
+    const confirmedBid = market && market.bestBidXlm > 0 &&
+      market.bestAskXlm > market.bestBidXlm ? market.bestBidXlm : null;
+    // An extreme spread is not a reliable sell valuation; preserve high asks.
+    // The BID side can still be independently corroborated by stable snapshots.
+    const confirmedNarrowMid = market && confirmedBid !== null &&
       market.bestAskXlm / market.bestBidXlm <= 1.10
       ? (market.bestBidXlm + market.bestAskXlm) / 2 : null;
-    const marketStale = midpoint === null ? [] : oldestFirst.filter((offer) => {
+    const marketStale = confirmedBid === null ? [] : oldestFirst.filter((offer) => {
       if (!offer.last_modified_time) return false;
       const age = now - Date.parse(offer.last_modified_time);
       if (!Number.isFinite(age) || age < 20 * 60_000) return false;
@@ -154,11 +157,11 @@ export class StellarTradeExecutor {
       if (offer.selling.asset_type === "native") {
         const originalBuyXlm = 1 / horizonPrice;
         // Significant regime shift in either direction, not a tiny quote change.
-        return originalBuyXlm > midpoint * 1.65 || originalBuyXlm < midpoint / 1.65;
+        return originalBuyXlm > confirmedBid * 1.65 || originalBuyXlm < confirmedBid / 1.65;
       }
-      // Only stale, substantially UNDERPRICED sells are at risk. A seller can
-      // knowingly hold an aspirational ask above the market without deletion.
-      return horizonPrice < midpoint / 1.65;
+      // Only stale, substantially UNDERPRICED sells in a narrow, confirmed
+      // market can be retired. Do not infer fair value from a wide spread.
+      return confirmedNarrowMid !== null && horizonPrice < confirmedNarrowMid / 1.65;
     });
     const toRemove = new Map<string, AccountOffer>();
     for (const offer of oldestFirst.slice(0, excess)) toRemove.set(offer.id, offer);
