@@ -51,3 +51,7 @@ The separate payout worker may use Railway cron with `RYLO_BONUS_RUN_ONCE=true` 
 ### Updated bonus promotion terms (2026-11-25)
 
 Promotion `rylo_bonus_v2` replaces the original unactivated 50%-over-1,000 preview. The new minimum is **500 RYLO inclusive**; the bonus is **36% of the verified purchase** (500 → 180 RYLO, 1,000 → 360 RYLO). The website remains in preview until the dedicated bonus-distribution service has a funded signer, a provisioned ledger, and verified activation. Previous campaign identifiers are retained only in the database history; they are not silently rewritten to new reward amounts.
+
+## Create Token integration (27 Nov 2026)
+
+`/create-token` redirects to the independently deployed ORRYLO Token Studio at `https://orrylo-production.up.railway.app/create-token`, linked from the primary navbar, mobile navigation, home page and footer. The Studio's frontend is branded to match the charcoal / muted-rose RYLO logo and has a return link to the public site. Its code remains in the private `rameshyadavkaviti/orrylo-outdated` repository on `rebuild/clean-mvp`. No issuer keys, payment processing, sessions or signer services were migrated into the public frontend. A future `create.orrylo.com` custom domain would require verified DNS and auth-origin configuration before switching links.

@@ -49,6 +49,8 @@
 
 | 2026-11-25 | ACCEPTED — BONUS PROMOTION V2 | Replace the unactivated 50%-for-purchases-over-1,000 proposal with a new **36% bonus** for **website purchases of at least 500 RYLO (inclusive)**, once per wallet after verification and subject to funded fulfillment. Keep the promotional preview clearly inactive while the payout service is not provisioned. Use a new campaign identifier `rylo_bonus_v2` to avoid retroactively changing previous claim terms. The bonus ledger constraint must also accept quantity 500, including existing installations. |
 
+| 2026-11-27 | ACCEPTED — TOKEN STUDIO INTEGRATION | Main ORRYLO website gains a prominent `Create Token` link and `/create-token` redirect to the separately deployed token builder hosted at `orrylo-production.up.railway.app/create-token`. Harmonize its frontend with the charcoal/muted-rose identity, including logo and return navigation. Do not copy or migrate protected signer, wallet-secret, auth-cookie, payment or legacy issuer functions into the public ORRYLO repository. Studio still distinguishes available features from gated offerings. |
+
 ## Interpretation
 Human-like behavioral evolution is a **research objective**, not a verified daily result, literal human transformation, or consciousness claim. ORRYLO and VEYRIX must remain conceptually and operationally distinct.
 
